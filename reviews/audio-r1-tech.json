@@ -1,0 +1,82 @@
+{
+  "unit": "audio",
+  "round": 1,
+  "lens": "tech",
+  "pass": false,
+  "score": 6,
+  "summary": "Solid, contract-complete engine: AudioSystem fully implemented; tsc has 0 errors and there is no `any`; the largest file is system.ts at 297 lines; no console errors in Chromium or WebKit. Nothing is created before the first gesture, events turn into sound within about 1 ms, the game runs at 121 fps at 1920x1080, and gameplay is identical with and without audio for the same seed. There is no WebAudio node leak across 3 races (296/255/307 live nodes after GC, 181 after quit), and with every voice clip returning 404 the game falls back cleanly to animal calls. But three real-time defects block a pass. (1) Opening Settings from Pause swaps the race song for the menu song, and resuming restarts the race song from its intro. (2) Music drops to silence for about 1.8 s on every race load: the 180 ms lookahead scheduler starves while the main thread is blocked. (3) Audio-thread load is 8-14 % in races (p90 16 %, peak 28 %), against the brief's limit of under 5 %. The unit's own tools/audio-check.mjs also currently exits 1 (flaky). Evidence: shots/review/audio/r1-tech/*.json and *.png.",
+  "issues": [
+    {
+      "severity": "major",
+      "title": "Pause -> Settings plays the MENU song; resuming restarts the race song from its intro",
+      "detail": "src/audio/events-race.ts:9,26-31: MENU_SCREENS includes 'settings' and 'howto', and the handler reacts to every flow:screen even while a session is attached. That duplicates and contradicts ui/flow-rules.ts musicFor(), which deliberately keeps the race song. system.ts:33-36 SCREEN_SONG is a third copy of the mapping. Measured in probe-calib-pause.json: racing gives race-coast; Esc gives race-coast at muffle 1; pause->settings gives menu; settings->pause stays on menu; resume gives race-coast again with formIndex 0 (the 'intro' section). So the player hears the wrong, muffled song exactly while adjusting the music volume, then the race theme starts over.",
+      "fix": "Keep one source of truth. Either drop the flow:screen->song wiring and obey the UI's music() calls, or ignore settings/howto/credits while h.session() is non-null. Add an audio-check case: pause -> settings -> pause -> resume, asserting the song is unchanged and the SongPlayer was not recreated."
+    },
+    {
+      "severity": "major",
+      "title": "Music cuts out for ~2 s on every race load (lookahead scheduler starves, then fires dozens of past steps)",
+      "detail": "system.ts:125-131 schedules only 0.18 s ahead from a 25 ms main-thread timer, and music/player.ts:80-86 has no guard for steps that are already late. RaceSession.create blocks the main thread for 2.2 s (long tasks 2247 and 2220 ms in probe-stall.json). During that block nothing is scheduled; afterwards 38 menu-song steps were scheduled 0.67-2.04 s in the past. A recording of the real final mix (debug record(), analysed with the unit's own analyse()) shows 18 x 100 ms windows at -57..-64 dB, i.e. silence, across the load, against 0 dropouts in a no-stall baseline (probe-record.json). Commercial games keep music running through loading screens.",
+      "fix": "When 'flow:screen' loading or flow:startRace arrives, raise the lookahead to about 3 s before the heavy work starts (the hidden-tab path already does 1.6 s). In SongPlayer.schedule, if nextTime < currentTime - 0.03, resync to the next step boundary instead of scheduling past notes. Longer term, sequence in an AudioWorklet. Add a check that records across a race load and asserts no dropout over 200 ms."
+    },
+    {
+      "severity": "major",
+      "title": "Real-time audio-thread load is ~2x the 5 % CPU budget",
+      "detail": "Measured with CDP WebAudio.getRealtimeData renderCapacity on the realtime context. Races at 1080p: mean 10.5 / 14.0 / 12.0 % over 3 consecutive races, peaks 17.7 / 28.4 / 26.6 % (probe-main-coast.json). City race: median 11.6 % with music+sfx, 4.5 % with sfx and bike loops only (music off), 6.1 % for menu music alone, 1.2 % for the silent graph (probe-cpu-split.json). Lab, music only: 5.5-6.6 %, 7.7 % at intensity 2. Control: a trivial 32 kHz oscillator graph reads 0.3 %. Status claims 1.7-3.4 % per song plus under 1 % for sfx, but that is an offline render estimate (check.ts) that never measures the realtime graph. Caveat: the machine load was about 11 on 10 cores; re-measure idle, but the gap from the claim is 3-4x.",
+      "fix": "Add a realtime renderCapacity gate to tools/audio-check.mjs (CDP WebAudio domain) for menu, race, race at intensity 2, and race with a busy pack. Reduce cost: use a shorter or mono music IR, or a cheap algorithmic reverb, instead of the 1.5 s stereo convolver. Halve the persistent oscillators (Rhodes runs 12, brass 10). Cull rival reward sfx (see the slingshot issue). Make voice stealing stop sources, not just mute them. Cache the per-hit StereoPanners in DrumKit.panned()."
+    },
+    {
+      "severity": "minor",
+      "title": "The unit's own acceptance check fails (exit 1): flaky timestamp filter",
+      "detail": "`node tools/audio-check.mjs` reports FAILED (2): skill:cast -> skill.pelican.torpedo and traffic:honk -> traffic.horn.car are 'missing' (shots/review/audio/r1-tech/audio-check.log). Both sounds actually play. The cause: system.ts:256 stores Math.round(performance.now()), while audio-check.mjs:105/154 filters e.ms >= at with an unrounded `at`, so a sound played less than 0.5 ms after the emit rounds below `at`. In probe-rounding, 3 of 20 emits (15 %) were dropped this way. The status says the unit is 'verified', but the gate is red.",
+      "fix": "Store unrounded ms in the trace, or compare against Math.floor(at). Rerun until the check is green and keep it green."
+    },
+    {
+      "severity": "minor",
+      "title": "Rival reward cues swamp the mix (slingshot is the most frequent sound in a race)",
+      "detail": "events-race.ts:71-74 plays bike.slingshot / miniturbo / pad / boost for every rider's rider:boost, and :60-65 plays bike.perfect for every rider's perfect landing. In a 27 s autopilot race (probe-mixbusy.json): rival 'draft' boosts 28 vs the player's 2. bike.slingshot played 28 times, 11 of them at gain > 0.5, more than swing.light (19) or bike.bump (15). The player's own reward sounds can't be told apart from the pack's (Pillar 2 says every hit and skill must read instantly).",
+      "fix": "Make draft, perfect and mini-turbo reward cues player-only, like drift already is. Give rivals at most a distinct, quieter, low-passed whoosh with a per-rider cooldown (e.g. 3 s)."
+    },
+    {
+      "severity": "minor",
+      "title": "Bike loops drone on when the frame loop stops (hidden browser tab / long stall)",
+      "detail": "watcher.ts:35-61 and sfx/loops.ts only move when AudioRuntime.update() runs (system.ts:167-180). With rAF stopped, the race is frozen (sim time stuck at 7.146 s) but the sfx-only mix stays at -35 dB RMS for 6.5 s and more (probe-hidden.json): constant wind and chain whirr at the last speed. Hidden tabs were handled for music (system.ts:129) but not for the loops or the siren.",
+      "fix": "In the timer-driven pump(), if update() hasn't run for more than 0.25 s, call loops.update with active=false and timeScale=0, and fade the siren; restore on the next update(). Alternatively listen to visibilitychange."
+    },
+    {
+      "severity": "minor",
+      "title": "Offline renders are not reproducible (module-global PRNG state)",
+      "detail": "dsp/noise.ts:8 keeps a module-level `offsets` Rng, and music/instruments/keys.ts:9-13 keeps a module-level LCG jitter() for detune and chord roll. Rendering race-city twice in one page with identical settings gives a max sample difference of 0.86; hit.baguette twice gives 0.07 (probe-repro). This contradicts noise.ts's header ('fixed seed so offline renders are reproducible'), so audio-check peak/click numbers depend on render order. The keys.ts LCG also duplicates core Rng.",
+      "fix": "Pass a per-SongPlayer / per-SfxPlayer Rng into noise() offsets and instrument detune. Delete the hand-rolled LCG and use core/rng."
+    },
+    {
+      "severity": "minor",
+      "title": "sfx('sting.<unknown>') throws TypeError instead of warning",
+      "detail": "system.ts:144 does an unchecked cast `id.slice(6) as StingerId`, so conductor.ts:58-63 calls STINGERS[id] when it is undefined. Result: 'TypeError: sting is not a function', thrown into the caller (probe-stall.json, badSting). Unknown sfx, song and voice ids warn as designed. The 350 ms KO-fallback setTimeout (events-combat.ts:48-53) also fires its stinger and voice after a quit, because it never checks the session.",
+      "fix": "Use a type guard `id in STINGERS` and warn once. In the KO fallback, also check that h.session() is unchanged before playing."
+    },
+    {
+      "severity": "minor",
+      "title": "Gameplay sounds that exist but never trigger (wall scrape, ULT riser, projectile miss)",
+      "detail": "The sim emits rider:obstacleHit {kind:'wall'} on wall bounces (sim/surfaces.ts:89), but OBSTACLE_SFX (events-race.ts:10-13) has no 'wall' entry, so walls play the generic obstacle.hit and the dedicated 'bike.scrape' is never used. 'skill.pelican.ult' never plays: combat emits no skill:cast for the ult slot, and events-combat.ts:86-90 only plays the stinger. projectile:end misses are silent. The brief says gameplay should not need to call sfx().",
+      "fix": "Map wall to bike.scrape. Play skill.pelican.ult on ult:start (or cine:ult start) for the player. Add a small thud on projectile:end with hit === null."
+    },
+    {
+      "severity": "minor",
+      "title": "Dead code and duplicated logic",
+      "detail": "Unused: Band.setTrim (music/band.ts:189), SongPlayer.level (music/player.ts:66), SessionWatcher.dispose (watcher.ts:119) and SfxPlayer.has (sfx/bank.ts:43). wireRace/wireCombat return unsubscribers that system.ts:69-70 discards. Duplicated: raceSong() in system.ts:280 and events-race.ts:21; isPlayer in both events-*.ts files. The screen->song mapping exists twice in the unit (SCREEN_SONG, MENU_SCREENS) and once in ui/flow-rules.ts, which is the root of the pause/settings bug.",
+      "fix": "Delete the unused members. Move raceSong/isPlayer into Host. Keep a single screen->music table."
+    },
+    {
+      "severity": "minor",
+      "title": "First key press freezes the main thread ~254 ms (unlock)",
+      "detail": "unlock() runs `new AudioContext()` synchronously; the first call took 208 ms of device bring-up. It also builds the Engine (two IRs and convolvers, 25 ms) inside the gesture handler, at system.ts:107-113. That produced a 261 ms long task exactly at 'PRESS ANY KEY' (probe-stall.json, probe-unlock).",
+      "fix": "Create the context suspended during boot/preload (allowed without a gesture, and it can't make sound) and only resume() in unlock(). Build the tunnel convolver lazily on first tunnel entry."
+    },
+    {
+      "severity": "minor",
+      "title": "cross-unit: UI cut-ins are silent; police whistle bypasses the bus",
+      "detail": "Nothing calls 'ui.cutin', 'ui.slash' or 'ui.stamp' (grep: 0 callers), so the skill cut-in, SHOWTIME, KNOCK OUT, FINISH and PERFECT splashes have no UI swoosh/stamp beyond the stingers. gameplay/race/police.ts:107 calls app.audio.sfx('police.whistle') directly instead of emitting an event.",
+      "fix": "ui-hud should call sfx('ui.cutin' / 'ui.stamp') on its cut-ins (or audio can map those events). Race should emit an event for the whistle so audio can place it at the corgi's position."
+    }
+  ]
+}

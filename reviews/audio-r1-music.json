@@ -1,0 +1,79 @@
+{
+  "pass": false,
+  "score": 5,
+  "summary": "Technically excellent and musically literate, but not yet commercial-grade music/sound design. Verified: tools/audio-check.mjs passes (6 songs peak -2.0...-4.2 dBFS, 0 clicks/dropouts, clean loop seams, 98 sfx clean; first in-game run had one flaky miss of hit.slipper, the re-run passed), nothing plays before unlock, KO/pause muffle + bass drop work, voices load lazily and missing files are silent, tsc clean, and the harmony is genuinely good (ii-V-I, tritone subs, voice leading; of ~1860 lead/bass onsets only a handful are avoid notes). Measured against a polished stylised game it falls short: the mix buries every melodic part under kick + sub-bass (lead -14.6 LU, clav -35 LU; in a race the hook sits 3.5-6.5 dB under its masker), each race song is a 60 s loop on one-bar bass/keys/kick ostinatos, the adaptive layers change the mix by ~0.3 dB, stingers are fixed-key (clash on city/mountain), unquantized and unducked, the race start is not synced to the groove, the KO impact clears the music's own kicks by only ~3 dB while a victim bark talks over the announcer, and the title theme is never heard in the normal flow. Evidence: shots/review/audio/r1-music/ (audio-check.log, harmony.json, analysis.json, probe-coast.json, mask-coast.json, ko-mix.webm, *.png, scripts).",
+  "issues": [
+    {
+      "severity": "major",
+      "title": "Mix buries every melodic part under kick + sub-bass; the hooks are inaudible in a race",
+      "detail": "Stem loudness vs full mix (EBU R128 gated, glue comp bypassed, render.mjs solo stems): race-coast drums -2.2 LU, bass -4.7, keys -14.6, lead -14.6, brass -18.4, pad -26.4, clav -35.3 (title/mountain/results lead -10...-14.6; clav -35.9 in title = effectively absent). 60-150 Hz holds 49-58 % of every song's energy (-2.4...-3.1 dB of total) while 1-2.5 kHz sits at -13.8...-16.5 dB. The 'slap' bass stem is a sine sub (its 1-2.5 kHz band is 22 dB under its 60-150 Hz band; bass.ts sub gain 0.62), so it never reads as slap. In game (mask-coast.json: coast A2 at 19.4 m/s, voice muted) the wah hook measures -41.6 dB (500-1200 Hz) / -44.1 dB (1.2-3 kHz) against -38.1 / -37.6 dB for the rest of the music plus bike SFX: the hook sits 3.5-6.5 dB UNDER its masker, so the 'catchy hooks' deliverable is lost exactly where it matters.",
+      "fix": "Rebalance band.ts DEFAULT_MIX: lead x2.8 (+9 dB), keys +4 dB, brass +6 dB, pad +6 dB, clav +14 dB (or widen its wah Q 3.2 -> 1.5); bass.ts sub sine 0.62 -> ~0.3 and bass trim -3 dB, with more pop/upper-mid (louder 2.7 kHz transient, higher filter settle). Targets: lead -4...-7 LU, bass -7...-9 LU, 60-150 Hz <= 35-40 % of energy, in-race hook >= +3 dB over its masker at 20 m/s. Add a stem-LU check to tools/audio-check.mjs."
+    },
+    {
+      "severity": "major",
+      "title": "Race songs are a 60 s loop built on one-bar ostinatos: heavy loop fatigue over a ~3 min race",
+      "detail": "variety.mjs over each loop (src/audio/music/songs/*.ts): race-coast, race-city, race-mountain, menu and results each have exactly 2 distinct 8-bar progressions (A, B); the bass and the keys comp are ONE bar pattern for all 32 bars (coast BASS, city BASS, mountain DRIVE, results BASS, menu WALK), the kick is one pattern (mountain: 2), the snare is groove + the same 1-bar FILL every 8 bars, and coast B ('...A') reuses A's drums unchanged. The loop is 32 bars = 59-62 s, so a 3.2-3.6 km race (~2.7-3 min) repeats it ~3 times and the same bass/kick/comp bar ~85-90 times. Commercial racing tracks run 2-3 min with section-specific grooves, breakdowns and solos.",
+      "fix": "Write distinct bass lines per section (A syncopated slap, B walking/octave, A2 variation with pickups every 4 bars), 2-4 drum patterns per song (the half-time/ride B of title everywhere, a 4-bar breakdown before the last A2, snare-roll builds), comp variations per section, 3-4 rotating fill variants, and add a solo/breakdown section so each race loop is >= 2 min (e.g. intro, A, A2, B, C-solo, breakdown, A2')."
+    },
+    {
+      "severity": "major",
+      "title": "Stingers are fixed-key (D/A major), unquantized and never duck the song: they clash on 2 of 3 race tracks",
+      "detail": "stingers.ts hard-codes GO = E6/9 (E G# C# F# B) + A6 beep, KO = Dm -> Dm(b6) fall (D F A Bb), SHOWTIME = A-Bm-C#m rips -> Dmaj9 + A5, FINISH = Bb -> C -> D6/9 (D F# B E) + D6, ONE MORE = G -> A rip, while race-city is C minor, race-mountain A Dorian, race-coast A major. At GO the city song is on A bar 2 (Fm9: F Ab C Eb G): 5 of GO's 6 pitch classes sit a semitone from a sounding tone; SHOWTIME's Dmaj9 and FINISH's D6/9 are equally foreign to C minor; on mountain GO's G#/C# rub against Fmaj9/Am9 and SHOWTIME's C# against the tonic's minor third; KO's F/Bb clash with coast (A major) and mountain (F#, B). Conductor.stinger() fires at now+10 ms (off the beat grid) and does not duck the band (the stingers.ts header claims it does): rendered against race-coast's A2 bed (300-5000 Hz) ONE MORE is -7.8 dB, BUSTED -7.5, FINISH -5.7, count -11.7; only the announcer's voice duck lifts them to rough parity, while the announcer talks over them.",
+      "fix": "Add tonic + mode to Song and build stingers relative to the playing song (major/minor variants: GO = V -> I hit on the song tonic, FINISH = bVI-bVII-I of the song key, KO = i-bVI fall); quantize stinger onsets to the next 8th/beat of the current SongPlayer (expose nextBeatTime()); duck the music 6-9 dB with a 5 ms attack for the stinger length; raise ONE MORE/BUSTED/FINISH ~6 dB."
+    },
+    {
+      "severity": "major",
+      "title": "Race start is not musically synced: off-beat countdown kicks, groove drops during the count, GO lands mid-phrase",
+      "detail": "probe-coast.json (real race): bars start at 1.865 / 3.74 / 5.615 s (1.875 s @128 bpm); countdown 3/2/1/GO at 2.91 / 3.91 / 4.91 / 5.92 s. The count stinger contains a kick (stingers.ts count: drums.kick) at 60 bpm against a 128 bpm four-on-the-floor, so the beeps flam between beats; the A section (crash + full groove) enters at 3.74 s, inside the countdown; GO with its kick/crash/brass lands 0.30 s (~2.6 sixteenths) after the A-bar-2 downbeat, and nothing changes in the music. Nothing syncs the two: from the constants (INTRO_TIME 3.6 s, COUNT_STEP 1 s, song started at race:intro) the coast beeps fall at beat fractions .68/.81/.95 and GO is .64 of a beat off on city and .30 off on mountain; GO never coincides with a section start.",
+      "fix": "On race:intro start the race song in a hold state that loops a 1-2-bar intro vamp + riser (no full groove) until race:countdown n=0, then re-phase the SongPlayer so A bar 1 beat 1 (crash) lands exactly on GO with an in-key GO stinger. Drop the kick from the count stinger or place count beeps on the nearest beat. (Cross-unit option: race sets COUNT_STEP to 2 beats of the song, 0.9375 s at 128 bpm.)"
+    },
+    {
+      "severity": "major",
+      "title": "KO money shot: the impact barely clears the music low end, and a 3 s victim bark talks over the announcer",
+      "detail": "Recorded final mix of a real KO (ko-mix.webm / ko-peak.png): below 120 Hz the KO impact peaks at -6.1 dB vs -9.2 dB for the music's own kick peaks, only ~3 dB of contrast. At cine:ko 'start' the music is still full range (muffle steers with 70-120 ms time constants; the bass drop waits for 'peak', 300-450 ms later), while four sub sweeps stack into the glue comp and soft clipper (ko.boom 72->28 Hz, the KO stinger's boom 78->30 Hz + kick, cine.impact 60->35 Hz, bike.crash thumps; peak -1.21 dBFS). Trace: +9 ms bark:pigeon_hurt_1 (a 3.03 s clip, from events-combat.ts combat:ko -> h.bark(victim, 'hurt')), +455 ms voice:ann_ko, so the announcer call plays on top of the victim's line; VoicePlayer never ducks or cuts barks for announcer lines.",
+      "fix": "On cine:ko start duck the music -10...-12 dB with a 5 ms ramp and cut its sub (<120 Hz) immediately, then do the SPEC bass drop at 'peak'; keep one sub boom while a cinematic runs (skip ko.boom's tonal sweep or the stinger's boom). In VoicePlayer, an announcer line with priority >= 3 fades active barks (30 ms) and blocks new ones until it ends; defer the victim's hurt bark to cine 'end'."
+    },
+    {
+      "severity": "major",
+      "title": "Adaptive music is practically inaudible (top-3 and final stretch)",
+      "detail": "Same-bar renders (race-coast vs race-coast_top3 / race-coast_stretch, race-city vs race-city_top3): the top-3 layer adds only shaker/tambourine, +2.4 dB at 6-16 kHz and -0.1...-0.7 dB elsewhere on coast, +0.9 dB at 3-6 kHz on city. The final stretch (jump to B->A2 + claps + 16th shaker + octave-down hook) adds +3 dB at 6-16 kHz, stays within +-0.4 dB below 6 kHz, +0.3 dB RMS overall, and its octave-doubled hook is itself buried (issue 1). A player will not notice either state change; commercial racers mark the last stretch unmistakably.",
+      "fix": "Final stretch: +4-6 % tempo (ramp SongPlayer.stepDur at the bar line) or a whole-step modulation, driving 8th-note bass + double-time hats, a brass riff layer, a 1-bar riser/snare roll into the switch, and +2 dB on the music bus. Top-3: add a mid-range layer (clav/brass ostinato or a percussion groove at 1-4 kHz) instead of air-band shaker only."
+    },
+    {
+      "severity": "major",
+      "title": "The title theme (the main hook) is never heard in the normal flow",
+      "detail": "flow-0-before-key.png: title screen, audio state ctx 'none', wanted 'title' (correct: nothing before unlock). One key (Enter, or a click) both unlocks audio and advances the UI to the menu; by the time AudioRuntime.start() has resumed the context, wanted is 'menu', so the conductor plays 'menu' (flow-1-after-key.png; the trace holds only ui.confirm). 'title', which status calls 'the main hook', plays only if the player backs out to the title with Esc (verified).",
+      "fix": "In system.ts SCREEN_SONG / events-race.ts flow:screen: play 'title' on the main 'menu' screen and keep the lounge 'menu' song for career/garage/trackSelect/settings/howto/credits/loading, or remember that the unlocking gesture came from the title and keep 'title' until the first non-main-menu screen. Cross-unit alternative: the first key on the title only unlocks + slams the logo."
+    },
+    {
+      "severity": "minor",
+      "title": "Voice lines: 7 s sloth barks, frozen bark positions, music ducked for barks, inconsistent loudness",
+      "detail": "public/assets/voice: sloth_taunt_1 7.34 s, sloth_ko_1 6.84 s, sloth_taunt_0 3.44 s, sloth_hurt_0 3.33 s, pigeon_hurt_1 3.03 s (gen-tts speed 0.5 for the sloth). voice/player.ts: a bark sets busy.bark = now + duration, blocking all barks for duration + 1.3 s, and holds setVoiceDuck(1) (music -8 dB) for the whole clip; pan and gain are fixed at start, so a sloth that falls 40 m back keeps talking at full level for 7 s. Speech RMS: ann_1/ann_go -10.5 dB and ann_2/ann_3 -13.2/-13.8 dB vs -15...-17 dB for the other announcer lines (a +5 dB jump at the countdown).",
+      "fix": "Regenerate the sloth lines at speed 0.75-0.8 with pauses trimmed (<= 2.5 s); duck music only for announcer lines; update bark gain/pan per frame from the rider's position and fade out beyond 40 m; normalise every clip to the same speech loudness in tools/gen-tts.mjs (two-pass loudnorm, RMS match for clips < 0.4 s)."
+    },
+    {
+      "severity": "minor",
+      "title": "Boost SFX spam: a slingshot whoosh about once per second from the whole pack",
+      "detail": "mask-coast.json: 30 'bike.slingshot' plays in 29 s of racing, 7 at gain 1.0 (player or very near) and 23 rival ones at gain 0.15-0.47 (probe-coast.json: 36 in ~38 s). events-race.ts rider:boost plays every rider's draft/pad/launch boost, so the player's own slingshot cue drowns in a constant whoosh bed.",
+      "fix": "Rival boosts only within ~12 m of the camera, one per rider per 3 s (cooldown key boost<riderId>), volume x0.5; keep the player's at full volume. Collapse the GO launch 'pad' boosts into one sound."
+    },
+    {
+      "severity": "minor",
+      "title": "SFX coverage gaps: wall scrape and the SHOWTIME launch sound are never triggered",
+      "detail": "sim/surfaces.ts emits rider:obstacleHit with kind 'wall' (bounce) and 'wallScrape' (~6x/s while grinding), but events-race.ts OBSTACLE_SFX maps neither, so walls play the generic 'obstacle.hit' thud and 'bike.scrape' (SPEC section 11 'scrape') has no trigger. 'skill.pelican.ult' (rising launch whoosh) is only reachable via skill:cast, which gameplay/combat/skills/runner.ts never emits for the ult slot (it emits ult:start), so the SHOWTIME leap has no sound of its own.",
+      "fix": "Map 'wall' -> bike.scrape + a short metal ring and 'wallScrape' -> a speed-scaled scrape grain with a 0.15 s cooldown; play 'skill.pelican.ult' on ult:start for the player, under the SHOWTIME stinger."
+    },
+    {
+      "severity": "minor",
+      "title": "Harmony nits: a few sustained avoid notes and one bass rub",
+      "detail": "harmony.mjs (real compiler, chord-scale classification of ~1860 lead/bass onsets): menu A2 bar 6 beat 2 and B bar 5 beat 3 hold Ab5 = b9 over Gm7b5 on the beat; race-city B bar 7 beat 4 Eb6 = b9 over Dm7b5; race-mountain B bar 5 beat 4 C6 = b9 over Bm7b5; race-coast A/A2 bar 7 beat 3: bass '6' = D# under F#7alt, whose voicing holds the b13 (D). Everything else is a chord tone or an available tension.",
+      "fix": "Use the 9th or 11th of the half-diminished chord on the beat (A over Gm7b5, E over Dm7b5, C# over Bm7b5), or move the b9 off the beat as a passing note; in coast BASS use '5'/'b7' instead of '6' over F#7alt (or make the chord F#13)."
+    },
+    {
+      "severity": "minor",
+      "title": "cross-unit: UI never triggers its cut-in / stamp / count / pause sounds",
+      "detail": "grep over src/ui: no caller for sfx('ui.cutin'), 'ui.slash', 'ui.stamp', 'ui.count', 'ui.pause' or 'ui.unlock' (all defined in sfx/ui-bike.ts; the brief says the UI calls ui.cutin). Skill and SHOWTIME cut-ins, the results grade stamp and the coin count-up tick are silent; only ui.move/confirm/back/coin are wired.",
+      "fix": "ui-hud/ui-screens: call ui.cutin on cut-ins, ui.stamp on the grade stamp, ui.count per coin tick, ui.pause on pause. Audio-side alternative: auto-trigger ui.cutin from skill:cast (player) and ult:start like the other bus-driven sounds."
+    }
+  ]
+}

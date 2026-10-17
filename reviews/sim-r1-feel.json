@@ -1,0 +1,82 @@
+{
+ "unit": "sim",
+ "round": 1,
+ "lens": "feel",
+ "score": 5,
+ "summary": "The foundation is strong. tsc is clean and feel-telemetry passes 28/28 again: 0-60 km/h in 4.42 s, top 20.0 m/s, tau63 0.083 s, yaw visible in 1 frame (2 on the keyboard), no overshoot, hop 0.375 s, ramp 0.68 s PERFECT. Physics is deterministic across dt 1/30, 1/60 and 1/144: 30 and 60 fps are identical, and 144 fps is within 0.2 m after 8.4 s. Without shake the camera shows no jitter at any rate, slow-mo moves at most 0.58 px per frame, and keyboard taps are precise (100 ms = 0.4 m). A 120 s soak with 8 riders and traffic on the real coast track had 0 NaN, 0 out-of-bounds, 0 tunnelling and 0 page errors, with smooth shoulder pressing and exact crash/respawn timings. On the real track, though, the drift cannot be controlled: holding Shift into the turn crosses the road at 10 m/s and wrecks on the seawall in 0.93 s. Only full counter-steer survives; the tuning was validated on an R=45 curve the track does not have. The camera blend-out never rotates (slerpQuaternions aliasing), so every KO and WRECKED cinematic ends by gliding while still looking backwards and then snapping 171 deg in one frame. Combat knocks move a rider only 0.2-0.6 m because the grip lag absorbs them, and snaking drifts on straights are 17-22 % faster than riding. Four majors, so this fails.",
+ "issues": [
+  {
+   "severity": "major",
+   "title": "Drift dives into the wall and wrecks on the real coast track",
+   "detail": "steering.ts:35 sets the drift lateral target to driftDir*auth*1.35*lerp(0.15,1,u): 10.1 m/s inward with the stick held into the drift, 5.8 m/s at neutral and 1.5 m/s at full counter-steer (20 m/s). That target ignores road curvature, and every coast curve has R >= 150 m (outward push <= 2.1 m/s), so nothing balances it. scripts/driftreal.mjs on the real track with all units: on the straight at s=200, hold-into WRECKS ('wall') at 0.93 s with only L1 charged, neutral hits the wall at 1.52 s, and only counter-steer survives. On the R150 left at s=985, hold-into hits the wall at 1.17 s (v 20 -> 10.8) and neutral ends at x -7.7 of -8.45 after 2.1 s. With the real keyboard, Shift+A from mid-road went over the seawall onto the beach 0.8 s later (keys/c-driftL1.png, keys/d-driftL3.png, strips/drift-into-wall.png). The wall-crash rule at surfaces.ts:80 (>18 m/s and atan(vx/v) > 24 deg) can only fire during a drift (vx 10.1 -> 26.8 deg). The telemetry drift check uses kappa 1/45 (feel-scenarios.mjs:134), a curve the track never has.",
+   "fix": "Make the drift road-relative and gentle. In lateral(), while drifting, use target = d*lerp(-1.0, 4.0, u)*clamp01(v/top) with u=(steer*d+1)/2, and drop the curve-push bias while drifting so the arc follows the road. Neutral then drifts about 1.5 m/s inward, which leaves about 4.7 s to cross the 7 m half-road. Clamp drift |vx| to v*tan(wallCrashAngle-4 deg) so a drift bounces off a wall instead of wrecking. Acceptance: at coast s=200 and s=985, hold, neutral and counter each stay on asphalt for >= 2.5 s and reach L3. Add these 6 cases to feel-telemetry."
+  },
+  {
+   "severity": "major",
+   "title": "Camera blend-out never rotates, then snaps (171 deg after every KO cinematic)",
+   "detail": "camera/blend.ts:36 calls pose.quat.slerpQuaternions(this.from.quat, pose.quat, a), which aliases its target. In three 0.186 slerpQuaternions(qa,qb,t) is this.copy(qa).slerp(qb,t), so pose.quat is overwritten with 'from' and then slerped toward itself. It stays at 'from' for every a (checked standalone in scripts/slerp-alias.mjs: 171 deg from the chase pose at a=0..1). Only the position blends. Per frame (scripts/koblend.mjs, blendpop.mjs): after __br.ko the camera glides 0.32 s still facing backwards, then turns 171.5 deg in one frame (koblend.json frame 98). The respawn glide stays frozen and then snaps 18.5 deg (frame 289), the race intro hand-off snaps 3.0 deg, and the WRECKED exit glides while staring sideways at the cliff (strips/crash.png 2.82 s, strips/respawn-blend.png). This breaks SPEC 6 ('blends back in <= 0.35 s with no pops') on the KO money shot. The telemetry popRatio only measures position steps, so it passed.",
+   "fix": "Slerp into a temp: this.tmp.copy(pose.quat); pose.quat.copy(this.from.quat).slerp(this.tmp, a). Add an angular-step metric to feel-scenarios-camera.mjs: the max per-frame camera rotation during the blend and for 2 frames after must stay < 6 deg. Test it with an override that faces backwards, and cover the KO, respawn and intro hand-offs."
+  },
+  {
+   "severity": "major",
+   "title": "Knockback is eaten by the 0.07 s grip lag, so hits barely move the victim",
+   "detail": "physics.ts:116 applyImpulse adds the lateral impulse to vx. On the next substep, steering.ts:51 pulls vx back to the steer target with tau = 0.07 s, so the impulse only carries the rider for about knock*0.065 s. scripts/knock.mjs (stub combat, flat road, 20 m/s): 3.2 m/s (light) -> 0.21 m, 5.5 -> 0.36 m, 9 (heavy/ult) -> 0.59 m, and 9 while the victim steers back -> 0.18 m within 3 frames. Only an oiled rider travels far (2.4 m). With real units, a 7.4 m/s shoulder bump separates the two riders by < 0.1 m, and they are glued together again within 0.15 s (scripts/bumpai.mjs: dx 0.92 -> 0.83 -> 0.75). Pillar 2's knockback reaction, and shoving rivals into walls or traffic, do not read.",
+   "fix": "Give impulses a carry window. applyImpulse sets sr.knockTime = clamp(|lateral|/10*0.35, 0.12, 0.35). During that window lateral() uses tau x4 and steer authority x0.3, and the lean follows vx. Target displacement is about 0.6 m light, 1.5 m heavy and 2 m ult, without breaking the per-substep caps. Add a knock scenario to feel-telemetry that expects 1.2-1.8 m for 9 m/s."
+  },
+  {
+   "severity": "major",
+   "title": "Drift-snaking on straights is a dominant +17-22 % strategy",
+   "detail": "drift.ts:24 charges by time alone (L1 at 0.55 s), regardless of steering or curvature, and the L1 reward (0.45 s at +22 %, tuning.ts:44-46) lasts almost as long as its charge. scripts/exploit.mjs (stub world, flat straight, 20 s): riding straight averages 20.0 m/s. Alternating L1 drifts with counter-steer average 23.3 m/s (+16.6 %, 32 boosts), L2 averages 23.9 and L3 averages 24.4 m/s (+22 %), while the rider stays within 1.2-3.4 m of the line. The AI never does this (rubber band +-8 %), so a wiggling player wins every straight.",
+   "fix": "Charge by commitment: dCharge = dt*lerp(0.35, 1.3, u)*(0.6+0.4*clamp01(|kappa|*60)), so counter-steering on a straight charges at about 20 %. Add a 0.3 s re-drift lockout after release and shorten the L1 boost to 0.3 s. Acceptance: snaking gains <= +3 % over 20 s, and corner drifts are unchanged."
+  },
+  {
+   "severity": "minor",
+   "title": "Wall hits do not visibly bounce and register twice",
+   "detail": "surfaces.ts:85 reflects vx x-0.35, but with steer held the grip lag sends vx back into the wall within about 20 ms (about 2 cm of travel). The rider re-hits 33 ms later and then sticks. scripts/wallbounce.mjs at 30/60/144 fps with full steer into the cliff: two 'wall' events (into 6.9 then 1.6 m/s, 2 frames apart, so sparks, shake and sound fire twice), speed 20 -> 14.1 (-30 %), then a scrape (strips/wall.png, wallhi.png). The spec's 'walls bounce' never shows on screen.",
+   "fix": "On impact, set sr.bounceTime = 0.22 s with steer x0.25 and tau x3 so the bounce carries 0.5-0.8 m. Make impact() honour wallCooldown, or merge impacts within 0.16 s and keep the max, so one approach gives one event."
+  },
+  {
+   "severity": "minor",
+   "title": "Slopes barely change speed, so hills have no weight",
+   "detail": "forces.ts:40 pulls any overspeed back at 0.8/s*(v-top), which caps the gain from gravity at about +0.9 m/s. scripts/slopes.mjs on the real coast (features removed, throttle held): the -13 % drop at s 1645-1695 only goes 19.25 -> 20.66 m/s (+7 %), and the long -5.5 % section settles at 20.4. The +10 % climb only costs 19.9 -> 19.2 (-4 %). Climbs and descents feel like flat road.",
+   "fix": "Keep the 0.8/s pull only for boost-induced overspeed. Above top, use quadratic drag a -= k*(v^2-top^2) with k about 0.005, so -13 % settles at about 23.5 m/s (+17 %) and -5.5 % at about 21.5 m/s."
+  },
+  {
+   "severity": "minor",
+   "title": "Oil and puddles have no felt or visible effect on the bike",
+   "detail": "features.ts:83 and steering.ts:14 only lengthen the grip lag (tau 0.07 -> 0.28 s on oil) for 1.2 s. There is no slide, fishtail, wobble or speed loss. strips/oil.png (real oil at s 910, straight then steer 0.5): the pelican rides through as if on clean asphalt, and only the fx rings show anything happened.",
+   "fix": "While oiled, add a decaying fishtail: lateral sway 1.5 m/s at about 6 rad/s, visual yaw +-12 deg and lean wobble. Scrub 6 % speed on entry. On puddles, use a 0.3 s lighter version."
+  },
+  {
+   "severity": "minor",
+   "title": "Landings have almost no camera impact",
+   "detail": "rig.ts:149-150 uses trauma 0.15*air (about 0.09 after a 0.63 s ramp jump, i.e. about 1.5 cm or 0.15 deg of shake). It also applies chase.bump(-1.6*air) to an omega=9 critically damped spring, whose peak is v0/(omega*e), about 4 cm. Non-PERFECT landings show no feedback at all, and PERFECT landings only get the boost FOV kick (strips/ramp.png, crest.png).",
+   "fix": "Apply a direct landing dip: y offset -clamp(0.12+0.25*air, 0, 0.45) m, recovered by the spring. Add a 60 ms -2 deg FOV dip on non-perfect landings after >= 0.5 s of air."
+  },
+  {
+   "severity": "minor",
+   "title": "The hero reads small at speed, and smaller still when boosting",
+   "detail": "scripts/framing.mjs at 1280x720: the player spans 149x39 px cruising at 20 m/s (21 % of screen height), 113x30 px during an L3 boost (FOV 85.8 = 74 + 12 kick) and 187 px at 6 m/s. The pouch, wings and swings read poorly. Polished stylised racers keep the hero about 25-30 % of screen height.",
+   "fix": "Counter-dolly during FOV kicks (move the camera in by dist*(1-tan(fov0/2)/tan(fov/2))) so the rider keeps its size while the world stretches. Also propose dist 4.3->5.1 m and fov 60->70 to the integrator so the cruising rider is >= 175 px."
+  },
+  {
+   "severity": "minor",
+   "title": "feel-telemetry passes 28/28 but misses the real problems",
+   "detail": "tools/feel-scenarios.mjs:134 tests drift only at kappa 1/45. feel-scenarios-camera.mjs:88-105 detects pops from position steps only, so a 171 deg orientation snap passes. Nothing checks knock displacement, snaking, wall double impacts or slopes. The critic's own instrument reports all green while issues 1-4 are present.",
+   "fix": "Add these scenarios: drift hold/neutral/counter at kappa 0 and 1/150 (no wall hit or crash within 2.5 s); max camera angular step through override, blend and respawn; knock displacement at 3.2 and 9 m/s; 20 s of snaking vs riding straight (<= +3 %); one event per wall approach; speed on a -13 % slope."
+  },
+  {
+   "severity": "minor",
+   "title": "cross-unit: track wall meshes sit inside bounds(), so the rider renders half inside the rock",
+   "detail": "While scraping the cliff at s about 1440, the sim holds the rider at x 8.05, and the model's right edge (8.37) stays inside bounds.right (8.40) (scripts/wallgap.mjs). Even so, about half the pelican disappears into the cliff face (wall-scrape-full.png, strips/wallhi.png), so the rock is roughly 0.3 m inside the drivable bounds. The tunnel's red wall looks the same (strips/tunnel.png).",
+   "fix": "Track unit: put cliff and tunnel wall faces at or beyond bounds() + 0.05 m."
+  },
+  {
+   "severity": "minor",
+   "title": "cross-unit: coast curves are too gentle for the handling targets",
+   "detail": "track-profile.json: the tightest coast curve has R = 150 m (max |kappa| = 1/150), so it needs about 28 % steer at top speed. The telemetry figures R60 = 71 % and R100 = 43 % exist only on the patched stub road, and no corner ever calls for a drift. 'Fast corners need 60-80 % steer' and the mini-turbo pillar are never exercised in a real race.",
+   "fix": "Track unit: add 2-3 corners of R 45-70 m with run-off (e.g. after the tunnel and the market chicane). Sim then re-validates drift and curve push there."
+  }
+ ],
+ "pass": false
+}

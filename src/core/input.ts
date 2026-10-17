@@ -104,7 +104,13 @@ export class Input {
   /** Simulate a press (tests, on-screen buttons). */
   press(action: Action): void {
     if ((EDGE_ACTIONS as readonly string[]).includes(action)) this.edges.add(action as EdgeAction);
-    for (const fn of Array.from(this.listeners)) fn(action);
+    for (const fn of Array.from(this.listeners)) {
+      try {
+        fn(action);
+      } catch (err) {
+        console.error('[input] action listener threw', err);
+      }
+    }
   }
 
   /** Per rendered frame: poll gamepads and ramp analog values. */

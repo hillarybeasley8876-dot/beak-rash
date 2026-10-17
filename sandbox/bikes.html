@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BEAK RASH — bikes turntable</title>
+    <link rel="icon" href="data:,">
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #cfe9ff; font: 13px/1.35 system-ui, sans-serif; }
+      #view { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+      #panel { position: fixed; top: 10px; left: 10px; background: rgba(11, 11, 15, 0.82); color: #fff; padding: 10px 12px;
+        border-left: 5px solid #e5191c; transform: skewX(-6deg); min-width: 250px; user-select: none; }
+      #panel > * { transform: skewX(6deg); }
+      #panel h1 { margin: 0 0 6px; font: 900 18px/1 system-ui; letter-spacing: 0.04em; }
+      #panel label { display: flex; gap: 6px; align-items: center; justify-content: space-between; margin: 3px 0; }
+      #panel select, #panel input[type=range] { width: 140px; }
+      #panel button { background: #e5191c; color: #fff; border: 0; padding: 3px 8px; font-weight: 800; cursor: pointer; }
+      #stats { margin-top: 6px; white-space: pre; font: 11px/1.35 ui-monospace, monospace; color: #ffe600; }
+      #caption { position: fixed; right: 16px; bottom: 14px; color: #0b0b0f; font: 900 30px/1 system-ui;
+        text-shadow: 2px 2px 0 #fff; transform: skewX(-10deg); }
+    </style>
+  </head>
+  <body>
+    <canvas id="view"></canvas>
+    <div id="panel"></div>
+    <div id="caption"></div>
+    <script type="module" src="./bikes.ts"></script>
+  </body>
+</html>

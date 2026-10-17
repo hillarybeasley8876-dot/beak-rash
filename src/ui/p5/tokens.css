@@ -1,0 +1,78 @@
+/* P5 design tokens + root layout for the BEAK RASH UI (ui-screens). Original styling, P5-inspired. */
+.br-ui {
+  --red: #e5191c;
+  --red-hot: #ff1e3c;
+  --red-deep: #9e0c12;
+  --black: #0b0b0f;
+  --ink: #0b0b0f;
+  --white: #ffffff;
+  --paper: #f4f1ea;
+  --yellow: #ffe600;
+  --grey: #8b8b93;
+  --f-display: 'Anton', 'Bebas Neue', Impact, 'Noto Sans SC', sans-serif;
+  --f-bebas: 'Bebas Neue', 'Anton', 'Noto Sans SC', sans-serif;
+  --f-comic: 'Bangers', 'Anton', 'Noto Sans SC', sans-serif;
+  --f-stencil: 'Black Ops One', 'Anton', sans-serif;
+  --f-mono: 'Rubik Mono One', 'Anton', sans-serif;
+  --f-marker: 'Permanent Marker', 'Bangers', sans-serif;
+  --f-cn-block: 'ZCOOL QingKe HuangYou', 'Noto Sans SC', 'PingFang SC', sans-serif;
+  --f-cn-play: 'ZCOOL KuaiLe', 'Noto Sans SC', 'PingFang SC', sans-serif;
+  --f-cn-brush: 'Ma Shan Zheng', 'Zhi Mang Xing', 'Noto Sans SC', serif;
+  --f-cn-wild: 'Zhi Mang Xing', 'Ma Shan Zheng', 'Noto Sans SC', serif;
+  --f-cn-heavy: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --skew: -10deg;
+  --ease-slam: cubic-bezier(0.2, 1.7, 0.35, 1);
+  --ease-snap: cubic-bezier(0.75, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0.15, 0.9, 0.25, 1);
+  --s: 1;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  color: var(--white);
+  font-family: var(--f-cn-heavy);
+  font-weight: 900;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.br-ui *, .br-ui *::before, .br-ui *::after { box-sizing: border-box; }
+
+.br-layer { position: absolute; inset: 0; }
+.br-hud-layer { z-index: 1; }
+.br-screens { z-index: 2; }
+.br-wipe { z-index: 5; pointer-events: none; }
+.br-toasts { z-index: 6; pointer-events: none; }
+
+/* One screen = full-bleed background + a 1920×1080 stage scaled to fit (letterboxed by the bg). */
+.br-screen { position: absolute; inset: 0; pointer-events: auto; overflow: hidden; }
+.br-screen.is-passive { pointer-events: none; }
+.br-bg { position: absolute; inset: 0; overflow: hidden; }
+.br-stage {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1920px;
+  height: 1080px;
+  margin: -540px 0 0 -960px;
+  transform: scale(var(--s));
+  transform-origin: 50% 50%;
+}
+.br-abs { position: absolute; }
+.br-skew { transform: skewX(var(--skew)); }
+.br-unskew { transform: skewX(calc(var(--skew) * -1)); }
+.br-hidden { display: none !important; }
+
+/* Focus is always visible: every navigable element gets .is-focus from ui/nav.ts. */
+.br-ui [data-nav] { cursor: pointer; outline: none; }
+.br-ui [data-nav].is-disabled { cursor: not-allowed; }
+
+@media (prefers-reduced-motion: reduce) {
+  .br-ui *, .br-ui *::before, .br-ui *::after {
+    animation-duration: 0.001ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    transition-delay: 0s !important;
+  }
+}

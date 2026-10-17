@@ -42,7 +42,7 @@ export function toon(color: ColorRepresentation, opts: { emissive?: ColorReprese
 const outlineMats = new Map<string, MeshBasicMaterial>();
 
 /** Back-face hull material pushed out along normals by `width` (object-space metres). */
-function outlineMaterial(color: ColorRepresentation, width: number): MeshBasicMaterial {
+export function outlineMaterial(color: ColorRepresentation, width: number): MeshBasicMaterial {
   const key = `${new Color(color).getHexString()}|${width.toFixed(4)}`;
   let m = outlineMats.get(key);
   if (!m) {
@@ -51,7 +51,8 @@ function outlineMaterial(color: ColorRepresentation, width: number): MeshBasicMa
     m.onBeforeCompile = (shader) => {
       shader.vertexShader = shader.vertexShader.replace(
         '#include <begin_vertex>',
-        `#include <begin_vertex>\n  transformed += normalize(objectNormal) * ${w};`,
+        // `objectNormal` only exists in MeshBasicMaterial with skinning/envmap; `normal` always does.
+        `#include <begin_vertex>\n  transformed += normalize(normal) * ${w};`,
       );
     };
     m.customProgramCacheKey = () => `outline-${w}`;

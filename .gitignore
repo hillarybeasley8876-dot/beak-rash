@@ -4,3 +4,7 @@ shots
 _probe
 *.log
 .locks
+desktop/electron
+desktop/build
+desktop/*.log
+desktop/*.ok

@@ -1,0 +1,66 @@
+{
+  "unit": "sim",
+  "round": 1,
+  "lens": "camera",
+  "pass": false,
+  "score": 5,
+  "summary": "In normal driving the chase follow is commercial-grade. Sub-pixel smoothness at 30/60/144 fps and with uneven pacing (residuals <=0.23 px, identical numbers per fps). Wall/tunnel clearance stays >=2.1 m. Jumps stay framed, look-back cuts cleanly, and shake is clean and setting-aware. The cinematic exit is broken, though: blend.ts aliases slerpQuaternions, so on every KO, wrecked, ult, respawn and intro exit the view keeps its old orientation while the position glides, then snaps up to 176 deg in one frame (measured in scripted runs and in a real autopilot lap). The straight-line blend path also flies through traffic and riders. Speed skills (wing +40 %) get no FOV response at all. Evidence: shots/review/sim/r1-camera/.",
+  "issues": [
+    {
+      "severity": "blocker",
+      "title": "Every blend-out freezes the view orientation, then snaps up to 176 deg in one frame (src/camera/blend.ts:36)",
+      "detail": "Blend.apply calls pose.quat.slerpQuaternions(this.from.quat, pose.quat, a). In three 0.186 slerpQuaternions(qa,qb,t) is this.copy(qa).slerp(qb,t). Because this === qb, the target is overwritten, so the result is from.quat on every blend frame. When t reaches 1 the blend stops and the camera snaps to the chase orientation. Isolated repro: shots/review/sim/r1-camera/slerp-alias.mjs (171 deg at a=0.25/0.5/0.75). Measured single-frame rotations: scripted KO 170.4 deg (t3-ko.json; t3-ko-stripB.png 1.62 -> 1.65 s). Real autopilot lap KOs 176.0 and 170.9 deg (t17-lap.json spikes; t18-3070-3118.png 51.92 -> 51.97 s, t18-5530-5578.png 92.82 -> 92.87 s). Player wrecked 102.2 deg, ult exit 165 deg (t13t14t15.json, t21t22.json). Respawn glide 18.5 deg after a traffic crash and 59.5 deg after a water crash (t4-crash.json, t19t20.json, t4-crash-respawn.png 4.72 -> 4.77 s). Intro -> GO 3.0 deg (t5.json). This breaks SPEC 6 ('blends back in <= 0.35 s with no pops') and the exit of the pillar-3 KO money shot on every KO.",
+      "fix": "Keep a scratch quaternion in Blend: this.tq.copy(pose.quat); pose.quat.slerpQuaternions(this.from.quat, this.tq, a) (or pose.quat.copy(this.from.quat).slerp(this.tq, a)). A page-side preview of this fix gives a smooth bell, peak 16.6 deg/frame (t3b.json, t3b-patched-blend.png). Add a regression that asserts per-frame angular step during KO and respawn blends (see the telemetry issue)."
+    },
+    {
+      "severity": "major",
+      "title": "Blend path is a straight world-space lerp: the exit flies through traffic and riders and (once the snap is fixed) whips ~170 deg in 0.32 s",
+      "detail": "Blend lerps position linearly from the frozen cine pose to the live chase pose. In the lap the KO shot sat 37 m ahead of the player (camS 937.6 vs player s 900.4), and the blend flew back at up to 3.9 m/frame (~230 m/s). At lap frame 3102 it skims a traffic van within ~0.1 m of its side; the van fills the frame (t18-3070-3118.png 51.67 s). In the scripted KO the path passes 0.61 m from the victim's anchors and the goose fills the frame (t3b.json minDistDuringBlend 0.61; t3-ko-stripB.png 1.42 s). At lap frames 5552-5558 and on the ult exit (t21t22.json 2.95 s) the camera comes level with the player and the rider leaves the frame for ~8 frames (projected sx +-19 903 px). With the slerp fixed, the same blend still rotates ~170 deg in 0.32 s (peak ~1000 deg/s) while the FOV ramps 46 -> 73.6 deg, a disorienting whip at the end of the money shot.",
+      "fix": "Blend in player-relative chase space: express from-pose as (ds, dx, height, yaw/pitch offsets) relative to the player's track frame at blend start. Interpolate those toward the chase values so the camera arcs around the rider and moves with it. Push the path >= 1 m away from rider and obstacle boxes. When the from->chase angle is > ~100 deg or the distance is > ~12 m, hard-cut on the KO release whoosh (or use a <= 0.12 s blend under an fx smear/speed-line frame) instead of sweeping."
+    },
+    {
+      "severity": "major",
+      "title": "Skill and status boosts get no camera speed response (pelican.wing: FOV pinned at 74, no kick)",
+      "detail": "The FOV kick only fires on the rider:boost event (rig.ts:152), and sim emits that only from giveBoost (drift/land/draft/pad). Combat skill boosts set boostTime/boostPower through statuses, as the SPEC boost API allows, without that event. The base FOV is lerped on clamp01(speed / bike top) (chase.ts:74), so overspeed adds nothing. Measured pelican.wing: speed 20.0 -> 27.9 m/s for 2.2 s, FOV 74.0 and kick 0 throughout (t21t22.json). The same applies to sloth.flash (+60 %), shiba.doge, penguin.slide and pickups. Drift boosts are thinner than they look too: the L1 kick is gone by +0.57 s (t7-boost.csv), while v stays 21-22.6 m/s with FOV back at 74.",
+      "fix": "Drive the kick from rider state, not only the event. Each frame compare p.boostPower/p.boostTime with last frame. When power rises or time jumps by > 0.2 s, kick lerp(8,12, power) for boostTime+0.15 s, deduped against the event path. Let base FOV keep scaling above the bike top (e.g. vn up to 1.4 -> +4..5 deg) so sustained overspeed reads after the kick releases."
+    },
+    {
+      "severity": "minor",
+      "title": "Hit-stop: the chase keeps sliding while the world is frozen",
+      "detail": "ChaseCam springs integrate dtReal, so during clock.hitStop the lateral/look springs keep closing their lag while the bike is frozen. Measured over a 0.1 s crit hit-stop at full lock: camera travels 0.43 m and the bike shifts 36 px on screen across 6 frozen frames (t10t11.json hitstop). The freeze-frame reads as a smear, which weakens the pillar-2 impact read. Typical combat swerves (vx ~2 m/s) still give ~10 px.",
+      "fix": "Step the follow springs (x, y, lx, ly, bodyS/X) with dtSim (or skip them while app.clock.frozen); keep shake, kicks and blends on dtReal."
+    },
+    {
+      "severity": "minor",
+      "title": "Crash cam pulls back and frames the wreck small and far for the whole 2.6 s",
+      "detail": "On 'crashed' the rig adds +1.6 m distance and +1.1 m height while the body is launched forward at 0.7 v. The tumbling pelican sits 7.0-8.7 m from the lens at screen centre, roughly half its riding size, for the full crashed window (t8-crashcam.json dCamBody; t4-crash-strip.png 2.42-4.02 s and t24-crashbike.png show a small lump far down the road). Frequent wipe-outs are where a combat racer sells drama. Compare Road Rash/Burnout crash cams, which keep the rider large.",
+      "fix": "During 'crashed', aim ~4-4.5 m from the body anchor at 1.4-1.7 m height with a slow 10-15 deg/s side orbit (FOV ~58). Keep the pull-back only for the first ~0.2 s of the impact."
+    },
+    {
+      "severity": "minor",
+      "title": "Low-trauma channels are imperceptible: curb rumble, speed buzz and landings",
+      "detail": "Amplitude = trauma^1.25 x (0.3 m, 0.055 rad), so the SPEC values vanish. Curb .05 gives ~0.07 deg (~0.7 px at 720p). Speed buzz measured 0.036 deg peak. A 1 s landing (.15) peaks at 0.26 deg / 1.8 px (t10t11.json land1s). The landing bump (-1.6*air m/s on an omega-9 spring) dips only ~5 cm. A non-perfect 0.8 s crest landing has essentially no camera response (t9-crest-strip.png 2.83-3.27 s).",
+      "fix": "Map continuous sources (curb, scrape, rough surfaces) to a separate small vertical/roll buzz channel that is visible (1-2 px, 12-18 Hz). Make landings a real camera-position compression (~0.12-0.25 m x air with a fast spring return) on top of the shake."
+    },
+    {
+      "severity": "minor",
+      "title": "Camera telemetry cannot see rotation pops, so the blocker passes CI",
+      "detail": "tools/feel-scenarios-camera.mjs 'camera' scores pops from position steps only. It uses a fake override that just nudges cam y, with no rotation or FOV change, so popRatio 1.017 PASSES. Re-run today: 5/5 camera/jitter checks pass (shots/review/sim/r1-camera/telemetry/metrics.json), while every real KO, ult and respawn exit snaps 18-176 deg.",
+      "fix": "Record per-frame angular step (deg) and FOV step. Add scenarios with a real __br.ko(1,0), a ko(0,1) wrecked, a traffic crash -> respawn, and an override whose orientation differs ~170 deg from the chase. Fail on any frame > 8 deg or > 3x its neighbours, and on camera-to-rider distance < 1 m during blends."
+    },
+    {
+      "severity": "minor",
+      "title": "cross-unit: combat skill boosts never emit rider:boost (kind 'skill' exists in events-map)",
+      "detail": "Combat applies skill boosts through statuses/boostTime only. Besides the camera, the HUD boost cut-in (ui/hud/events.ts), audio boost SFX (audio/events-race.ts) and fx speed reactions (fx/react/bus-ride.ts) also stay silent for wing/flash/doge/slide (t21t22.json: no rider:boost after pelican.wing cast).",
+      "fix": "Combat (or a sim-side detector of boostPower rising) should emit rider:boost {kind:'skill', power, time} when a skill raises the boost. Coordinate via status files."
+    }
+  ],
+  "verified_ok": [
+    "Frame-rate independence: slalom + S-bend at dt 1/30, 1/60, 1/144 and random 1/30-1/144 pacing; bike screen residual <=0.23 px, pitch/roll/yaw residual <=0.03 deg (t2.json)",
+    "Clearance: >=2.09 m over road in 6 wall-hugging runs (cliff rock, rail, cutting, tunnel x2, bridge parapet), never inside bounds (t12.json, t12-*.png)",
+    "Full autopilot lap with traffic: 0 LOS blocks by traffic, 0 frames inside riders, rider off-frame only during blend-outs (t17-lap.json)",
+    "Jumps: crest 0.83 s and ramp 0.63/0.72 s air keep the rider framed (head >= 263 px), smooth (<=0.3 deg/frame) (t9.json, t9-*-strip.png)",
+    "Roll follows lean x0.18 (max ~6.7 deg in drift), FOV 62->74 with speed, drift L1 kick +9.4 deg; look-back cuts cleanly; shake honours settings.shake=0",
+    "Typecheck: no errors in src/camera or src/sim"
+  ]
+}

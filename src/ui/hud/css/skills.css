@@ -1,0 +1,51 @@
+/* Skill diamonds (U/I/O + ult P) and the weapon slot, part of the bottom-right cluster. */
+.sk { position: absolute; right: 262px; bottom: 216px; display: flex; align-items: flex-end; gap: 36px; }
+.sk-d { position: relative; width: 62px; height: 62px; }
+.sk-d.ult { width: 84px; height: 84px; margin-left: 6px; }
+.sk-box {
+  position: absolute; inset: 0; rotate: 45deg; background: var(--paper); overflow: hidden;
+  box-shadow: 0 0 0 4px var(--ink), 0 0 0 7px var(--paper), 0 0 0 10px var(--ink), 6px 6px 0 10px rgba(11, 11, 15, 0.6);
+}
+.sk-sweep {
+  position: absolute; inset: 0;
+  background: conic-gradient(from -45deg, rgba(11, 11, 15, 0.78) calc(var(--cd, 0) * 360deg), transparent 0);
+}
+.sk-ultfill { position: absolute; inset: 0; background: linear-gradient(315deg, var(--sp) calc(var(--fill, 0) * 100%), #2a2a30 0); }
+.sk-in { position: absolute; inset: 0; display: grid; place-items: center; }
+.sk-g { font: 400 36px/1 "ZCOOL QingKe HuangYou", sans-serif; color: var(--ink); translate: 0 2px; }
+.sk-d.ult .sk-g { font-size: 46px; }
+.sk-t {
+  position: absolute; left: 50%; top: 50%; translate: -50% -46%; font: 400 34px/1 "Anton", sans-serif; color: var(--paper);
+  -webkit-text-stroke: 6px var(--ink); paint-order: stroke fill; visibility: hidden;
+}
+.sk-key {
+  position: absolute; left: 50%; bottom: -24px; translate: -50% 0; padding: 3px 7px 1px; background: var(--ink); color: var(--paper);
+  font: 400 22px/1 "Anton", sans-serif; box-shadow: 0 0 0 2px var(--paper);
+}
+.sk-d.is-cd .sk-box { background: #8b8b94; }
+.sk-d.is-cd .sk-g { opacity: 0.45; }
+.sk-d.is-cd .sk-t { visibility: inherit; }
+.sk-d.is-ready .sk-box { background: var(--paper); }
+.sk-d.is-ready .sk-key { background: var(--red); }
+.sk-d.ult .sk-key { background: var(--sp); color: var(--ink); box-shadow: 0 0 0 2px var(--ink); }
+.sk-d.ult.is-ready .sk-box { box-shadow: 0 0 0 4px var(--ink), 0 0 0 7px var(--sp), 0 0 0 10px var(--ink), 0 0 26px 10px rgba(255, 230, 0, 0.85); }
+.sk-d.ult.is-ready .sk-g { color: var(--red); }
+.sk-flash { position: absolute; inset: -6px; rotate: 45deg; background: var(--paper); opacity: 0; }
+.sk-deny {
+  position: absolute; left: 50%; top: -34px; translate: -50% 0; white-space: nowrap; padding: 3px 7px 1px; background: var(--red);
+  color: var(--paper); font: 400 20px/1 "ZCOOL QingKe HuangYou", sans-serif; box-shadow: 0 0 0 2px var(--ink); opacity: 0;
+}
+.sk-d.is-denied .sk-box { background: var(--hot); }
+
+.wp { position: absolute; right: 262px; bottom: 12px; display: flex; align-items: stretch; transform: skewX(-14deg); box-shadow: 5px 5px 0 var(--ink); }
+.wp-k { background: var(--ink); color: var(--paper); font: 400 17px/1 "Bebas Neue", sans-serif; padding: 6px 6px 4px; writing-mode: vertical-rl; text-orientation: mixed; letter-spacing: 1px; }
+.wp-body { display: flex; align-items: center; gap: 10px; background: var(--paper); padding: 4px 12px 2px 10px; }
+.wp-ico { width: 40px; height: 40px; }
+.wp-ico svg { width: 100%; height: 100%; overflow: visible; }
+.wp-n { font: 400 30px/1 "ZCOOL QingKe HuangYou", sans-serif; color: var(--ink); white-space: nowrap; }
+.wp-u { display: flex; gap: 4px; align-items: center; }
+.wp-pip { width: 9px; height: 20px; background: var(--red); box-shadow: 0 0 0 2px var(--ink); }
+.wp-pip.off { background: #c9c9cf; }
+.wp-x { font: 400 30px/1 "Anton", sans-serif; color: var(--red); }
+.wp.is-last .wp-pip:not(.off) { animation: brh-low 0.4s steps(2, end) infinite; }
+.wp-flash { position: absolute; inset: 0; background: var(--sp); opacity: 0; pointer-events: none; }

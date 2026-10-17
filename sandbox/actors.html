@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><title>actors sandbox — BEAK RASH</title><link rel="icon" href="data:,">
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #2b2f3a; font: 13px/1.4 system-ui, sans-serif; color: #fff; }
+    canvas { display: block; width: 100vw; height: 100vh; }
+    #panel { position: fixed; left: 10px; top: 10px; background: rgba(11, 11, 15, .82); padding: 10px 12px; border-left: 4px solid #e5191c; max-width: 300px; }
+    #panel button, #panel select { font: inherit; margin: 2px 2px 2px 0; background: #fff; color: #0b0b0f; border: 0; padding: 3px 7px; cursor: pointer; }
+    #panel button.on { background: #e5191c; color: #fff; }
+    #panel .row { margin: 4px 0; }
+    #stats { margin-top: 6px; color: #ffe600; white-space: pre; font-family: ui-monospace, monospace; font-size: 11px; }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <div id="panel"></div>
+  <script type="module" src="./actors.ts"></script>
+</body>
+</html>

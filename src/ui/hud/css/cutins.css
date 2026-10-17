@@ -1,0 +1,55 @@
+/* Cut-in layer: countdown, player skill band, rival skill chips. Stage = 1920×1080 scaled by --k. */
+.brh-cutins { pointer-events: none; }
+.ci { position: absolute; inset: 0; }
+.ci > * { position: absolute; }
+
+/* Countdown 3-2-1-GO. Centre (960, 420). */
+.cd-burst { left: 640px; top: 100px; width: 640px; height: 640px; background: var(--red); }
+.cd-burst2 { left: 600px; top: 60px; width: 720px; height: 720px; background: var(--ink); }
+.cd-slash { left: -200px; top: 380px; width: 2320px; height: 90px; background: var(--ink); transform-origin: 50% 50%; }
+.cd-slash::after { content: ""; position: absolute; left: 0; right: 0; top: 10px; height: 8px; background: var(--paper); }
+.cd-num {
+  left: 0; right: 0; top: 150px; text-align: center; font: 400 400px/1 "Anton", sans-serif; color: var(--paper);
+  -webkit-text-stroke: 26px var(--ink); paint-order: stroke fill; letter-spacing: -6px;
+}
+.cd-cn {
+  left: 50%; top: 590px; padding: 8px 22px 4px; background: var(--paper); color: var(--ink);
+  font: 400 72px/1 "ZCOOL QingKe HuangYou", sans-serif; box-shadow: 0 0 0 6px var(--ink), 10px 10px 0 6px var(--red);
+}
+.ci-cd.go .cd-burst { background: var(--paper); }
+.ci-cd.go .cd-burst2 { background: var(--red); }
+.ci-cd.go .cd-num { color: var(--red); -webkit-text-stroke-color: var(--ink); font-size: 380px; top: 170px; }
+.ci-cd.go .cd-cn { font: 400 110px/1 "Ma Shan Zheng", serif; background: var(--ink); color: var(--paper); padding: 6px 26px 0; box-shadow: 10px 10px 0 0 var(--red); }
+
+/* Player skill band: diagonal strip across the upper third with an eyes close-up. */
+.bd-strip {
+  left: -400px; top: 210px; width: 2720px; height: 230px; background: var(--ink); transform-origin: 50% 50%;
+  box-shadow: 0 -14px 0 0 var(--red), 0 14px 0 0 var(--red), 0 -22px 0 0 var(--paper), 0 22px 0 0 var(--paper);
+  overflow: hidden;
+}
+.bd-lines {
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.13) 0 3px, transparent 3px 46px, rgba(255, 255, 255, 0.07) 46px 120px, transparent 120px 170px);
+}
+.bd-eyes { position: absolute; left: 620px; top: 22px; width: 900px; height: 186px; clip-path: polygon(6% 0, 100% 0, 94% 100%, 0 100%); }
+.bd-eyes .eyes { position: absolute; inset: 0; }
+.bd-txt { position: absolute; left: 1500px; top: 26px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.bd-en { font: 400 112px/0.95 "Anton", sans-serif; color: var(--paper); letter-spacing: 1px; white-space: nowrap; -webkit-text-stroke: 4px var(--ink); paint-order: stroke fill; }
+.bd-cn {
+  padding: 6px 16px 2px; background: var(--red); color: var(--paper); font: 400 50px/1 "ZCOOL QingKe HuangYou", sans-serif;
+  box-shadow: 0 0 0 4px var(--paper), 8px 8px 0 4px var(--ink);
+}
+.bd-key { position: absolute; left: 470px; top: 64px; font: 400 90px/1 "Anton", sans-serif; color: var(--red); -webkit-text-stroke: 3px var(--paper); paint-order: stroke fill; }
+
+/* Rival skill chips (top-right, under the counters). Positioned in viewport px by the chips module. */
+.chips { position: absolute; right: calc(var(--k) * 34px); top: calc(var(--k) * 150px); width: 0; height: 0; }
+.chip { position: absolute; right: 0; top: 0; display: flex; align-items: center; gap: 10px; transform-origin: 100% 0; }
+.chip-card {
+  display: flex; align-items: center; gap: 10px; padding: 6px 16px 6px 8px; background: var(--ink); color: var(--paper);
+  transform: skewX(-12deg); box-shadow: 0 0 0 3px var(--paper), 6px 6px 0 3px var(--c3, var(--red));
+}
+.chip-card .bdg { width: 46px; height: 46px; flex: none; }
+.chip-t { display: flex; flex-direction: column; gap: 3px; }
+.chip-en { font: 400 34px/0.9 "Anton", sans-serif; letter-spacing: 1px; white-space: nowrap; }
+.chip-cn { font: 400 20px/1 "ZCOOL QingKe HuangYou", sans-serif; color: var(--sp); white-space: nowrap; }
+.chip-who { font: 900 16px/1 "Noto Sans SC", sans-serif; color: #bbb; white-space: nowrap; }

@@ -1,3 +1,3 @@
-// Bikes sub-unit entry. Replace the re-export with the real models (same exported names).
-export * from './stub';
+// Bikes sub-unit entry: the seven toy bikes (createBike) plus the bike ↔ rider contract types.
+export { createBikeModel as createBike, type BikeMarkersEx } from './model';
 export type { BikeModel, BikeMarkers, CreateBike } from './types';

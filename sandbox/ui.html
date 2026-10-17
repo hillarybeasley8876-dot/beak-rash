@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>BEAK RASH · UI screens sandbox</title>
+    <link rel="icon" href="data:,">
+    <style>
+      html, body { margin: 0; height: 100%; background: #0b0b0f; color: #fff; font: 14px/1.4 system-ui, sans-serif; }
+      #bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 8px 10px; background: #e5191c; }
+      #bar button { border: 0; padding: 6px 12px; background: #0b0b0f; color: #fff; font-weight: 700; cursor: pointer; transform: skewX(-10deg); }
+      #bar button.on { background: #fff; color: #0b0b0f; }
+      #bar label { margin-left: 10px; font-weight: 700; }
+      #stage { position: absolute; left: 0; right: 0; top: 52px; bottom: 0; display: grid; place-items: center; overflow: hidden; }
+      #frame { border: 0; transform-origin: center; box-shadow: 0 0 0 4px #fff; background: #000; }
+    </style>
+  </head>
+  <body>
+    <div id="bar"></div>
+    <div id="stage"><iframe id="frame" title="screen preview"></iframe></div>
+    <script type="module" src="./ui.ts"></script>
+  </body>
+</html>

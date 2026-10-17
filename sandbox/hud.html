@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BEAK RASH — HUD sandbox</title>
+    <link rel="icon" href="data:,">
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+      #game { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+      /* The game's own UI (screens + its HUD instance) renders here, hidden: only our HUD shows. */
+      #ui { display: none; }
+      #hud { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+    </style>
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+    <div id="ui"></div>
+    <div id="hud"></div>
+    <script type="module" src="./hud.ts"></script>
+  </body>
+</html>

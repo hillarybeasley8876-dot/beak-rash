@@ -1,2 +1,2 @@
-// Unit entry point. Replace the re-export with the real implementation (same exported names).
-export * from './stub';
+// Unit entry point (contract: createRaceLogic, core/contracts.ts).
+export { createRaceLogic } from './logic';

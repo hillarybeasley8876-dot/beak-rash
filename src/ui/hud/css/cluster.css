@@ -1,0 +1,57 @@
+/* P5 battle-style cluster (bottom-right): tilted portrait, HP/SP bars, skill diamonds, weapon slot. */
+.cl { position: relative; width: 720px; height: 380px; }
+.cl-pc-wrap { position: absolute; right: 6px; bottom: 34px; width: 214px; height: 254px; rotate: -7deg; transform-origin: 50% 100%; }
+.cl-pc-shadow, .cl-pc-frame {
+  position: absolute; inset: 0;
+  clip-path: polygon(6% 0, 100% 3%, 95% 46%, 100% 100%, 3% 96%, 0 54%);
+}
+.cl-pc-shadow { background: var(--red); translate: 12px 10px; }
+.cl-pc-frame { background: var(--ink); padding: 9px; }
+.cl-pc-frame .pc {
+  width: 100%; height: 100%;
+  clip-path: polygon(6% 0, 100% 3%, 95% 46%, 100% 100%, 3% 96%, 0 54%);
+}
+.cl-pc-wrap .pc-sil { inset: 12% 8% -8% -8%; }
+.cl-hurt { position: absolute; inset: 0; background: var(--red); mix-blend-mode: multiply; opacity: 0; }
+.cl-name {
+  position: absolute; right: 18px; bottom: 6px; display: flex; align-items: baseline; gap: 8px; padding: 5px 12px 3px;
+  background: var(--ink); color: var(--paper); transform: skewX(-12deg) rotate(-4deg); box-shadow: 4px 4px 0 var(--red);
+}
+.cl-name b { font: 400 34px/1 "ZCOOL QingKe HuangYou", sans-serif; }
+.cl-name i { font: 400 22px/1 "Bebas Neue", sans-serif; font-style: normal; color: var(--red); letter-spacing: 1px; }
+
+.cl-bars { position: absolute; right: 236px; bottom: 84px; width: 440px; transform: skewX(-14deg); }
+.cl-row { position: relative; display: flex; align-items: center; height: 44px; }
+.cl-row + .cl-row { margin-top: 8px; }
+.cl-k {
+  width: 52px; text-align: center; padding: 6px 0 2px; font: 400 30px/1 "Bebas Neue", sans-serif;
+  box-shadow: 0 0 0 3px var(--ink);
+}
+.cl-row.cl-hp .cl-k { background: var(--red); color: var(--paper); }
+.cl-row.cl-sp .cl-k { background: var(--sp); color: var(--ink); }
+.cl-bar { position: relative; flex: 1; height: 26px; margin: 0 10px; background: var(--ink); box-shadow: 0 0 0 3px var(--paper), 0 0 0 6px var(--ink); overflow: hidden; }
+.cl-row.cl-sp .cl-bar { height: 20px; }
+.cl-fill, .cl-chunk { position: absolute; inset: 4px; transform-origin: 0 50%; }
+.cl-chunk { background: var(--hot); }
+.cl-row.cl-hp .cl-fill { background: linear-gradient(180deg, #fff 0 55%, #d9d9de 55% 100%); }
+.cl-row.cl-sp .cl-fill { background: repeating-linear-gradient(-60deg, var(--sp) 0 12px, #ffd000 12px 20px); }
+.cl.is-low .cl-row.cl-hp .cl-fill { background: var(--hot); animation: brh-low 0.5s steps(2, end) infinite; }
+@keyframes brh-low { 50% { filter: brightness(1.7); } }
+.cl-v { min-width: 112px; font: 400 40px/1 "Anton", sans-serif; color: var(--paper); -webkit-text-stroke: 7px var(--ink); paint-order: stroke fill; font-variant-numeric: tabular-nums; }
+.cl-v small { font: 400 24px/1 "Bebas Neue", sans-serif; -webkit-text-stroke: 4px var(--ink); margin-left: 2px; }
+.cl-ready {
+  position: absolute; left: 62px; right: 2px; top: -3px; bottom: -3px; display: flex; gap: 14px; align-items: center;
+  padding: 0 12px; visibility: hidden; background: var(--ink); transform-origin: 30% 50%;
+  box-shadow: 0 0 0 3px var(--sp), 0 0 0 6px var(--ink), 0 0 24px 6px rgba(255, 230, 0, 0.75);
+}
+.cl-ready .rn { font-size: 30px; }
+.cl-ready .rg-gap { width: 0.45em; }
+.cl.is-full .cl-row.cl-sp .cl-bar, .cl.is-full .cl-row.cl-sp .cl-v { visibility: hidden; }
+.cl-ready kbd {
+  font: 400 26px/1 "Anton", sans-serif; background: var(--sp); color: var(--ink); padding: 3px 9px 1px; box-shadow: 0 0 0 3px var(--ink), 3px 3px 0 3px var(--ink);
+}
+.cl.is-full .cl-ready { visibility: inherit; animation: brh-ready 0.6s ease-in-out infinite alternate; }
+@keyframes brh-ready { from { scale: 1; } to { scale: 1.06; } }
+@media (prefers-reduced-motion: reduce) {
+  .cl.is-full .cl-ready, .cl.is-low .cl-row.cl-hp .cl-fill { animation: none; }
+}

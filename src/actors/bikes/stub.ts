@@ -37,7 +37,9 @@ export function createBike(id: BikeId, opts: { quality: Quality; tint?: string }
   const gripL = new Object3D(); gripL.position.set(-0.22, 0.16, -0.05); steer.add(gripL);
   const gripR = new Object3D(); gripR.position.set(0.22, 0.16, -0.05); steer.add(gripR);
   const saddle = new Object3D(); saddle.position.copy(seat).add(new Vector3(0, 0.05, 0)); root.add(saddle);
-  root.add(Object.assign(new Mesh(new CylinderGeometry(0.07, 0.05, 0.06, 10), toon('#222')), { position: seat.clone().add(new Vector3(0, 0.03, 0)) }));
+  const seatMesh = new Mesh(new CylinderGeometry(0.07, 0.05, 0.06, 10), toon('#222'));
+  seatMesh.position.copy(seat).add(new Vector3(0, 0.03, 0));
+  root.add(seatMesh);
   const crank = new Object3D(); crank.position.copy(bb); root.add(crank);
   const pedalL = new Object3D(), pedalR = new Object3D();
   const armL = new Object3D(), armR = new Object3D();

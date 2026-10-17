@@ -1,2 +1,2 @@
-// Unit entry point. Replace the re-export with the real implementation (same exported names).
-export * from './stub';
+// sim unit entry: arcade bicycle physics in track space (SPEC §6). Contract: createPhysics(session).
+export { createPhysics } from './physics';

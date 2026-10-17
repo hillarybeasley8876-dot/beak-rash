@@ -1,2 +1,2 @@
-// Unit entry point. Replace the re-export with the real implementation (same exported names).
-export * from './stub';
+// camera unit entry (owned by sim): chase rig, look-back, cinematic overrides, shake/kicks (SPEC §6).
+export { createCameraRig } from './rig';

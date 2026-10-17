@@ -1,0 +1,54 @@
+/* World-anchored overlays: rival name tags, taunt bubbles, damage numbers, edge warnings. */
+.brh-world { position: absolute; inset: 0; }
+.wa { position: absolute; left: 0; top: 0; will-change: transform, opacity; visibility: hidden; }
+
+/* Name tag: origin at the anchor point (above the head); content grows upward. */
+.nt-in { position: absolute; left: 0; bottom: 0; width: max-content; translate: -50% 0; display: flex; flex-direction: column; align-items: center; transform-origin: 50% 100%; }
+.nt-plate {
+  display: flex; align-items: center; gap: 6px; padding: 3px 9px 3px 4px; background: var(--ink);
+  transform: skewX(-12deg); box-shadow: 3px 3px 0 var(--c3, var(--red)), 0 0 0 2px var(--paper);
+}
+.nt-dot {
+  width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: var(--c1, #fff);
+  color: var(--ink); font: 400 16px/1 "ZCOOL QingKe HuangYou", sans-serif; box-shadow: 0 0 0 2px var(--c3, var(--red));
+}
+.nt-name { font: 900 22px/1 "Noto Sans SC", sans-serif; color: var(--paper); white-space: nowrap; }
+.nt-pl { font: 400 22px/1 "Anton", sans-serif; color: var(--ink); background: var(--paper); padding: 2px 5px 0; }
+.nt-hp { position: relative; width: 104px; height: 9px; margin-top: 5px; background: var(--ink); transform: skewX(-20deg); box-shadow: 0 0 0 2px var(--paper); overflow: hidden; }
+.nt-hp-f { position: absolute; inset: 2px; background: var(--paper); transform-origin: 0 50%; }
+.nt-hp-f.low { background: var(--hot); }
+.nt-chip {
+  position: absolute; right: -30px; top: -14px; padding: 2px 5px 1px; font: 400 18px/1 "ZCOOL QingKe HuangYou", sans-serif;
+  background: var(--red); color: var(--paper); transform: rotate(10deg); box-shadow: 0 0 0 2px var(--ink); visibility: hidden;
+}
+.nt-chip.on { visibility: inherit; }
+.nt-chip.angry { background: var(--red); }
+.nt-chip.stun { background: var(--sp); color: var(--ink); }
+.nt-chip.shield { background: #2FA8FF; }
+.nt-chip.weapon { background: var(--paper); color: var(--ink); }
+.nt-tip { width: 14px; height: 9px; margin-top: 2px; background: var(--paper); clip-path: polygon(0 0, 100% 0, 50% 100%); }
+
+/* Taunt bubble: jagged white speech shape with a tail pointing at the speaker. */
+.tb-in { position: absolute; left: 0; bottom: 0; width: max-content; max-width: 340px; translate: -50% 0; transform-origin: 50% 100%; }
+.tb-box {
+  position: relative; max-width: 330px; padding: 12px 20px 12px 18px; background: var(--paper); color: var(--ink);
+  font: 400 26px/1.18 "ZCOOL KuaiLe", "Noto Sans SC", sans-serif; text-align: center;
+  clip-path: polygon(0 12%, 9% 0, 40% 6%, 62% 0, 100% 9%, 96% 52%, 100% 92%, 66% 100%, 30% 94%, 4% 100%, 2% 55%);
+  filter: drop-shadow(0 0 0 var(--ink));
+}
+.tb-out {
+  position: absolute; inset: -5px; background: var(--ink);
+  clip-path: polygon(0 12%, 9% 0, 40% 6%, 62% 0, 100% 9%, 96% 52%, 100% 92%, 66% 100%, 30% 94%, 4% 100%, 2% 55%);
+  translate: 5px 5px;
+}
+.tb-who { position: absolute; left: -10px; top: -16px; padding: 3px 7px 1px; background: var(--red); color: var(--paper); font: 400 17px/1 "ZCOOL QingKe HuangYou", sans-serif; transform: rotate(-8deg); box-shadow: 0 0 0 2px var(--ink); }
+.tb-tail { position: absolute; left: 50%; bottom: -20px; width: 30px; height: 24px; translate: -30% 0; background: var(--paper); clip-path: polygon(0 0, 100% 0, 18% 100%); }
+
+/* Damage numbers. */
+.dn-in { position: absolute; left: 0; top: 0; width: max-content; translate: -50% -50%; white-space: nowrap; text-align: center; }
+.dn-v { font: 400 58px/1 "Anton", sans-serif; color: var(--paper); -webkit-text-stroke: 9px var(--ink); paint-order: stroke fill; }
+.dn.crit .dn-v { font-size: 82px; color: var(--sp); }
+.dn.heavy .dn-v { font-size: 70px; }
+.dn.hurt .dn-v { color: var(--hot); }
+.dn.block .dn-v { font: 400 40px/1 "Bangers", sans-serif; color: #9fd8ff; letter-spacing: 2px; }
+.dn-tag { display: block; margin: 0 auto 2px; width: max-content; padding: 2px 6px 0; background: var(--red); color: var(--paper); font: 400 24px/1 "Bangers", sans-serif; letter-spacing: 1px; transform: rotate(-8deg); box-shadow: 0 0 0 2px var(--ink); }

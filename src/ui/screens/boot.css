@@ -1,0 +1,37 @@
+.br-scr-boot .br-bg { background: var(--ink); }
+.br-boot-slash {
+  position: absolute;
+  left: -200px;
+  top: 400px;
+  width: 2320px;
+  height: 250px;
+  background: var(--red);
+  rotate: -9deg;
+  clip-path: polygon(0 18%, 100% 0, 100% 82%, 0 100%);
+  animation: br-slash 0.16s var(--ease-snap) both;
+}
+.br-boot-slash.is-thin { top: 690px; height: 26px; background: var(--white); animation-delay: 0.08s; }
+.br-boot-logo { position: absolute; left: 0; right: 0; top: 330px; text-align: center; rotate: -9deg; }
+.br-boot-en {
+  font-family: var(--f-stencil);
+  font-weight: 400;
+  font-size: 210px;
+  line-height: 1;
+  color: var(--white);
+  text-shadow: 10px 10px 0 var(--ink);
+  animation: br-slam 0.4s var(--ease-slam) 0.06s both;
+}
+.br-boot-cn { margin-top: 10px; font-size: 110px; --delay: 260ms; }
+.br-boot-credit {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 120px;
+  text-align: center;
+  font-family: var(--f-bebas);
+  font-weight: 400;
+  font-size: 34px;
+  letter-spacing: 0.3em;
+  color: rgba(255, 255, 255, 0.6);
+  animation: br-fade-in 0.3s ease 0.4s both;
+}

@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>BEAK RASH — track sandbox</title>
+    <link rel="icon" href="data:,">
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #111; color: #fff; font: 12px/1.4 monospace; }
+      #c { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+      #sheet { position: fixed; inset: 0; display: none; background: #111; }
+      #hud { position: fixed; left: 8px; top: 8px; background: rgba(0,0,0,.55); padding: 6px 8px; pointer-events: none; white-space: pre; }
+    </style>
+  </head>
+  <body>
+    <canvas id="c"></canvas>
+    <canvas id="sheet"></canvas>
+    <div id="hud"></div>
+    <script type="module" src="./track.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,48 @@
+/* Intro: track title banner (top-left) and rival "calling cards" (lower right). Stage px. */
+.ib { position: absolute; left: 70px; top: 80px; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; transform-origin: 0 0; }
+.ib-en {
+  font: 400 128px/0.9 "Anton", sans-serif; color: var(--paper); letter-spacing: 2px; white-space: nowrap;
+  -webkit-text-stroke: 16px var(--ink); paint-order: stroke fill; transform: skewX(-10deg);
+}
+.ib-cn {
+  padding: 8px 20px 4px; background: var(--red); color: var(--paper); font: 400 58px/1 "ZCOOL QingKe HuangYou", sans-serif;
+  transform: skewX(-10deg); box-shadow: 0 0 0 5px var(--ink), 10px 10px 0 5px var(--ink);
+}
+.ib-meta {
+  padding: 6px 14px 3px; background: var(--ink); color: var(--paper); font: 400 30px/1 "Bebas Neue", "ZCOOL QingKe HuangYou", sans-serif;
+  letter-spacing: 1px; transform: skewX(-10deg); white-space: nowrap;
+}
+
+.ic { position: absolute; left: 1180px; top: 610px; width: 660px; height: 340px; transform-origin: 50% 50%; }
+.ic-sh, .ic-card { position: absolute; inset: 0; clip-path: polygon(0 4%, 3% 0, 26% 3%, 52% 0, 78% 4%, 100% 0, 98% 30%, 100% 62%, 97% 100%, 70% 96%, 44% 100%, 18% 96%, 0 100%, 2% 66%, 0 34%); }
+.ic-sh { background: var(--ink); translate: 16px 16px; }
+.ic-card {
+  background:
+    radial-gradient(circle, rgba(11, 11, 15, 0.28) 2px, transparent 3px) 0 0 / 14px 14px,
+    linear-gradient(160deg, var(--hot) 0 55%, var(--red) 55% 100%);
+}
+.ic-pc { position: absolute; left: 26px; top: 26px; width: 236px; height: 288px; background: var(--ink); padding: 8px; clip-path: polygon(6% 0, 100% 3%, 96% 100%, 0 97%); }
+.ic-pc .pc { width: 100%; height: 100%; }
+.ic-pc .pc-sil { inset: 12% 0 -6% 0; }
+.ic-code {
+  position: absolute; left: 290px; top: 26px; padding: 6px 14px 2px; background: var(--ink); color: var(--paper);
+  font: 400 34px/1 "Anton", sans-serif; letter-spacing: 3px; transform: rotate(-3deg);
+}
+.ic-name { position: absolute; left: 286px; top: 82px; font-size: 92px; }
+.ic-title {
+  position: absolute; left: 292px; top: 200px; padding: 5px 12px 2px; background: var(--paper); color: var(--ink);
+  font: 400 32px/1 "ZCOOL QingKe HuangYou", sans-serif; box-shadow: 0 0 0 3px var(--ink), 6px 6px 0 3px var(--ink); white-space: nowrap;
+}
+.ic-tag {
+  position: absolute; left: 292px; right: 24px; top: 252px; color: var(--paper); font: 400 30px/1.15 "ZCOOL KuaiLe", "Noto Sans SC", sans-serif;
+  text-shadow: 3px 3px 0 var(--ink);
+}
+.ic-skill {
+  position: absolute; right: 20px; top: 22px; width: 74px; height: 74px; display: grid; place-items: center; rotate: 45deg;
+  background: var(--paper); box-shadow: 0 0 0 4px var(--ink);
+}
+.ic-skill span { rotate: -45deg; font: 400 38px/1 "ZCOOL QingKe HuangYou", sans-serif; color: var(--ink); }
+.ic-grid {
+  position: absolute; left: 1180px; top: 560px; padding: 4px 12px 1px; background: var(--paper); color: var(--ink);
+  font: 400 30px/1 "Anton", sans-serif; letter-spacing: 2px; box-shadow: 0 0 0 4px var(--ink); transform: rotate(-4deg);
+}

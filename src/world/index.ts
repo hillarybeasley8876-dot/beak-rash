@@ -1,2 +1,2 @@
-// Unit entry point. Replace the re-export with the real implementation (same exported names).
-export * from './stub';
+// Track unit entry. Contract: createTrack(app, id, rng) → Track (core/contracts.ts).
+export { createTrack } from './track';

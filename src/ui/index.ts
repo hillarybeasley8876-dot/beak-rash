@@ -1,2 +1,2 @@
-// Unit entry point. Replace the re-export with the real implementation (same exported names).
-export * from './stub';
+// ui-screens entry: the P5 menu shell (screens, transitions, toasts) hosting the ui-hud layer.
+export { createUi } from './shell';

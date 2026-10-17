@@ -123,6 +123,7 @@ export interface RiderState {
   place: number;       // 1-based standing
   progress: number;    // 0..1 of track length
   finishTime: number | null;
+  rubber: number;      // race-owned top-speed factor (rubber band / hunt sprint), 1 = neutral; physics multiplies it in
   // --- combat (owned by gameplay/combat) ---
   hp: number;
   maxHp: number;

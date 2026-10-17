@@ -1,0 +1,79 @@
+{
+ "pass": false,
+ "score": 6.5,
+ "summary": "Combat does not pass this round: score 6.5/10, with three major issues. The engineering is solid. All 26 scenario checks pass in isolated, all-real and full modes. tsc reports 0 errors, there is no `any`, and the largest file is 173 lines with one job each. Two runs with the same seed produce identical event logs over 3000 frames. Memory returns to baseline after each of 3 consecutive races. Combat costs 0.14-0.19 ms of CPU per frame and adds 7-44 draw calls (31-42k triangles) at 1080p; the whole game stays within the 600-call and 1.5M-triangle budget. Two full-race soaks with traffic and police produced 0 console errors and exactly one KO event per wreck. The three major issues: (1) SHOWTIME and Big Gulp move riders up without marking them airborne first, so sim scores a PERFECT landing (+20 % boost, +8 SP, PERFECT callout) after every ult and for every gulp victim. (2) Four combat-owned events declared in events-map (weaponBreak, bell, projectile:spawn/end) are never emitted, though audio already listens to them. (3) Big Gulp's vacuum tag is never cleared, so later gulps collect items from any distance (146 m repro). There are also nine minor issues covering shader recompiles per cast, stacked feedback on multi-victim hits, merged speed boosts, event positions, bell SP farming, per-substep render work, a duplicate outline material, spec deviations and test gaps.",
+ "issues": [
+  {
+   "severity": "major",
+   "title": "Combat-driven flights become sim 'launch' airs: every SHOWTIME and every gulp victim scores a PERFECT landing",
+   "detail": "ult.ts:52 sets r.airborne = y > 0.01, which is false on the cast step (y = 0, vy > 0.5). gulp.ts:82 glue() sets v.airborne = r.airborne (false) while lifting v.y to r.y + 0.4. sim/air.ts vertical() therefore calls startAir(sr,'launch') and owns the flight, so it never treats it as 'external'. On the impact frame (frame 766, the same frame as ult:impact), sim emits rider:boost{kind:'land',power:0.2,time:0.6} and rider:land{perfect:true}. sp.ts then adds +8 SP, so SP goes 100 -> 0 -> 8 right after casting. The HUD queues PERFECT!, audio plays bike.perfect plus the 完美落地 announcer, and fx bursts sparkle. ult-after-5/6.png show SP 8 and the BOOST gauge. The spat gulp victim gets the same boost and SP (rider:land airTime 0.45, perfect, logged before the 25 dmg spit hit). Because the flight is a 'launch' with an 8 m peak, it is also subject to sim's crash-on-landing rule (|yaw| > 45°). Evidence: shots/review/combat/r1-tech/air.txt, ultshot.mjs.",
+   "fix": "Mark every combat-driven flight airborne from its first step so sim adopts it as 'external'. In the ult, set r.airborne = true in the constructor and keep it true while this.t < IMPACT_T. In gulp, have glue() and advance() set v.airborne = true. Add a combat-check scenario asserting no rider:land and no rider:boost{kind:'land'} for the caster or victim, and SP < 1 after SHOWTIME."
+  },
+  {
+   "severity": "major",
+   "title": "Four combat-owned events declared in events-map are never emitted, and audio already listens to them",
+   "detail": "events-map.ts (now updated at 19:09) declares combat:weaponBreak, combat:bell, projectile:spawn and projectile:end. Combat emits none of them. armory.ts:38-47 only fires fx bursts on a break. bell.ts:20 still sends a 'taunt' with text 叮叮叮！, which audio string-matches on '叮'. ProjectileSystem.spawn/remove emit nothing. audio/events-combat.ts:65-72 subscribes to all three: the weapon.break crunch, the bell, and the 'ui.incoming' homing warning, so none of those sounds can ever play. status/combat.md (18:26) still lists these as 'core requests' and says there is 'no dedicated bell event yet'.",
+   "fix": "Emit combat:weaponBreak in consumeUse() before equip('none'). Emit combat:bell{riderId,pos,angered[]} in ringBell(), then drop the 叮 taunt or keep it as flavour only. Emit projectile:spawn{id,owner,target,kind:skillId,pos} in spawn(). Emit projectile:end{id,hit,pos} on hit, poof, swallow and dispose. Assert each in combat-check and update status."
+  },
+  {
+   "severity": "major",
+   "title": "Big Gulp vacuum tag is never cleared, so later gulps pull items from any distance",
+   "detail": "pickups.ts:118-131 sets it.vacuumBy = r.id and never resets it: not when take() refuses the item (a road weapon while armed), and not when the gulp ends. The guard `if (d > radius && it.vacuumBy !== r.id) continue` then exempts those items from the 4 m limit on every future gulp. Repro (shots/review/combat/r1-tech/vacuum.txt): an armed pelican gulps beside a road keyboard, which is dragged along and left 6.2 m behind. The pelican rides on and gulps again with nothing in range. The keyboard flies 146 m and is collected. Coins that enter the radius late in the 1.2 s window get tagged the same way. Vacuumed row items are also left displaced from their row.",
+   "fix": "In vacuum(), skip items that take() would refuse (weapons while armed). Clear vacuumBy on all items when the gulp's open window ends (Gulp.cleanup or t > open). Cap the pull at d <= radius + 1 regardless of the tag. Restore uncollected row items to their home s/x. Add a range regression to combat-check."
+  },
+  {
+   "severity": "minor",
+   "title": "GL program churn: each skill cast relinks its shaders, and nothing is pre-warmed",
+   "detail": "Every visual allocates a fresh MeshBasicMaterial or LineBasicMaterial, plus new Torus/Circle/Icosahedron geometries for auras (waves.ts:13-15, auras.ts:15-17/68-70/103-105/131, ribbon.ts:30-34), and disposes them on end. When the last user of a program is disposed, three deletes the program. With only combat real (shots/review/combat/r1-tech/churn-isolated.txt), every honk, torpedo and doge creates 2 'basic' programs at +0 frames and deletes them when the visual ends, then relinks them on the next cast (2-4 linkProgram calls per cast). The first-ever cast compiles mid-race. On the M1 Max this stays at or under 10 ms per frame (hitch-isolated.txt). On ANGLE/D3D or mobile GPUs it means a stutter on every cast.",
+   "fix": "Add a session-scoped material and geometry cache in PropLibrary keyed by (colour, side, blending). Keep per-instance opacity in vertex alpha, or pool the cloned materials and keep them alive until session dispose. Pre-compile on session start with renderer.compile() on hidden instances of each visual type."
+  },
+  {
+   "severity": "minor",
+   "title": "Area-of-effect hits stack hit-stop, camera kicks and rumble once per victim",
+   "detail": "feedback.impact() runs inside land() for every victim. One SHOWTIME hitting 6 riders emits 6 'hitstop' + 6 'cam:shake' events and 6 input.rumble() calls in the same substep (shots/review/combat/r1-tech/stack.txt), plus 1 more hitstop from fx. camera/rig.ts sums the 'hitstop' FOV kicks (-3° each, capped at 16°), so the punch scales with victim count. The gamepad effect restarts 6 times. The same happens for cat.spin and wing rams.",
+   "fix": "Coalesce feedback per substep in feedback.ts: record the strongest ImpactKind and highest involvement, then emit one hitstop, one shake and one rumble from postStep."
+  },
+  {
+   "severity": "minor",
+   "title": "Skill speed buffs use the shared boost pair, which merges overlapping boosts; Wing Dash also ignores brakes",
+   "detail": "statuses.ts:73/92 writes r.boostTime = max(...) and r.boostPower = max(...) every substep. Any boost that is still running therefore inherits the longest duration, and the skill inherits the strongest power. trade.txt: a +35 % drift boost with 0.25 s left, followed by DOGE (+15 %, 3 s), stays at +35 % for 3 s. Separately, wing.ts:36 restores the pre-physics speed every substep. With Wing active, braking for 1 s raises speed from 19.98 to 22.19 m/s; without it, speed drops to 6.69 (wing.txt). Walls, uphill and bumps cannot slow the pelican for 2.2 s either. The SPEC's 'without slowing you' refers to ramming.",
+   "fix": "Apply skill speed buffs through mods.speedMul/accelMul, which RiderMods exists for, instead of the shared boost pair. Alternatively, request a stacked boost API from core. In wing, only cancel the speed lost to ram contacts, not brake, slope or wall losses."
+  },
+  {
+   "severity": "minor",
+   "title": "Event positions ignore lean and yaw",
+   "detail": "ctx.pos() (ctx.ts:84-87) uses track.toWorld(s, x, y + lift) for combat:hit, combat:ko, skill:hit and pickup positions. Compared with the victim's rendered chest anchor over 53 real hits (shots/review/combat/r1-tech/misc.txt): median 0.19 m off, worst 0.55 m at 25° lean. Sparks, damage numbers and the KO focus appear beside a leaning rider.",
+   "fix": "Build event positions from physics.pose() plus a rider-local offset, as VisualSystem.local() already does. Expose that as ctx.pos()."
+  },
+  {
+   "severity": "minor",
+   "title": "The bell grants SP with nobody in range, so SHOWTIME can be farmed risk-free",
+   "detail": "ringBell() (bell.ts:19) adds +5 SP every 3 s whether or not anyone was angered. 20 bell presses with every rival 300 m or more away gave 100 SP in 62 s (shots/review/combat/r1-tech/misc.txt): a free SHOWTIME every minute.",
+   "fix": "Award SP only when at least one rival was angered, or apply per-target diminishing returns. Emit the angered list in combat:bell (see the events issue)."
+  },
+  {
+   "severity": "minor",
+   "title": "Rendering work and allocations happen inside each sim substep",
+   "detail": "postStep redraws every pickup instance matrix (pickups.ts:52/158-167) and rebuilds every ribbon. It also allocates on each substep: Trail.probe.clone(); RibbonSet.at() creating a new Vector3 per point (Lightning 42 per substep, VacuumSpiral 48, Tether clones); and others() building, sorting and mapping arrays for wing, spin, chill and honk every substep. At 60 Hz that is twice per frame. During hit-stop (0 substeps), camera-facing ribbons are not re-faced while the camera kicks. Measured cost is small (combat CPU mean 0.14-0.19 ms, p95 0.4 ms at 1080p, perf.txt).",
+   "fix": "Sync visuals and pickups at most once per rendered frame (skip when clock.realTime is unchanged) and reuse scratch vectors and arrays. If needed, request a per-frame combat hook from core."
+  },
+  {
+   "severity": "minor",
+   "title": "Duplicate outline material: meshes/build.ts hullMaterial copies core's outlineMaterial",
+   "detail": "build.ts:56-75 re-implements render/toon.ts outlineMaterial (same begin_vertex patch) under a different program key ('combat-hull-*' vs 'outline-*'). That duplicates code, against the global no-duplication rule, and adds one more GL program. Core's version already offsets before instancing, so it works for InstancedMesh.",
+   "fix": "Use outlineMaterial(color, width) from render/toon.ts for the instanced hulls and delete hullMaterial/disposeHullMaterials."
+  },
+  {
+   "severity": "minor",
+   "title": "Spec and fairness deviations in several skills and in trade resolution",
+   "detail": "corgi.whistle slows everyone ahead when no offender is in range (whistle.ts:18-19). The SPEC says offenders only. pelican.wing rams riders up to 2.1 m behind (wing.ts:37 uses |ds|). pigeon.ghost reappears with no obstacle or traffic check, and is pulled backwards when cast within 5 m of the finish (ghost.ts:32, min(length-5, s+25)). Simultaneous swing trades always go to the lower rider id, because resolveSwing runs in id order and the first strike cancels the other swing (trade.txt: player beats goose, goose beats cat).",
+   "fix": "Restrict whistle to offenders. Require ds > -0.5 for wing rams. Use max(r.s, …) for the ghost teleport and pick a clear lane. Resolve swings in two passes (collect, then apply) so a same-substep exchange trades both hits or uses a seeded tiebreak."
+  },
+  {
+   "severity": "minor",
+   "title": "Test harness misses the defects above and filters errors too narrowly",
+   "detail": "combat-check has no scenario for combat-driven landings, vacuum range, declared-but-unemitted events, AoE feedback stacking or boost merging. Its leak check covers a single restart with no renderer.info check. Its error gate (combat-check.mjs:20) only counts messages containing 'combat'. All 26 scenarios pass in isolated, real and full modes, yet issues 1-3 exist.",
+   "fix": "Add those scenarios. Add a 3-race loop asserting renderer.info.memory and bus listener counts return to baseline. Fail on any new console error that is not from another unit's known stub fallback."
+  }
+ ]
+}

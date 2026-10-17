@@ -16,6 +16,7 @@ import type { BikeId, CharacterId, Quality, TrackId } from './types';
 
 export class Game {
   readonly app: AppContext;
+  readonly achievements: ReturnType<Modules['createAchievements']>;
   session: RaceSession | null = null;
   lastConfig: RaceConfig | null = null;
   /** Manual stepping mode (tests): the RAF loop renders but does not advance time. */
@@ -51,6 +52,7 @@ export class Game {
     app.ui = modules.createUi(app);
     app.audio = modules.createAudio(app);
     this.app = app;
+    this.achievements = modules.createAchievements(app);
     this.wireFlow();
     this.resize();
     window.addEventListener('resize', () => this.resize());
@@ -98,6 +100,8 @@ export class Game {
       this.app.rig.attach(session);
       this.app.fx.attach(session);
       this.app.ui.attach(session);
+      this.app.audio.attach?.(session);
+      this.achievements.attach(session);
       await this.show('race', { config });
     } catch (err) {
       console.error('[game] could not start race', err);
@@ -113,9 +117,12 @@ export class Game {
     this.app.rig.attach(null);
     this.app.fx.attach(null);
     this.app.ui.attach(null);
+    this.app.audio.attach?.(null);
+    this.achievements.attach(null);
     this.session.dispose();
     this.session = null;
     this.app.clock.clearScale('pause');
+    this.app.audio.setMuffle(0);
   }
 
   private buildConfig(o: Partial<RaceConfig>): RaceConfig {

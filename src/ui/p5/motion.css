@@ -1,0 +1,90 @@
+/* P5 motion vocabulary: slams (1.4→1 with overshoot), 12 fps idle jitter, slashes, pops, spins. */
+@keyframes br-slam {
+  0% { transform: scale(1.45) rotate(var(--slam-r, -4deg)); opacity: 0; }
+  55% { transform: scale(0.94) rotate(0deg); opacity: 1; }
+  78% { transform: scale(1.03); }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes br-glyph-in {
+  0% { transform: translateY(var(--dy, 0)) rotate(calc(var(--r, 0deg) * -3)) scale(1.8); opacity: 0; }
+  60% { transform: translateY(var(--dy, 0)) rotate(var(--r, 0deg)) scale(calc(var(--k, 1) * 0.92)); opacity: 1; }
+  100% { transform: translateY(var(--dy, 0)) rotate(var(--r, 0deg)) scale(var(--k, 1)); opacity: 1; }
+}
+@keyframes br-jitter {
+  0% { translate: 0 0; }
+  17% { translate: 1px -1px; }
+  33% { translate: -1px 1px; }
+  50% { translate: 2px 0; }
+  67% { translate: 0 1px; }
+  83% { translate: -1px -1px; }
+  100% { translate: 0 0; }
+}
+@keyframes br-press {
+  0% { scale: 1; }
+  40% { scale: 0.9; }
+  100% { scale: 1; }
+}
+@keyframes br-pop {
+  0% { transform: scale(0.6) rotate(-6deg); opacity: 0; }
+  70% { transform: scale(1.05) rotate(1deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+@keyframes br-spin { to { rotate: 360deg; } }
+@keyframes br-pulse {
+  0%, 100% { opacity: 1; scale: 1; }
+  50% { opacity: 0.55; scale: 0.97; }
+}
+@keyframes br-drift { to { background-position: 160px -96px; } }
+@keyframes br-scroll-lines { to { background-position: 200px 0; } }
+@keyframes br-in-left {
+  0% { transform: translateX(-120%) skewX(var(--skew)); }
+  100% { transform: translateX(0) skewX(var(--skew)); }
+}
+@keyframes br-in-right {
+  0% { transform: translateX(120%) skewX(var(--skew)); }
+  100% { transform: translateX(0) skewX(var(--skew)); }
+}
+@keyframes br-rise {
+  0% { translate: 0 60px; opacity: 0; }
+  100% { translate: 0 0; opacity: 1; }
+}
+@keyframes br-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes br-slash {
+  0% { clip-path: polygon(0 0, 0 0, 0 100%, 0 100%); }
+  100% { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); }
+}
+@keyframes br-float {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -10px; }
+}
+@keyframes br-shake {
+  0%, 100% { translate: 0 0; }
+  20% { translate: -14px 0; }
+  40% { translate: 12px 0; }
+  60% { translate: -8px 0; }
+  80% { translate: 5px 0; }
+}
+@keyframes br-toast-in {
+  0% { transform: translateX(120%) skewX(var(--skew)); }
+  100% { transform: translateX(0) skewX(var(--skew)); }
+}
+@keyframes br-toast-out {
+  0% { transform: translateX(0) skewX(var(--skew)); opacity: 1; }
+  100% { transform: translateX(60%) skewX(var(--skew)); opacity: 0; }
+}
+@keyframes br-stamp-in {
+  0% { transform: scale(3.2) rotate(-40deg); opacity: 0; }
+  60% { transform: scale(0.9) rotate(-10deg); opacity: 1; }
+  100% { transform: scale(1) rotate(-14deg); opacity: 1; }
+}
+@keyframes br-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0.15; } }
+@keyframes br-wheel-spin { to { transform: rotate(360deg); } }
+.br-wheel { animation: br-wheel-spin 0.35s linear infinite; }
+.br-anim-slam { animation: br-slam 0.42s var(--ease-slam) both; animation-delay: var(--delay, 0ms); }
+.br-anim-pop { animation: br-pop 0.3s var(--ease-slam) both; animation-delay: var(--delay, 0ms); }
+.br-anim-rise { animation: br-rise 0.36s var(--ease-out) both; animation-delay: var(--delay, 0ms); }
+.br-anim-left { animation: br-in-left 0.3s var(--ease-out) both; animation-delay: var(--delay, 0ms); }
+.br-anim-right { animation: br-in-right 0.3s var(--ease-out) both; animation-delay: var(--delay, 0ms); }
+.br-anim-jitter { animation: br-jitter 0.5s steps(6) infinite; }
+.br-anim-float { animation: br-float 2.4s ease-in-out infinite; }
+.br-anim-shake { animation: br-shake 0.32s var(--ease-out); }

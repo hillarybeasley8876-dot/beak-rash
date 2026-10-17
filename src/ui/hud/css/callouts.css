@@ -1,0 +1,40 @@
+/* Callouts (left-middle stack), FINAL STRETCH banner (top centre) and rival skill chips. Stage px. */
+.co-stack { position: absolute; left: 70px; top: 372px; width: 0; height: 0; }
+.co { position: absolute; left: 0; top: 0; display: flex; align-items: baseline; gap: 12px; padding: 10px 26px 8px 20px; transform-origin: 0 50%; white-space: nowrap; }
+.co-bg { position: absolute; inset: 0; z-index: -1; background: var(--paper); clip-path: polygon(3% 0, 100% 6%, 96% 100%, 0 92%); }
+.co-sh { position: absolute; inset: 0; z-index: -2; background: var(--ink); translate: 8px 7px; clip-path: polygon(3% 0, 100% 6%, 96% 100%, 0 92%); }
+.co-en { font: 400 58px/1 "Bangers", sans-serif; letter-spacing: 2px; color: var(--red); -webkit-text-stroke: 2px var(--ink); paint-order: stroke fill; }
+.co-cn { font: 400 28px/1 "ZCOOL QingKe HuangYou", sans-serif; color: var(--ink); }
+.co-x { font: 400 40px/1 "Anton", sans-serif; color: var(--paper); -webkit-text-stroke: 6px var(--ink); paint-order: stroke fill; }
+.co-near .co-bg { background: var(--ink); }
+.co-near .co-sh { background: var(--red); }
+.co-near .co-en { color: var(--paper); }
+.co-near .co-cn { color: var(--sp); }
+.co-drift .co-bg { background: var(--dc, #2FA8FF); }
+.co-drift .co-en { color: var(--paper); -webkit-text-stroke: 7px var(--ink); }
+.co-slip .co-bg { background: var(--sp); }
+.co-slip .co-en { color: var(--ink); -webkit-text-stroke: 0; }
+.co-place .co-bg { background: var(--ink); }
+.co-place .co-en { color: var(--paper); font-family: "Anton", sans-serif; }
+.co-place.down .co-en { color: var(--hot); }
+.co-place .co-cn { color: var(--paper); }
+.co-pick .co-bg { background: var(--paper); }
+.co-pick .co-en { font-size: 44px; color: var(--ink); -webkit-text-stroke: 0; }
+.co-more { padding: 14px 30px 12px 22px; }
+.co-more .co-bg { background: var(--red); }
+.co-more .co-en { font-size: 76px; }
+.co-more .co-en .rg { box-shadow: 0.05em 0.06em 0 var(--ink); }
+.co-more .co-cn { color: var(--paper); font-size: 32px; }
+
+.fs { position: absolute; left: 50%; top: 150px; width: 980px; height: 96px; margin-left: -490px; }
+.fs-tape {
+  position: absolute; inset: 0; transform: skewX(-14deg);
+  background: repeating-linear-gradient(-45deg, var(--red) 0 26px, var(--paper) 26px 52px);
+  box-shadow: 0 0 0 6px var(--ink), 10px 10px 0 6px rgba(11, 11, 15, 0.6);
+}
+.fs-text {
+  position: absolute; left: 50%; top: 50%; translate: -50% -50%; display: flex; align-items: center; gap: 18px;
+  padding: 8px 26px 4px; background: var(--ink); color: var(--paper); transform: skewX(-14deg); white-space: nowrap;
+}
+.fs-text b { font: 400 64px/1 "Anton", sans-serif; letter-spacing: 3px; }
+.fs-text i { font: 400 50px/1 "ZCOOL QingKe HuangYou", sans-serif; font-style: normal; color: var(--sp); }

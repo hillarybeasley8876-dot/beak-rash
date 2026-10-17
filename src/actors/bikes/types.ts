@@ -9,6 +9,8 @@ export interface BikeMarkers {
   gripR: Object3D;
   pedalL: Object3D;    // pedal centres (children of the crank arms, kept level)
   pedalR: Object3D;
+  /** Bell on the bars (child of `steer`): the rider's hand target when ringing it (taunt). */
+  bell?: Object3D;
   /** Optional: front basket (shared bike), rear rack (erba), stoker seat (tandem passenger). */
   basket?: Object3D;
   rack?: Object3D;

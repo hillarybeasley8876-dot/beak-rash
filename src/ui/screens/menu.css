@@ -1,0 +1,96 @@
+.br-menu-slab { position: absolute; left: -12%; top: -10%; width: 78%; height: 120%; background: var(--ink); clip-path: polygon(0 0, 58% 0, 82% 100%, 0 100%); }
+.br-menu-slab.is-white { background: var(--white); clip-path: polygon(58% 0, 59.6% 0, 83.6% 100%, 82% 100%); }
+.br-menu-logo { position: absolute; left: 86px; top: 52px; font-size: 60px; rotate: -5deg; }
+
+.br-menu-list { position: absolute; left: 150px; top: 205px; width: 940px; height: 780px; }
+.br-menu-item {
+  position: absolute;
+  left: calc(var(--i) * 44px);
+  top: calc(var(--i) * 124px);
+  display: flex;
+  align-items: baseline;
+  gap: 22px;
+  padding: 2px 34px 0 26px;
+  font-family: var(--f-cn-block);
+  font-weight: 400;
+  font-size: 96px;
+  line-height: 1.08;
+  color: var(--white);
+  text-shadow: 6px 6px 0 var(--red-deep);
+  transform: skewX(var(--skew)) rotate(-5deg);
+  transition: transform 0.12s var(--ease-out), color 0.08s;
+  white-space: nowrap;
+  isolation: isolate;
+  animation: br-in-left 0.3s var(--ease-out) both;
+  animation-delay: calc(var(--i) * 30ms);
+}
+.br-menu-item::before { content: ''; position: absolute; inset: 0; background: var(--white); clip-path: var(--clip); z-index: -1; opacity: 0; transform: scaleX(0.6); transform-origin: left; transition: opacity 0.08s, transform 0.12s var(--ease-out); }
+.br-menu-en { font-family: var(--f-display); font-weight: 400; font-size: 46px; letter-spacing: 0.06em; color: var(--red); text-shadow: none; }
+.br-menu-item.is-focus { color: var(--ink); text-shadow: none; transform: skewX(var(--skew)) rotate(-5deg) translateX(18px) scale(1.08); }
+.br-menu-item.is-focus::before { opacity: 1; transform: none; }
+.br-menu-item.is-focus .br-menu-cn { animation: br-jitter 0.5s steps(6) infinite; display: inline-block; }
+
+.br-menu-cursor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  rotate: -5deg;
+  transition: transform 0.14s var(--ease-out), width 0.14s var(--ease-out), height 0.14s var(--ease-out);
+  pointer-events: none;
+}
+.br-menu-cursor::before { content: ''; position: absolute; inset: 0; background: var(--red); clip-path: var(--clip); animation: br-jitter 0.42s steps(5) infinite; }
+.br-menu-cursor::after {
+  content: '';
+  position: absolute;
+  left: -34px;
+  top: 50%;
+  width: 74px;
+  height: 90px;
+  margin-top: -45px;
+  background: var(--white);
+  clip-path: polygon(0 0, 100% 50%, 0 100%, 24% 50%);
+  filter: drop-shadow(4px 4px 0 var(--ink));
+}
+.br-menu-cursor.is-instant { transition: none; }
+
+.br-menu-hero { position: absolute; left: 1150px; top: 128px; width: 660px; height: 800px; }
+.br-menu-frame { position: absolute; inset: 0 0 110px 0; background: var(--white); clip-path: var(--clip); rotate: 4deg; animation: br-pop 0.34s var(--ease-slam) 0.05s both; }
+.br-menu-frame .br-portrait { position: absolute; inset: 16px; background: var(--ink); }
+.br-menu-frame.is-backing { inset: 60px 30px 170px 40px; background: var(--ink); box-shadow: inset 0 0 0 14px var(--white); }
+.br-menu-art { position: absolute; left: -50px; top: -60px; width: 760px; height: 860px; object-fit: contain; filter: drop-shadow(12px 12px 0 var(--ink)); animation: br-pop 0.36s var(--ease-slam) 0.08s both; }
+.br-menu-frame .br-portrait.is-fallback { background: radial-gradient(circle at 50% 55%, #ff1e3c 0 34%, transparent 35%), var(--ink); }
+.br-menu-name {
+  position: absolute;
+  left: -50px;
+  bottom: 96px;
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  padding: 6px 36px 4px 28px;
+  background: var(--ink);
+  transform: skewX(var(--skew)) rotate(-4deg);
+  box-shadow: 8px 8px 0 var(--white);
+  animation: br-in-right 0.3s var(--ease-out) 0.12s both;
+}
+.br-menu-name b { font-family: var(--f-cn-block); font-weight: 400; font-size: 84px; color: var(--white); }
+.br-menu-name span { font-family: var(--f-display); font-weight: 400; font-size: 44px; color: var(--red); letter-spacing: 0.06em; }
+.br-menu-epithet { position: absolute; left: 10px; bottom: 44px; padding: 3px 18px 1px; background: var(--white); color: var(--ink); font-family: var(--f-cn-play); font-weight: 400; font-size: 30px; transform: skewX(var(--skew)) rotate(-4deg); }
+
+.br-menu-blurb {
+  position: absolute;
+  left: 900px;
+  top: 905px;
+  max-width: 900px;
+  padding: 16px 40px 14px;
+  background: var(--white);
+  color: var(--ink);
+  font-family: var(--f-cn-play);
+  font-weight: 400;
+  font-size: 36px;
+  clip-path: var(--clip);
+  rotate: -2deg;
+}
+.br-menu-coins { position: absolute; right: 70px; top: 46px; }
+.br-scr-menu .br-hints { bottom: 20px; }

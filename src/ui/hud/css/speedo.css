@@ -1,0 +1,43 @@
+/* Jagged speedometer (bottom-left) with drift charge ring, boost and slipstream tags. */
+.spd { position: relative; width: 300px; height: 300px; --dc: #2FA8FF; }
+.spd-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.spd-num {
+  position: absolute; left: 0; right: 0; top: 104px; text-align: center; font: 400 92px/1 "Anton", sans-serif;
+  color: var(--paper); -webkit-text-stroke: 12px var(--ink); paint-order: stroke fill; font-variant-numeric: tabular-nums;
+  transform: skewX(-8deg);
+}
+.spd-unit {
+  position: absolute; left: 50%; top: 204px; translate: -50% 0; padding: 3px 8px 0; background: var(--paper); color: var(--ink);
+  font: 400 24px/1 "Bebas Neue", sans-serif; transform: skewX(-12deg); box-shadow: 3px 3px 0 var(--red);
+}
+.spd-pips { position: absolute; left: 50%; top: 240px; translate: -50% 0; display: flex; gap: 10px; }
+.spd-pip { width: 16px; height: 16px; rotate: 45deg; background: #333; box-shadow: 0 0 0 3px var(--ink); }
+.spd-pip.on { background: var(--dc); box-shadow: 0 0 0 3px var(--ink), 0 0 12px 2px var(--dc); }
+.spd-spark { opacity: 0; }
+.spd.is-drift .spd-spark { animation: brh-spark 0.25s steps(2, end) infinite; }
+.spd.is-drift .spd-spark:nth-child(2n) { animation-delay: -0.12s; animation-duration: 0.31s; }
+.spd.is-drift .spd-spark:nth-child(3n) { animation-delay: -0.07s; animation-duration: 0.19s; }
+@keyframes brh-spark { 0% { opacity: 1; scale: 1; } 50% { opacity: 0.2; scale: 0.6; } 100% { opacity: 1; scale: 1.15; } }
+.spd-dlbl {
+  position: absolute; left: 50%; top: 66px; translate: -50% 0; padding: 3px 9px 0; color: var(--ink); background: var(--dc);
+  font: 400 24px/1 "Bebas Neue", sans-serif; letter-spacing: 1px; transform: skewX(-12deg); box-shadow: 0 0 0 3px var(--ink);
+  visibility: hidden;
+}
+.spd.is-drift .spd-dlbl { visibility: inherit; }
+
+.spd-tags { position: absolute; left: 286px; bottom: 34px; display: flex; flex-direction: column; gap: 12px; align-items: flex-start; }
+.spd-tag { position: relative; display: flex; align-items: stretch; transform: skewX(-14deg); opacity: 0; box-shadow: 5px 5px 0 var(--ink); }
+.spd-tag-k { padding: 6px 10px 2px; font: 400 32px/1 "Bebas Neue", sans-serif; letter-spacing: 1px; }
+.spd-tag-m { position: relative; width: 120px; background: var(--ink); overflow: hidden; }
+.spd-tag-f { position: absolute; inset: 6px; transform-origin: 0 50%; }
+.spd-tag.boost .spd-tag-k { background: var(--red); color: var(--paper); }
+.spd-tag.boost .spd-tag-f { background: repeating-linear-gradient(-60deg, var(--sp) 0 10px, var(--hot) 10px 20px); animation: brh-chev 0.3s linear infinite; }
+.spd-tag.draft .spd-tag-k { background: var(--paper); color: var(--ink); }
+.spd-tag.draft .spd-tag-f { background: repeating-linear-gradient(90deg, var(--paper) 0 14px, transparent 14px 20px); }
+.spd-tag.draft.is-ready .spd-tag-k { background: var(--sp); }
+.spd-tag.draft.is-ready { box-shadow: 5px 5px 0 var(--ink), 0 0 18px 3px rgba(255, 230, 0, 0.75); }
+@keyframes brh-chev { to { background-position: 40px 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .spd.is-drift .spd-spark, .spd-tag.boost .spd-tag-f { animation: none; }
+  .spd.is-drift .spd-spark { opacity: 1; }
+}

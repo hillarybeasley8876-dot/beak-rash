@@ -1,0 +1,87 @@
+/* ui-hud base: palette, layers, ransom glyphs, badges, portrait cards, shared P5 shapes. */
+.brh {
+  --red: #E5191C; --hot: #FF1E3C; --ink: #0B0B0F; --paper: #FFFFFF; --sp: #FFE600;
+  --k: 1;
+  position: absolute; inset: 0; overflow: hidden; pointer-events: none;
+  font-family: "Anton", "Noto Sans SC", sans-serif; font-weight: 400; color: var(--paper);
+  user-select: none; -webkit-user-select: none; contain: layout style size;
+}
+.brh, .brh * { box-sizing: border-box; }
+.brh.is-off { display: none; }
+.brh-hud { position: absolute; inset: 0; }
+
+/* Corner modules are laid out in 1080p reference pixels and scaled by --k from their anchor. */
+.brh-corner { position: absolute; transform: scale(var(--k)); }
+.brh-corner.tl { left: calc(var(--k) * 34px); top: calc(var(--k) * 26px); transform-origin: 0 0; }
+.brh-corner.top { left: 50%; top: calc(var(--k) * 30px); width: 0; height: 0; transform-origin: 0 0; }
+.brh-corner.bl { left: calc(var(--k) * 30px); bottom: calc(var(--k) * 26px); transform-origin: 0 100%; }
+.brh-corner.br { right: calc(var(--k) * 30px); bottom: calc(var(--k) * 24px); transform-origin: 100% 100%; }
+.brh-corner.tr { right: calc(var(--k) * 34px); top: calc(var(--k) * 30px); transform-origin: 100% 0; }
+.brh-stage {
+  position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px;
+  margin: -540px 0 0 -960px; transform: scale(var(--k)); transform-origin: 50% 50%;
+}
+.brh-layer { position: absolute; inset: 0; }
+
+/* Ransom-note glyphs. */
+.rn { display: inline-flex; align-items: center; white-space: nowrap; line-height: 1; }
+.rg {
+  display: inline-block; padding: 0.07em 0.09em 0.03em; margin: 0 0.012em;
+  transform: var(--rg-a, translate(0, 0)) var(--rg-tf, none);
+  box-shadow: 0.05em 0.06em 0 var(--ink);
+}
+.rg-w { background: var(--ink); color: var(--paper); }
+.rg-b { background: var(--paper); color: var(--ink); box-shadow: 0 0 0 0.04em var(--ink), 0.06em 0.07em 0 var(--ink); }
+.rg-r { background: var(--red); color: var(--paper); box-shadow: 0 0 0 0.035em var(--ink), 0.06em 0.07em 0 var(--ink); }
+.rg-gap { display: inline-block; width: 0.28em; }
+
+/* Outlined display text (white fill, thick black stroke behind the fill). */
+.stk { -webkit-text-stroke: 0.09em var(--ink); paint-order: stroke fill; }
+.stk-thin { -webkit-text-stroke: 0.05em var(--ink); paint-order: stroke fill; }
+
+/* Species badge: round, character colours, thick outline. */
+.bdg {
+  position: relative; width: 44px; height: 44px; border-radius: 50%;
+  background: var(--c3, var(--red)); box-shadow: 0 0 0 3px var(--ink), 3px 4px 0 3px var(--ink);
+}
+.bdg-in {
+  position: absolute; inset: 3px; border-radius: 50%; overflow: hidden;
+  background: radial-gradient(circle at 40% 35%, var(--paper) 0 30%, var(--c2, #ccc) 31% 100%);
+}
+.bdg-in svg { position: absolute; left: -6%; top: 0; width: 112%; height: 112%; }
+.bdg-img { position: absolute; left: -80%; top: -44%; width: 260%; height: auto; max-width: none; }
+
+/* Portrait card: art or SVG silhouette on a halftone panel. */
+.pc { position: relative; overflow: hidden; background: var(--c3, var(--red)); }
+.pc-bg {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(circle, rgba(11, 11, 15, 0.38) 1.6px, transparent 2.2px) 0 0 / 9px 9px,
+    linear-gradient(135deg, var(--c2, #888) 0 38%, var(--c3, var(--red)) 38% 100%);
+}
+.pc-l { position: absolute; inset: 0; }
+.pc-img { position: absolute; left: 50%; top: 0; height: 118%; transform: translateX(-50%); }
+.pc-sil { position: absolute; inset: 4% 2% -6% 2%; }
+.pc-sil svg { width: 100%; height: 100%; filter: drop-shadow(5px 6px 0 rgba(11, 11, 15, 0.85)); }
+.pc[data-mood="hurt"] .pc-l { filter: saturate(0.6) contrast(1.15); }
+.pc[data-mood="hurt"] .pc-bg { filter: hue-rotate(-20deg) saturate(1.6); }
+
+/* Eyes strip. */
+.eyes { position: relative; overflow: hidden; background: var(--c1, #fff); }
+.eyes svg, .eyes-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+
+/* Shared P5 pieces. */
+.halftone {
+  background-image: radial-gradient(circle, rgba(11, 11, 15, 0.5) 1.4px, transparent 2px);
+  background-size: 8px 8px;
+}
+.burst { position: absolute; background: var(--paper); }
+.jit { animation: brh-jit 0.5s steps(1, end) infinite; }
+.jit.j2 { animation-delay: -0.17s; } .jit.j3 { animation-delay: -0.33s; }
+@keyframes brh-jit {
+  0% { translate: 1px 0; } 16% { translate: -1px 1px; } 33% { translate: 0 -1px; }
+  50% { translate: 1px 1px; } 66% { translate: -1px -1px; } 83% { translate: 2px 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .jit { animation: none; }
+}

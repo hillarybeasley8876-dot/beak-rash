@@ -1,0 +1,179 @@
+// Keyboards: pooled electric piano, a persistent funk clavinet (narrow pulse through an envelope
+// wah, plus a muted "chicken scratch"), and a persistent legato saw pad.
+import { adsr, filter, holdAt, perc } from '../../dsp/env';
+import { pulseWave } from '../../dsp/curves';
+import { midiToHz } from '../theory';
+import { NoiseVoice, Pool, osc, type Gate } from './voice';
+import type { Band } from '../band';
+
+/** ±0.5 detune / timing jitter from the band's Rng (reproducible per band). */
+const jitter = (b: Band): number => b.rng.next() - 0.5;
+
+interface EpVoice {
+  body: OscillatorNode;
+  bark: OscillatorNode;
+  bodyAmp: GainNode;
+  barkAmp: GainNode;
+  gate: Gate;
+  busyUntil: number;
+  startedAt: number;
+}
+
+const waves = new WeakMap<BaseAudioContext, [PeriodicWave, PeriodicWave]>();
+
+/**
+ * Electric-piano spectra: a mellow body (mostly fundamental) and a bright "bark" (the spectrum a
+ * ratio-1 FM pair has at a high index, plus a little tine), crossfaded by envelopes.
+ */
+function epWaves(ctx: BaseAudioContext): [PeriodicWave, PeriodicWave] {
+  let w = waves.get(ctx);
+  if (!w) {
+    const make = (amps: number[]): PeriodicWave => {
+      const real = new Float32Array(amps.length + 1);
+      const imag = new Float32Array(amps.length + 1);
+      amps.forEach((a, k) => (imag[k + 1] = a));
+      return ctx.createPeriodicWave(real, imag);
+    };
+    w = [
+      make([1, 0.16, 0.05, 0.02]),
+      make([1, 0.78, 0.5, 0.26, 0.13, 0.07, 0.12, 0.03, 0.02, 0.01, 0.01, 0.01, 0.01, 0.06]),
+    ];
+    waves.set(ctx, w);
+  }
+  return w;
+}
+
+/**
+ * 6-voice electric piano. Each voice = body + bark oscillators at the same pitch; the bark decays
+ * in ~0.3 s (louder when played harder) so notes bite then mellow, like an FM tine piano, while
+ * every oscillator stays on WebAudio's cheap constant-frequency path.
+ */
+export class Rhodes {
+  private pool: Pool<EpVoice>;
+
+  constructor(private b: Band) {
+    const [bodyWave, barkWave] = epWaves(b.ctx);
+    const voices: EpVoice[] = [];
+    for (let i = 0; i < 6; i++) {
+      const body = osc(b, 'sine', 220, jitter(b) * 7);
+      const bark = osc(b, 'sine', 220, jitter(b) * 7);
+      body.setPeriodicWave(bodyWave);
+      bark.setPeriodicWave(barkWave);
+      const bodyAmp = new GainNode(b.ctx, { gain: 0 });
+      const barkAmp = new GainNode(b.ctx, { gain: 0 });
+      const mix = new GainNode(b.ctx, { gain: 1 });
+      body.connect(bodyAmp).connect(mix);
+      bark.connect(barkAmp).connect(mix);
+      voices.push({ body, bark, bodyAmp, barkAmp, gate: b.gate(mix, b.input('keys')), busyUntil: 0, startedAt: 0 });
+    }
+    this.pool = new Pool(voices);
+  }
+
+  private note(t: number, midi: number, dur: number, vel: number): void {
+    const v = this.pool.take(t);
+    const f = midiToHz(midi);
+    if (v.busyUntil > t) {
+      // Stealing a sounding voice: duck it to zero just before the new onset.
+      for (const g of [v.bodyAmp.gain, v.barkAmp.gain]) {
+        holdAt(g, t - 0.006);
+        g.linearRampToValueAtTime(0, t);
+      }
+    }
+    for (const o of [v.body, v.bark]) {
+      holdAt(o.frequency, t);
+      o.frequency.setValueAtTime(f, t);
+    }
+    const keyScale = Math.min(1.15, Math.max(0.5, (midi - 36) / 40));
+    const peak = 0.2 * (0.55 + 0.45 * vel);
+    v.busyUntil = adsr(v.bodyAmp.gain, t, dur, peak, 0.003, 1.6, 0.3, 0.3, true);
+    perc(v.barkAmp.gain, t, peak * (0.25 + 0.75 * vel) * keyScale, 0.002, Math.min(dur + 0.05, 0.22 + 0.18 * vel), true);
+    v.startedAt = t;
+    v.gate.open(v.busyUntil);
+  }
+
+  /** Chord with a slight low-to-high roll. */
+  chord(t: number, midis: number[], dur: number, vel: number): void {
+    midis.forEach((m, i) => this.note(t + i * 0.006 + Math.abs(jitter(this.b)) * 0.004, m, dur, vel * (1 + 0.12 * jitter(this.b))));
+  }
+}
+
+export class Clav {
+  private oscs: OscillatorNode[] = [];
+  private wah: BiquadFilterNode;
+  private amp: GainNode;
+  private gate: Gate;
+  private scratch: NoiseVoice;
+
+  constructor(b: Band) {
+    const ctx = b.ctx;
+    const hp = filter(ctx, { type: 'highpass', frequency: 170, Q: 0.7 });
+    this.wah = filter(ctx, { type: 'bandpass', frequency: 900, Q: 1.6 });
+    this.amp = new GainNode(ctx, { gain: 0 });
+    hp.connect(this.wah).connect(this.amp);
+    this.gate = b.gate(this.amp, b.input('clav'));
+    const wave = pulseWave(ctx, 0.22);
+    for (let i = 0; i < 3; i++) {
+      const o = osc(b, 'sine', 330, jitter(b) * 6);
+      o.setPeriodicWave(wave);
+      o.connect(new GainNode(ctx, { gain: 0.42 })).connect(hp);
+      this.oscs.push(o);
+    }
+    this.scratch = new NoiseVoice(b, [{ type: 'bandpass', frequency: 1700, Q: 1.8 }], b.input('clav'));
+  }
+
+  hit(t: number, midis: number[], dur: number, vel: number): void {
+    this.oscs.forEach((o, i) => {
+      const m = midis[Math.min(i, midis.length - 1)];
+      if (m === undefined) return;
+      holdAt(o.frequency, t);
+      o.frequency.setValueAtTime(midiToHz(m), t);
+    });
+    const w = this.wah.frequency;
+    holdAt(w, t);
+    w.setValueAtTime(550, t);
+    w.exponentialRampToValueAtTime(2300 + 900 * vel, t + 0.045);
+    w.exponentialRampToValueAtTime(850, t + 0.22);
+    this.gate.open(adsr(this.amp.gain, t, Math.min(dur, 0.5), 0.3 * vel, 0.002, 0.12, 0.35, 0.05, true));
+  }
+
+  mute(t: number, vel: number): void {
+    this.scratch.hit(t, 0.16 * vel, 0.001, 0.025);
+  }
+}
+
+/**
+ * Warm legato pad: four persistent detuned saws through one slowly opening low-pass. Chord
+ * changes glide the voices (40 ms) and re-swell the VCA from its current level, so no new nodes.
+ */
+export class Pad {
+  private saws: OscillatorNode[] = [];
+  private lp: BiquadFilterNode;
+  private amp: GainNode;
+  private gate: Gate;
+
+  constructor(b: Band) {
+    this.lp = filter(b.ctx, { type: 'lowpass', frequency: 700, Q: 0.8 });
+    this.amp = new GainNode(b.ctx, { gain: 0 });
+    this.lp.connect(this.amp);
+    this.gate = b.gate(this.amp, b.input('pad'));
+    for (let i = 0; i < 4; i++) {
+      const o = osc(b, 'sawtooth', 220, i % 2 ? 9 : -11);
+      o.connect(this.lp);
+      this.saws.push(o);
+    }
+  }
+
+  chord(t: number, midis: number[], dur: number, vel: number): void {
+    this.saws.forEach((o, i) => {
+      const m = midis[i % Math.max(1, midis.length)];
+      if (m === undefined) return;
+      holdAt(o.frequency, t);
+      o.frequency.exponentialRampToValueAtTime(midiToHz(m), t + 0.04);
+    });
+    const fr = this.lp.frequency;
+    holdAt(fr, t);
+    fr.linearRampToValueAtTime(700, t + 0.05);
+    fr.linearRampToValueAtTime(1500, t + Math.min(1.2, dur));
+    this.gate.open(adsr(this.amp.gain, t, dur, 0.085 * vel, 0.35, 0.5, 0.8, 0.7, true));
+  }
+}

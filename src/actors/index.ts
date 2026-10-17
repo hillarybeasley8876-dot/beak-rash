@@ -1,2 +1,3 @@
-// Unit entry point. Replace the re-export with the real implementation (same exported names).
-export * from './stub';
+// Unit entry point (actors): rider views = bike (bikes sub-unit) + skinned character + animation.
+export { createRiderView } from './view';
+export { preload } from './preload';

@@ -12,7 +12,7 @@ export interface GameEvents {
   'flow:loading': { progress: number; label: string };
 
   // ---- race lifecycle (gameplay/race) ----
-  'race:intro': { trackId: TrackId };
+  'race:intro': { trackId: TrackId; duration?: number };   // duration (s) of the flyover, for HUD pacing
   'race:countdown': { n: number };                // 3, 2, 1, then 0 = GO
   'race:start': Record<string, never>;
   'race:placeChange': { riderId: RiderId; from: number; to: number };
@@ -27,7 +27,7 @@ export interface GameEvents {
   'rider:hop': { riderId: RiderId };
   'rider:land': { riderId: RiderId; airTime: number; perfect: boolean };
   'rider:drift': { riderId: RiderId; phase: 'start' | 'level' | 'end'; level: number };
-  'rider:boost': { riderId: RiderId; kind: 'drift' | 'skill' | 'land' | 'draft' | 'pickup' | 'pad'; power: number; time: number };
+  'rider:boost': { riderId: RiderId; kind: 'drift' | 'skill' | 'land' | 'draft' | 'pickup' | 'pad' | 'launch'; power: number; time: number };
   'rider:nearMiss': { riderId: RiderId; kind: 'traffic' | 'rider' };
   'rider:offroad': { riderId: RiderId; surface: string };
   'rider:obstacleHit': { riderId: RiderId; obstacleId: number; kind: string; speed: number; pos: Vec3Like };
@@ -42,6 +42,10 @@ export interface GameEvents {
   'combat:combo': { riderId: RiderId; count: number };
   'combat:weaponDrop': { riderId: RiderId; weapon: WeaponId; pos: Vec3Like };
   'combat:weaponPick': { riderId: RiderId; weapon: WeaponId; stolenFrom: RiderId | null };
+  'combat:weaponBreak': { riderId: RiderId; weapon: WeaponId; pos: Vec3Like };
+  'combat:bell': { riderId: RiderId; pos: Vec3Like; angered: RiderId[] };
+  'projectile:spawn': { id: number; owner: RiderId; target: RiderId | null; kind: string; pos: Vec3Like };
+  'projectile:end': { id: number; hit: RiderId | null; pos: Vec3Like };
   'skill:cast': { riderId: RiderId; skillId: string; slot: number };
   'skill:hit': { riderId: RiderId; skillId: string; victim: RiderId; pos: Vec3Like };
   'skill:end': { riderId: RiderId; skillId: string };
@@ -52,9 +56,12 @@ export interface GameEvents {
   'taunt': { riderId: RiderId; text: string; character: CharacterId };
 
   // ---- police / traffic (gameplay/race) ----
-  'police:alert': { riderId: RiderId; level: number };
+  'police:alert': { riderId: RiderId; level: number; reason?: 'spawn' | 'lost' | 'busted' };
   'police:busted': { riderId: RiderId; fine: number };
   'traffic:honk': { obstacleId: number; pos: Vec3Like };
+
+  // ---- meta (gameplay/achievements) ----
+  'achievement:unlock': { id: string };
 
   // ---- cinematics (fx/ko director) ----
   'cine:ko': { phase: 'start' | 'peak' | 'end'; attacker: RiderId | null; victim: RiderId; chain: number };

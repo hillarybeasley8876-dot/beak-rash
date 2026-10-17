@@ -1,0 +1,107 @@
+/* Content gallery: every line drawn the way the game draws it (fonts, sizes, widths), overflow in yellow. */
+:root {
+  --red: #e5191c; --hot: #ff1e3c; --ink: #0b0b0f; --paper: #fff; --sp: #ffe600; --skew: -10deg;
+  --play: 'ZCOOL KuaiLe', 'Noto Sans SC', sans-serif;
+  --block: 'ZCOOL QingKe HuangYou', 'Noto Sans SC', sans-serif;
+  --brush: 'Ma Shan Zheng', 'Noto Sans SC', serif;
+  --heavy: 'Noto Sans SC', sans-serif;
+  --display: 'Anton', 'Bebas Neue', 'Noto Sans SC', sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--ink); color: var(--paper); font-family: var(--heavy); }
+body { width: 1920px; }
+
+.cg-top {
+  position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 36px; height: 92px; padding: 0 40px;
+  background: var(--red); box-shadow: 0 8px 0 var(--ink), 0 14px 0 var(--paper);
+}
+.cg-logo b { font: 400 54px/1 var(--block); color: var(--paper); text-shadow: 4px 4px 0 var(--ink); }
+.cg-logo span { margin-left: 14px; font: 400 30px/1 var(--display); letter-spacing: 0.06em; color: var(--ink); }
+.cg-nav { display: flex; gap: 10px; }
+.cg-nav a { padding: 6px 16px 3px; background: var(--ink); color: var(--paper); font: 400 24px/1 var(--display); text-decoration: none; transform: skewX(var(--skew)); }
+.cg-nav a:hover { background: var(--paper); color: var(--ink); }
+.cg-summary { margin-left: auto; padding: 8px 18px 6px; background: var(--ink); font: 900 22px/1.2 var(--heavy); transform: skewX(var(--skew)); }
+.cg-summary.is-bad { background: var(--sp); color: var(--ink); }
+
+.cg-main { padding: 40px 40px 120px; }
+.cg-sec { margin: 56px 0 0; scroll-margin-top: 120px; }
+.cg-sec > h2 {
+  display: inline-block; margin: 0 0 26px; padding: 8px 30px 4px; background: var(--paper); color: var(--ink);
+  font: 400 48px/1 var(--block); transform: skewX(var(--skew)); box-shadow: 8px 8px 0 var(--red);
+}
+.cg-sec > h2 small { margin-left: 16px; font: 400 26px/1 var(--display); color: var(--red); }
+.cg-label { display: inline-block; margin: 14px 0 8px; padding: 3px 12px 1px; background: var(--red); font: 400 20px/1 var(--display); letter-spacing: 0.05em; transform: skewX(var(--skew)); }
+.cg-grid { display: grid; grid-template-columns: repeat(2, 900px); gap: 34px 40px; }
+.cg-wrap { display: flex; flex-wrap: wrap; gap: 16px 18px; align-items: flex-start; }
+.is-over { outline: 4px solid var(--sp); outline-offset: 3px; }
+.cg-note { color: rgba(255, 255, 255, 0.55); font: 900 18px/1.4 var(--heavy); }
+
+/* racer card */
+.cg-racer { position: relative; padding: 22px 26px 26px; background: #16161d; border-left: 10px solid var(--c, var(--red)); }
+.cg-racer-head { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+.cg-racer-name { font: 400 56px/1 var(--block); }
+.cg-racer-code { font: 400 34px/1 var(--display); color: var(--c, var(--red)); letter-spacing: 0.04em; }
+.cg-racer-title { padding: 5px 12px 2px; background: var(--paper); color: var(--ink); font: 400 32px/1 var(--block); box-shadow: 0 0 0 3px var(--ink), 6px 6px 0 3px var(--ink); white-space: nowrap; }
+.cg-racer-tag { margin-top: 14px; font: 400 30px/1.15 var(--play); text-shadow: 3px 3px 0 #000; }
+
+/* taunt bubble (ui/hud/css/world.css .tb-box) */
+.cg-bubble { position: relative; width: max-content; max-width: 340px; }
+.cg-bubble-out, .cg-bubble-box { clip-path: polygon(0 12%, 9% 0, 40% 6%, 62% 0, 100% 9%, 96% 52%, 100% 92%, 66% 100%, 30% 94%, 4% 100%, 2% 55%); }
+.cg-bubble-out { position: absolute; inset: -5px; background: var(--ink); translate: 5px 5px; }
+.cg-bubble-box { position: relative; max-width: 330px; padding: 12px 20px 12px 18px; background: var(--paper); color: var(--ink); font: 400 26px/1.18 var(--play); text-align: center; }
+.cg-bubble.k-ko .cg-bubble-box { background: #ffe9e9; }
+.cg-bubble.k-hurt .cg-bubble-box { background: #e6ecf5; }
+.cg-bubble.k-win .cg-bubble-box { background: #fff7c2; }
+.cg-bubble.k-lose .cg-bubble-box { background: #e8e8e8; }
+.cg-bubble.k-skill .cg-bubble-box { background: var(--red); color: var(--paper); }
+
+/* toast (ui/p5/kit.css .br-toast at 1080p) */
+.cg-toast { width: max-content; max-width: 883px; padding: 10px 30px 8px; font: 400 30px/1.25 var(--block); background: var(--red); color: var(--paper); transform: skewX(var(--skew)); box-shadow: 7px 7px 0 var(--ink); }
+
+/* loading tip (ui/screens/loading.css .br-load-tip) */
+.cg-tip { width: 560px; padding: 30px 40px 32px; background: #000; border: 2px solid #222; }
+.cg-tip.is-wide { width: 980px; padding: 34px 48px; }
+.cg-tip p { margin: 0; font: 400 36px/1.35 var(--play); }
+.cg-tip.is-wide p { font-size: 42px; }
+.cg-tip-tag { display: inline-block; margin-bottom: 12px; padding: 2px 10px; background: var(--red); font: 400 24px/1 var(--block); }
+
+/* calendar 宜/忌 */
+.cg-cal { width: 610px; padding: 22px 30px; background: var(--paper); color: var(--ink); rotate: -2deg; }
+.cg-cal h3 { margin: 0 0 12px; font: 400 40px/1 var(--display); color: var(--red); }
+.cg-cal-row { display: flex; gap: 18px; align-items: center; padding: 6px 0; border-top: 2px dashed #ccc; font: 400 34px/1.1 var(--block); white-space: nowrap; }
+.cg-cal-row i { font-style: normal; display: inline-grid; place-items: center; width: 46px; height: 46px; background: var(--red); color: var(--paper); }
+.cg-cal-row i.bad { background: var(--ink); }
+
+/* results: grade stamps, achievement chips (ui/screens/results.css) */
+.cg-grade { display: flex; gap: 26px; align-items: center; width: 900px; padding: 18px 24px; background: #1d0507; }
+.cg-grade-stamp { flex: none; display: grid; place-items: center; width: 150px; height: 150px; border-radius: 50%; background: var(--paper); box-shadow: 0 0 0 8px var(--ink), 0 0 0 14px var(--red); font: 400 110px/1 var(--display); color: var(--red); }
+.cg-grade-title { font: 400 86px/1.1 var(--brush); text-shadow: 6px 6px 0 var(--ink); }
+.cg-grade-quote { margin-top: 6px; font: 400 34px/1.25 var(--play); color: rgba(255, 255, 255, 0.9); }
+.cg-ach { display: flex; align-items: center; gap: 10px; width: max-content; max-width: 600px; padding: 4px 18px 2px 8px; background: var(--paper); color: var(--ink); transform: skewX(var(--skew)); box-shadow: 5px 5px 0 var(--red); }
+.cg-ach-icon { flex: none; display: grid; place-items: center; width: 54px; height: 54px; background: var(--red); color: var(--paper); font: 400 26px/1 var(--block); font-style: normal; clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); transform: skewX(10deg); }
+.cg-ach b { font: 400 30px/1.2 var(--block); white-space: nowrap; }
+.cg-ach span { font: 900 18px/1.2 var(--heavy); color: #55555e; white-space: nowrap; }
+.cg-ach small { font: 400 15px/1 var(--display); color: var(--red); }
+
+/* HUD callouts */
+.cg-call { display: flex; flex-direction: column; gap: 6px; padding: 16px 26px; background: #16161d; min-width: 280px; }
+.cg-call b { font: 400 92px/1 var(--brush); color: var(--paper); text-shadow: 6px 6px 0 var(--red); white-space: nowrap; }
+.cg-call em { font: 400 30px/1 var(--display); font-style: normal; color: var(--red); letter-spacing: 0.04em; }
+.cg-call span { font: 400 26px/1.2 var(--play); color: rgba(255, 255, 255, 0.85); }
+.cg-wreck { padding: 10px 18px; background: #2a0c0e; font: 400 30px/1.2 var(--play); }
+
+/* world faces */
+.cg-face { display: flex; flex-direction: column; gap: 6px; }
+.cg-face canvas { display: block; background: #222; }
+.cg-face small { font: 900 15px/1.2 var(--heavy); color: rgba(255, 255, 255, 0.55); }
+
+/* menus */
+.cg-credit { display: flex; gap: 20px; align-items: baseline; width: 900px; padding: 8px 0; border-bottom: 1px dashed #333; }
+.cg-credit span { width: 220px; text-align: right; font: 400 28px/1.2 var(--block); color: var(--red); }
+.cg-credit b { font: 400 34px/1.2 var(--play); font-weight: 400; }
+.cg-howto { width: 900px; padding: 18px 24px; background: #16161d; }
+.cg-howto-row { display: flex; gap: 18px; align-items: center; padding: 5px 0; font: 900 26px/1.2 var(--heavy); }
+.cg-howto-row kbd { min-width: 170px; padding: 4px 10px; background: var(--paper); color: var(--ink); font: 400 24px/1 var(--display); text-align: center; }
+.cg-bike { width: 440px; padding: 16px 22px; background: #16161d; }
+.cg-bike b { display: block; font: 400 40px/1.1 var(--block); }
+.cg-bike p { margin: 8px 0 0; font: 400 28px/1.3 var(--play); color: rgba(255, 255, 255, 0.85); }

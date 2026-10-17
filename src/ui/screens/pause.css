@@ -1,0 +1,32 @@
+.br-scr-pause .br-bg { background: none; }
+.br-pz-veil { position: absolute; inset: 0; background: rgba(11, 11, 15, 0.58); animation: br-fade-in 0.12s ease both; }
+.br-pz-slab { position: absolute; left: -10%; top: -10%; width: 54%; height: 120%; background: var(--red); clip-path: polygon(0 0, 100% 0, 72% 100%, 0 100%); animation: br-in-left 0.2s var(--ease-out) both; }
+.br-pz-veil .br-halftone { --dot-mask: linear-gradient(110deg, #000 0%, transparent 40%); }
+.br-pz-title { position: absolute; left: 80px; top: 28px; rotate: -6deg; }
+.br-pz-word { display: block; font-family: var(--f-display); font-weight: 400; font-size: 210px; line-height: 0.95; color: var(--white); text-shadow: 12px 12px 0 var(--ink); animation: br-slam 0.36s var(--ease-slam) both; }
+.br-pz-title .br-rn { font-size: 70px; margin: 8px 0 0 40px; --delay: 120ms; }
+.br-pz-list { position: absolute; left: 120px; top: 430px; display: flex; flex-direction: column; align-items: flex-start; gap: 26px; }
+.br-pz-list .br-btn { font-size: 68px; margin-left: calc(var(--i) * 34px); animation: br-in-left 0.26s var(--ease-out) both; animation-delay: calc(60ms + var(--i) * 35ms); }
+
+.br-pz-info { position: absolute; left: 1120px; top: 46px; display: flex; align-items: baseline; gap: 20px; animation: br-in-right 0.26s var(--ease-out) both; }
+.br-pz-info .br-tag { font-size: 30px; }
+.br-pz-info b { font-family: var(--f-cn-block); font-weight: 400; font-size: 40px; }
+.br-pz-time { margin-left: auto; font-family: var(--f-display); font-size: 48px; text-shadow: 4px 4px 0 var(--red); }
+
+.br-pz-stand { position: absolute; left: 1110px; top: 130px; width: 720px; padding: 24px 36px 26px; animation: br-in-right 0.28s var(--ease-out) 0.04s both; }
+.br-pz-stand-title { display: flex; align-items: baseline; gap: 16px; margin-bottom: 10px; }
+.br-pz-stand-title b { font-family: var(--f-display); font-weight: 400; font-size: 48px; letter-spacing: 0.04em; color: var(--red); }
+.br-pz-stand-title span { font-family: var(--f-cn-block); font-size: 30px; color: rgba(255, 255, 255, 0.7); }
+.br-pz-row { display: grid; grid-template-columns: 92px 50px 1fr 130px; align-items: center; gap: 12px; height: 52px; padding: 0 14px; margin-bottom: 4px; transform: skewX(var(--skew)); }
+.br-pz-row .c-place { font-family: var(--f-display); font-size: 36px; }
+.br-pz-row b { font-family: var(--f-cn-block); font-weight: 400; font-size: 34px; }
+.br-pz-row .c-gap { text-align: right; font-family: var(--f-display); font-size: 30px; color: rgba(255, 255, 255, 0.75); }
+.br-pz-row.is-player { background: var(--red); }
+.br-pz-row.is-player .c-gap { color: var(--white); }
+.br-pz-head { width: 46px; height: 46px; }
+.br-pz-empty { padding: 20px 0; font-family: var(--f-cn-play); font-size: 34px; color: rgba(255, 255, 255, 0.7); }
+
+.br-pz-keys { position: absolute; left: 1110px; top: 760px; width: 760px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 18px; animation: br-rise 0.3s var(--ease-out) 0.1s both; }
+.br-pz-key { display: flex; align-items: center; gap: 10px; }
+.br-pz-key kbd { padding: 3px 10px 0; background: var(--white); color: var(--ink); font-family: var(--f-display); font-size: 24px; box-shadow: 4px 4px 0 var(--red); transform: skewX(var(--skew)); white-space: nowrap; }
+.br-pz-key span { font-family: var(--f-cn-block); font-size: 27px; white-space: nowrap; }

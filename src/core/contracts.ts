@@ -84,10 +84,12 @@ export interface Session {
 export interface Track {
   readonly id: TrackId;
   readonly length: number;     // m, start line s=0 .. finish line s=length
+  /** Drivable run-off after the finish line (m). frameAt/toWorld/project/bounds are valid on [0, length + runoff]. */
+  readonly runoff?: number;
   readonly look: EnvLook;
   readonly group: Group;       // road, terrain, scenery, sky — added to the session world
   readonly features: TrackFeature[];
-  /** Interpolated frame at s (clamped to [0, length]). `out` is reused when given. */
+  /** Interpolated frame at s (clamped to [0, length + runoff]). `out` is reused when given. */
   frameAt(s: number, out?: TrackFrame): TrackFrame;
   /** World position of track-space point (s, x, y). */
   toWorld(s: number, x: number, y: number, out: Vector3): Vector3;
@@ -194,6 +196,8 @@ export interface Ui {
 export interface AudioSystem {
   /** Must be called from a user gesture before anything is audible. */
   unlock(): Promise<void>;
+  /** Session in progress (positional SFX, adaptive music); null between races. */
+  attach?(session: Session | null): void;
   music(id: string | null, fade?: number): void;
   sfx(id: string, opts?: { volume?: number; pitch?: number; pan?: number }): void;
   voice(id: string): void;

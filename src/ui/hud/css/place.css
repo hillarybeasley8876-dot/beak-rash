@@ -1,0 +1,68 @@
+/* Place block (top-left) + race timer + KO/coin counters (top-right). 1080p reference sizes. */
+.pl { position: relative; width: 330px; height: 176px; transform: skewX(-10deg); }
+.pl-shadow, .pl-shard {
+  position: absolute; left: -16px; top: 12px; width: 300px; height: 150px;
+  clip-path: polygon(0 10%, 78% 0, 100% 14%, 93% 52%, 100% 100%, 16% 92%, 4% 100%);
+}
+.pl-shadow { background: var(--ink); translate: 10px 9px; }
+.pl-shard { background: var(--red); }
+.pl-shard::after {
+  content: ""; position: absolute; inset: 0;
+  background: radial-gradient(circle, rgba(11, 11, 15, 0.35) 1.5px, transparent 2.1px) 0 0 / 8px 8px;
+  mask-image: linear-gradient(115deg, transparent 35%, #000 80%);
+}
+.pl-star {
+  position: absolute; left: -46px; top: -30px; width: 200px; height: 200px; background: var(--paper);
+  clip-path: polygon(50% 0, 59% 33%, 90% 14%, 70% 43%, 100% 50%, 70% 57%, 90% 86%, 59% 67%, 50% 100%, 41% 67%, 10% 86%, 30% 57%, 0 50%, 30% 43%, 10% 14%, 41% 33%);
+  visibility: hidden;
+}
+.pl.is-first .pl-star { visibility: inherit; animation: brh-spin 6s linear infinite; }
+.pl.is-first .pl-shard { background: var(--ink); }
+.pl-num {
+  position: absolute; left: 6px; top: -22px; font: 400 196px/1 "Anton", sans-serif; color: var(--paper);
+  -webkit-text-stroke: 14px var(--ink); paint-order: stroke fill; letter-spacing: -4px;
+  transform-origin: 30% 70%;
+}
+.pl.is-first .pl-num { color: var(--red); -webkit-text-stroke-color: var(--paper); }
+.pl-suf {
+  position: absolute; left: 132px; top: 28px; padding: 2px 10px 0; background: var(--ink); color: var(--paper);
+  font: 400 62px/1 "Bebas Neue", sans-serif; transform: rotate(-6deg);
+  box-shadow: 4px 4px 0 var(--red);
+}
+.pl-of {
+  position: absolute; left: 168px; top: 92px; font: 400 64px/1 "Anton", sans-serif; color: var(--paper);
+  -webkit-text-stroke: 8px var(--ink); paint-order: stroke fill;
+}
+.pl-arrow {
+  position: absolute; left: 252px; top: 18px; font: 400 54px/1 "Anton", sans-serif; opacity: 0;
+  -webkit-text-stroke: 6px var(--ink); paint-order: stroke fill;
+}
+.pl-arrow.up { color: var(--paper); }
+.pl-arrow.down { color: var(--red); }
+.pl-flash { position: absolute; inset: 0 30px 0 -20px; background: var(--paper); mix-blend-mode: difference; opacity: 0; }
+
+.tm { position: relative; margin: 6px 0 0 6px; display: flex; align-items: stretch; transform: skewX(-12deg); }
+.tm-lbl {
+  background: var(--paper); color: var(--ink); font: 400 28px/1 "Bebas Neue", sans-serif;
+  padding: 8px 8px 4px; box-shadow: 0 0 0 3px var(--ink);
+}
+.tm-val {
+  min-width: 182px; background: var(--ink); color: var(--paper); font: 400 44px/1 "Bebas Neue", sans-serif;
+  padding: 4px 12px 0; letter-spacing: 1px; font-variant-numeric: tabular-nums; contain: layout paint;
+  box-shadow: 5px 5px 0 var(--red);
+}
+.tm-pen {
+  margin-left: 10px; align-self: center; background: var(--red); color: var(--paper); padding: 4px 8px 1px;
+  font: 400 26px/1 "Bebas Neue", sans-serif; box-shadow: 0 0 0 3px var(--ink); visibility: hidden;
+}
+
+.ctr { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; transform: skewX(-10deg); }
+.ctr-row { display: flex; align-items: stretch; box-shadow: 5px 5px 0 var(--ink); }
+.ctr-k { background: var(--red); color: var(--paper); font: 400 30px/1 "Bebas Neue", sans-serif; padding: 7px 10px 3px; }
+.ctr-v {
+  min-width: 78px; text-align: right; background: var(--paper); color: var(--ink); padding: 3px 10px 0;
+  font: 400 40px/1 "Anton", sans-serif; font-variant-numeric: tabular-nums;
+}
+.ctr-row.coin .ctr-k { background: var(--ink); font-family: "ZCOOL QingKe HuangYou", sans-serif; font-size: 26px; }
+@keyframes brh-spin { to { rotate: 360deg; } }
+@media (prefers-reduced-motion: reduce) { .pl.is-first .pl-star { animation: none; } }

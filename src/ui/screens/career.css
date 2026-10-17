@@ -1,0 +1,39 @@
+.br-car-stats { position: absolute; right: 70px; top: 64px; display: flex; gap: 14px; transform: skewX(var(--skew)); animation: br-in-right 0.3s var(--ease-out) both; }
+.br-car-stats span { display: flex; align-items: baseline; gap: 10px; padding: 4px 18px 2px; background: var(--white); color: var(--ink); box-shadow: 5px 5px 0 var(--red); }
+.br-car-stats i { font-style: normal; font-family: var(--f-cn-block); font-size: 24px; }
+.br-car-stats b { font-family: var(--f-display); font-weight: 400; font-size: 36px; }
+
+.br-car-grid { position: absolute; left: 80px; top: 238px; display: grid; grid-template-columns: 350px repeat(3, 300px); grid-auto-rows: 228px; gap: 22px 24px; }
+.br-car-cup { display: flex; flex-direction: column; justify-content: center; gap: 6px; padding-left: 10px; animation: br-in-left 0.3s var(--ease-out) both; animation-delay: calc(var(--t) * 60ms); }
+.br-car-cup .br-rn { font-size: 64px; }
+.br-car-cup b { font-family: var(--f-display); font-weight: 400; font-size: 36px; letter-spacing: 0.05em; color: var(--red); }
+.br-car-motto { margin: 0; font-family: var(--f-cn-play); font-weight: 400; font-size: 22px; color: rgba(255, 255, 255, 0.72); max-width: 340px; }
+
+.br-car-ev { position: relative; isolation: isolate; color: var(--ink); transform: skewX(-6deg); transition: transform 0.14s var(--ease-out); animation: br-pop 0.3s var(--ease-slam) both; }
+.br-car-ev::before { content: ''; position: absolute; inset: 0; background: var(--white); clip-path: var(--clip); z-index: -1; }
+.br-car-ev::after { content: ''; position: absolute; inset: 0; background: var(--ink); clip-path: var(--clip); z-index: -2; transform: translate(10px, 10px); transition: background 0.1s, transform 0.14s var(--ease-out); }
+.br-car-ev.is-focus { transform: skewX(-6deg) scale(1.07); z-index: 2; }
+.br-car-ev.is-focus::after { background: var(--red); transform: translate(14px, 14px); }
+.br-car-art { position: absolute; left: 10px; right: 10px; top: 10px; height: 140px; clip-path: var(--clip); overflow: hidden; background: var(--ink); }
+.br-car-art svg { width: 100%; height: 100%; display: block; }
+.br-car-name { position: absolute; left: 18px; bottom: 18px; font-family: var(--f-cn-block); font-weight: 400; font-size: 32px; }
+.br-car-best, .br-car-new { position: absolute; right: 12px; top: 116px; padding: 2px 12px 0; font-family: var(--f-display); font-weight: 400; font-size: 26px; background: var(--ink); color: var(--white); transform: rotate(-6deg); }
+.br-car-best.is-gold { background: var(--red); }
+.br-car-new:empty { display: none; }
+.br-car-new { background: var(--red); }
+.br-car-ev.is-locked .br-car-art { filter: grayscale(1) brightness(0.35); }
+.br-car-ev.is-locked .br-car-name { color: #8b8b93; }
+.br-car-lock { position: absolute; left: 0; right: 0; top: 34px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.br-car-lock svg { width: 64px; height: 64px; }
+.br-car-lock b { font-family: var(--f-display); font-weight: 400; font-size: 30px; letter-spacing: 0.12em; color: var(--white); }
+
+.br-car-detail { position: absolute; left: 1468px; top: 236px; width: 400px; min-height: 600px; padding: 34px 34px 40px; animation: br-in-right 0.3s var(--ease-out) 0.1s both; }
+.br-car-dtag { font-size: 28px; }
+.br-car-dname { margin-top: 18px; font-family: var(--f-cn-block); font-weight: 400; font-size: 54px; line-height: 1.1; }
+.br-car-den { margin-top: 6px; font-family: var(--f-display); font-weight: 400; font-size: 28px; color: var(--red); letter-spacing: 0.04em; }
+.br-car-drows { margin-top: 22px; display: flex; flex-direction: column; gap: 14px; }
+.br-car-drows div { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 8px; border-bottom: 3px solid var(--ink); }
+.br-car-drows span { font-family: var(--f-cn-heavy); font-size: 22px; color: #55555e; }
+.br-car-drows b { font-family: var(--f-cn-block); font-weight: 400; font-size: 28px; }
+.br-car-dgo { margin-top: 30px; padding: 8px 0 4px; text-align: center; background: var(--red); color: var(--white); font-family: var(--f-display); font-weight: 400; font-size: 44px; letter-spacing: 0.06em; transform: skewX(var(--skew)); animation: br-pulse 1.1s ease-in-out infinite; }
+.br-car-detail.is-locked .br-car-dgo { background: #55555e; animation: none; }

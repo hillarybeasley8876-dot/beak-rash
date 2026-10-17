@@ -1,0 +1,82 @@
+{
+  "unit": "combat",
+  "round": 1,
+  "lens": "gameplay",
+  "score": 6,
+  "summary": "Combat is complete and robust: all 13 skills, statuses, melee, KO pipeline, pickups and projectiles exist. combat-check passes 26/26 both isolated and with every real unit (--full), tsc is clean, and five autopilot races (~165 s each, all real units) show no double hits, exactly one KO per wreck, a skill:end for every cast, at most 5 visuals and 1 projectile alive, and zero console errors. Event positions sit within 1.2 m of the rider, and restart/quit in the middle of an ult or gulp disposes cleanly. Melee reads well (impact star, damage numbers, CRIT/HEAVY tags, red hurt vignette, weapons visible in hand), and SHOWTIME into TRIPLE KNOCK OUT is a real money shot. But a player will find the rule holes fast: SHOWTIME refunds most or all of its own SP, so it can be chained; the bell is a risk-free SP faucet; Wing Dash disables braking and wall/grass slowdown; a rival held in the pouch can finish ahead of you; and a ghosting pigeon can hit people while invisible and intangible. Skill inputs are also dropped during swings and staggers, and the gulp's payoff lands off-screen. Five majors -> fail.",
+  "issues": [
+    {
+      "severity": "major",
+      "title": "SHOWTIME refunds its own SP meter (chainable ult)",
+      "detail": "skills/ult.ts slam() hits every victim through damage.ts land() -> gainSp(attacker, SP.hit=6) and ko.ts award() adds SP.ko=20 per KO, while the 100 SP cost is taken at cast (runner.tryCast). Measured (shots/review/combat/r1-gameplay/edge-d.mjs): 7 full-HP victims -> SP back to 50; 4 victims at 30 HP -> 4 KOs -> SP 100 and a second SHOWTIME started one second later; 3 KOs -> SP 86 right after TRIPLE KNOCK OUT (shots/review/combat/r1-gameplay/strip/ult-ko-15.png). The money shot can be chained, which also breaks pillar 3 (never boring on repeat).",
+      "fix": "Grant no attacker SP for hits/KOs whose skillId is pelican.ult (carry a spMul:0 flag on Hit and use koBy.skillId in award), or block gainSp for the caster until ~3 s after the ult skill:end. Keep victim hurt SP. If ult KOs then feel rare, add an execute rule (victims left <= 20 % HP are knocked out) instead of refunding meter."
+    },
+    {
+      "severity": "major",
+      "title": "Bell is a free SP faucet (100 SP per minute, zero risk)",
+      "detail": "bell.ts ringBell() always calls gainSp(r, SP.bell) even when nobody is within 15 m. Measured (shots/review/combat/r1-gameplay/edge-b.mjs): 20 rings with every rival >= 72 m behind -> SP 0 -> 100 in 60.7 s. Pressing B every 3 s yields ~2.7 SHOWTIMEs per 165 s race without fighting; together with the ult refund the SP economy collapses.",
+      "fix": "Give +5 SP only when the ring angers at least one rival (the taunt risk is the point); otherwise 0, or diminishing 5/2/0 for consecutive empty rings. Add a combat-check scenario for the empty ring."
+    },
+    {
+      "severity": "major",
+      "title": "Wing Dash pins speed: brake, walls, grass and slopes cannot slow the pelican for 2.2 s",
+      "detail": "skills/wing.ts pre() stores preSpeed before physics and tick() sets r.speed = max(r.speed, preSpeed) every substep, cancelling all deceleration, not only ram losses. Measured: full brake for 1 s during the dash -> 19.7 -> 24.2 m/s (shots/review/combat/r1-gameplay/edge-b.mjs); steering full right into grass for 100 frames -> minimum speed 22.9 vs 22.7 at the start, x reached 10.2 m off the asphalt, no slowdown (shots/review/combat/r1-gameplay/edge-e.mjs). The player loses brake control at +40 % top speed into corners and traffic.",
+      "fix": "Restore only the speed lost to a ram: record speed just before and after each rammed rider contact (or the applyImpulse you trigger) and add that delta back; let brake, surfaces, slopes and wall bounces apply normally. Add a scenario asserting braking during the dash reduces speed."
+    },
+    {
+      "severity": "major",
+      "title": "Finish line: a rival in the Big Gulp pouch finishes ahead of the pelican",
+      "detail": "gulp.ts glue() holds the victim at caster.s + 0.2, so it crosses track.length 0.2 m before the caster. Measured (shots/review/combat/r1-gameplay/edge-c.mjs): pelican at L-8 gulps the pigeon -> race:finishLine pigeon place 1 (6.008 s), pelican place 2 (6.017 s); the flight phase then drags the finished pigeon 15 m back behind the line. Related: ghost.ts cleanup teleports a pigeon that finished during its ghost back to L-5 (shots/review/combat/r1-gameplay/edge-f.mjs: 3300.2 -> 3295.1).",
+      "fix": "Carry the victim behind the beak (s = caster.s - 0.4) and never let a carried victim s exceed caster.s; if the caster crosses the line while holding, release the victim behind it. In ghost cleanup skip the jump when r.mode is not racing or r.finishTime is set."
+    },
+    {
+      "severity": "major",
+      "title": "Invisible + intangible riders can still attack (ghost pigeon hits while untouchable)",
+      "detail": "melee.ts canSwing() checks active/canAttack/action/busy only, and statuses.ts leaves canAttack true for invisible/intangible. Measured (shots/review/combat/r1-gameplay/edge-g.mjs): a ghosting pigeon alongside the player started two swings and landed 2 hits while invisible+intangible; the player sees damage from nothing and every counter-hit skips the ghost. By code the same holds for respawn invulnerability (canSwing ignores r.invuln, ~1.4 s of racing untargetable).",
+      "fix": "In applyMods set canAttack = false while invisible or intangible, or end the ghost early (drop both statuses, cancel the 25 m jump) when it swings; clear r.invuln when a rider starts a swing or casts."
+    },
+    {
+      "severity": "minor",
+      "title": "Skill presses during a swing or hit stagger are dropped, not buffered",
+      "detail": "runner.check() returns state while r.action is hit or an unresolved swing and tryCast denies immediately; swings have a 0.18 s buffer (INPUT_BUFFER) but skills have none. Measured: J then U one frame later -> U denied, no cast (shots/review/combat/r1-gameplay/edge-f.mjs); U during the 0.28 s hit stagger -> denied (shots/review/combat/r1-gameplay/edge-d.mjs). A flanked player spent 23 % of 8 s staggered or unable to attack (shots/review/combat/r1-gameplay/edge-c.mjs), so escape skills get eaten.",
+      "fix": "Buffer skill presses like swings (slot + age <= 0.2 s in RiderCombat, retried after the action ends); emit skill:denied only when the buffer expires."
+    },
+    {
+      "severity": "minor",
+      "title": "Big Gulp payoff happens off-screen, and its catch zone includes riders behind",
+      "detail": "gulp.ts spits the victim to caster.s - 15 m: the arc passes over the chase camera and the 25-dmg landing, damage number and flinch happen behind it (shots/review/combat/r1-gameplay/strip/gulp-07..13.png: the pigeon pops up at frame 07, then only SP +6 shows the hit). inRadius() is a circle, so a rider 2.2 m behind is swallowed and Wing Dash rams a rider at ds -1.9 (shots/review/combat/r1-gameplay/edge-a.mjs).",
+      "fix": "Keep the payoff in frame (short high arc landing 6-8 m behind at a visible lateral offset, or a brief camera glance or slow-mo on the landing); use a forward-biased zone for the gulp (ds -0.5..3 m, |dx| < 1.6) and ds >= -1 for wing rams."
+    },
+    {
+      "severity": "minor",
+      "title": "Melee resolution: stunned/chilled attackers still land; ties always go to the lower rider id",
+      "detail": "resolveSwing() never rechecks r.mods.canAttack, so a swing whose attacker is honk-stunned or chilled mid-windup still hits (shots/review/combat/r1-gameplay/edge-b.mjs: 1 hit while stunned, 1 while chilled). Same-frame swings resolve in rider-array order and react() cancels the second, so the player (id 0) wins every tie and rival 2 always beats rival 3 (shots/review/combat/r1-gameplay/edge-a.mjs).",
+      "fix": "In resolveSwing cancel the swing when !r.mods.canAttack; collect all hits of a substep first and apply them afterwards so simultaneous swings trade."
+    },
+    {
+      "severity": "minor",
+      "title": "Forced weapon downgrades from crates, bites and steals",
+      "detail": "pickups.take() always swaps the held weapon for a crate roll without dropping it (slipper -> keyboard, shots/review/combat/r1-gameplay/edge-b.mjs). Gulp bite and seagull steal call takeWeapon(..., replace=true): a pelican holding a slipper bites a leek capybara and ends with the leek, slipper dropped (shots/review/combat/r1-gameplay/edge-g.mjs).",
+      "fix": "Armed riders skip crates like road weapons (or drop the old weapon as a pickup); when the biter/stealer is armed, knock the victim weapon onto the road instead of swapping."
+    },
+    {
+      "severity": "minor",
+      "title": "Event gaps: combat:bell / combat:weaponBreak never emitted; gulp sends two skill:hit",
+      "detail": "events-map now defines combat:bell and combat:weaponBreak, but bell.ts only emits taunt with text and armory.consumeUse only an fx burst; status/combat.md still lists them as pending core requests. Gulp emits skill:hit at the catch and again at the spit for one victim (shots/review/combat/r1-gameplay/edge-a.mjs), so listeners play hit feedback twice.",
+      "fix": "Emit combat:bell {riderId,pos,angered} and combat:weaponBreak {riderId,weapon,pos}; send one skill:hit per victim per cast (tag or drop the catch one)."
+    },
+    {
+      "severity": "minor",
+      "title": "Uncollected pickups render huge as the chase camera passes them",
+      "detail": "pickups/render.ts draws every alive item within 220 m with no near-camera fade; a missed coin fills the bottom-left over the speedometer (shots/review/combat/r1-gameplay/pickups-1.png).",
+      "fix": "Fade or shrink items within ~3 m of the camera, or stop drawing them once they are 2 m behind the player."
+    },
+    {
+      "severity": "minor",
+      "title": "cross-unit: HUD cut-in hides the torpedo; ONE MORE! on every combo; sparse/off-road pickup rows",
+      "detail": "ui-hud: the skill cut-in band covers the top-middle for ~0.6 s on each cast, hiding the torpedo flight and its hit (shots/review/combat/r1-gameplay/torpedo-0..2.png); layer.ts combo() shows ONE MORE! for every count >= 3 although combat grants the bonus only at 3/6/9. track: coast rows give 51 coins, 2 crates, 1 can, 2 fish over 3.3 km and 4 items sit on the shoulder (row s 550, x -9.5).",
+      "fix": "ui-hud: thin/corner player cut-ins while a projectile is in flight, ONE MORE! only at count % 3 == 0. track: at least one crate/can row per ~400 m, rows inside halfWidth - 1 m."
+    }
+  ],
+  "pass": false
+}
