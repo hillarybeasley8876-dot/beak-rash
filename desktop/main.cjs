@@ -4,6 +4,9 @@ const { app, BrowserWindow, protocol, net, Menu, globalShortcut } = require('ele
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 
+// Smoke tests attach over CDP: BR_DEBUG_PORT=9333 open the app binary directly.
+if (process.env.BR_DEBUG_PORT) app.commandLine.appendSwitch('remote-debugging-port', process.env.BR_DEBUG_PORT);
+
 protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
 ]);
