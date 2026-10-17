@@ -1,0 +1,193 @@
+// Keyboard + gamepad → abstract actions. Keyboard steering is ramped so it feels analog;
+// edge actions (hop, attacks, skills) are latched until a sim step consumes them, so a tap
+// during hit-stop or slow-mo is never lost.
+
+import { approach, clamp } from './math';
+import type { Controls } from './types';
+
+export type Action =
+  | 'left' | 'right' | 'up' | 'down' | 'drift' | 'hop' | 'attackL' | 'attackR' | 'heavy'
+  | 'skill1' | 'skill2' | 'skill3' | 'ult' | 'bell' | 'lookBack' | 'pause' | 'confirm' | 'back';
+
+export const KEYMAP: Record<Action, string[]> = {
+  left: ['ArrowLeft', 'KeyA'],
+  right: ['ArrowRight', 'KeyD'],
+  up: ['ArrowUp', 'KeyW'],
+  down: ['ArrowDown', 'KeyS'],
+  drift: ['ShiftLeft', 'ShiftRight'],
+  hop: ['Space'],
+  attackL: ['KeyJ'],
+  heavy: ['KeyK'],
+  attackR: ['KeyL'],
+  skill1: ['KeyU'],
+  skill2: ['KeyI'],
+  skill3: ['KeyO'],
+  ult: ['KeyP'],
+  bell: ['KeyB'],
+  lookBack: ['KeyC'],
+  pause: ['Escape'],
+  confirm: ['Enter', 'NumpadEnter', 'Space'],
+  back: ['Escape', 'Backspace'],
+};
+
+/** Standard-mapping gamepad buttons per action. */
+export const PADMAP: Partial<Record<Action, number[]>> = {
+  hop: [0], confirm: [0], attackR: [1], back: [1], attackL: [2], heavy: [3],
+  skill1: [4], drift: [5], down: [6], up: [7], bell: [8], pause: [9],
+  lookBack: [10], ult: [11], skill2: [12], skill3: [13], left: [14], right: [15],
+};
+
+const EDGE_ACTIONS = ['hop', 'attackL', 'attackR', 'heavy', 'skill1', 'skill2', 'skill3', 'ult', 'bell'] as const;
+type EdgeAction = (typeof EDGE_ACTIONS)[number];
+
+const STEER_RISE = 6.5;   // /s, keyboard steer ramp toward full lock
+const STEER_FALL = 11;    // /s, ramp back to centre
+const STICK_DEADZONE = 0.14;
+
+export class Input {
+  steer = 0;
+  throttle = 0;
+  brake = 0;
+  autoPedal = false;
+  /** Test/autopilot override: replaces device input entirely while set. */
+  scripted: Partial<Controls> | null = null;
+  lastDevice: 'keyboard' | 'gamepad' = 'keyboard';
+
+  private keys = new Set<string>();
+  private padDown = new Set<Action>();
+  private padPrev = new Set<Action>();
+  private edges = new Set<EdgeAction>();
+  private listeners = new Set<(action: Action) => void>();
+  private padSteer = 0;
+  private padThrottle = 0;
+  private padBrake = 0;
+  private detach: (() => void) | null = null;
+
+  attach(target: Window): void {
+    const gameCodes = new Set(Object.values(KEYMAP).flat());
+    const onDown = (e: KeyboardEvent): void => {
+      if (gameCodes.has(e.code)) e.preventDefault();
+      this.lastDevice = 'keyboard';
+      if (e.repeat) return;
+      this.keys.add(e.code);
+      for (const action of this.actionsForKey(e.code)) this.press(action);
+    };
+    const onUp = (e: KeyboardEvent): void => {
+      this.keys.delete(e.code);
+    };
+    const onBlur = (): void => this.keys.clear();
+    target.addEventListener('keydown', onDown);
+    target.addEventListener('keyup', onUp);
+    target.addEventListener('blur', onBlur);
+    this.detach = () => {
+      target.removeEventListener('keydown', onDown);
+      target.removeEventListener('keyup', onUp);
+      target.removeEventListener('blur', onBlur);
+    };
+  }
+
+  dispose(): void {
+    this.detach?.();
+    this.listeners.clear();
+  }
+
+  /** Menu/UI listeners: called on every fresh press from any device. */
+  onAction(fn: (action: Action) => void): () => void {
+    this.listeners.add(fn);
+    return () => this.listeners.delete(fn);
+  }
+
+  isDown(action: Action): boolean {
+    return this.padDown.has(action) || KEYMAP[action].some((code) => this.keys.has(code));
+  }
+
+  /** Simulate a press (tests, on-screen buttons). */
+  press(action: Action): void {
+    if ((EDGE_ACTIONS as readonly string[]).includes(action)) this.edges.add(action as EdgeAction);
+    for (const fn of Array.from(this.listeners)) fn(action);
+  }
+
+  /** Per rendered frame: poll gamepads and ramp analog values. */
+  update(dtReal: number): void {
+    this.pollPad();
+    const kbSteer = (this.isKeyDown('right') ? 1 : 0) - (this.isKeyDown('left') ? 1 : 0);
+    if (Math.abs(this.padSteer) > 0) {
+      this.steer = this.padSteer;
+    } else if (kbSteer !== 0) {
+      if (Math.sign(this.steer) === -kbSteer) this.steer = 0; // instant reversal through centre
+      this.steer = approach(this.steer, kbSteer, STEER_RISE * dtReal);
+    } else {
+      this.steer = approach(this.steer, 0, STEER_FALL * dtReal);
+    }
+    const kbThrottle = this.isKeyDown('up') ? 1 : 0;
+    const kbBrake = this.isKeyDown('down') ? 1 : 0;
+    this.brake = Math.max(kbBrake, this.padBrake);
+    const wantThrottle = Math.max(kbThrottle, this.padThrottle, this.autoPedal && this.brake === 0 ? 1 : 0);
+    this.throttle = approach(this.throttle, wantThrottle, 9 * dtReal);
+  }
+
+  /** Current player controls; edges stay latched until consumeEdges(). */
+  peek(out: Controls): Controls {
+    if (this.scripted) {
+      Object.assign(out, { steer: 0, throttle: 0, brake: 0, drift: false, lookBack: false }, this.scripted);
+    } else {
+      out.steer = this.steer;
+      out.throttle = this.throttle;
+      out.brake = this.brake;
+      out.drift = this.isDown('drift');
+      out.lookBack = this.isDown('lookBack');
+    }
+    for (const a of EDGE_ACTIONS) out[a] = this.edges.has(a) || (this.scripted?.[a] ?? false);
+    return out;
+  }
+
+  consumeEdges(): void {
+    this.edges.clear();
+    if (this.scripted) for (const a of EDGE_ACTIONS) this.scripted[a] = false;
+  }
+
+  rumble(strong: number, weak: number, ms: number): void {
+    const pads = navigator.getGamepads?.() ?? [];
+    for (const pad of pads) {
+      const actuator = pad?.vibrationActuator as
+        | { playEffect?: (type: string, p: Record<string, number>) => Promise<unknown> }
+        | undefined;
+      actuator?.playEffect?.('dual-rumble', {
+        duration: ms, strongMagnitude: clamp(strong, 0, 1), weakMagnitude: clamp(weak, 0, 1),
+      }).catch((err: unknown) => console.warn('[input] rumble failed', err));
+    }
+  }
+
+  private isKeyDown(action: Action): boolean {
+    return KEYMAP[action].some((code) => this.keys.has(code));
+  }
+
+  private actionsForKey(code: string): Action[] {
+    return (Object.keys(KEYMAP) as Action[]).filter((a) => KEYMAP[a].includes(code));
+  }
+
+  private pollPad(): void {
+    const pad = (navigator.getGamepads?.() ?? []).find((p) => p && p.connected) ?? null;
+    this.padPrev = this.padDown;
+    this.padDown = new Set();
+    this.padSteer = this.padThrottle = this.padBrake = 0;
+    if (!pad) return;
+    for (const action of Object.keys(PADMAP) as Action[]) {
+      if ((PADMAP[action] ?? []).some((i) => pad.buttons[i]?.pressed)) this.padDown.add(action);
+    }
+    const ax = pad.axes[0] ?? 0;
+    const mag = Math.abs(ax);
+    if (mag > STICK_DEADZONE) this.padSteer = Math.sign(ax) * Math.pow((mag - STICK_DEADZONE) / (1 - STICK_DEADZONE), 1.5);
+    this.padThrottle = pad.buttons[7]?.value ?? 0;
+    this.padBrake = pad.buttons[6]?.value ?? 0;
+    const ay = pad.axes[1] ?? 0;
+    if (ay < -0.6) this.padDown.add('up');
+    if (ay > 0.6) this.padDown.add('down');
+    for (const action of this.padDown) {
+      if (!this.padPrev.has(action)) {
+        this.lastDevice = 'gamepad';
+        this.press(action);
+      }
+    }
+  }
+}

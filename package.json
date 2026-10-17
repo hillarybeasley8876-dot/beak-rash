@@ -1,0 +1,33 @@
+{
+  "name": "beak-rash",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "暴力鹈鹕 BEAK RASH — a 3D pelican-on-a-bicycle combat racer",
+  "scripts": {
+    "dev": "vite --port 5300 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 5310 --strictPort",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@fontsource/anton": "^5.3.0",
+    "@fontsource/bangers": "^5.3.0",
+    "@fontsource/bebas-neue": "^5.3.0",
+    "@fontsource/black-ops-one": "^5.3.0",
+    "@fontsource/ma-shan-zheng": "^5.3.1",
+    "@fontsource/noto-sans-sc": "^5.3.1",
+    "@fontsource/permanent-marker": "^5.3.0",
+    "@fontsource/rubik-mono-one": "^5.3.0",
+    "@fontsource/zcool-kuaile": "^5.3.0",
+    "@fontsource/zcool-qingke-huangyou": "^5.3.0",
+    "@fontsource/zhi-mang-xing": "^5.3.0",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@types/three": "^0.186.0",
+    "playwright": "^1.60.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.4"
+  }
+}
