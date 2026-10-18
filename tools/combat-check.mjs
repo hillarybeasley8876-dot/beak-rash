@@ -6,6 +6,7 @@
 import { fixes } from './combat-check/fixes.mjs';
 import { fixes2 } from './combat-check/fixes2.mjs';
 import { fixes3 } from './combat-check/fixes3.mjs';
+import { fixes4 } from './combat-check/fixes4.mjs';
 import { finish } from './combat-check/finish.mjs';
 import { installHelpers } from './combat-check/page.mjs';
 import { items } from './combat-check/items.mjs';
@@ -19,7 +20,7 @@ const LINEUP = 'goose,cat,capybara,shiba,pigeon,penguin,seagull,sloth,corgi';
 const stubs = a.full ? '' : typeof a.stub === 'string' ? a.stub : 'fx,audio,ui,actors';
 const stub = stubs ? `&stub=${stubs}` : '';
 const url = `/?race=coast&seed=${a.seed ?? 7}&traffic=0&police=0&manual=1&rivals=${LINEUP}${stub}`;
-const all = [...melee, ...items, ...skills, ...sigs, ...fixes, ...fixes2, ...fixes3, ...finish].filter(([name]) => !a.only || name.includes(String(a.only)));
+const all = [...melee, ...items, ...skills, ...sigs, ...fixes, ...fixes2, ...fixes3, ...fixes4, ...finish].filter(([name]) => !a.only || name.includes(String(a.only)));
 
 // Every console error fails the run unless it is clearly another unit's (its [tag] or a stack in its files);
 // those are listed but don't fail (isolate them with --stub).

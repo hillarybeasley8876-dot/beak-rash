@@ -158,3 +158,13 @@ brake, 10 launch/ticket HUD) → re-run scenarios + soak. Status per issue (appe
   (the soak's braking autopilot fired a torpedo at 50.3 s); the ram is fixed by issue 4. Outrun check retuned to the
   design: the corgi rides alongside ≥ 4 s first and the escape takes ≥ 15 s (no 'lost' < 8 s); calm escapes (heat < 0.3,
   15 m ahead) count only after the corgi caught up (≤ 6 m). `node tools/race-soak.mjs --seeds 1,2,3` SOAK OK (busted 1/1/1).
+- Continuation (resumed fixer): remaining → full suite re-run (scenarios + soak) → 10 launch callout (drop the race
+  toast if ui-hud has 'launch') → content req 4 (POLICE_LINES corgi toasts, skillLines for rival sig casts) →
+  rider.rubber (sim now multiplies it in) replaces boost pulses → cross-unit notes 8/9/10 → final suite.
+- [content req 4 / core r2 note] DONE: corgi toasts use content's POLICE_LINES (arrival = alert, fine = busted + "罚 100
+  小鱼干，靠边 4 秒", escape = lost line); rivals shout their roster skillLines on a signature cast (60 %, next tick so
+  combat's own MINE! / 咕嘟 is not doubled, same 2 s / burst limits as KO lines).
+- [rubber, known issue 2 / core req 5] DONE: sim now multiplies `rider.rubber` in, so the catch-up and the hunt sprint
+  set `rider.rubber` (ai/pace.ts easeRubber: cap ÷ own bike top, ≤ 1.35, eased 0.1/s, 1 when in view / not racing)
+  instead of boostTime pulses (no boost streaks, no `free`-road gate); brain's top includes it. `--only pulses` now also
+  asserts rubber ≤ 1.01 on rivals in view (0 of 9812 samples; max unseen 1.297), opening PASS.

@@ -7,7 +7,7 @@
 import { Quaternion, Vector3 } from 'three';
 import { clamp } from '../../core/math';
 import { createRiderState } from '../../core/rider';
-import { ROSTER } from '../../data/roster';
+import { POLICE_LINES, ROSTER } from '../../data/roster';
 import { WEAPONS } from '../../data/weapons';
 import type { CrashCause, Obstacle } from '../../core/types';
 import { topOf } from './ai/control';
@@ -67,7 +67,8 @@ export function createPolice(ctx: RaceCtx): Police {
   let selfCrash = false;                      // the player's current crash was their own doing
   const pos = new Vector3(), quat = new Quaternion();
 
-  // Corgi speech stays in toasts only for the arrival and the fine (no world-anchored line for non-riders yet).
+  // Corgi speech (content's POLICE_LINES) stays in toasts, only for the arrival, the fine and an escape
+  // (no world-anchored bubble for non-riders yet).
   const say = (text: string): void => app.ui.toast(`${ROSTER.corgi.name}：${text}`, 'warn');
   const alert = (level: number, reason?: Reason): void => {
     if (level === alertLevel) return;
@@ -92,7 +93,7 @@ export function createPolice(ctx: RaceCtx): Police {
     ob.active = true;
     if (!session.obstacles.includes(ob)) session.obstacles.push(ob);
     alert(1, 'spawn');
-    say(rng.pick(ROSTER.corgi.taunts));
+    say(rng.pick(POLICE_LINES.alert));
   };
 
   const despawn = (): void => {
@@ -109,7 +110,7 @@ export function createPolice(ctx: RaceCtx): Police {
     setMode('leaving');
     player.heat = Math.min(player.heat, CALM_HEAT);
     alert(0, escaped ? 'lost' : undefined);
-    if (escaped) app.ui.toast('甩掉了柯基警官！  腿短不是借口', 'meme');
+    if (escaped) app.ui.toast(`甩掉了柯基警官！  “${rng.pick(POLICE_LINES.lost)}”`, 'meme');
   };
 
   const bust = (): void => {
@@ -120,7 +121,7 @@ export function createPolice(ctx: RaceCtx): Police {
     if (player.mode === 'racing') { player.mode = 'busted'; player.modeTime = 0; }
     setMode('ticket');
     alert(0, 'busted');
-    say(`罚款 ${FINE} 小鱼干！靠边 ${PENALTY} 秒，下次注意！`);
+    say(`${rng.pick(POLICE_LINES.busted)}  罚 ${FINE} 小鱼干，靠边 ${PENALTY} 秒`);
   };
 
   const whistle = (): void => {

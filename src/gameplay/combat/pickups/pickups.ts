@@ -1,6 +1,7 @@
 // Pickups (SPEC §7): rows from track 'pickupRow' features + weapon drops. Collected by proximity in track
 // space by any racing rider: 小鱼干 coins, fish +25 HP, weapon crate, 能量鱼罐头 +25 SP, dropped weapons
 // (unarmed riders only). Row items pop back after a few seconds; drops fade after PICKUP.dropLife.
+import { WEAPONS } from '../../../data/weapons';
 import type { RiderState, WeaponId } from '../../../core/types';
 import { equip, rollWeapon } from '../armory';
 import { clampToRoad, type CombatCtx } from '../ctx';
@@ -187,6 +188,7 @@ export class PickupSystem {
     const it = makeItem(this.nextId(), kind, s, x, this.ctx.rng.next() * 6);
     if (kind === 'weapon') {
       it.weapon = weapon;
+      it.uses = WEAPONS[weapon].uses;
       it.life = PICKUP.dropLife;
     }
     it.pop = 0;

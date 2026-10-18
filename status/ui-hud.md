@@ -46,3 +46,20 @@
   (pose(name), fire(cut, opts), place(id, ds, x), reset(), freezeSim(on), dispose(), names()).
 - Screenshot tour: node sandbox/hud.shots.mjs [--only a,b] [--size 1280x720] [--live] → shots/ui-hud/*.png
 - Real race: node tools/shot.mjs --url "/?race=coast&seed=4" --step 600 --controls '{"throttle":1}' --out shots/ui-hud/x.png
+
+## Fix round 1
+Plan (critic reviews/ui-hud-r1-correctness.json + requests from core/content/race/combat). [x] = done + verified.
+Resume: skip [x] items.
+- [ ] 1 weapon uses (major): rider.weaponUses when finite, else per-rider event tracker; '?' when unknown
+- [ ] 2 merged callouts keep stale cn/mod (major): rebuild text/class on merge + sandbox assert scene
+- [ ] 3 taunt bubbles pile up (major): one layout pass with tags, de-overlap bubbles, dock stacking, cap 2
+- [ ] 4 BUSTED +4S invented (major): drop penalty; ticket hold countdown while mode 'busted'; splash sub
+- [ ] 5 POLICE false alarm (major): glow/chip from police:alert only
+- [ ] 6 intro cards vs camera (major): card the rival at the camera's look point; core request race:introFocus
+- [ ] 7 skill band under WRECKED/BUSTED (minor)
+- [ ] 8 km readout under the player badge (minor)
+- [ ] 9 side chevron for on-screen casters (minor): edge only when off-screen; flash the tag instead
+- [ ] 10 callouts swallowed by cinematics (minor): freeze lifetimes while calm < 1
+- [ ] 11 progress strip says KO for every down rider (minor)
+- [ ] 12 projectile:spawn/end warning (minor)
+- [ ] 13 requests: achievement chip; font warm-up lines; 'launch' callout; UI sfx; portrait preload; thin band while a projectile flies

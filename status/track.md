@@ -56,6 +56,15 @@
 - deferred (not small; core integration TODO for wave 2): coast tight corners R 45–70 m / hairpin / chicane.
   Note: wave-2 units env-city / env-mountain now own the city / mountain layouts + dressings.
 
+## Tight corners (integrator note, resume 10-18 #2) — plan / progress
+- [ ] sandbox/track.plan.mjs: node layout checker (game's own buildLayout via tools/content-ts.mjs hook):
+      corners list (R, turn), self-proximity, sea/land side conflicts, pickup rows |x| ≤ hw − 1, plan PNG.
+- [ ] coast.wip.ts → coast.ts: S-chicane R 55–70 (replaces the R150 sbend), near-hairpin R 40–55 around the
+      lighthouse promontory (lighthouse on the outside of the bend), 1 more tighter corner; length ≈ 3.3 km;
+      features/pickups on asphalt; marks/bumps/sign positions follow the new s values.
+- [ ] content request 6: curves sign = ROAD_SIGNS[5] 「连续弯道 弯弯有鹅」 placed before the new corners.
+- [ ] verify: track.test, track.shots (chase + aerial), track.perf, feel-tour, race-soak --seeds 1.
+
 ## Feature data (for sim / race / combat)
 - ramp: wedge 0 → data.height (1.2) from s0 to s1 across x0..x1 · jumpCrest: data.peak = crest s
 - boostPad: data.power/time (0.3 / 1.0) · oil, puddle: boxes · tunnel / bridge: s range, full width

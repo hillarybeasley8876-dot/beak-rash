@@ -4,9 +4,10 @@ import type { RiderState, WeaponId } from '../../core/types';
 import type { CombatCtx } from './ctx';
 import { WEAPON_RULES } from './tuning';
 
+/** Hand `weapon` to r with `uses` hits left (a fresh one by default); RiderState.weaponUses is combat's to write. */
 export function equip(ctx: CombatCtx, r: RiderState, weapon: WeaponId, uses?: number): void {
   r.weapon = weapon;
-  ctx.rd(r).uses = weapon === 'none' ? Infinity : uses ?? WEAPONS[weapon].uses;
+  r.weaponUses = weapon === 'none' ? Infinity : uses ?? WEAPONS[weapon].uses;
   ctx.view(r)?.setWeapon(weapon);
 }
 
@@ -37,9 +38,8 @@ const BREAK_BURST: Partial<Record<WeaponId, string>> = { baguette: 'crumbs', key
 /** One landed hit wears the weapon; it breaks at 0 uses (combat:weaponBreak, then bare wings). */
 export function consumeUse(ctx: CombatCtx, r: RiderState): void {
   if (r.weapon === 'none') return;
-  const d = ctx.rd(r);
-  d.uses -= 1;
-  if (d.uses > 0) return;
+  r.weaponUses -= 1;
+  if (r.weaponUses > 0) return;
   const pos = ctx.pos(r, 1.3);
   ctx.bus.emit('combat:weaponBreak', { riderId: r.id, weapon: r.weapon, pos });
   ctx.session.app.fx.burst(BREAK_BURST[r.weapon] ?? 'debris', pos, { count: 14 });
@@ -58,7 +58,7 @@ export function knockLoose(ctx: CombatCtx, a: RiderState, v: RiderState, heavy: 
 export function takeWeapon(ctx: CombatCtx, a: RiderState, v: RiderState): void {
   const weapon = v.weapon;
   if (weapon === 'none') return;
-  const uses = ctx.rd(v).uses;
+  const uses = v.weaponUses;
   equip(ctx, v, 'none');
   if (a.weapon === 'none') {
     equip(ctx, a, weapon, uses);

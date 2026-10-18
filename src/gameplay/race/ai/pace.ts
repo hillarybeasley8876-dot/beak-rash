@@ -2,8 +2,9 @@
 // roadbike rider, +2 %/level) plus a small per-rider offset, so the player's own bike is a real edge (a
 // faster bike does not speed the field up) while rival bike differences are compressed; leaders ease off
 // from 40 m ahead; riders far behind (out of the chase camera) get a catch-up nudge (none for 12 s after
-// their own respawn, so a KO buys a real gap), and a hunter closing in from behind pedals freely. Riders never
-// exceed their own bike top except through those unseen boost pulses (`rider.rubber` is not wired in sim).
+// their own respawn, so a KO buys a real gap), and a hunter closing in from behind pedals freely. Riders only
+// exceed their own bike top through `rider.rubber` (a top-speed factor the sim multiplies in, no boost visuals),
+// raised only while they are out of the chase camera and eased back to 1 before they come into view.
 import { BIKES } from '../../../data/bikes';
 import { clamp, smoothstep } from '../../../core/math';
 import type { RiderState } from '../../../core/types';
@@ -17,8 +18,8 @@ const CATCH_UP = 0.08;                // max catch-up above the pace, unseen rid
 const UNSEEN_BEHIND = 20;             // m behind the player: behind the chase camera
 const CATCH_FULL = 90;                // m behind where the catch-up is complete
 const SPRINT_BEHIND = 8;              // a hunter this far behind the player may sprint (unseen)
-const PULSE = 0.15;                   // s of each nudge pulse
-const MAX_PULSE = 0.35;
+const MAX_RUBBER = 0.35;              // max top-speed factor above the rider's own bike (kidbike → pace + 8 %)
+const RUBBER_RATE = 0.1;              // 1/s: how fast rider.rubber moves (0.08 settles in under a second)
 
 export interface PaceInput {
   rider: RiderState;
@@ -50,14 +51,14 @@ export function paceCap(i: PaceInput): number {
   return cap;
 }
 
-/** Apply an unseen nudge pulse when the cap is above what the rider's own bike can reach. */
-export function nudge(r: RiderState, cap: number, unseen: boolean): void {
-  if (!unseen || r.mode !== 'racing' || r.boostTime > 0) return;
-  // Relative to the bike's own top (statuses such as chill still slow the rider down).
-  const need = cap / Math.max(1, topOf(r)) - 1;
-  if (need <= 0.005) return;
-  r.boostTime = PULSE;
-  r.boostPower = clamp(need, 0, MAX_PULSE);
+/**
+ * Ease `rider.rubber` toward what the cap needs above the rider's own bike top while it is unseen (1 when
+ * in view or not racing). Statuses such as chill still slow the rider down: the sim multiplies both in.
+ */
+export function easeRubber(r: RiderState, cap: number, unseen: boolean, dt: number): void {
+  const want = unseen && r.mode === 'racing' ? clamp(cap / Math.max(1, topOf(r)), 1, 1 + MAX_RUBBER) : 1;
+  const now = r.rubber > 0 ? r.rubber : 1;
+  r.rubber = now + clamp(want - now, -RUBBER_RATE * dt, RUBBER_RATE * dt);
 }
 
 /** Is a rider behind the player far enough to be out of the chase camera? */

@@ -4,14 +4,17 @@
 //            every stinger and every sfx through the real mixing graph in an OfflineAudioContext
 //            (sandbox/audio.html): peak / RMS / clipping / clicks / dropouts / low-end share / render cost.
 //  game    — runs a real race (audio-check-game.mjs): nothing before unlock, music per screen, event →
-//            sound mapping, KO cinematic, pause muffle, mix peaks in game, no errors when muted.
-//   node tools/audio-check.mjs [--offline | --game] [--seconds 20] [--only race-coast] [--sfx] [--verbose]
+//            sound mapping, KO cinematic, pause muffle, mix peaks in game, no errors when muted;
+//            race-start sync (audio-check-start.mjs), no-WebAudio / WebKit robustness (audio-check-robust.mjs),
+//            realtime audio-thread load (audio-check-cpu.mjs: renderCapacity p50 ≤ 5 %, p90 ≤ 8 %).
+//   node tools/audio-check.mjs [--offline | --game | --cpu] [--seconds 20] [--only race-coast] [--sfx] [--verbose]
 //                              [--stub camera,fx]   (isolate from other units' breakage)
 import os from 'node:os';
 import { withPage, parseArgs, BASE } from './lib.mjs';
 import { gameCheck } from './audio-check-game.mjs';
 import { robustCheck } from './audio-check-robust.mjs';
 import { startCheck } from './audio-check-start.mjs';
+import { cpuCheck } from './audio-check-cpu.mjs';
 
 const args = parseArgs(process.argv.slice(2));
 const SECONDS = Number(args.seconds ?? 20);
@@ -37,8 +40,9 @@ const row = (s, bad) =>
   `clicks ${s.clicks}  cpu ${String(s.cpuNet).padStart(5)}% (raw ${s.cpuPct})  ${bad.length ? 'FAIL ' + bad.join(', ') : 'ok'}`;
 
 const failures = [];
-const RUN_OFFLINE = !args.game;
-const RUN_GAME = !args.offline && !args.only;
+const RUN_OFFLINE = !args.game && !args.cpu;
+const RUN_GAME = !args.offline && !args.only && !args.cpu;
+const RUN_CPU = !args.offline && !args.only;
 if (RUN_OFFLINE) await withPage(async (page, h) => {
   await page.goto(BASE + '/sandbox/audio.html', { waitUntil: 'load', timeout: 60000 });
   await page.waitForFunction(() => window.__audioCheck?.ready === true, null, { timeout: 60000 });
@@ -124,6 +128,7 @@ if (RUN_OFFLINE) await withPage(async (page, h) => {
 });
 
 if (RUN_GAME) failures.push(...await gameCheck(args), ...await startCheck(args), ...await robustCheck(args));
+if (RUN_CPU) failures.push(...(await cpuCheck(args)).fails);
 
 if (failures.length) {
   console.log(`\nFAILED (${failures.length}):\n- ` + failures.join('\n- '));

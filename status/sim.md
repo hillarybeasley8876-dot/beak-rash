@@ -173,3 +173,8 @@ Plan (issue -> fix; [x] = done + verified). Critic scripts: shots/review/sim/r2-
 - [ ] minors: hero framing (core.md asks sim: CHASE dist/fov), PERFECT needs a clean touchdown, drift curve push
       partial + driftLatIn 4.5 + release ramp, knock vs steering victim, telemetry, respawn glide cut, SHOWTIME settle,
       pause freeze, water-crash FOV, camera telemetry, rider.rubber (core.md request).
+- resumed 11:15 (new fixer after API outage): found UNVERIFIED code from the previous fixer for C (camera/avoid.ts
+  + crash.ts vault over the roof), PERFECT calm/timed (air.ts), drift curve-cancel x1.35 + driftLatIn 4.5 + release
+  ramp (steering.ts/drift.ts), knock carry direction-aware (knockSteer 0.1), rider.rubber (forces.ts). Verifying each
+  now; then the camera minors (respawn cut, SHOWTIME settle, pause freeze, water FOV, framing per new SPEC numbers,
+  chasePose) and the telemetry additions.

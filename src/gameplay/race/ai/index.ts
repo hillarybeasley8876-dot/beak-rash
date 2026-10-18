@@ -8,7 +8,7 @@ import { riderRating } from '../grid';
 import { Brain, type AiWorld } from './brain';
 import type { HuntToken } from './fight';
 import { buildRacingLine } from './line';
-import { nudge, paceCap, unseenBehind } from './pace';
+import { easeRubber, paceCap, unseenBehind } from './pace';
 import { makePersonality } from './personality';
 import { Senses } from './sense';
 import { Taunts } from './taunts';
@@ -66,15 +66,18 @@ export function createAi(session: Session): AiDirector {
   /** The player's brain drives on autopilot, and rolls the bike out after the finish line. */
   const driveFor = (r: RiderState): boolean => config.autopilot || r.finishTime !== null;
 
-  const rubberBand = (b: Brain): void => {
+  const rubberBand = (b: Brain, dt: number): void => {
     const r = b.r, p = session.player;
-    if (r.isPlayer || session.phase !== 'racing') { b.paceTop = Infinity; return; }
+    if (r.isPlayer || session.phase !== 'racing') {
+      b.paceTop = Infinity;
+      if (!r.isPlayer) r.rubber = 1;
+      return;
+    }
     const chaseCam = app.rig.mode === 'chase';
     const huntingPlayer = b.fighter.hunt === p;
     const recovering = session.time - (respawnAt.get(r.id) ?? -Infinity) < RECOVER;
     b.paceTop = paceCap({ rider: r, player: p, level: config.level, offset: offsets.get(r.id) ?? 0, huntingPlayer, chaseCam, recovering });
-    // Pulses only on a free road: a boost accelerates even off the pedals (sim), so never while following or braking.
-    if (b.free) nudge(r, b.paceTop, unseenBehind(r, p, chaseCam, huntingPlayer));
+    easeRubber(r, b.paceTop, unseenBehind(r, p, chaseCam, huntingPlayer), dt);
   };
 
   const bellCheck = (b: Brain): void => {
@@ -94,7 +97,7 @@ export function createAi(session: Session): AiDirector {
       world.time = session.time;
       for (const b of brains.values()) {
         if (b.r.isPlayer && !driveFor(b.r)) continue;
-        rubberBand(b);
+        rubberBand(b, dt);
         if (session.phase === 'racing') bellCheck(b);
         b.update(dt, world);
       }

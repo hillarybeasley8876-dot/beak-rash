@@ -4,7 +4,7 @@
 //   node tools/feel-telemetry.mjs [--only accel,steer,...] [--strips] [--out shots/sim/telemetry]
 //        [--stub world,actors,combat,race,fx,ui,audio] [--seed 1] [--browser webkit]
 // Scenarios: accel coastBrake steer keyboard slalom curveHold drift air wall bump press slipstream crash
-//            driftWall knock snake wallEvents slope wallPin driftTiming jitter camera handoff
+//            driftWall knock snake wallEvents slope wallPin driftTiming jitter camera handoff trafficCam
 import path from 'node:path';
 import { parseArgs, withPage } from './lib.mjs';
 import { installFeel, installPatches, saveDataUrl, writeCsv, writeJson } from './feel-lib.mjs';
@@ -14,8 +14,9 @@ import { CAMERA } from './feel-scenarios-camera.mjs';
 import { HANDOFF } from './feel-scenarios-blend.mjs';
 import { ABUSE } from './feel-scenarios-abuse.mjs';
 import { REVIEW2 } from './feel-scenarios-r2.mjs';
+import { CAMERA2 } from './feel-scenarios-cam2.mjs';
 
-const SCENARIOS = [...HANDLING, ...WORLD, ...ABUSE, ...REVIEW2, ...CAMERA, ...HANDOFF];
+const SCENARIOS = [...HANDLING, ...WORLD, ...ABUSE, ...REVIEW2, ...CAMERA, ...HANDOFF, ...CAMERA2];
 
 const a = parseArgs(process.argv.slice(2));
 const OUT = a.out ?? 'shots/sim/telemetry';
@@ -60,6 +61,11 @@ const CHECKS = [
   ['handoff', 'ko_maxRotDeg', 0, 8], ['handoff', 'ko_rotPopRatio', 0, 3], ['handoff', 'wrecked_maxRotDeg', 0, 8],
   ['handoff', 'wrecked_rotPopRatio', 0, 3], ['handoff', 'respawn_maxRotDeg', 0, 8], ['handoff', 'respawn_rotPopRatio', 0, 3],
   ['handoff', 'intro_maxRotDeg', 0, 8], ['handoff', 'intro_rotPopRatio', 0, 3],
+  // camera review r2: a traffic crash never puts the eye inside the vehicle, the body is never hidden by it
+  // for more than 6 frames (car, stopped van, oncoming bus)
+  ['trafficCam', 'car_crashed', true, true], ['trafficCam', 'car_eyeInBox', 0, 0], ['trafficCam', 'car_hiddenRun', 0, 6],
+  ['trafficCam', 'van_crashed', true, true], ['trafficCam', 'van_eyeInBox', 0, 0], ['trafficCam', 'van_hiddenRun', 0, 6],
+  ['trafficCam', 'bus_crashed', true, true], ['trafficCam', 'bus_eyeInBox', 0, 0], ['trafficCam', 'bus_hiddenRun', 0, 6],
 ];
 
 function report(results) {

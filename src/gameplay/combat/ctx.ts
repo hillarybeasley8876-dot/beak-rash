@@ -16,7 +16,6 @@ export interface SwingTiming { windup: number; active: number; recover: number; 
 /** Combat bookkeeping that is private to this unit (RiderState only carries the shared fields). */
 export interface RiderCombat {
   swing: SwingTiming;                             // timing of the current / last swing
-  uses: number;                                   // hits left on the current weapon
   buffered: { heavy: boolean; side: Side | 0; age: number } | null; // swing pressed during a swing tail / stagger
   skillBuf: Array<{ slot: number; age: number }>; // skills pressed mid-swing / mid-stagger (one per slot), retried
   bellBuf: number | null;                         // age of a bell press held while a swing / stagger finishes
@@ -56,7 +55,7 @@ export class CombatCtx {
     this.root.name = 'combat';
     session.world.add(this.root);
     this.data = session.riders.map(() => ({
-      swing: { windup: 0, active: 0, recover: 0, total: 0 }, uses: Infinity, buffered: null, skillBuf: [], bellBuf: null, bellCd: 0, bellPaid: session.riders.map(() => -Infinity),
+      swing: { windup: 0, active: 0, recover: 0, total: 0 }, buffered: null, skillBuf: [], bellBuf: null, bellCd: 0, bellPaid: session.riders.map(() => -Infinity),
       nextCrit: false, koFired: false, hpAtCrash: 0, lastAttack: -999, hitByMirror: null, koBy: null, pin: null,
     }));
   }

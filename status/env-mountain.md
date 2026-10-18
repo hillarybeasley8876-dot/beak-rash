@@ -22,6 +22,25 @@
 ## Done
 - M1 layout v1 (3588 m, y 3..119, max grade 15 %), registry lines, 2D bench (sandbox/mountain.*).
 - M2 switchback terrain: env/mountain-legs.ts (LegBlend) via new optional hook; legs hug the slope.
+- M3 look (mostly): env/mountain-relief.ts (ridged relief + lake peaks), mountain-grade.ts (alpine
+  vertex palette, farmland off), mountain-sky.ts (golden-hour dome, sun disc, god-ray hint),
+  mountain-ridges.ts (4 layered silhouettes), mountain-lake.ts (sky-mirroring lake shader).
+- M4 started: props/mountain-trees.ts (pine/fir/birch/farPine/teaBush), dressing/mountain/forest.ts
+  (roadside trees, boulders, far forest), dressing/mountain/index.ts, util.ts.
+- sandbox/mountain.race.mjs (autopilot soak) written 03:53 (not yet run/recorded).
+
+## In progress (resumed 10-18 ~11:20 after outage) — M4 module plan
+- [ ] dressing/mountain/marks.ts: mark dispatcher (all kinds in layouts/mountain.ts).
+- [ ] dressing/mountain/signage.ts: chevrons/km markers (coast helpers), road signs (ROAD_SIGNS[5],
+      TRACK_SIGNS.mountain), billboards (TRACK_BILLBOARDS.mountain + BILLBOARD_LINES, BILLBOARDS.mountain art).
+- [ ] dressing/mountain/village.ts + props/mountain-house.ts + props/mountain-deco.ts: chalets, stands,
+      lantern strings/poles, gantries (+lanterns), flags/banners.
+- [ ] props/mountain-bridge.ts + dressing/mountain/gorge.ts + env/mountain-waterfall.ts: suspension
+      bridge (towers, cables, hangers, deck slab), waterfall shader + mist, river rocks.
+- [ ] props/mountain-pagoda.ts: pagoda viewpoint at the crest.
+- [ ] dressing/mountain/farm.ts + props/mountain-animals.ts: tea terraces, cows + fences, hot spring
+      + capybaras + sign.
+- [ ] env/mountain-life.ts: cable car (moving gondolas), wind turbines (spinning), balloons, prayer flags.
 
 ## Shared-file edits (track unit files; additive only)
 - layouts/index.ts: `if (id === 'mountain') return MOUNTAIN;` (+ import).

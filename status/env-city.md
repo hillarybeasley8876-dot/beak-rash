@@ -12,19 +12,20 @@
        shader (procedural lit windows, animated TVs/toggles, distance AA), HDR neon (flicker), LED
        screens, traffic-light cycle, additive light pools.
 3. [x] Buildings (scenery/props/city-building.ts) + street walls/towers/skyline (dressing/city/blocks.ts).
-4. [ ] Neon signs atlas + meme lines (dressing/city/neon.ts, lines.ts), LED billboards with BILLBOARDS.city
-       art (screens.ts), road signs / distance markers / banners (reuse coast helpers where generic).
-5. [ ] Wet road: planar reflection of the emissive layer → additive overlay with streak blur +
-       roughness noise (env/city-wet.ts); sidewalk paving + kerbs + zebra/scramble paint + light pools
-       (dressing/city/paint.ts).
-6. [ ] Street props (city-street.ts, city-shops.ts, city-people.ts): lamps, traffic lights, bus stops,
-       vending machines, food stalls 烧烤/奶茶, convenience store, subway entrance, cables, planter trees
-       (cherry/ginkgo), scooters, calling-card mural, animal pedestrians with umbrellas.
-7. [ ] Landmarks: start neon gantry, finish gantry + giant screen, expressway viaduct (deck/piers),
-       underpass retaining walls + tunnel fans, roundabout monument, riverside skyline, bridge neon.
-8. [ ] Sky extras (moon halo, stars) + light rain (env/city-sky.ts, env/city-rain.ts).
-9. [ ] Verify: sandbox + in-game shots (chase 70 km/h, aerial), perf ≤ 250 calls / ≤ 800k tris,
-       build ≤ 4 s, autopilot race finishes, errors clean. Fix what looks wrong.
+4. [x] Neon signs atlas + meme lines (neon.ts, neon-faces.ts, lines.ts), LED screens with BILLBOARDS.city art.
+5. [x] Wet road (env/city-mirror.ts + env/city-wet.ts).
+--- resume 10-18 (session 2) plan ---
+A. [ ] Wire paint.ts (sidewalks, zebra, scramble, lamp pools) + street props placement
+       (dressing/city/street.ts): lamps+pools, traffic lights at crossings, bus stops, vending, planters, scooters.
+B. [ ] Shops & people (props/city-shops.ts, city-people.ts; dressing/city/life.ts): food stalls 烧烤/奶茶,
+       convenience store, subway entrance, calling-card mural, umbrella animal pedestrians (crowd bob), cables.
+C. [ ] Landmarks (dressing/city/landmarks.ts …): start/finish neon gantries + giant finish screen, viaduct
+       piers + deck fascia, underpass retaining-wall skin, tunnel interior (tiles, jet fans, lamp strips),
+       roundabout monument (claims the hairpin island first), bridge arch neon.
+D. [ ] Signs: distance markers, crest warning, corner chevrons, city road signs, start/finish banners.
+E. [ ] Sky extras (moon halo, stars; env/city-sky.ts) + light rain (env/city-rain.ts, 1 draw call).
+F. [ ] Far city fill for the aerial (cheap blocks to the harbour, cross streets).
+G. [ ] Verify: chase + aerial shots, perf <= 250 calls / 800k tris, build <= 4 s, autopilot race, errors.
 
 ## Done
 - M1 layout `layouts/city.ts` (3378 m, STREET 9 m abs, flat paved ground, harbour beyond ~200 m, river

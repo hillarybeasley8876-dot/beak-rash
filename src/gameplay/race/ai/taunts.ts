@@ -1,7 +1,7 @@
 // Taunts: roster lines from rivals near the player, paced so the chatter never stacks up. One idle line
 // at a time across the field (4.5–6.5 s apart, from the nearest rider in front of the camera), each rider
-// at most every ~8–14 s (longer when the pack is crowded), KO / respawn lines ≥ 2 s after any other line,
-// and every rider draws its lines from a shuffled no-repeat bag.
+// at most every ~8–14 s (longer when the pack is crowded), KO / respawn / signature-skill shouts ≥ 2 s after
+// any other line, and every rider draws its lines from a shuffled no-repeat bag.
 import { ROSTER } from '../../../data/roster';
 import type { Session } from '../../../core/contracts';
 import type { Rng } from '../../../core/rng';
@@ -15,8 +15,9 @@ const CROWD = 0.15;         // per-rider gap grows by this per extra rider withi
 const IDLE_GAP = [4.5, 6.5]; // s between idle taunts across the whole field
 const FORCE_GAP = 2;        // s after any line before a KO / respawn line
 const BURST = 3;            // s window: never be the third line inside it
+const SKILL_SHOUT = 0.6;    // chance a rival shouts its skillLines on a signature cast
 
-type Kind = 'taunts' | 'koLines' | 'hurtLines';
+type Kind = 'taunts' | 'koLines' | 'hurtLines' | 'skillLines';
 
 export class Taunts {
   private next = new Map<RiderId, number>();
@@ -26,6 +27,7 @@ export class Taunts {
   private lastLine = -Infinity;     // race-clock time of the last line of any kind
   private recent: number[] = [];    // times of lines (any source) in the last BURST s
   private idleAt = 0;               // earliest time for the next idle line
+  private shouts: RiderState[] = []; // signature casts waiting for their shout (next tick)
   private offs: Array<() => void> = [];
 
   constructor(private session: Session, private rng: Rng, private taunty: (id: RiderId) => number) {
@@ -44,9 +46,14 @@ export class Taunts {
       const r = session.rider(riderId);
       if (r && !r.isPlayer && this.rng.next() < 0.45) this.forced(r, 'hurtLines');
     }));
+    this.offs.push(bus.on('skill:cast', ({ riderId, slot }) => {
+      const r = session.rider(riderId);
+      // Shouted on the next tick, so a skill that already says something (seagull's MINE!) is not doubled.
+      if (r && !r.isPlayer && slot === 1 && this.rng.next() < SKILL_SHOUT) this.shouts.push(r);
+    }));
   }
 
-  /** KO / respawn line: within earshot and not on top of another line. */
+  /** KO / respawn / skill line: within earshot and not on top of another line. */
   private forced(r: RiderState, kind: Kind): void {
     if (this.time - this.lastLine < FORCE_GAP || this.crowded() || !this.audible(r, EARSHOT)) return;
     this.say(r, kind);
@@ -95,6 +102,8 @@ export class Taunts {
 
   update(dt: number): void {
     this.time += dt;
+    for (const r of this.shouts) this.forced(r, 'skillLines');
+    this.shouts.length = 0;
     if (this.session.phase !== 'racing' || this.time < this.idleAt || this.crowded()) return;
     const p = this.session.player;
     let best: RiderState | null = null;
