@@ -1,7 +1,8 @@
 // Solid obstacles from session.obstacles (traffic, police car, props) in track space, plus near misses.
 // Head-on / rear-end hits above 8 m/s relative crash the rider ('traffic' for vehicles, props need more);
-// slower hits and side swipes push the rider out with a wobble and a short carry (so steering can't glue
-// the rider back onto the vehicle every few frames). Jumping above `height` clears them.
+// slower hits and side swipes push the rider out with a wobble and a short carry (steering back into the
+// vehicle is muted for a moment, steering away stays live); pressing into the same vehicle again right after
+// a swipe scrapes along it instead of pinballing. Jumping above `height` clears them.
 import { TUNING as T } from './tuning';
 import { endDrift } from './drift';
 import { startCarry } from './steering';
@@ -15,6 +16,8 @@ export function obstacleContacts(ctx: SimCtx, sr: SimRider, dt: number): void {
   const r = sr.r;
   sr.nearMissCooldown = Math.max(0, sr.nearMissCooldown - dt);
   sr.swipeCooldown = Math.max(0, sr.swipeCooldown - dt);
+  sr.swipeFree += dt;
+  if (sr.swipeFree > T.wallLatchTime) sr.swipeLatch = -1;
   if (!isSolid(r)) {
     sr.touching.clear();
     sr.nearMiss.clear();
@@ -55,7 +58,7 @@ function hit(ctx: SimCtx, sr: SimRider, o: Obstacle, ds: number, dx: number, was
   const endOn = !wasTouching && depthS <= depthX + 0.3;
   if (endOn && Math.abs(rel) > (vehicle ? T.trafficCrashRel : T.propCrashRel)) {
     emitHit(ctx, sr, o, Math.abs(rel));
-    crashRider(ctx, sr, vehicle ? 'traffic' : 'obstacle', null);
+    crashRider(ctx, sr, vehicle ? 'traffic' : 'obstacle', null, o.height);
     return;
   }
   endDrift(ctx, sr, false);
@@ -66,12 +69,21 @@ function hit(ctx: SimCtx, sr: SimRider, o: Obstacle, ds: number, dx: number, was
     r.speed = Math.max(0, behind ? Math.min(r.speed, o.speed - 1) : Math.max(r.speed, o.speed + 1));
     r.vx += (dx > 0 ? -1 : 1) * 1.5;
   } else {
-    // Side swipe: push out to the near side, reflect the lateral velocity, scrub a little speed.
+    // Side swipe: push out to the near side; the first touch reflects the lateral velocity, shoves the rider
+    // off and scrubs a little speed, a latched re-contact only stops the motion into the vehicle.
     const side = dx > 0 ? -1 : 1;
     r.x = o.x + side * (o.halfWidth + T.riderHalfWidth + 0.02);
+    const latched = sr.swipeLatch === o.id;
+    sr.swipeLatch = o.id;
+    sr.swipeFree = 0;
+    if (latched) {
+      if (r.vx * side < 0) r.vx = 0;
+      return;
+    }
     if (r.vx * side < 0) r.vx = -r.vx * 0.4;
     r.vx += side * 1.2;
-    startCarry(sr, T.wallCarryTime, 0, T.wallCarryTau);
+    startCarry(sr, T.wallCarryTime, 0, T.wallCarryTau, side > 0 ? -1 : 1);
+    sr.yawEase = T.yawEaseTime;
     if (!wasTouching && sr.swipeCooldown <= 0) r.speed *= 1 - (vehicle ? T.sideSwipeLoss : T.propSpeedLoss);
   }
   sr.wobbleTime = Math.max(sr.wobbleTime, T.wobbleTime);

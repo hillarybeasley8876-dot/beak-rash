@@ -2,7 +2,8 @@
 // rides alongside, and BUSTS you if you stay slow (or crash yourself) next to it for 2 s: fine 100 and a
 // 4 s stop served on the road (so crossing order = final order). Counterplay: it cruises just under
 // your top speed, tires after riding alongside for a while, gets stuck behind traffic and can be
-// knocked back; lead it by 38 m for 2 s (or let the heat cool while ahead) and it gives up.
+// knocked back; build a real lead (25 m from its closest approach, then 38 m for 2 s, or 15 m with the
+// heat cooled after it caught up) and it gives up. No escape credit in the first seconds of a chase.
 import { Quaternion, Vector3 } from 'three';
 import { clamp } from '../../core/math';
 import { createRiderState } from '../../core/rider';
@@ -17,7 +18,7 @@ import { PoliceView } from './police-view';
 import { trackPose } from './pose';
 
 const SPAWN_HEAT = 0.5;
-const SPAWN_BEHIND = 45;
+const SPAWN_BEHIND = 28;
 const SPAWN_BEFORE = 0.9;     // no new chase in the last 10 % of the track
 const SLOW = 8;               // m/s: slower than this next to the corgi counts toward BUSTED
 const BUST_TIME = 2;
@@ -25,6 +26,9 @@ const FINE = 100, PENALTY = 4; // the penalty is the ticket stop itself
 const WHISTLE_CD = 9;
 const COOLDOWN = 20;
 const LOSE_GAP = 38, LOSE_TIME = 2;
+const LEAD_BUILT = 25;        // m the player must pull away from the corgi's closest approach to escape
+const MIN_CHASE = 8;          // s: no escape before the chase has really begun
+const REACHED = 6;            // m: the corgi has caught up with the player this chase
 const CALM_HEAT = 0.3, CALM_GAP = 15;
 const LET_GO_HEAT = 0.12;     // a model citizen alongside: the corgi lets it go (no 'lost' credit)
 const KNOCK_HEAT = 0.05;      // knocking the officer about is an offence too
@@ -52,13 +56,14 @@ export function createPolice(ctx: RaceCtx): Police {
   st.name = ROSTER.corgi.name;
   st.mode = 'racing';
   const corgi = createCorgi(st);
-  const rideWorld: RideWorld = { track, obstacles: session.obstacles, playerTop: topOf(player) };
+  const rideWorld: RideWorld = { track, obstacles: session.obstacles, playerTop: topOf(player), playerSpeed: 0 };
   const ob: Obstacle = { id: 900, kind: 'police', s: 0, x: 0, speed: 0, halfWidth: 0.45, halfLength: 0.9, height: 1.6, solid: false, active: false };
   let view: PoliceView | null = null;
   let mode: Mode = 'off';
   let side: 1 | -1 = 1;
   let modeT = 0, bustT = 0, lostT = 0, whistleCd = 0, cooldown = 0, alertLevel = 0, simAcc = 0, lastReal = app.clock.realTime;
   let wingT = 0;                              // s left of the player's Wing Dash
+  let minGap = Infinity;                      // closest approach (player.s − corgi.s) this chase
   let selfCrash = false;                      // the player's current crash was their own doing
   const pos = new Vector3(), quat = new Quaternion();
 
@@ -79,6 +84,7 @@ export function createPolice(ctx: RaceCtx): Police {
     st.speed = Math.max(player.speed + 4, 12);
     st.vx = 0;
     bustT = lostT = 0;
+    minGap = player.s - st.s;
     whistleCd = 2.5;
     rideWorld.playerTop = topOf(player);
     view ??= new PoliceView(app, session.world);
@@ -152,6 +158,7 @@ export function createPolice(ctx: RaceCtx): Police {
     if (Math.abs(gap) > 14) side = st.x <= player.x ? -1 : 1;
     const hw = track.bounds(player.s).halfWidth;
     if (Math.abs(player.x + side * 1.7) > hw - 0.6) side = side === 1 ? -1 : 1;
+    rideWorld.playerSpeed = player.speed;
     ride(corgi, rideWorld, dt, want, Math.abs(gap) < 14 ? player.x + side * 1.7 : player.x, 5.5);
     const alongside = Math.abs(gap) < 4 && Math.abs(player.x - st.x) < 3.4;
     tire(corgi, dt, gap);
@@ -160,8 +167,13 @@ export function createPolice(ctx: RaceCtx): Police {
     if (bustT >= BUST_TIME) { bust(); return; }
     whistleCd -= dt;
     if (gap > -1 && gap < 12 && whistleCd <= 0 && !tired(corgi) && player.mode === 'racing') whistle();
-    lostT = gap > LOSE_GAP ? lostT + dt : Math.max(0, lostT - dt);
-    if (lostT > LOSE_TIME || (player.heat < CALM_HEAT && gap > CALM_GAP)) { giveUp(true); return; }
+    minGap = Math.min(minGap, Math.max(0, gap));
+    // Escaping needs a lead built during the chase (never just a corgi that has not arrived yet): 25 m
+    // pulled from its closest approach and 38 m held for 2 s, or a calm lead of 15 m after it rode alongside.
+    const settled = modeT > MIN_CHASE;
+    lostT = settled && gap - minGap > LEAD_BUILT && gap > LOSE_GAP ? lostT + dt : Math.max(0, lostT - dt);
+    const calmEscape = settled && minGap < REACHED && gap > CALM_GAP && player.heat < CALM_HEAT;
+    if (lostT > LOSE_TIME || calmEscape) { giveUp(true); return; }
     if (player.heat < LET_GO_HEAT && modeT > 20) { giveUp(false); return; }
     if (player.finishTime !== null) { giveUp(false); return; }
     alert(alongside || gap < 20 ? 2 : 1);
@@ -212,6 +224,7 @@ export function createPolice(ctx: RaceCtx): Police {
       mode, s: +st.s.toFixed(1), x: +st.x.toFixed(2), v: +st.speed.toFixed(1), gap: +(player.s - st.s).toFixed(1),
       heat: +player.heat.toFixed(2), bustT: +bustT.toFixed(2), cooldown: +Math.max(0, cooldown).toFixed(1),
       tired: tired(corgi), knocked: corgi.knockT > 0, closeT: +corgi.closeT.toFixed(1),
+      minGap: Number.isFinite(minGap) ? +minGap.toFixed(1) : null, chaseT: +corgi.chaseT.toFixed(1),
     }),
     dispose() {
       for (const off of offs) off();

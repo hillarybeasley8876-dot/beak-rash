@@ -1,13 +1,16 @@
 // Crashes and respawns (SPEC §6): launch the body (forward 0.7 v, up 4–7 m/s, lateral, spin 4–9 rad/s)
 // into rider.crash for the actors view, slide the sim body to a stop, then after 2.6 s respawn at a
 // safe x near the crash point: 0.6 s 'respawning' blink, 2 s invulnerability, HP back to ≥ 70 %.
+// Hitting a vehicle end-on vaults the body over its roof (`over` = obstacle height) instead of through it.
 import { clamp, damp } from '../core/math';
 import { TUNING as T } from './tuning';
 import { endDrift } from './drift';
 import { dropStatus, isRiding, worldPos, type SimCtx, type SimRider } from './state';
 import type { CrashCause, RiderId } from '../core/types';
 
-export function crashRider(ctx: SimCtx, sr: SimRider, cause: CrashCause, attacker: RiderId | null): void {
+export function crashRider(
+  ctx: SimCtx, sr: SimRider, cause: CrashCause, attacker: RiderId | null, over = 0,
+): void {
   const r = sr.r;
   if (r.mode === 'crashed' || r.mode === 'respawning' || r.mode === 'finished' || r.mode === 'busted') return;
   endDrift(ctx, sr, false);
@@ -16,7 +19,9 @@ export function crashRider(ctx: SimCtx, sr: SimRider, cause: CrashCause, attacke
   const rng = ctx.rng;
   const speed = r.speed;
   const fwd = T.crashForward * speed;
-  const up = rng.range(T.crashUp[0] ?? 4, T.crashUp[1] ?? 7) + Math.max(0, r.vy) * 0.5;
+  const rise = over > 0 ? over + T.crashVaultMargin - T.crashBodyHeight : 0;
+  const vault = rise > 0 ? Math.sqrt(2 * T.crashVaultGravity * rise) : 0;
+  const up = Math.max(vault, rng.range(T.crashUp[0] ?? 4, T.crashUp[1] ?? 7)) + Math.max(0, r.vy) * 0.5;
   const side = r.vx * 0.8 + rng.range(-2, 2);
   const origin = worldPos(ctx, r);
   // Mostly a forward tumble (negative rotation about the road's right axis), plus some yaw/roll.
@@ -83,6 +88,9 @@ export function respawnRider(ctx: SimCtx, sr: SimRider): void {
   sr.oilTime = sr.wetTime = 0;
   sr.slip = sr.pitch = 0;
   sr.onRamp = false;
+  sr.carryTime = sr.yawEase = sr.driftExit = 0;
+  sr.wallSide = 0;
+  sr.swipeLatch = -1;
   dropStatus(r, 'oiled');
   dropStatus(r, 'wet');
   ctx.bus.emit('rider:respawn', { riderId: r.id });

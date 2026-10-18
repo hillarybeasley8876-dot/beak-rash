@@ -142,3 +142,46 @@ Order: T4, T1/M7/T10, T8, T2, M1, M3, M4, M5, M6, M2, T3, then minors.
   (victim's hurt, rival's gloat) wait for cine:ko end. Recorded in game (coast, __br.ko): < 120 Hz the KO boom peaks
   −3.6 dBFS vs −12.2 for the music's kicks (+8.6 dB, was ≈ 3); timeline boom +8 ms, ann_ko at the peak (455 ms), the
   victim's bark at cine end (1302 ms) instead of +9 ms.
+
+## Fix round 2
+Critic issues (reviews/audio-r2-music.json, audio-r2-tech.json). [x] = done + verified, [ ] = open. Order:
+B1 retrigger → TB boot without audio → T5 split system.ts → TR restart/pause sync → C1 realtime CPU → t1 mute check →
+t2 voice pause → t3 trace → t4 WebKit → m2 hysteresis → m1 finish → m5 harmony → m6 cymbals → m4 menu songs → m3 voices → cross-unit notes.
+- [x] B1 retrigger (blocker): dsp/env.ts tracks where each envelope-driven param settles (WeakMap: end time + value);
+  anchor(p, t) = cancel-and-hold mid-envelope, else setValueAtTime(settled value, t), so every note starts AT its time.
+  perc/adsr settle at 0 (adsr's sustain is now a flat ramp, so a retrigger inside it cuts cleanly too); clap / tambourine /
+  flute breath / Rhodes + brass steals use anchor + settle; Pad glides only between sounding chords (else sets pitch at t),
+  its filter is anchored; Band.fade anchors (+ the reverb sends are now post-fader, so fades take the reverb along);
+  side-chain duck, under-lead dip and Engine.duckMusic attack with setTarget (starts from the value at its own time).
+  Gates still plug in at scheduling time (safe against main-thread stalls); the VCA is pinned at 0 until the note, so it is silent.
+  Regression (src/audio/check-onsets.ts, in audio-check offline): 22 instruments × 2 notes (dry strip), 7 stingers after 5 s
+  idle, song stop fade. Fixed: all 150 ms pre-onset windows −200 dBFS (stingers ≤ −98), fade −1.1 dB @100 ms / −5.9 @400 ms.
+  With the old begin() restored the same check fails 20/22 instruments (−0.1…−21 dBFS), 6/7 stingers, fade −16.2 dB @100 ms.
+- [x] TB no AudioContext (major): preload is async; prepare() wraps context + graph creation in try/catch → one warning,
+  `disabled`, returns null; unlock() resolves at once; every method already no-ops without a runtime. Permanent check
+  tools/audio-check-robust.mjs (AudioContext throwing / undefined): boots, key → menu, race reachable, 0 page errors (both pass).
+  audio-check.mjs split: offline part stays, in-game part → tools/audio-check-game.mjs, robustness → audio-check-robust.mjs.
+- [x] T5 split: system.ts is AudioSystem + Host wiring only (355 lines); music/pump.ts = lookahead / stall policy (timer,
+  loading → settling → normal, hidden tab, halt), voice/barks.ts = bark choice + distance-faded placement, debug.ts = Trace.
+  Host gained place(where). Volumes re-apply from save.onChange only when master/music/sfx/voice changed (t1, system side).
+- [x] TR race-start sync (major): attach(session) on the same track with its song already current → Conductor.restart():
+  a fresh copy in its vamp from the running song's next bar line (0.3 s crossfade; SongPlayer.stop(fade, at)). Pause
+  (external muffle ≥ 0.9) mid-countdown → Conductor.pauseCountdown(): SongPlayer.hold() back into the vamp, goAt cleared,
+  so the next count re-cues GO (and re-holds the count-in pad); countdown() also re-cues when a count drifts > 60 ms from
+  the prediction. New permanent check tools/audio-check-start.mjs (SongPlayer.starts + Conductor.sync() in state().sync):
+  first race / pause → restart / pause 2.4 s at "2" → A starts −9 / −9 / −5 ms from GO, 0 A starts while paused.
+  With restart() + pauseCountdown() disabled the same check fails (no vamp after restart; A started inside the pause).
+- [x] t2 voices + pause: VoicePlayer.setPaused (from setMuffle ≥ 0.9): barks fade, the queued announcer line is dropped,
+  nothing starts until resumed; barks requested while paused are dropped.
+- [x] t3 trace: VoicePlayer.play() → 'started' | 'queued' | 'dropped' | 'none'; the trace entry is written by an onStart
+  hook when the line really sounds (barks too). Check (audio-check-robust.mjs): ann_ko + queued ann_final → logged at
+  0 / +415 ms; paused 150 ms in → ann_final never plays (paused or after resume).
+- [ ] C1 audio-thread CPU ~2× budget + realtime gate (major, both lenses)
+- [x] t1 mute check: audio-check mutes through app.save.update (as the settings screen does), adds an unrelated save, and
+  restores the saved master afterwards; system side re-applies volumes only on volume edits → −180 dBFS, check green.
+- [x] t4 WebKit: prepare() sets ctx.onstatechange → suspend() whenever the context starts running before unlock (removed on
+  unlock). audio-check-robust.mjs (WebKit): 'suspended' before the gesture, live after; without the handler: 'running'.
+  In-game suite after the refactor: all 31 game checks green (mute −180 dBFS across an unrelated save).
+- [ ] m2 top-3 layers: bar-line switching + 2 s hold · m1 finish: freeze form, place-based FINISH, results variant
+- [ ] m5 harmony nits · m6 cymbals · m4 menu songs ≥ 2 min · m3 voice clips (needs IOA VPN)
+- [ ] m7 / t6 cross-unit (ui stamp/count/pause sounds; police whistle event) → core requests

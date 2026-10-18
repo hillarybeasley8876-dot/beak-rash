@@ -18,6 +18,8 @@ export interface SimRider {
   driftDir: -1 | 0 | 1;
   driftLevel: number;
   driftLock: number;                 // s until another drift may start (after a release)
+  driftExit: number;                 // s left of the release ramp (drift lateral speed → grip steering) …
+  driftExitVx: number;               // … starting from this lateral speed
   slip: number;                      // visual slip angle (rad, signed)
   // air
   airKind: AirKind;
@@ -26,10 +28,13 @@ export interface SimRider {
   // lateral / visuals
   wobblePhase: number;
   pitch: number;                     // visual pitch (rad, + nose up)
-  vxTarget: number;                  // lateral velocity the rider is pushing toward (walls use it as pressure)
+  vxTarget: number;                  // lateral velocity the grip is pulling toward this step (after carry clamps)
+  vxWant: number;                    // the rider's own intent (no carry clamp): wall pressure, latch release
   carryTime: number;                 // s left of a carry window (knock / bump / wall bounce): weak steer, slow grip
-  carrySteer: number;                // steering multiplier during the carry window
-  carryTau: number;                  // minimum grip time constant during the carry window (s)
+  carrySteer: number;                // multiplier on steering that points toward the hazard during the carry
+  carryTau: number;                  // minimum grip time constant while the grip pulls toward the hazard (s)
+  carryDir: -1 | 0 | 1;              // side of the hazard (wall, vehicle, hitter); 0 = clamp every direction
+  yawEase: number;                   // s left of yaw smoothing after a bounce flipped vx in one step
   slidePhase: number;                // oil / puddle fishtail phase (rad)
   // surfaces
   oilTime: number;
@@ -51,7 +56,14 @@ export interface SimRider {
   touching: Set<number>;             // obstacle ids overlapping last step
   wallCooldown: number;              // scrape event spacing
   wallHitCooldown: number;           // one 'wall' impact event per approach
+  wallSide: -1 | 0 | 1;              // contact hysteresis: side of the last impact (re-contacts scrape) …
+  wallFree: number;                  // … s since the rider last touched it
   swipeCooldown: number;             // one side-swipe event / speed scrub per approach to a vehicle
+  swipeLatch: number;                // obstacle id of the last side swipe (re-contacts scrape), −1 none …
+  swipeFree: number;                 // … s since the rider last touched it
+  // air (landing judgement)
+  airCalm: number;                   // s the steering has stayed below perfectSteerMax in this air episode
+  hopPressAt: number;                // air time of the last hop press while airborne (−1 none)
   // crash
   respawnPending: boolean;
   prevS: number;
@@ -61,13 +73,15 @@ export interface SimRider {
 export function createSimRider(r: RiderState): SimRider {
   return {
     r, tune: bikeTune(r.bike, r.character), frame: emptyFrame(),
-    driftDir: 0, driftLevel: 0, driftLock: 0, slip: 0,
+    driftDir: 0, driftLevel: 0, driftLock: 0, driftExit: 0, driftExitVx: 0, slip: 0,
     airKind: 'hop', airPeak: 0, airOwn: false,
-    wobblePhase: r.id * 1.7, pitch: 0, vxTarget: 0, carryTime: 0, carrySteer: 1, carryTau: 0, slidePhase: 0,
+    wobblePhase: r.id * 1.7, pitch: 0, vxTarget: 0, vxWant: 0,
+    carryTime: 0, carrySteer: 1, carryTau: 0, carryDir: 0, yawEase: 0, slidePhase: 0,
     oilTime: 0, wetTime: 0, wobbleTime: 0, wobbleStrength: 0, lastSurface: 'road', offroadCooldown: 0, onRamp: false, rampSlope: 0,
     inPad: false, inOil: false, inPuddle: false,
     draftLeader: -1,
-    nearMiss: new Map(), nearMissCooldown: 0, touching: new Set(), wallCooldown: 0, wallHitCooldown: 0, swipeCooldown: 0,
+    nearMiss: new Map(), nearMissCooldown: 0, touching: new Set(), wallCooldown: 0, wallHitCooldown: 0,
+    wallSide: 0, wallFree: 0, swipeCooldown: 0, swipeLatch: -1, swipeFree: 0, airCalm: 0, hopPressAt: -1,
     respawnPending: false, prevS: r.s, accel: 0,
   };
 }

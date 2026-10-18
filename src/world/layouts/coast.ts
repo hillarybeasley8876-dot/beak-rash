@@ -56,13 +56,16 @@ export const COAST: LayoutDef = {
     },
     {
       len: 300, name: 'beach', radius: -380, rise: -0.1, bank: -2, ease: 60, left: beachL,
-      features: [{ kind: 'pickupRow', at: 150, len: 21, x0: -9.5, x1: -3.5, data: { kind: 'coin' } }],
+      features: [
+        { kind: 'pickupRow', at: 30, len: 12, x0: 3.5, x1: 3.5, data: { kind: 'crate' } },
+        { kind: 'pickupRow', at: 150, len: 21, x0: -6, x1: -1, data: { kind: 'coin' } },
+      ],
       marks: [{ kind: 'villas', at: 20, x: 1, data: { len: 260 } }, { kind: 'towels', at: 30, x: -1, data: { len: 240 } }],
     },
     {
       len: 280, name: 'bay', radius: 320, rise: 7.35, bank: 4, ease: 70, left: rocksL, right: hillsR,
       features: [
-        { kind: 'pickupRow', at: 120, len: 15, x0: 2.5, x1: 2.5, data: { kind: 'coin' } },
+        { kind: 'pickupRow', at: 120, len: 15, x0: 2.5, x1: 2.5, data: { kind: 'can' } },
         { kind: 'oil', at: 210, len: 9, x0: -5.5, x1: -2.0 },
       ],
       marks: [{ kind: 'palms', at: 0, x: 1, data: { len: 280 } }],
@@ -75,11 +78,15 @@ export const COAST: LayoutDef = {
     },
     {
       len: 240, name: 'cliff', radius: -600, rise: 9, ease: 60, left: cliffL, right: rockWallR,
-      features: [{ kind: 'pickupRow', at: 150, len: 18, x0: -4.5, x1: -4.5, data: { kind: 'coin' } }],
+      features: [
+        { kind: 'pickupRow', at: 90, len: 12, x0: 1.5, x1: -1.5, data: { kind: 'crate' } },
+        { kind: 'pickupRow', at: 150, len: 18, x0: -4.5, x1: -4.5, data: { kind: 'coin' } },
+      ],
       marks: [{ kind: 'chevrons', at: 20, x: -1, data: { len: 200 } }],
     },
     {
       len: 180, name: 'cliff', radius: 520, rise: 5, ease: 60,
+      features: [{ kind: 'pickupRow', at: 80, len: 12, x0: 3.5, x1: 3.5, data: { kind: 'can' } }],
       marks: [{ kind: 'lighthouse', at: 105, x: -88 }, { kind: 'warnCrest', at: 120, x: 1 }],
     },
     { len: 60, name: 'crest', rise: 6, vEase: 24, right: hillsR, sideEase: 40 },
@@ -96,11 +103,13 @@ export const COAST: LayoutDef = {
       marks: [{ kind: 'warnRamp', at: 60, x: 1 }],
     },
     {
-      len: 40, name: 'cutting', rise: -1, ease: 30,
+      len: 36, name: 'cutting', rise: -0.9, ease: 30,
       left: { shoulder: 1.4, surface: 'road', edge: 'rock', ground: { abs: true, step: 30, stepW: 1.8, flat: 30, slope: -0.4, target: -18, rough: 4, mat: 'rock' } },
       right: { shoulder: 1.4, surface: 'road', edge: 'rock', ground: { abs: false, step: 15, stepW: 1.8, flat: 4, slope: 0.5, target: 48, rough: 5, mat: 'rock' } },
       sideEase: 36,
     },
+    // The cutting narrows to the tunnel's bound before the portal plane (portal arch never inside bounds).
+    { len: 4, name: 'cutting', rise: -0.1, sideEase: 4, left: { shoulder: 1.0 }, right: { shoulder: 1.0 } },
     {
       len: 160, name: 'tunnel', radius: 900, rise: -2, roof: 17,
       left: { shoulder: 1.0, edge: 'tunnel' }, right: { shoulder: 1.0, edge: 'tunnel' }, sideEase: 4,
@@ -109,8 +118,9 @@ export const COAST: LayoutDef = {
         { kind: 'puddle', at: 92, len: 7, x0: -4.2, x1: -0.8 },
       ],
     },
+    { len: 4, name: 'portal', sideEase: 0, left: { edge: 'rock' }, right: { edge: 'rock' } },
     {
-      len: 30, name: 'portal', sideEase: 4,
+      len: 26, name: 'portal', sideEase: 4,
       left: { shoulder: 1.4, edge: 'rock' }, right: { shoulder: 1.4, edge: 'rock' },
     },
     {
@@ -120,6 +130,7 @@ export const COAST: LayoutDef = {
       features: [
         { kind: 'bridge', at: 0, len: 160, x0: -8.2, x1: 8.2 },
         { kind: 'boostPad', at: 66, len: 6, x0: -5.2, x1: -1.8, data: { power: 0.3, time: 1 } },
+        { kind: 'pickupRow', at: 110, len: 12, x0: 2.5, x1: 2.5, data: { kind: 'crate' } },
       ],
       marks: [{ kind: 'sailboats', at: 80, x: 1, data: { count: 4 } }],
     },
@@ -134,6 +145,7 @@ export const COAST: LayoutDef = {
     },
     {
       len: 140, name: 'village', radius: -340, rise: -2.5, bank: -3, ease: 60, left: seawallL, right: villasR,
+      features: [{ kind: 'pickupRow', at: 60, len: 12, x0: -2, x1: -2, data: { kind: 'crate' } }],
       marks: [{ kind: 'umbrellas', at: 10, x: -1, data: { len: 130 } }, { kind: 'villas', at: 0, x: 1, data: { len: 140 } }],
     },
     {
@@ -143,6 +155,7 @@ export const COAST: LayoutDef = {
         { kind: 'pickupRow', at: 120, len: 15, x0: -3.5, x1: -3.5, data: { kind: 'fish' } },
         { kind: 'puddle', at: 205, len: 7, x0: -5.0, x1: -2.0 },
         { kind: 'boostPad', at: 262, len: 6, x0: 1.6, x1: 5.0, data: { power: 0.3, time: 1 } },
+        { kind: 'pickupRow', at: 290, len: 12, x0: -3.5, x1: -3.5, data: { kind: 'can' } },
       ],
       marks: [
         { kind: 'stalls', at: 10, x: 1, data: { len: 300 } },

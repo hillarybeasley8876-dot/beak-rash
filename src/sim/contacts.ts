@@ -83,9 +83,11 @@ export class Contacts {
     ra.vx -= (n * j) / ma;
     rb.vx += (n * j) / mb;
     if (e > 0) {
-      // A real side impact: both riders carry the bounce instead of gluing back together within 0.15 s.
-      startCarry(a, T.knockTime, T.knockSteer, T.knockTau);
-      startCarry(b, T.knockTime, T.knockSteer, T.knockTau);
+      // A real side impact: both riders carry the bounce instead of gluing back together within 0.15 s
+      // (steering back toward the other rider is muted for a moment, steering away is not).
+      const toB = n > 0 ? 1 : -1;
+      startCarry(a, T.knockTime, T.knockSteer, T.knockTau, toB);
+      startCarry(b, T.knockTime, T.knockSteer, T.knockTau, toB > 0 ? -1 : 1);
     }
     return -rel;
   }

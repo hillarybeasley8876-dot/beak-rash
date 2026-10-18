@@ -3,6 +3,7 @@
 import { BufferAttribute, BufferGeometry, Color, Mesh, type PerspectiveCamera } from 'three';
 import { smoothstep } from '../../core/math';
 import type { WorldCtx } from '../ctx';
+import { farmWeight } from './farmland';
 import { terrainMat } from './material';
 import type { TerrainField } from './field';
 import { NEAR_EXTENT } from './near';
@@ -33,8 +34,9 @@ export function buildFarTerrain(ctx: WorldCtx, field: TerrainField): FarHeight {
     minX = Math.min(minX, L.px[i] ?? 0); maxX = Math.max(maxX, L.px[i] ?? 0);
     minZ = Math.min(minZ, L.pz[i] ?? 0); maxZ = Math.max(maxZ, L.pz[i] ?? 0);
   }
-  const x0 = Math.floor((minX - MARGIN) / CELL) * CELL, z0 = Math.floor((minZ - MARGIN) / CELL) * CELL;
-  const nx = Math.ceil((maxX + MARGIN - x0) / CELL), nz = Math.ceil((maxZ + MARGIN - z0) / CELL);
+  const margin = L.def.farMargin ?? MARGIN;
+  const x0 = Math.floor((minX - margin) / CELL) * CELL, z0 = Math.floor((minZ - margin) / CELL) * CELL;
+  const nx = Math.ceil((maxX + margin - x0) / CELL), nz = Math.ceil((maxZ + margin - z0) / CELL);
   // Sample every grid vertex once.
   const vx = nx + 1, vz = nz + 1;
   const H = new Float32Array(vx * vz);
@@ -56,7 +58,7 @@ export function buildFarTerrain(ctx: WorldCtx, field: TerrainField): FarHeight {
       S[k] = isShore(smp.g) || smp.bump ? 1 : 0;
     }
   }
-  const mat = terrainMat(ctx);
+  const mat = terrainMat(ctx, true);
   const chunks: Mesh[] = [];
   const color = new Color();
   for (let cj = 0; cj < nz; cj += CHUNK) {
@@ -89,6 +91,7 @@ export function buildFarTerrain(ctx: WorldCtx, field: TerrainField): FarHeight {
       geo.computeVertexNormals();
       const nrm = geo.getAttribute('normal').array as Float32Array;
       const col = new Float32Array(cols * rows * 3);
+      const farm = new Float32Array(cols * rows);
       for (let j = 0; j < rows; j++) {
         for (let i = 0; i < cols; i++) {
           const k = (cj + j) * vx + (ci + i), v = j * cols + i;
@@ -96,9 +99,11 @@ export function buildFarTerrain(ctx: WorldCtx, field: TerrainField): FarHeight {
           const m = (M[k] ?? 'grass') as 'sand' | 'grass' | 'rock' | 'dirt' | 'stone';
           groundColor(m, H[k] ?? 0, nrm[v * 3 + 1] ?? 1, Math.max(0, U[k] ?? 0), field.noise.get(wx / 23, wz / 23), S[k] === 1, color);
           col[v * 3] = color.r; col[v * 3 + 1] = color.g; col[v * 3 + 2] = color.b;
+          farm[v] = farmWeight(field.noise, wx, wz, U[k] ?? 0, nrm[v * 3 + 1] ?? 1, H[k] ?? 0, S[k] === 1);
         }
       }
       geo.setAttribute('color', new BufferAttribute(col, 3));
+      geo.setAttribute('farm', new BufferAttribute(farm, 1));
       geo.computeBoundingSphere();
       const mesh = new Mesh(ctx.own(geo), mat);
       mesh.name = `far:${ci},${cj}`;

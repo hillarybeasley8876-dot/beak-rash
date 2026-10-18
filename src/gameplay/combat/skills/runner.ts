@@ -3,15 +3,15 @@
 import { PLAYER_SKILLS, PLAYER_ULT, SKILLS } from '../../../data/skills';
 import { ROSTER } from '../../../data/roster';
 import type { Controls, RiderState } from '../../../core/types';
-import { active, type CombatCtx } from '../ctx';
+import { active, finished, type CombatCtx } from '../ctx';
 import { applyMods } from '../statuses';
-import { SKILL_BUFFER } from '../tuning';
+import { PRESS_HOLD } from '../tuning';
 import { SKILL_IMPLS } from './registry';
 import type { ActiveSkill, EndReason } from './types';
 
 export const ULT_SLOT = 4;
 type DenyReason = 'cooldown' | 'sp' | 'state';
-/** Why a cast can't happen now; 'busy' (mid-swing / hit stagger) is buffered briefly instead of denied. */
+/** Why a cast can't happen now; 'busy' (mid-swing / hit stagger) is buffered briefly (one press per slot) instead. */
 type Block = DenyReason | 'busy';
 
 export class SkillRunner {
@@ -44,6 +44,11 @@ export class SkillRunner {
     return this.running.some((a) => a.caster === r && a.exclusive);
   }
 
+  /** Does `r` have a skill running that eats incoming waves / projectiles right now? */
+  swallowing(r: RiderState): boolean {
+    return this.running.some((a) => a.caster === r && a.swallows?.() === true);
+  }
+
   find(r: RiderState, id: string): ActiveSkill | undefined {
     return this.running.find((a) => a.caster === r && a.id === id);
   }
@@ -56,21 +61,25 @@ export class SkillRunner {
     return this.running.map((a) => ({ caster: a.caster.id, id: a.id }));
   }
 
+  /** Buffered presses, oldest first: each casts once nothing blocks it, or is denied when its hold runs out. */
   private retry(r: RiderState, dt: number): void {
-    const d = this.ctx.rd(r);
-    const b = d.skillBuf;
-    if (!b) return;
-    b.age += dt;
-    if (b.age <= SKILL_BUFFER && this.check(r, b.slot, this.skillIn(r, b.slot)) === 'busy') return;
-    d.skillBuf = null;
-    this.tryCast(r, b.slot, false); // casts now, or the final skill:denied
+    const buf = this.ctx.rd(r).skillBuf;
+    for (const b of buf.slice()) {
+      b.age += dt;
+      if (b.age <= PRESS_HOLD && this.check(r, b.slot, this.skillIn(r, b.slot)) === 'busy') continue;
+      buf.splice(buf.indexOf(b), 1);
+      this.tryCast(r, b.slot, false); // casts now, or the final skill:denied
+    }
   }
 
   tryCast(r: RiderState, slot: number, buffer = true): boolean {
     const id = this.skillIn(r, slot);
     const block = this.check(r, slot, id);
+    const buf = this.ctx.rd(r).skillBuf;
     if (block === 'busy' && buffer) {
-      this.ctx.rd(r).skillBuf = { slot, age: 0 };
+      const held = buf.find((b) => b.slot === slot);
+      if (held) held.age = 0;
+      else buf.push({ slot, age: 0 });
       return false;
     }
     if (block || !id) {
@@ -85,7 +94,8 @@ export class SkillRunner {
     r.invuln = 0; // casting gives up respawn protection
     if (r.action && r.action.kind !== 'skill' && r.action.kind !== 'ult') r.action = null;
     this.ctx.rd(r).buffered = null;
-    this.ctx.rd(r).skillBuf = null;
+    const i = buf.findIndex((b) => b.slot === slot);
+    if (i >= 0) buf.splice(i, 1);
     if (slot !== ULT_SLOT) {
       this.ctx.bus.emit('skill:cast', { riderId: r.id, skillId: id, slot });
       this.ctx.view(r)?.cue('skill', { skillId: id });
@@ -115,7 +125,8 @@ export class SkillRunner {
   post(dt: number): void {
     for (const a of this.running.slice()) {
       if (!this.running.includes(a)) continue;
-      if (!a.post(dt)) this.finish(a, 'done');
+      if (finished(a.caster)) this.finish(a, 'finish'); // past the line: no more hits, catches or debuffs
+      else if (!a.post(dt)) this.finish(a, 'done');
     }
   }
 

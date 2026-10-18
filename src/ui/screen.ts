@@ -12,7 +12,7 @@ export interface ScreenCtx {
   /** Screen we came from (for back navigation decisions). */
   readonly from: ScreenId;
   session(): Session | null;
-  /** Achievement watcher for the attached race. */
+  /** Achievements unlocked in the attached (or most recent) race. */
   readonly tracker: RaceTracker;
   sfx(id: string): void;
   go(screen: ScreenId, props?: ScreenProps): void;

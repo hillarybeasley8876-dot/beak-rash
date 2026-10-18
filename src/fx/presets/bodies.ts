@@ -1,4 +1,4 @@
-// Body presets: feathers, fur, bike debris, dizzy stars, KO bursts, weapon bits, skill poofs.
+// Body presets: feathers, fur, bike debris, KO bursts, weapon bits, skill poofs.
 import { Vector3 } from 'three';
 import { FRAME } from '../particles/atlas';
 import { koPow, ring } from './impacts';
@@ -43,22 +43,6 @@ export const debris: Preset = (k, pos, o) => {
     s.rot = k.range(0, 6.28); s.spin = k.range(-14, 14);
     s.drag = 0.6; s.gravity = 15; s.ground = ground + 0.04;
     inherit(s, o, 0.6, 1.4);
-    k.p.emit(s);
-  }
-};
-
-/** Stars circling a rider's head; `follow` = anchor slot, `life` = stun time. */
-export const dizzy: Preset = (k, pos, o) => {
-  const count = Math.min(5, k.n(4, o));
-  const life = o.life ?? 1.2;
-  for (let i = 0; i < count; i++) {
-    const s = k.p.spec();
-    if (o.follow === undefined) { s.x = pos.x; s.y = pos.y + 0.3; s.z = pos.z; } else { s.y = 0.3; s.follow = o.follow; }
-    k.p.colors(s, i % 2 ? '#ffffff' : (o.color ?? '#ffe600'));
-    s.frame = FRAME.star5; s.mode = 4;
-    s.vx = 0.34 * (o.scale ?? 1); s.vy = 0.05;
-    s.rot = (i / count) * Math.PI * 2; s.spin = 5.5;
-    s.life = life; s.size0 = 0.15 * (o.scale ?? 1); s.size1 = s.size0;
     k.p.emit(s);
   }
 };

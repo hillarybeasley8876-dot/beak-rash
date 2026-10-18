@@ -14,8 +14,10 @@ import { ACHIEVEMENTS } from '../src/data/achievements';
 import * as S from '../src/data/strings';
 import { BIKES, BIKE_ORDER } from '../src/data/bikes';
 import { TRACKS, TRACK_ORDER } from '../src/data/tracks';
-import { check, h, label, maxLines, maxWidth, noOverflow, runChecks, section } from './content.kit';
-import { billboard, roadSign } from './content.world';
+import { check, h, label, maxLines, maxWidth, noOrphan, noOverflow, runChecks, section } from './content.kit';
+import { billboard, loadPosters, posterBillboard, roadSign } from './content.world';
+import { BILLBOARDS } from '../src/data/assets';
+import type { TrackId } from '../src/core/types';
 
 const stats: Record<string, number> = {};
 const count = (key: string, n: number): void => { stats[key] = (stats[key] ?? 0) + n; };
@@ -76,7 +78,7 @@ for (const [group, tips] of Object.entries(TIP_GROUPS)) {
   loading.append(label(`TIPS · ${group} ×${tips.length} (art layout: 560 px box)`), h('div', { class: 'cg-wrap' }, ...tips.map((t, i) => {
     const p = h('p', { text: t });
     const el = h('div', { class: 'cg-tip' }, h('span', { class: 'cg-tip-tag', text: 'TIPS 小贴士' }), p);
-    check(el, `tips.${group}[${i}]`, t, maxLines(p, 4));
+    check(el, `tips.${group}[${i}]`, t, () => maxLines(p, 4)() ?? noOrphan(p)());
     return el;
   })));
 }
@@ -139,14 +141,21 @@ function hud(): void {
 }
 
 // ---------------------------------------------------------------- world (canvas: after fonts load)
-function world(): void {
+async function world(): Promise<void> {
   const sec = section('world', '路边广告', 'WORLD TEXT');
+  const posters = new Map(await Promise.all(TRACK_ORDER.map(async (id) => [id, await loadPosters(BILLBOARDS[id] ?? [])] as const)));
+  const poster = (id: TrackId, i: number): HTMLImageElement | null => {
+    const list = posters.get(id) ?? [];
+    return list.length ? list[i % list.length] ?? null : null;
+  };
+  const pair = (t: string, where: string, id: TrackId, i: number): HTMLElement[] =>
+    [billboard(t, where), posterBillboard(t, `${where}+art`, poster(id, i))];
   count('billboards', BILLBOARD_LINES.length);
-  sec.append(label(`BILLBOARDS ×${BILLBOARD_LINES.length} (plain / with poster art)`),
-    h('div', { class: 'cg-wrap' }, ...BILLBOARD_LINES.flatMap((t, i) => [billboard(t, `billboards[${i}]`, false), billboard(t, `billboards[${i}]+art`, true)])));
+  sec.append(label(`BILLBOARDS ×${BILLBOARD_LINES.length} (plain / on poster art, as every track draws them)`),
+    h('div', { class: 'cg-wrap' }, ...BILLBOARD_LINES.flatMap((t, i) => pair(t, `billboards[${i}]`, TRACK_ORDER[i % TRACK_ORDER.length] ?? 'coast', i))));
   for (const id of TRACK_ORDER) {
     count('billboards', TRACK_BILLBOARDS[id].length);
-    sec.append(label(`${id.toUpperCase()} EXTRAS`), h('div', { class: 'cg-wrap' }, ...TRACK_BILLBOARDS[id].map((t, i) => billboard(t, `billboards.${id}[${i}]`, false))));
+    sec.append(label(`${id.toUpperCase()} EXTRAS`), h('div', { class: 'cg-wrap' }, ...TRACK_BILLBOARDS[id].flatMap((t, i) => pair(t, `billboards.${id}[${i}]`, id, i))));
   }
   const signs = [...ROAD_SIGNS.map((t, i) => roadSign(t, `signs[${i}]`)),
     ...TRACK_ORDER.flatMap((id) => TRACK_SIGNS[id].map((t, i) => roadSign(t, `signs.${id}[${i}]`)))];
@@ -188,8 +197,6 @@ results();
 hud();
 menus();
 fontsReady()
-  .then(() => {
-    world();
-    requestAnimationFrame(() => requestAnimationFrame(() => runChecks(stats)));
-  })
+  .then(world)
+  .then(() => requestAnimationFrame(() => requestAnimationFrame(() => runChecks(stats))))
   .catch((err: unknown) => console.error('[content] gallery failed', err));

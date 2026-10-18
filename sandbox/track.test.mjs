@@ -46,6 +46,16 @@ const result = await withPage(async (page) => {
       const beyondL = t.surfaceAt(s, -b.left - 0.05), beyondR = t.surfaceAt(s, b.right + 0.05);
       if (beyondL !== b.leftKind || beyondR !== b.rightKind) fails.push(`edge kind mismatch at ${s}`);
     }
+    // Run-off past the finish: drivable (bounds, surface) and round-trips like the race road.
+    const runoff = t.runoff ?? 0;
+    if (runoff < 200) fails.push(`runoff ${runoff} < 200`);
+    for (let s = t.length; s <= t.length + runoff; s += 10) {
+      const p = t.toWorld(s, 3, 0.5, V());
+      const q = t.project(p, s - 4);
+      if (Math.abs(q.s - s) > 0.05 || Math.abs(q.x - 3) > 0.05) fails.push(`runoff round trip at ${s}: ${q.s.toFixed(2)}`);
+      if (t.surfaceAt(s, 0) !== 'road' || !(t.bounds(s).right > 7)) fails.push(`runoff not drivable at ${s}`);
+    }
+    if (t.frameAt(t.length + runoff + 50).s !== t.length + runoff) fails.push('frameAt not clamped at length + runoff');
     const reuse = t.frameAt(10); const same = t.frameAt(20, reuse) === reuse && reuse.s === 20;
     if (!same) fails.push('frameAt out not reused');
     if (maxErrS > 0.05 || maxErrX > 0.05 || maxErrY > 0.05 || maxErrHint > 0.05) fails.push('round trip error too large');
@@ -54,7 +64,7 @@ const result = await withPage(async (page) => {
     const feats = t.features.map((f) => `${f.kind}@${f.s0.toFixed(0)}-${f.s1.toFixed(0)} x${f.x0}..${f.x1}`);
     const kinds = {};
     for (let s = 0; s <= t.length; s += 1) { const b = t.bounds(s); kinds[`${b.leftKind}/${b.rightKind}`] = (kinds[`${b.leftKind}/${b.rightKind}`] ?? 0) + 1; }
-    return { length: t.length, maxErrS, maxErrX, maxErrY, maxErrHint, projMs: +projMs.toFixed(4), maxStep, minStep, maxDk, maxDtanDeg: maxDtan * 57.3, kinds, feats, fails: fails.slice(0, 20), failCount: fails.length };
+    return { length: t.length, runoff, maxErrS, maxErrX, maxErrY, maxErrHint, projMs: +projMs.toFixed(4), maxStep, minStep, maxDk, maxDtanDeg: maxDtan * 57.3, kinds, feats, fails: fails.slice(0, 20), failCount: fails.length };
   });
 });
 // Leak test: build → render → dispose; rebuild and check memory returns to the same level.

@@ -29,6 +29,12 @@
 }
 .br-cal-week b { font-family: var(--f-display); font-weight: 400; font-size: 64px; color: var(--white); }
 .br-cal-week span { font-family: var(--f-cn-heavy); font-weight: 900; font-size: 46px; color: var(--red); }
+.br-cal-luck { position: absolute; left: 40px; top: 340px; display: flex; flex-direction: column; gap: 8px; rotate: -2deg; }
+.br-cal-luck div { display: flex; align-items: center; gap: 12px; }
+.br-cal-luck i { display: grid; place-items: center; width: 50px; height: 50px; border-radius: 50%; background: var(--red); color: var(--white); font-family: var(--f-cn-heavy); font-weight: 900; font-style: normal; font-size: 30px; line-height: 1; }
+.br-cal-luck .is-bad i { background: var(--ink); }
+.br-cal-luck span { font-family: var(--f-cn-block); font-weight: 400; font-size: 42px; line-height: 1; white-space: nowrap; }
+.br-cal-luck .is-long span { font-size: 32px; }
 .br-cal-weather { position: absolute; left: 34px; bottom: 50px; display: flex; align-items: center; gap: 16px; font-family: var(--f-cn-block); font-weight: 400; font-size: 46px; }
 .br-cal-icon { width: 76px; height: 76px; }
 

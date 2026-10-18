@@ -18,6 +18,7 @@ export interface CombatDebug {
   cast(id: number, slot: number): void;
   /** Start a swing now if the rider can swing (side 0 = auto). Returns false if it couldn't. */
   swing(id: number, side: Side | 0, heavy?: boolean): boolean;
+  /** Skill cooldowns, the bell cooldown and the bell's per-rival SP lockout. */
   resetCooldowns(id?: number): void;
   force(rolls: ForcedRolls | null): void;
   spawn(kind: PickupKind, s: number, x: number, weapon?: WeaponId): number;
@@ -73,7 +74,12 @@ export function installCombatDebug(ctx: CombatCtx): () => void {
       return true;
     },
     resetCooldowns: (id) => {
-      for (const r of ctx.session.riders) if (id === undefined || r.id === id) r.cooldowns.fill(0);
+      for (const r of ctx.session.riders) {
+        if (id !== undefined && r.id !== id) continue;
+        r.cooldowns.fill(0);
+        ctx.rd(r).bellCd = 0;
+        ctx.rd(r).bellPaid.fill(-Infinity);
+      }
     },
     force: (rolls) => {
       for (const k of Object.keys(ctx.force) as Array<keyof ForcedRolls>) delete ctx.force[k];

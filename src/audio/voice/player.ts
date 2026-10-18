@@ -2,12 +2,17 @@
 // (one line at a time, one queued, stale lines dropped; ducks the music) and character barks
 // (positional — gain / pan follow the speaker every frame — rate limited, and silenced by
 // important announcer lines). Clips load lazily / in the background; a missing file is silent.
+// While the game is paused nothing new starts: barks fade, the queued announcer line is dropped.
 import { VOICE } from '../../data/voice';
 import { holdAt, steer } from '../dsp/env';
 import type { Engine } from '../engine';
 
 type Clip = AudioBuffer | 'missing';
 export type VoiceChannel = 'announcer' | 'bark';
+/** What a request did: sounding now, queued (busy / still loading), dropped (rate limit, pause), or no such clip. */
+export type VoiceResult = 'started' | 'queued' | 'dropped' | 'none';
+/** Called when a line actually starts sounding (the test trace). */
+export type OnVoiceStart = (id: string, channel: VoiceChannel, gain: number) => void;
 
 /** Where a bark's speaker is now (null = gone / out of range). */
 export type Follow = () => { gain: number; pan: number } | null;
@@ -41,8 +46,9 @@ export class VoicePlayer {
   private current: Record<VoiceChannel, Playing | null> = { announcer: null, bark: null };
   private pending: { id: string; opts: VoiceOpts; at: number } | null = null;
   private warned = false;
+  private paused = false;
 
-  constructor(private engine: Engine, private base: URL) {
+  constructor(private engine: Engine, private base: URL, private onStart: OnVoiceStart = () => undefined) {
     for (const line of Object.values(VOICE)) this.byText.set(line.text, line.id);
   }
 
@@ -90,35 +96,46 @@ export class VoicePlayer {
     return p;
   }
 
-  /** Request a line. Returns false if no such line exists (caller may fall back to an sfx). */
-  play(id: string, opts: VoiceOpts = {}): boolean {
-    if (!(id in VOICE)) return false;
+  /** Request a line ('none' = no such clip: the caller may fall back to an sfx). */
+  play(id: string, opts: VoiceOpts = {}): VoiceResult {
+    if (!(id in VOICE)) return 'none';
     const now = this.engine.now;
     const channel = opts.channel ?? 'announcer';
-    if (channel === 'bark' && now < this.busy.bark + BARK_GAP) return true;
+    if (channel === 'bark' && (this.paused || now < this.busy.bark + BARK_GAP)) return 'dropped';
     const clip = this.clips.get(id);
-    if (clip === 'missing') return false;
+    if (clip === 'missing') return 'none';
     if (!clip) {
       const asked = now;
       void this.load(id).then((c) => {
         if (c !== 'missing' && this.engine.now - asked < 0.6) this.play(id, opts);
       });
-      return true;
+      return 'queued';
     }
-    if (channel === 'announcer' && now < this.busy.announcer) {
+    if (channel === 'announcer' && (this.paused || now < this.busy.announcer)) {
       const pri = opts.priority ?? 1;
-      if (pri > (this.current.announcer?.priority ?? 0) + 1) {
+      if (!this.paused && pri > (this.current.announcer?.priority ?? 0) + 1) {
         this.cut('announcer');
-        this.start(clip, opts, channel);
+        this.start(id, clip, opts, channel);
+        return 'started';
       }
-      else if (!this.pending || pri >= (this.pending.opts.priority ?? 1)) this.pending = { id, opts, at: now };
-      return true;
+      if (this.pending && pri < (this.pending.opts.priority ?? 1)) return 'dropped';
+      this.pending = { id, opts, at: now };
+      return 'queued';
     }
-    this.start(clip, opts, channel);
-    return true;
+    this.start(id, clip, opts, channel);
+    return 'started';
   }
 
-  private start(clip: AudioBuffer, opts: VoiceOpts, channel: VoiceChannel): void {
+  /** Game paused: barks fade out, the queued announcer line is dropped, nothing new starts until resumed. */
+  setPaused(paused: boolean): void {
+    if (paused === this.paused) return;
+    this.paused = paused;
+    if (!paused) return;
+    this.pending = null;
+    this.cut('bark');
+  }
+
+  private start(id: string, clip: AudioBuffer, opts: VoiceOpts, channel: VoiceChannel): void {
     const ctx = this.engine.ctx;
     const now = this.engine.now;
     const src = new AudioBufferSourceNode(ctx, { buffer: clip });
@@ -134,6 +151,7 @@ export class VoicePlayer {
     const priority = opts.priority ?? 1;
     this.busy[channel] = now + clip.duration;
     this.current[channel] = { src, gain, pan, follow: opts.follow, priority };
+    this.onStart(id, channel, opts.gain ?? 1);
     if (channel === 'announcer') {
       this.engine.setVoiceDuck(1);
       if (priority >= LOUD) {
@@ -158,11 +176,11 @@ export class VoicePlayer {
   /** Per frame: play the queued announcer line when free, move barks with their speaker, release the duck. */
   update(): void {
     const now = this.engine.now;
-    if (this.pending && now >= this.busy.announcer) {
+    if (this.pending && !this.paused && now >= this.busy.announcer) {
       const { id, opts, at } = this.pending;
       this.pending = null;
       const clip = this.clips.get(id);
-      if (clip && clip !== 'missing' && now - at < STALE) this.start(clip, opts, 'announcer');
+      if (clip && clip !== 'missing' && now - at < STALE) this.start(id, clip, opts, 'announcer');
     }
     const bark = this.current.bark;
     if (bark && now >= this.busy.bark) this.current.bark = null;

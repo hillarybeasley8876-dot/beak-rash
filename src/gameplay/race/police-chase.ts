@@ -1,5 +1,6 @@
-// The corgi officer's riding (track space): sprint in from behind and hold station alongside for a few
-// seconds, then cruise just under the player's own top speed, so a player at full pedal slowly pulls away. Short
+// The corgi officer's riding (track space): sprint in from behind (always faster than the player, boosts
+// included) and hold station alongside for a few seconds, then cruise just under the player's own top
+// speed, so a player at full pedal slowly pulls away. Short
 // legs tire after chasing close for a while (腿短), traffic blocks it (brakes behind vehicles, changes
 // lanes slowly), and a swing or a Wing Dash from the player knocks it back for a few seconds.
 import { approach, clamp, damp } from '../../core/math';
@@ -7,6 +8,7 @@ import type { Track } from '../../core/contracts';
 import type { Obstacle, RiderState } from '../../core/types';
 
 const SPRINT_MUL = 1.28, SPRINT_MAX = 15;   // × player top, while arriving (at most SPRINT_MAX s)…
+const SPRINT_CLOSE = 4;                      // …and never less than the player's current speed + this
 const ALONG_HOLD = 4;                        // …and for this long alongside
 const CRUISE = 0.97;                         // × the player's flat-road top speed
 const TIRE_AFTER = 15, TIRED_TIME = 6, TIRED_MUL = 0.85;
@@ -56,46 +58,58 @@ export function knock(c: Corgi, awayX: number): void {
 
 export const tired = (c: Corgi): boolean => c.tiredT > 0;
 
-function topSpeed(c: Corgi, playerTop: number): number {
+function topSpeed(c: Corgi, w: RideWorld): number {
   const sprint = c.alongT < ALONG_HOLD && c.chaseT < SPRINT_MAX;
-  const base = playerTop * (sprint ? SPRINT_MUL : CRUISE);
+  const base = sprint ? Math.max(w.playerTop * SPRINT_MUL, w.playerSpeed + SPRINT_CLOSE) : w.playerTop * CRUISE;
   return base * (c.tiredT > 0 ? TIRED_MUL : 1) * (c.knockT > 0 ? KNOCK_MUL : 1);
 }
 
-/** Nearest solid obstacle in the corgi's path within LOOK m ahead. */
+/** Nearest solid obstacle within LOOK m ahead in the corgi's lane or across its path to `tx`. */
 function blocker(obstacles: readonly Obstacle[], st: RiderState, tx: number): Obstacle | null {
   let best: Obstacle | null = null;
+  const lo = Math.min(st.x, tx), hi = Math.max(st.x, tx);
   for (const o of obstacles) {
     if (!o.active || !o.solid) continue;
     const ds = o.s - st.s;
     if (ds < -o.halfLength || ds > LOOK + o.halfLength) continue;
-    const lane = Math.min(Math.abs(o.x - st.x), Math.abs(o.x - tx));
-    if (lane > o.halfWidth + 0.9) continue;
+    const m = o.halfWidth + 0.9;
+    if (o.x + m < lo || o.x - m > hi) continue;
     if (!best || ds < best.s - st.s) best = o;
   }
   return best;
+}
+
+/** Pass on the side the corgi is already on when there is room, else on the roomier side. */
+function passSide(b: Obstacle, x: number, hw: number): 1 | -1 {
+  const room = (side: number): number => hw - side * b.x - b.halfWidth;
+  const mine = x >= b.x ? 1 : -1;
+  if (room(mine) > 1.6) return mine;
+  return room(1) >= room(-1) ? 1 : -1;
 }
 
 export interface RideWorld {
   track: Track;
   obstacles: readonly Obstacle[];
   playerTop: number;
+  /** The player's current speed (boosts included): the arrival sprint always closes in. */
+  playerSpeed: number;
 }
 
 /** Ride toward `wantSpeed` and lateral target `tx`; brakes behind traffic and squeezes past slowly. */
 export function ride(c: Corgi, w: RideWorld, dt: number, wantSpeed: number, tx: number, accel: number): void {
   const st = c.st;
-  let want = clamp(wantSpeed, -WALK_BACK, topSpeed(c, w.playerTop));
+  let want = clamp(wantSpeed, -WALK_BACK, topSpeed(c, w));
   let lat = 4;
   const hw = w.track.bounds(st.s).halfWidth;
   const b = blocker(w.obstacles, st, tx);
   if (b) {
-    const gap = b.s - st.s - b.halfLength - 1;
-    want = Math.min(want, Math.max(0, b.speed + (gap - 2) * 0.8));
-    const room = (side: number): number => hw - side * b.x - b.halfWidth;
-    const side = room(1) >= room(-1) ? 1 : -1;
-    tx = b.x + side * (b.halfWidth + 1.3);
-    lat = 1.6;
+    // Steer around it slowly; brake only while still in its lane (beside it the corgi rides on).
+    tx = b.x + passSide(b, st.x, hw) * (b.halfWidth + 1.3);
+    lat = b.speed < 0 ? 3.5 : 1.6;               // oncoming traffic: dodge smartly
+    if (Math.abs(b.x - st.x) < b.halfWidth + 0.9) {
+      const gap = b.s - st.s - b.halfLength - 1;
+      want = Math.min(want, Math.max(0, b.speed + (gap - 2) * 0.8));
+    }
   }
   st.speed = approach(st.speed, want, (want > st.speed ? accel : 14) * dt);
   const target = clamp(tx, -hw + 0.6, hw - 0.6);

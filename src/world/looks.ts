@@ -12,22 +12,26 @@ const COAST_LOOK: EnvLook = {
   grade: { saturation: 1.12, contrast: 1.06, tint: '#fff8ec', bloom: 0.15, night: false },
 };
 
+// Night city (env-city): a moon ~28° above the west-south-west (ahead on the final sprint), navy sky
+// with a purple city glow at the horizon, dark violet fog so far towers read as silhouettes.
 const CITY_LOOK: EnvLook = {
-  name: 'Neon Night (placeholder)',
-  sky: { top: '#0b0b2a', horizon: '#3b1f5e', bottom: '#120d24' },
-  fog: { color: '#2a1a4a', near: 120, far: 720 },
-  sun: { dir: { x: 0.3, y: -0.7, z: -0.5 }, color: '#8fa2ff', intensity: 0.7 },
-  ambient: { sky: '#5a4aa8', ground: '#2a1530', intensity: 0.9 },
-  grade: { saturation: 1.2, contrast: 1.12, tint: '#e8dcff', bloom: 0.8, night: true },
+  name: 'Neon Night',
+  sky: { top: '#05071c', horizon: '#4a1d63', bottom: '#120a26' },
+  fog: { color: '#24163f', near: 50, far: 640 },
+  sun: { dir: { x: 0.856, y: -0.469, z: -0.212 }, color: '#a9bcff', intensity: 0.85 },
+  ambient: { sky: '#6e5fd0', ground: '#3a1d4a', intensity: 1.0 },
+  grade: { saturation: 1.15, contrast: 1.1, tint: '#eee6ff', bloom: 0.9, night: true },
 };
 
+// Golden hour (env-mountain): the sun sits ~10° above the west-south-west horizon, over the lake.
+// Mauve fog so fogged hills read as the first of the layered purple ridges (env/mountain-ridges.ts).
 const MOUNTAIN_LOOK: EnvLook = {
-  name: 'Sunset Pass (placeholder)',
-  sky: { top: '#5b4b9e', horizon: '#ffb36b', bottom: '#ffd9a8' },
-  fog: { color: '#f2a879', near: 160, far: 860 },
-  sun: { dir: { x: 0.25, y: -0.32, z: 0.91 }, color: '#ffbf80', intensity: 2.0 },
-  ambient: { sky: '#c99ad8', ground: '#a8665a', intensity: 0.95 },
-  grade: { saturation: 1.15, contrast: 1.08, tint: '#ffe6cc', bloom: 0.35, night: false },
+  name: 'Sunset Pass golden hour',
+  sky: { top: '#3d2f7a', horizon: '#ffc27a', bottom: '#d98a7e' },
+  fog: { color: '#c48aa6', near: 170, far: 900 },
+  sun: { dir: { x: 0.92, y: -0.17, z: -0.35 }, color: '#ffb46e', intensity: 2.3 },
+  ambient: { sky: '#b48ad8', ground: '#8a5462', intensity: 1.0 },
+  grade: { saturation: 1.18, contrast: 1.08, tint: '#ffe0c2', bloom: 0.25, night: false },
 };
 
 export function lookFor(id: TrackId): EnvLook {

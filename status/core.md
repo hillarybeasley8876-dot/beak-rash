@@ -32,3 +32,20 @@
 - 22:25 content: achievements wired — modules.ts loads `gameplay/achievements` (stub fallback
   `gameplay/achievements-stub.ts`); game.ts creates it once, `attach(session)` after audio.attach on race
   start and `attach(null)` before session.dispose().
+- 00:10 desktop: tools/package-desktop.sh builds desktop/build/暴力鹈鹕.app (Electron 44 from npmmirror, app:// protocol).
+  NOTE: VS Code's env has ELECTRON_RUN_AS_NODE=1 — launch with `env -u ELECTRON_RUN_AS_NODE`; Finder launches are fine.
+  Smoke: BR_DEBUG_PORT=9471 + chromium.connectOverCDP (port 9333 belongs to another app — never use it).
+  Preview v0.1 (commit 0b2dd79 snapshot) installed at ~/Desktop/暴力鹈鹕-预览版.app.
+
+## Requests from core to units (fixers: grep your unit name here)
+- sim: multiply the effective top speed by `rider.rubber` (race-owned factor, default 1; see types.ts).
+- sim (camera): hero framing — the pelican spans only ~21 % of screen height at speed and less while
+  boosting (feel critic r1). Bring the chase cam closer/lower at speed and cap the boost FOV kick so the
+  rider stays ≥ 26 % of the screen height; keep the bike centre-low (the HUD covers both bottom corners).
+- ui-screens / ui-hud: every cut-in, stamp, count-up and pause open/close should call `app.audio.sfx(...)`
+  (`ui.cutin`, `ui.stamp`, `ui.coin`, `ui.move`, `ui.confirm`, `ui.back`) — audio critic: the UI is silent.
+- ui-hud: the player portrait panel showed an empty orange/red frame in the production build at race start
+  (shots/core/prev-race.png): make sure the portrait image is preloaded/decoded before the race HUD shows,
+  with the vector fallback until it is ready.
+- track (wave 2 note): coast's tightest curve is R 150 m, so nothing calls for a drift. When the track unit
+  next touches layouts, add 2–3 tight corners (R 35–70 m) incl. one near-hairpin and an S-chicane.

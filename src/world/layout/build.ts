@@ -1,7 +1,7 @@
 // Layout → sampled centre line. Curvature, slope and bank are piecewise constant per segment and
 // change across each boundary with a smoothstep ramp (heading C2, no kinks); each segment keeps its
 // exact total turn and rise because the ramps are symmetric. Samples every 1 m from −pre to
-// length + post (the extra road is visual only; the Track API clamps to [0, length]).
+// length + post (visual road; the Track API is valid on [0, length + runoff], see query.ts).
 import { smoothstep } from '../../core/math';
 import type { TrackFeature } from '../../core/types';
 import type { LayoutDef, SegmentDef } from './types';

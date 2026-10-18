@@ -57,6 +57,8 @@ export class SongPlayer {
   private stopAt = Infinity;
   private crackle: AudioBufferSourceNode | null = null;
   private readonly home: Tonality;
+  /** Recent section starts (audio time): tests check that section A lands on the race GO. */
+  readonly starts: Array<{ section: string; at: number }> = [];
 
   constructor(readonly engine: Engine, song: Song, start: number, opts: PlayerOpts = {}) {
     this.song = song;
@@ -132,6 +134,15 @@ export class SongPlayer {
     this.nextTime = at;
   }
 
+  /** Back into the vamp from `at` at the latest (a paused countdown); cue() leaves it again. */
+  hold(at: number): void {
+    this.holdName = this.song.vamp ?? this.form[0] ?? null;
+    this.pendingForm = null;
+    this.building = false;
+    this.stepInSection = 0;
+    this.nextTime = Math.min(this.nextTime, at);
+  }
+
   /**
    * First grid point (every `steps` 16ths, bar-aligned) at or after `t` — stingers land on the
    * song's 8th notes / beats.
@@ -143,11 +154,11 @@ export class SongPlayer {
     return this.nextTime + d * this.stepDur;
   }
 
-  stop(fade: number): void {
-    const now = this.engine.ctx.currentTime;
+  /** Fade out over `fade` s from `at` (default now) and stop scheduling. */
+  stop(fade: number, at = this.engine.ctx.currentTime): void {
     if (this.stopAt !== Infinity) return;
-    this.band.fade(0, fade, now);
-    this.stopAt = now + fade + 0.05;
+    this.band.fade(0, fade, at);
+    this.stopAt = at + fade + 0.05;
     this.crackle?.stop(this.stopAt + 0.05);
     this.band.dispose(this.stopAt + 2.5);
   }
@@ -223,6 +234,10 @@ export class SongPlayer {
     const human = (amount: number): number => Math.max(0, t0 + (this.rng.next() - 0.5) * amount);
     const chord = sec.chords[step] ?? sec.chords[0];
     if (!chord) return;
+    if (step === 0) {
+      this.starts.push({ section: sec.name, at: this.nextTime });
+      if (this.starts.length > 12) this.starts.shift();
+    }
     if (this.crashNext) {
       this.crashNext = false;
       if (this.tok(sec, 'cym', step) !== 'C') this.band.drums.crash(this.nextTime, 0.9);

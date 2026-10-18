@@ -1,6 +1,6 @@
 // Keyboards: pooled electric piano, a persistent funk clavinet (narrow pulse through an envelope
 // wah, plus a muted "chicken scratch"), and a persistent legato saw pad.
-import { adsr, filter, holdAt, perc } from '../../dsp/env';
+import { adsr, anchor, filter, holdAt, perc, settle } from '../../dsp/env';
 import { pulseWave } from '../../dsp/curves';
 import { midiToHz } from '../theory';
 import { NoiseVoice, Pool, osc, type Gate } from './voice';
@@ -75,8 +75,9 @@ export class Rhodes {
     if (v.busyUntil > t) {
       // Stealing a sounding voice: duck it to zero just before the new onset.
       for (const g of [v.bodyAmp.gain, v.barkAmp.gain]) {
-        holdAt(g, t - 0.006);
+        anchor(g, t - 0.006);
         g.linearRampToValueAtTime(0, t);
+        settle(g, t, 0);
       }
     }
     for (const o of [v.body, v.bark]) {
@@ -150,6 +151,7 @@ export class Pad {
   private lp: BiquadFilterNode;
   private amp: GainNode;
   private gate: Gate;
+  private busyUntil = 0;
 
   constructor(b: Band) {
     this.lp = filter(b.ctx, { type: 'lowpass', frequency: 700, Q: 0.8 });
@@ -164,16 +166,24 @@ export class Pad {
   }
 
   chord(t: number, midis: number[], dur: number, vel: number): void {
+    // Glide only between sounding chords; after a rest the new chord starts on its own pitches.
+    const legato = t < this.busyUntil;
     this.saws.forEach((o, i) => {
       const m = midis[i % Math.max(1, midis.length)];
       if (m === undefined) return;
-      holdAt(o.frequency, t);
-      o.frequency.exponentialRampToValueAtTime(midiToHz(m), t + 0.04);
+      const f = midiToHz(m);
+      anchor(o.frequency, t);
+      if (legato) o.frequency.exponentialRampToValueAtTime(f, t + 0.04);
+      else o.frequency.setValueAtTime(f, t);
+      settle(o.frequency, legato ? t + 0.04 : t, f);
     });
     const fr = this.lp.frequency;
-    holdAt(fr, t);
+    const open = t + Math.max(0.06, Math.min(1.2, dur));
+    anchor(fr, t);
     fr.linearRampToValueAtTime(700, t + 0.05);
-    fr.linearRampToValueAtTime(1500, t + Math.min(1.2, dur));
-    this.gate.open(adsr(this.amp.gain, t, dur, 0.085 * vel, 0.35, 0.5, 0.8, 0.7, true));
+    fr.linearRampToValueAtTime(1500, open);
+    settle(fr, open, 1500);
+    this.busyUntil = adsr(this.amp.gain, t, dur, 0.085 * vel, 0.35, 0.5, 0.8, 0.7, true);
+    this.gate.open(this.busyUntil);
   }
 }

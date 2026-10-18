@@ -2,18 +2,21 @@
 import type { RiderState, Side } from '../../../core/types';
 import type { CombatCtx } from '../ctx';
 
-export type EndReason = 'done' | 'crash' | 'dispose';
+/** finish = the caster crossed the line: movement and visuals wind down, nothing scores any more. */
+export type EndReason = 'done' | 'crash' | 'finish' | 'dispose';
 
 export interface ActiveSkill {
   readonly id: string;
   readonly caster: RiderState;
-  /** Blocks melee and other skills while running. */
+  /** Blocks melee and other skills while true (may change as the skill runs, e.g. Big Gulp's pouch). */
   readonly exclusive: boolean;
   /** Before physics (e.g. holding a gulped rider in the pouch). */
   pre(dt: number): void;
   /** After physics; return false when finished. */
   post(dt: number): boolean;
-  /** Always called exactly once (finished, caster crashed, or session disposed). */
+  /** True while the caster swallows incoming waves and projectiles (Big Gulp's open pouch). */
+  swallows?(): boolean;
+  /** Always called exactly once (done, caster crashed or finished the race, or session disposed). */
   end(reason: EndReason): void;
 }
 
@@ -24,17 +27,24 @@ export interface SkillImpl {
   cast(ctx: CombatCtx, r: RiderState): ActiveSkill;
 }
 
-/** Skill that runs for `duration` sim seconds; the caster plays its 'skill' action for `actionDur`. */
+/**
+ * Skill that runs for `duration` sim seconds; the caster plays its 'skill' action for `actionDur`. A `lockout`
+ * skill is exclusive (and holds its action) for the whole duration; others only strike a 0.35 s cast pose.
+ */
 export abstract class TimedSkill implements ActiveSkill {
   protected t = 0;
   private actionDur: number;
 
   constructor(
     protected ctx: CombatCtx, readonly caster: RiderState, readonly id: string, protected duration: number,
-    readonly exclusive: boolean, kind: 'skill' | 'ult' = 'skill',
+    private readonly lockout: boolean, kind: 'skill' | 'ult' = 'skill',
   ) {
-    this.actionDur = exclusive ? duration : Math.min(duration, 0.35);
+    this.actionDur = lockout ? duration : Math.min(duration, 0.35);
     caster.action = { kind, side: 1, t: 0, dur: this.actionDur, weapon: caster.weapon, skillId: id, resolved: true };
+  }
+
+  get exclusive(): boolean {
+    return this.lockout;
   }
 
   pre(dt: number): void {

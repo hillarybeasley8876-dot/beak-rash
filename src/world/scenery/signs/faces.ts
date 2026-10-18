@@ -7,7 +7,7 @@ import { burst, halftone, label, P5, ransom, star } from './p5draw';
 
 type G = CanvasRenderingContext2D;
 
-function cell(atlas: SignAtlas, w: number, h: number, draw: (g: G, w: number, h: number) => void): AtlasRect | null {
+export function cell(atlas: SignAtlas, w: number, h: number, draw: (g: G, w: number, h: number) => void): AtlasRect | null {
   const c = atlas.alloc(w, h);
   if (!c) {
     console.warn('[track] sign atlas full; skipping a sign face');
@@ -31,7 +31,7 @@ function artBillboard(atlas: SignAtlas, rng: Rng, text: string, art: HTMLImageEl
     const k = Math.max(w / art.width, h / art.height);
     // Keep the top of the poster (its calm band is reserved for our text).
     g.drawImage(art, (w - art.width * k) / 2, 0, art.width * k, art.height * k);
-    const bandH = h * 0.3;
+    const bandH = h * 0.38;
     g.save();
     g.translate(w / 2, 14 + bandH / 2);
     g.rotate(-0.04);

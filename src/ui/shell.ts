@@ -214,7 +214,7 @@ class UiShell implements Ui {
       else if (isRaceView(this.cur.id)) used = this.raceAction(a);
       else used = this.cur.inst?.onAction?.(a) ?? false;
     } catch (err) {
-      // Input.press() iterates listeners without a guard: a throwing screen must not break the HUD/race.
+      // A throwing screen is logged and counts as consumed, so the same key press cannot act twice.
       console.error(`[ui] action "${a}" on ${this.cur.id} threw`, err);
       used = true;
     }

@@ -153,3 +153,23 @@ Plan (issue -> fix; [x] = done + verified). Critic scripts: shots/review/sim/r1-
       watcher covers any writer that does not.
 - [ ] not done: blend path vs obstacle boxes (only rider clearance is guaranteed: the arc never gets closer
       to the rider than the nearer end pose; far starts cut). F11/F12 are track-unit items (notes below).
+
+## Fix round 2
+Plan (issue -> fix; [x] = done + verified). Critic scripts: shots/review/sim/r2-feel/scripts, r2-camera. Probes: shots/sim/fix2/.
+- [x] W major wall pinball -> surfaces.ts contact hysteresis: an impact latches sr.wallSide; re-contacts on that side
+      take the scrape path (vx 0, friction by pressure from the rider's own intent vxWant, wallScrape events; no bounce,
+      no 'wall' event, no shake) until the rider steers > 0.4 m away, is > 1 m away or stays off it 0.8 s. Carry windows
+      are direction-aware (steering.ts startCarry(dir) + carried(): only steering toward the wall / vehicle / hitter is
+      muted, and the slow carry grip only holds back motion toward it). Yaw is rate-limited to 300 deg/s for 0.15 s
+      after a bounce or latched re-contact (attitude.ts, split out of steering.ts). Vehicle side swipes latch the same
+      way (obstacles.ts swipeLatch). Real cliff (critic wallpin.mjs): steer 0.15/0.3/0.45/1 -> exactly 1 'wall' event
+      at dt 1/30, 1/60, 1/144, 0 yaw reversals after 1.5 s (was 9 impacts, 4.4-4.8/s); walldead.mjs: |vx| >= 2 in
+      0 frames after the impact (was 18), yaw -5 deg in 2. Trauma: one 0.32 spike, then 0 (fix2/wall-steer10.png).
+- [x] D major drift charge on real curves -> driftChargeKappa 80 -> 250, driftChargeHigh 1.3 -> 1.15 (full commitment
+      on R <= 250 = 0.48/1.05/1.75 s, R300 0.55/1.20/1.98). New tools/feel-scenarios-r2.mjs driftTiming checks R300 and
+      R150 against L1 0.45-0.7 / L2 1.0-1.45 / L3 1.7-2.4: all pass. Straight factor 0.25 unchanged.
+- [ ] C major crash cam inside vehicles -> chase.ts eye vs solid obstacle boxes (rise above roof / side), crash.ts wreck
+      stops against solid vehicles; scenarios car / van / bus.
+- [ ] minors: hero framing (core.md asks sim: CHASE dist/fov), PERFECT needs a clean touchdown, drift curve push
+      partial + driftLatIn 4.5 + release ramp, knock vs steering victim, telemetry, respawn glide cut, SHOWTIME settle,
+      pause freeze, water-crash FOV, camera telemetry, rider.rubber (core.md request).

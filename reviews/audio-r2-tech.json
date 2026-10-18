@@ -1,0 +1,64 @@
+{
+ "unit": "audio",
+ "round": 2,
+ "lens": "tech",
+ "pass": false,
+ "score": 6,
+ "summary": "Round 2 verified most of the r1 tech fixes in the browser. T1: pause -> settings -> resume keeps race-coast on the same SongPlayer. T2: 0 ms gap across a race load. T5: slingshot is player-only, and rival boosts are a low-passed pass-by with a cooldown. T6: the frozen frame loop goes -20.9 -> -180 -> -21.4 dB. T7: renders repeat to 1e-6. T8: an unknown stinger warns once and does not throw. T9: wall/scrape/miss/ult sounds are mapped and exist. T10: done. T11: no long task on the first key. Other checks: tsc reports 0 errors and there is no `any`; the largest file is 386 lines; no __br errors in Chromium or WebKit; events reach sounds in 0.3-0.9 ms; gameplay is bit-identical with audio and with ?stub=audio; across 3 consecutive races there is no leak (WebAudio nodes after GC 329/290/259, heap 32.8/33.7/34.7 MB, 32.6 MB after quit); the game runs at 119-121 fps at 1080p with 193-205 draw calls and 0.61-0.64 M triangles; the main-thread audio share is 0.5-0.7 %; voice 404s fall back to animal calls silently. It does not pass. (1) The T11 change moved context creation into a synchronous preload, so a browser with no usable AudioContext now cannot boot the game at all (black screen). (2) The audio thread still runs at about 2x the 5 % budget (race p50 9-13 %, p90 13-19 %; a control graph reads 0.2 %); T3 was never addressed. (3) The race-start sync falls apart on pause -> 重新开始 and when pausing during the countdown. Minor: the unit's own audio-check exits 1 because of a flaky mute check, voice lines play over the pause menu, the trace logs voice lines that never sound, the WebKit context runs before the gesture, and system.ts is a grab-bag. Evidence: shots/review/audio/r2-tech/*.json and *.png.",
+ "issues": [
+  {
+   "severity": "major",
+   "title": "Without a usable AudioContext the whole game fails to boot (black screen); this is a regression from the T11 fix",
+   "detail": "index.ts:10-13 preload() is not async and calls prepare() synchronously. prepare() calls createContext() (system.ts:45-52), which retries without sampleRate but lets the second `new AudioContext()` throw. The exception escapes main.ts:15's Promise.all(map(fn => fn(app).catch(...))) synchronously, so boot() rejects. I tested this with an init script that makes the AudioContext constructor throw (NotSupportedError, as on a broken audio stack) or be undefined (as with WebAudio disabled). In both cases __br.ready stays false, the screen is stuck on 'boot', and __br.errors holds '[main] boot failed ... at createContext (system.ts) <- prepare <- preload (index.ts:11) <- main.ts' (shots/review/audio/r2-tech/probe-noaudio-throw.json, probe-noaudio-undefined.json; noaudio-throw.png is black). Every key press then throws an uncaught error (UI shell unlock -> AudioRuntime.unlock -> prepare), so unlock() breaks its Promise contract. Before T11 the context was created lazily in unlock(), so a missing audio device only cost audio.",
+   "fix": "Make preload async and wrap context and graph creation in try/catch. On failure, warn once ('[audio] WebAudio unavailable, running silent'), set a disabled flag, keep every AudioSystem/Host method a no-op, and have unlock() return a resolved promise. Add a regression probe: with AudioContext throwing, title -> menu -> race must be reachable with 0 page errors."
+  },
+  {
+   "severity": "major",
+   "title": "Audio-thread load is still about 2x the 5 % CPU budget (r1 T3 not fixed)",
+   "detail": "I measured the realtime renderCapacity (CDP WebAudio.getRealtimeData) at 1920x1080 over 3 consecutive autopilot races on coast. p50 was 10.8 / 9.2 / 9.7 %, p90 16.1 / 15.1 / 15.8 %, max 16.7 / 18.9 / 37.2 % (probe-main-coast.json). r1 measured a 10.5-14 % mean, so this has barely moved. A trivial 32 kHz oscillator graph in the same browser reads 0.11-0.56 %, so the machine is not the cause. Breakdown for a city race (probe-cpu-loaded.json): menu with the title theme 4.3 % p50; race with everything 9.0 % p50 / 13.1 % p90; the same race with the music stopped (sfx and bike loops only) 5.5 % / 7.2 %. Under heavier machine load (probe-cpu.json) the race reads 13.4 % / 19.3 % and the final-stretch layer 17.2 % / 27.4 %. The main thread adds another 0.5-0.7 %. The status figures ('1.7-3.4 % per song, sfx + loops < 1 %') come from offline renders (check.ts cpuNet), which under-report by 2-4x. Fix round 1 never addressed T3, and audio-check still has no realtime gate.",
+   "fix": "Render each synthesized sfx once at preload into AudioBuffers (OfflineAudioContext, 2-3 variation takes) and play them as buffers (1 source + gain + optional panner) instead of building 5-20 oscillator/filter nodes per hit. Throttle the dense rival sounds (bike.bump about 1/s and bike.passby about 0.8/s in probe-main). Halve the persistent music oscillators by using PeriodicWave stacks for the Rhodes and brass, and replace the music ConvolverNode with a cheap feedback-delay reverb. Add a CDP renderCapacity gate to tools/audio-check.mjs (menu, race, race at intensity 2, busy pack; p50 <= 5 %, p90 <= 8 %)."
+  },
+  {
+   "severity": "major",
+   "title": "The race-start sync (M4) breaks on pause -> 重新开始 (same track) and when pausing during the countdown",
+   "detail": "probe-restart.json, first race: the vamp is held through the intro (holding=true), the count-in starts at '3', and GO lands on bar 1 of A. Then flow:restartRace on the same track (the pause menu's 重新开始, ui/screens/pause.ts:56): Conductor.play() returns early for the same song id (conductor.ts:43), so there is no vamp (holding=false). The previous race's full groove (-12...-23 dB per 50 ms window) keeps running through '3' (the count beep lands off the grid with the count-in pad layered on top) and through '2'. countdown(2) then cues A at the predicted GO, which cuts the groove dead about 270 ms after '2' (the already-scheduled lookahead) and leaves 1.7 s of count-in. probe-countpause.json: a pause at '2' for 2.4 s freezes the sim-time countdown but not the audio-clock GO prediction. Section A, crash included, starts inside the pause menu, and at GO the song is at A step 22 (bar 2) instead of bar 1. countdown(1) never re-cues because scheduledUntil > goAt (conductor.ts:81).",
+   "fix": "On attach(session) when the race song is already current, restart it: Conductor.play(id, fade, { vamp: true, restart: true }) creating a fresh SongPlayer, or re-enter the vamp at the next bar line. In countdown(), re-hold the vamp and re-cue when the predicted goAt has already passed or a flow:pause happened since the last count. Add audio-check cases for pause -> restart and for a pause during the countdown, both asserting A step 0 at GO."
+  },
+  {
+   "severity": "minor",
+   "title": "The unit's own acceptance gate is red again (exit 1): the mute check races achievement saves",
+   "detail": "My full `node tools/audio-check.mjs` run exited 1 on 'master 0 -> silent (-5.2 dBFS)' (shots/review/audio/r2-tech/audio-check.log). I reproduced the cause in probe-mute3.json. The check mutes with an unpersisted app.audio.setVolumes({master: 0}), but system.ts:81 re-applies every saved setting on ANY save.onChange. In run 1 the 'slingshot' achievement unlocked 1.44 s later (save.update) and restored master 0.9 mid-measurement (-8.9 dBFS). Run 2 had no unlock and measured -180 dB. The player's own path (save.update settings.master = 0) stays muted even across unrelated saves (probe-mute.json), so the product is fine; only the gate is flaky.",
+   "fix": "In the check, mute through app.save.update((d) => { d.settings.master = 0; }) and restore it afterwards. In system.ts, re-apply volumes from onChange only when master, music, sfx or voice actually changed."
+  },
+  {
+   "severity": "minor",
+   "title": "Voice lines ignore pause: a queued announcer line starts over the pause menu at full level",
+   "detail": "probe-pausevoice.json: I triggered ann_ko (0.41 s) with ann_final queued behind it and paused 150 ms later. The queued 最后冲刺！ (0.82 s) started about 200 ms after the pause menu opened and played unmuffled (voice-only peak -4.0 dBFS, RMS -18.9 dB) while muffle = 1. The voice bus (engine.ts:87) bypasses the muffle and duck, and VoicePlayer.update() (voice/player.ts:159-166) keeps starting pending lines while paused. Barks also keep talking through the pause (pause-voice.png).",
+   "fix": "While the external (pause) muffle is >= 0.9, drop the pending announcer line and fade active barks (or route voiceIn through a pause gain), and do not start queued lines until the game is unpaused."
+  },
+  {
+   "severity": "minor",
+   "title": "The trigger trace reports voice lines that never play (rate-limited barks, queued announcer lines)",
+   "detail": "VoicePlayer.play() returns true for rate-limited barks (voice/player.ts:98), for lines still loading (:101-106) and for queued announcer lines (:108-115), and system.ts:201/270/292 then note them as played. In probe-ult.json 'bark:goose_ko_1' and 'bark:capybara_hurt_1' are logged in the same millisecond, although BARK_GAP 1.3 s allows only one, and 'bark:seagull_taunt_0' is logged at +6855 and +7189 ms. probe-pausevoice.json logs ann_final at request time although it started about 350 ms later. audio-check's voice assertions (countdown lines; 'KO -> ... pigeon_hurt_1') can therefore pass for lines that never sound.",
+   "fix": "Have VoicePlayer.play() return 'started' | 'queued' | 'dropped' and write the trace entry in VoicePlayer.start(), when the line actually sounds. Keep the existing semantics for the animal-call fallback."
+  },
+  {
+   "severity": "minor",
+   "title": "WebKit: the AudioContext runs before the user gesture (silent but live)",
+   "detail": "probe-webkit.json, before any input: ctx 'running', live false. prepare() (system.ts:122-125) only suspends a context that is already 'running' synchronously after construction. WebKit (and any engine that starts the context asynchronously when autoplay is allowed) flips to 'running' later, so the idle graph renders from boot and holds the output device; Safari then shows the tab's audio indicator on the title screen. Nothing is audible because `live` also requires unlock(), but the status claim 'nothing exists before unlock(), suspended at boot' does not hold.",
+   "fix": "In prepare(), add a one-shot ctx.onstatechange that calls suspend() whenever the context becomes 'running' before unlock(). Assert ctx !== 'running' before the gesture in the WebKit run of audio-check."
+  },
+  {
+   "severity": "minor",
+   "title": "system.ts is a 386-line grab-bag next to the 400-line limit",
+   "detail": "system.ts holds the AudioSystem facade, the Host implementation for both event reactors, the lookahead/stall policy (AHEAD, settleUntil, pump, halt), bark selection and distance fading (bark, barkPlace, BARK_NEAR/FAR), boom ownership, placement, cooldowns, and the test trace/debug state. All three majors above land in this file, so their fixes will push it past 400 lines.",
+   "fix": "Move bark selection and placement to voice/barks.ts, the lookahead/stall policy to a small music/pump.ts, and trace/debugState next to debug.ts. Keep system.ts as thin AudioSystem + Host wiring."
+  },
+  {
+   "severity": "minor",
+   "title": "cross-unit: race calls sfx() directly for the police whistle and corgi knocks (unpositioned)",
+   "detail": "gameplay/race/police.ts:122 calls app.audio.sfx('police.whistle') and :135 calls app.audio.sfx(`hit.${weapon}`), bypassing the bus. Both play centred at full volume wherever the corgi is, and audio's positional and rate-limit logic never sees them (the brief says gameplay should not need to call sfx()).",
+   "fix": "race emits an event (e.g. police:whistle {riderId, pos}) and audio plays it positionally, or audio derives both sounds from existing events (core request for the new event)."
+  }
+ ]
+}

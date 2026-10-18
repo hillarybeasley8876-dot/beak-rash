@@ -77,7 +77,7 @@ export function buildSea(ctx: WorldCtx, hm: HeightMap): void {
       uDeep: { value: new Color(night ? '#10184a' : '#1b78c2') },
       uMid: { value: new Color(night ? '#1d2c78' : '#1fa6d3') },
       uShallow: { value: new Color(night ? '#2c4aa0' : '#5fdbd6') },
-      uFoam: { value: new Color('#ffffff') },
+      uFoam: { value: new Color(night ? '#7d86c8' : '#ffffff') },
       uSunDir: { value: sunDir }, uCam: { value: new Vector3() },
     }]),
   }));

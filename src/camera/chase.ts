@@ -3,12 +3,14 @@
 // height, look-ahead and FOV grow with speed (FOV keeps widening above the bike's top speed); roll follows
 // the lean; heading blends 70/30 tangent/bike. Follow springs run on sim time, so hit-stop freezes them
 // and slow-mo slows them with the world. Crashed: a close, slowly orbiting shot of the tumbling body.
+// The eye rises over solid obstacles in its way (avoid.ts) instead of entering a vehicle.
 import { Matrix4, Quaternion, Vector3 } from 'three';
 import { clamp, clamp01, damp, DEG, lerp, springStep } from '../core/math';
 import { Poser } from '../sim/pose';
 import { bikeTune } from '../sim/tuning';
 import type { Session } from '../core/contracts';
 import type { Anchor } from './blend';
+import { ObstacleAvoid, type TrackPoint } from './avoid';
 
 export const CHASE = {
   dist: [4.6, 5.6], height: [1.9, 2.2], ahead: [5, 9], fov: [62, 74],
@@ -19,6 +21,7 @@ export const CHASE = {
   crashDist: 4.3, crashHeight: 1.6, crashFov: 58, crashOrbit: 12 * DEG, crashBodyLambda: 20, crashLambda: 4,
   dipOmega: 13, dipLook: 0.5,         // landing dip spring (1/s) and how much of it the look point shares
   edgeMargin: 1.0,                    // m the eye keeps inside bounds() (cliff faces sit a little inside them)
+  riderMid: 0.8,                      // m: the rider point the sight line must reach (obstacle avoidance)
 };
 
 export interface CamPose { pos: Vector3; quat: Quaternion; fov: number }
@@ -41,6 +44,8 @@ export class ChaseCam {
   private eye = new Vector3(); private look = new Vector3(); private anchorV = new Vector3(); private fwd = new Vector3();
   private up = new Vector3(); private rt = new Vector3(); private tg = new Vector3();
   private m = new Matrix4(); private q = new Quaternion();
+  private avoid = new ObstacleAvoid();
+  private eyeT: TrackPoint = { s: 0, x: 0, y: 0 }; private riderT: TrackPoint = { s: 0, x: 0, y: 0 };
 
   /** Snap every spring to the current target (new session, respawn, teleport). */
   reset(session: Session): void {
@@ -65,6 +70,7 @@ export class ChaseCam {
     this.bodyX = this.followX = r.x;
     this.lastSpeed = r.speed;
     this.lastS = r.s;
+    this.avoid.reset();
   }
 
   /** Landing dip: the camera drops by about `depth` m (peak after ~1/ω s) and springs back. */
@@ -75,7 +81,7 @@ export class ChaseCam {
   get state(): Record<string, number> {
     return {
       dist: this.dist, height: this.y, ahead: this.ahead, fovBase: this.fovBase, roll: this.roll, surge: this.surge,
-      offS: this.offS, offX: this.offX, dip: this.dipY,
+      offS: this.offS, offX: this.offX, dip: this.dipY, lift: this.avoid.lift,
     };
   }
 
@@ -148,7 +154,9 @@ export class ChaseCam {
     this.offS = camS - r.s;
     this.offX = camX - r.x;
     this.y = Math.max(this.y, CHASE.minHeight);
-    this.poser?.place(camS, camX, Math.max(CHASE.minHeight, this.y + this.dipY), this.eye);
+    Object.assign(this.eyeT, { s: camS, x: camX, y: Math.max(CHASE.minHeight, this.y + this.dipY) });
+    Object.assign(this.riderT, { s: this.followS, x: this.followX, y: CHASE.riderMid + r.y });
+    this.poser?.place(camS, camX, this.avoid.update(session, this.eyeT, this.riderT, dt), this.eye);
     this.poser?.place(this.followS + this.ahead, this.lx, this.ly + this.dipY * CHASE.dipLook, this.look);
     if (view) this.look.lerp(view.anchor('body', this.anchorV), this.crashBlend);
     return this.finish(this.fovBase + kick, this.fovRef, Math.hypot(this.dist, this.y - CHASE.lookHeight));

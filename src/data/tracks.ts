@@ -14,7 +14,7 @@ export interface TrackInfo {
 export const TRACKS: Record<TrackId, TrackInfo> = {
   coast: {
     id: 'coast', name: '鹈鹕湾海滨公路', nameEn: 'PELICAN BAY', blurb: '阳光、海风、偷薯条的海鸥。',
-    weather: '晴 · 海风 3 级', lengthKm: 3.2, difficulty: 1,
+    weather: '晴 · 海风 3 级', lengthKm: 3.3, difficulty: 1,
   },
   city: {
     id: 'city', name: '霓虹夜城', nameEn: 'NEON NIGHT', blurb: '霓虹灯下，没有一只鸟是无辜的。',

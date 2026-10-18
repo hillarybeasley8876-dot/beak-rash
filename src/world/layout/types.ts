@@ -2,6 +2,7 @@
 // gameplay features positioned relative to each segment. layout/build.ts turns it into a sampled
 // centre line; one new environment = one layout file (layouts/<id>.ts) + one dressing module.
 import type { FeatureKind, Surface, TrackId } from '../../core/types';
+import type { TerrainField, TerrainMod } from '../terrain/field';
 
 /** What bounds the drivable area on one side (drawn by road/edges.ts, mapped to bounds().*Kind). */
 export type EdgeKind =
@@ -35,7 +36,7 @@ export interface GroundDef {
   /** Terrain does not touch the road edge (bridge): the edge column starts at `step`. */
   detached: boolean;
   /** Dominant ground material near the road. */
-  mat: 'sand' | 'grass' | 'rock' | 'dirt' | 'stone';
+  mat: 'sand' | 'grass' | 'rock' | 'dirt' | 'stone' | 'paved'; // paved = city ground (env-city)
 }
 
 export interface SideDef {
@@ -115,4 +116,8 @@ export interface LayoutDef {
   left: SideDef;
   right: SideDef;
   segments: SegmentDef[];
+  /** Optional terrain modifier built with the terrain field (e.g. switchback legs, layouts/mountain.ts). */
+  terrainMod?: (field: TerrainField) => TerrainMod;
+  /** Far terrain grid margin beyond the road's bounding box (m, default 1000 ≈ fog far; layouts/city.ts). */
+  farMargin?: number;
 }

@@ -6,6 +6,7 @@ import type { WorldCtx } from '../ctx';
 import { frameOffset, rowsBetween, type MeshBuf } from '../geom';
 import type { PropBatch } from '../kit/batch';
 import type { TerrainField } from '../terrain/field';
+import { WALL_TOE } from '../terrain/profile';
 import { buildTunnelCap } from './tunnelCap';
 
 const WALL_H = 3.6;
@@ -44,7 +45,9 @@ function quad(buf: MeshBuf, a: Vector3, b: Vector3, c: Vector3, d: Vector3, col:
 }
 
 export function buildTunnel(ctx: WorldCtx, tube: PropBatch, lamps: PropBatch, field: TerrainField, f: TrackFeature): void {
-  const halfW = Math.min(field.bound(f.s0 + 1, -1), field.bound(f.s0 + 1, 1)) - 0.02;
+  // Walls a toe beyond the drivable bound, like the cutting's rock faces (riders scrape, never sink in).
+  const mid = (f.s0 + f.s1) / 2;
+  const halfW = Math.max(field.bound(mid, -1), field.bound(mid, 1)) + WALL_TOE;
   const outline = tunnelOutline(halfW);
   const fr = ctx.q.frameVis(f.s0);
   const centre = new Vector3();

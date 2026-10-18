@@ -25,11 +25,10 @@ export interface Item {
   home: { s: number; x: number } | null; // where a row item sits (restored if Big Gulp drags it and misses)
 }
 
-let nextId = 1;
-
-export function makeItem(kind: PickupKind, s: number, x: number, phase: number): Item {
+/** A fresh item; ids come from the session's PickupSystem (same seed, same ids after a restart). */
+export function makeItem(id: number, kind: PickupKind, s: number, x: number, phase: number): Item {
   return {
-    id: nextId++, kind, s, x, y: PICKUP.float, alive: true, respawnAt: Infinity, pop: 1, phase,
+    id, kind, s, x, y: PICKUP.float, alive: true, respawnAt: Infinity, pop: 1, phase,
     weapon: 'none', uses: 0, vel: null, life: Infinity, vacuumBy: null, home: kind === 'weapon' ? null : { s, x },
   };
 }
@@ -43,7 +42,7 @@ function rowKind(f: TrackFeature): PickupKind | 'mixed' {
  * Lay one row: items every ~3 m from (s0,x0) to (s1,x1). 'coin' rows are all coins; fish/can/crate rows put
  * that item on every third slot with coins between; rows without a kind get one random special in the middle.
  */
-export function layRow(f: TrackFeature, rng: Rng, out: Item[]): void {
+export function layRow(f: TrackFeature, rng: Rng, out: Item[], nextId: () => number): void {
   const len = Math.max(0, f.s1 - f.s0);
   const n = Math.max(1, Math.round(len / 3) + 1);
   const kind = rowKind(f);
@@ -52,7 +51,7 @@ export function layRow(f: TrackFeature, rng: Rng, out: Item[]): void {
   for (let i = 0; i < n; i++) {
     const t = n === 1 ? 0.5 : i / (n - 1);
     const k = kind === 'mixed' ? (i === mid && n >= 3 ? special : 'coin') : kind === 'coin' || i % 3 === 1 || n < 3 ? kind : 'coin';
-    out.push(makeItem(k, f.s0 + len * t, f.x0 + (f.x1 - f.x0) * t, i * 0.7 + rng.next()));
+    out.push(makeItem(nextId(), k, f.s0 + len * t, f.x0 + (f.x1 - f.x0) * t, i * 0.7 + rng.next()));
   }
 }
 

@@ -1,4 +1,4 @@
-// pelican.gulp — the pouch opens for 1.2 s: swallows projectiles, vacuums pickups ≤ 4 m. The first rival in
+// pelican.gulp — the pouch opens for 1.2 s: swallows waves and projectiles, vacuums pickups ≤ 4 m. The first rival in
 // reach of the beak (ahead of or alongside the pelican) is caught: small ones (scale ≤ 0.85) are gulped
 // (hidden 0.8 s, carried just behind the beak) then spat 15 m back — the 25 dmg lands at the spit, on screen;
 // bigger ones get bitten (12 dmg + weapon knocked loose).
@@ -7,10 +7,12 @@ import { lerp } from '../../../core/math';
 import type { RiderState } from '../../../core/types';
 import { takeWeapon } from '../armory';
 import { clampToRoad, others, targetable, type CombatCtx } from '../ctx';
+import { credit } from '../damage';
 import { addStatus, applyMods, removeStatus } from '../statuses';
 import { VacuumSpiral } from '../visuals/bolts';
 import { FlatRing } from '../visuals/waves';
 import { skillHit } from './common';
+import { swallowed } from './swallow';
 import { TimedSkill, type EndReason, type SkillImpl } from './types';
 
 const ID = 'pelican.gulp';
@@ -40,6 +42,16 @@ class Gulp extends TimedSkill {
     ctx.visuals.add(new VacuumSpiral(ctx.visuals, r, GULP.open, GULP.vacuum));
   }
 
+  /** The open pouch eats HONK / WHISTLE waves and projectiles (skills/swallow.ts). */
+  swallows(): boolean {
+    return this.t < GULP.open;
+  }
+
+  /** Busy while the pouch is open or holds a rival; the spit flight and landing run as a free tail. */
+  override get exclusive(): boolean {
+    return this.t < GULP.open || (this.victim !== null && this.phase === 'held');
+  }
+
   override pre(): void {
     const v = this.victim;
     if (v && this.phase === 'held' && this.still(v)) this.carry(v);
@@ -53,7 +65,7 @@ class Gulp extends TimedSkill {
   protected tick(dt: number): void {
     const { ctx, caster: r } = this;
     if (this.t <= GULP.open) {
-      ctx.projectiles.swallow(r, GULP.catchRadius);
+      if (ctx.projectiles.swallow(r, GULP.catchRadius) > 0) swallowed(ctx, r, 'scales');
       ctx.pickups.vacuum(r, GULP.vacuum, dt);
       if (!this.caught) this.tryCatch();
     } else this.closePouch();
@@ -89,10 +101,7 @@ class Gulp extends TimedSkill {
     ctx.skills.interrupt(v);
     v.action = null;
     ctx.rd(v).buffered = null;
-    v.lastHitBy = r.id;
-    v.lastHitTime = ctx.now();
-    ctx.rd(v).hitByMirror = r.id;
-    ctx.rd(v).koBy = { attacker: r.id, skillId: ID, weapon: 'none' };
+    credit(ctx, v, r, ID, 'none');
     applyMods(v);
     this.victim = v;
     this.phase = 'held';

@@ -16,8 +16,14 @@ export const ULT = {
   rise: 0.5, hang: 0.18, dive: 0.22, recover: 0.3, height: 8,
   ahead: 40, behind: 12, damage: 45, knock: 9, stun: 1,
   execute: 0.2, // victims the shockwave leaves at ≤ 20 % HP are knocked out (the chain-KO money shot)
+  diveSpeed: 6, // m/s added for the dive
+  lineGap: 3,   // m the impact must stay short of the finish line (else the cast is denied)
 } as const;
 const IMPACT_T = ULT.rise + ULT.hang + ULT.dive;
+
+/** True if the dive would land short of the finish line (no SHOWTIME scoring past the line). */
+const landsBeforeLine = (ctx: CombatCtx, r: RiderState): boolean =>
+  r.s + r.speed * IMPACT_T + ULT.diveSpeed * ULT.dive + ULT.lineGap < ctx.session.track.length;
 
 class Showtime extends TimedSkill {
   private hit = false;
@@ -53,7 +59,7 @@ class Showtime extends TimedSkill {
     r.vy = dt > 0 ? (this.heightAt(t + dt) - y) / dt : 0;
     r.y = y;
     r.airborne = true;
-    r.speed = Math.max(r.speed, this.preSpeed + (t > ULT.rise + ULT.hang ? 6 : 0));
+    r.speed = Math.max(r.speed, this.preSpeed + (t > ULT.rise + ULT.hang ? ULT.diveSpeed : 0));
   }
 
   override pre(dt: number): void {
@@ -96,8 +102,8 @@ class Showtime extends TimedSkill {
     const r = this.caster;
     this.trail.stop();
     if (reason !== 'dispose') removeStatus(r, 'intangible');
-    if (!this.hit && reason === 'crash') r.airborne = r.y > 0.01;
+    if (!this.hit && (reason === 'crash' || reason === 'finish')) r.airborne = r.y > 0.01;
   }
 }
 
-export const ult: SkillImpl = { id: ID, cast: (ctx, r) => new Showtime(ctx, r) };
+export const ult: SkillImpl = { id: ID, ready: landsBeforeLine, cast: (ctx, r) => new Showtime(ctx, r) };

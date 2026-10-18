@@ -1,0 +1,72 @@
+{
+  "unit": "combat",
+  "round": 2,
+  "lens": "tech",
+  "pass": true,
+  "score": 8.2,
+  "summary": "Combat passes round 2 at 8.2/10 with no blocker or major issue. All 3 majors and 8 of the 9 minors from r1-tech are fixed, as are the r1-gameplay rule holes. Independent probes confirm this. Two full-race soaks with every real unit, traffic and police each produced 0 invariant violations: no landing event after SHOWTIME or a gulp spit, exactly one KO per wreck, one projectile:end per spawn, one skill:end per cast, no hits on untouchable riders, SP and HP always in range, no NaN positions, and 0 console errors or warnings. The bell, weaponBreak and projectile events are emitted. tsc reports 0 errors, there is no `any`, and the largest file is 212 lines. combat-check passes 41/41 isolated but 40/41 with --full. Same-seed runs give identical event and state hashes across page loads; after an in-page restart only the projectile ids differ. Three consecutive races return to the same baseline: geometries 12, textures 10, programs 28, bus listeners 106, 4 scene objects. GL program links per repeat cast are 0. At 1920x1080 in real time with every real unit, the game runs at about 116 fps against a 120 Hz frame rate, with frame-interval p99 10.4 ms, 235-292 draw calls and 0.61-0.73 M triangles. Combat costs 0.21 ms CPU on average (p95 0.40 ms) and adds 43-47 draw calls and about 39k triangles at a skill-heavy moment. Ten minor issues remain. Four are edge-case rule bugs: SHOWTIME resolves after the caster finishes, debuffs merge strength and duration, the higher rider id always wins KO-credit ties, and Big Gulp's lock-out outlives the pouch. The others are a --full check that fails against what the status claims, the partly fixed per-substep render work, module-level id counters, Wing Dash copying sim's internals, dead code, and one cross-unit note.",
+  "evidence": "shots/review/combat/r2-tech/: check-isolated.txt, check-full.txt, determinism.json, leaks.json, perf.json, firstcast.json, edges.json, edges2.json, edges3.json, soak-3.json, soak-8.json, loop3.mjs, shot-*.png, perf-1080.png",
+  "r1_recheck": "Fixed: flights no longer score sim landings (combat-check plus my soaks), the 4 events are emitted, the vacuum tag is cleared, program churn is gone (0 links per repeat cast), AoE feedback is coalesced, boosts use their own clock, Wing braking works, positions follow the pose, bell SP is gated, the duplicate outline material is gone, whistle/wing/ghost/trade follow the spec, and the error gate is widened. Partly fixed: per-substep render work (listed again as issue 6). r1-gameplay: SP refund, bell faucet, Wing speed pin, pouch at the finish line, ghost attacks, skill buffer, gulp payoff and zone, whiffs and trades, forced downgrades, and near-camera pickups are all fixed.",
+  "issues": [
+    {
+      "severity": "minor",
+      "title": "SHOWTIME still resolves after the caster has finished: KOs and coins are credited after the line and a KO cinematic fires",
+      "detail": "skills/ult.ts slam() (lines 72-93) never checks the caster's mode. edges.json 'ult slam after the caster finished': the pelican is cast at L-12, crosses the line at frame 596 (place 1), and ult:impact fires at frame 617 on riders 1, 2 and 3. That gives 3 combat:ko events (attacker 0, pelican.ult), 3 cine:ko 'start' events during the FINISH moment, and results showing kos 3 and coins 650 (500 + 150).",
+      "fix": "In slam(), skip the shockwave damage and KO (land only) when caster.mode !== 'racing' or caster.finishTime !== null. Alternatively, end the ult early when the caster finishes, or deny the cast within about 25 m of the line. Add a finish.mjs scenario."
+    },
+    {
+      "severity": "minor",
+      "title": "Status stacking merges max strength with max duration, so a strong short debuff inherits a longer one's clock",
+      "detail": "statuses.ts:32-37 addStatus merges into combat's own entry with time = max and strength = max. edges.json: a whistle slow (0.35, 1 s) followed by a goose honk slow (0.15, 2 s) produces one entry of [1.98 s, 0.35]. 1.2 s later it is still [0.81 s, 0.35], with speedMul 0.65. The whistle's 35 % should have ended after 1 s, leaving 15 %. This is the same class of bug as the r1 boost merge, now for debuffs and shield levels.",
+      "fix": "Keep one combat entry per (id, source skill), or only extend time when the new strength is >= the current strength, and let applyMods take the max over active entries. Add a check that the whistle-plus-honk slow drops to 0.15 after 1 s."
+    },
+    {
+      "severity": "minor",
+      "title": "Same-substep lethal hits: KO credit always goes to the higher rider id, so the player loses every tie",
+      "detail": "damage.ts:62-66 land() overwrites lastHitBy and koBy even when the victim is already at 0 HP from an earlier hit in the same resolveSwings pass. edges.json: the player (0) and the goose (1) both hit a 5-HP cat on the same substep; hits land in order [0, 1] and combat:ko credits attacker 1.",
+      "fix": "Credit the killing blow: in land(), if v.hp was already 0 before this hit, keep lastHitBy and koBy (or break ties with the session RNG). Add a regression to fixes2.mjs."
+    },
+    {
+      "severity": "minor",
+      "title": "Big Gulp keeps the pelican exclusive-busy until the spat victim lands, up to 2.35 s",
+      "detail": "TimedSkill.exclusive is a constant, and gulp.ts:48-51 post() keeps the skill alive while victim !== null (0.8 s hold plus 0.45 s flight). edges3.json: a catch at t ≈ 1.0 s keeps SkillRunner.busy() true from cast to skill:end for 2.35 s, though the pouch is open for 1.2 s. Swings and U/O/P presses are blocked or denied the whole time, and the 0.18/0.3 s buffers cannot cover it.",
+      "fix": "Make exclusivity phase-based: exclusive only while the pouch is open, or until the spit. Let the flight and landing run as a non-exclusive tail. Assert in combat-check that a swing is possible 0.1 s after the spit."
+    },
+    {
+      "severity": "minor",
+      "title": "combat-check --full fails 1/41 every time (3-race loop), contrary to the status claim of 41/41 --full",
+      "detail": "tools/combat-check/finish.mjs:39-61 compares global renderer.info.memory 'during' values across races: geo 353/366/364 (check-full.txt, two reruns). That number depends on which track and actor geometry happens to be uploaded. loop3.mjs shows combat-owned geometry is a constant 6 per race, the scene's unique geometry is a constant 400, and the 'after' baselines are identical. Combat does not leak; the check is fragile and the status overstates it.",
+      "fix": "Compare combat-owned counts (unique geometries, materials and objects under ctx.root, plus counts()) during each race, and compare global memory, programs and listeners only 'after'. Update status/combat.md."
+    },
+    {
+      "severity": "minor",
+      "title": "r1 'render work per substep' is only partly fixed, and first casts build geometry lazily",
+      "detail": "Pickups are now gated per frame, but visuals.update() in postStep still rebuilds every ribbon (trail, lightning, spiral, tether) and repositions every visual mesh on each substep: 2x per frame at 60 Hz. Ribbons are not re-faced during hit-stop. Pickups draw on the FIRST substep of a frame, so they are one substep stale (vacuumed coins lag about 0.17 m). others() still allocates and sorts arrays per query. PropLibrary builds geometry on first use, so the first cast of each skill costs 1.6-2.7 ms of combat CPU against 0.5-0.8 ms on repeat (firstcast.json; torpedo 2.7 vs 0.6). Nine simultaneous first casts cost 10.8 ms of combat CPU in one 18.5 ms frame (perf.json hitch at frame 722). The average cost is small (0.21 ms, p95 0.40 ms).",
+      "fix": "Move visual and pickup syncing to the requested per-frame hook, or gate on the last substep of a frame rather than the first. Prebuild every PropLibrary geometry at session start next to the shader warm-up. Reuse a scratch array in others()."
+    },
+    {
+      "severity": "minor",
+      "title": "Module-level id counters make event payloads differ after an in-page restart with the same seed",
+      "detail": "projectiles.ts:33 and pickups/items.ts:28 use `let nextId = 1` at file scope. determinism.json: two page loads give identical hashes (6a604d45, 181 events, same rider states). A restart with the same seed in the same page hashes to d80c72c1, and the only differences are projectile:spawn/end ids (1 becomes 3). Replays, ghost diffs or tests that key on ids across restarts break.",
+      "fix": "Move both counters into the ProjectileSystem and PickupSystem instances, or CombatCtx, so ids restart at 1 each session."
+    },
+    {
+      "severity": "minor",
+      "title": "Wing Dash copies sim's private contact rules and brake numbers",
+      "detail": "wing.ts:13-24 hardcodes sim's rider-contact box (1.85 / 0.85 / 1 m), the solid-rider test (mode, intangible, invuln, gulped) and brake deceleration 12 m/s² so it can hand back the speed a rear-end contact takes. Any sim tuning or rule change will silently make the dash restore speed when there was no contact, or stop protecting the ram, and no check covers that coupling.",
+      "fix": "File a core request for a RiderMods flag (for example `pushImmune`) that sim honours in contacts, or a rider:bump payload that carries each rider's speed loss. Then delete the copy from wing.ts."
+    },
+    {
+      "severity": "minor",
+      "title": "Dead code and stale text",
+      "detail": "SHIELD_BLOCK_ONCE (tuning.ts:68) is never referenced, and the block-once branch in damage.ts:49 is unreachable because only shield strengths 1 and 2 are ever created. visuals/bolts.ts:38-40 and waves.ts:12-13 contain stray blank lines. The ctx.ts:2 comment says subsystems are attached by index.ts; it is system.ts. ko.ts:58-61 calls physics.crash before emitting combat:ko, so rider:crash precedes combat:ko (edges.json order 1230: hit, crash, ko). That reverses SPEC §7, and fx's bus-ride comment ('combat:ko already burst') assumes the opposite order.",
+      "fix": "Delete the constant and branch, or give block-once a real source. Remove the blank lines and fix the comment. Emit combat:ko before physics.crash, or document the order in the status file and SPEC request."
+    },
+    {
+      "severity": "minor",
+      "title": "cross-unit: the skill cut-in hides the torpedo and shows an empty portrait box; gulped riders flicker",
+      "detail": "ui-hud: the FISH TORPEDO cut-in band shows a blank white portrait panel and covers the torpedo flight (shot-torpedo.png). actors: 'gulped' riders still flicker like 'invisible' (a standing request). One non-combat ShaderMaterial (USE_FOG + USE_SHADOWMAP) links 3 frames after the first torpedo cast with every real unit, and 0 programs link with fx, ui, audio and actors stubbed (linkwho.mjs).",
+      "fix": "ui-hud: use the player's eyes portrait or a thin corner cut-in while a projectile is in flight. actors: hide 'gulped' riders completely. fx: pre-warm that material."
+    }
+  ]
+}

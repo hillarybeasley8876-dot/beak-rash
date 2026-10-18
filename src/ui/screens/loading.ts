@@ -1,8 +1,9 @@
-// loading: P5 calendar date card (today + track weather), track title, meme tip, road-shaped progress
+// loading: P5 calendar date card (today, 宜/忌 of the day, track weather), track title, meme tip, road-shaped progress
 // bar with a pedalling pelican. Stays up a short beat so the card can be read (leave()).
 import './loading.css';
 import type { TrackId } from '../../core/types';
 import { LOADING_ART } from '../../data/assets';
+import { calendarFor } from '../../data/strings';
 import { TIPS } from '../../data/tips';
 import { TRACKS, TRACK_ORDER } from '../../data/tracks';
 import { artImage, backdrop, h, jagged, ransom, riderIconSvg, svg, torn, wait } from '../p5';
@@ -18,6 +19,10 @@ const WEATHER_ICON: Record<TrackId, string> = {
   mountain: '<svg viewBox="0 0 64 64"><path d="M14 40a18 18 0 0 1 36 0z" fill="#e5191c" stroke="#0b0b0f" stroke-width="4"/><path d="M4 44h56M10 52h44" stroke="#0b0b0f" stroke-width="5" stroke-linecap="round"/></svg>',
 };
 
+/** One 宜/忌 row; long entries shrink so they never run into the weekday box. */
+const luckRow = (kind: 'good' | 'bad', mark: string, text: string): HTMLDivElement =>
+  h('div', { class: `is-${kind}${[...text].length > 4 ? ' is-long' : ''}` }, h('i', { text: mark }), h('span', { text }));
+
 const MIN_SHOW_MS = 900;
 const MIN_SHOW_DIRECT_MS = 250;
 
@@ -32,6 +37,7 @@ export const loadingScreen: ScreenFactory = (ctx) => {
   });
   const f = frame({ id: 'loading', bg });
   const course = String(TRACK_ORDER.indexOf(trackId) + 1).padStart(2, '0');
+  const day = calendarFor(trackId, now);
 
   const card = h('div', { class: 'br-cal br-anim-slam', vars: { '--clip': torn('cal', 'bottom', 5, 30) } },
     h('div', { class: 'br-cal-top' }, h('b', { text: String(now.getFullYear()) }), h('span', { text: MONTH_EN[now.getMonth()] ?? '' })),
@@ -40,6 +46,7 @@ export const loadingScreen: ScreenFactory = (ctx) => {
       h('i', { class: 'br-cal-slash', text: '/' }),
       h('span', { class: 'br-cal-d', text: String(now.getDate()) })),
     h('div', { class: 'br-cal-week' }, h('b', { text: WEEK_EN[now.getDay()] ?? '' }), h('span', { text: WEEK_CN[now.getDay()] ?? '' })),
+    h('div', { class: 'br-cal-luck' }, luckRow('good', '宜', day.good), luckRow('bad', '忌', day.bad)),
     h('div', { class: 'br-cal-weather' }, svg(WEATHER_ICON[trackId], 'br-cal-icon'), h('span', { text: info.weather })));
 
   const title = h('div', { class: 'br-load-title' },

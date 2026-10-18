@@ -1,6 +1,6 @@
 // AI director: one Brain per AI rider (and the player on autopilot), shared perception and racing
 // line, pace-normalised rubber band (pace.ts), one hunter on the player at a time, the hunt budget
-// (hits landed on the player), bell after overtaking the player, taunts.
+// (hits landed on the player), grudges (rivals the player hits), bell after overtaking the player, taunts.
 import type { Session } from '../../../core/contracts';
 import type { Rng } from '../../../core/rng';
 import type { RiderId, RiderState } from '../../../core/types';
@@ -14,6 +14,7 @@ import { Senses } from './sense';
 import { Taunts } from './taunts';
 
 const PACE_SPREAD = 0.02;   // ± pace offset between the strongest and the weakest rival
+const RECOVER = 12;         // s after a respawn without catch-up (a KO buys a real gap)
 
 export interface AiDirector {
   preStep(dt: number, countdownTime: number): void;
@@ -46,15 +47,21 @@ export function createAi(session: Session): AiDirector {
   const offsets = paceOffsets(session.riders, rng.fork(0xf0f));
   const taunts = new Taunts(session, rng.fork(0x7a), (id) => brains.get(id)?.p.taunty ?? 1);
   const lastDs = new Map<RiderId, number>();
+  const respawnAt = new Map<RiderId, number>();
   const world: AiWorld = {
     phase: session.phase, countdownTime: 0, time: 0, riders: session.riders, player: session.player, line,
     senses: new Senses(session),
     bounds: (s) => track.bounds(s),
   };
-  const offHit = app.bus.on('combat:hit', ({ attacker, victim, blocked }) => {
-    if (blocked || victim !== session.player.id || attacker === victim) return;
-    brains.get(attacker)?.fighter.landedOnPlayer(session.time, session.player);
-  });
+  const offs = [
+    app.bus.on('combat:hit', ({ attacker, victim, blocked }) => {
+      const p = session.player;
+      if (blocked || attacker === victim) return;
+      if (victim === p.id) brains.get(attacker)?.fighter.landedOnPlayer(session.time, p);
+      else if (attacker === p.id) brains.get(victim)?.fighter.wronged(p, session.time);
+    }),
+    app.bus.on('rider:respawn', ({ riderId }) => { respawnAt.set(riderId, session.time); }),
+  ];
 
   /** The player's brain drives on autopilot, and rolls the bike out after the finish line. */
   const driveFor = (r: RiderState): boolean => config.autopilot || r.finishTime !== null;
@@ -64,8 +71,10 @@ export function createAi(session: Session): AiDirector {
     if (r.isPlayer || session.phase !== 'racing') { b.paceTop = Infinity; return; }
     const chaseCam = app.rig.mode === 'chase';
     const huntingPlayer = b.fighter.hunt === p;
-    b.paceTop = paceCap({ rider: r, player: p, level: config.level, offset: offsets.get(r.id) ?? 0, huntingPlayer, chaseCam });
-    nudge(r, b.paceTop, unseenBehind(r, p, chaseCam, huntingPlayer));
+    const recovering = session.time - (respawnAt.get(r.id) ?? -Infinity) < RECOVER;
+    b.paceTop = paceCap({ rider: r, player: p, level: config.level, offset: offsets.get(r.id) ?? 0, huntingPlayer, chaseCam, recovering });
+    // Pulses only on a free road: a boost accelerates even off the pedals (sim), so never while following or braking.
+    if (b.free) nudge(r, b.paceTop, unseenBehind(r, p, chaseCam, huntingPlayer));
   };
 
   const bellCheck = (b: Brain): void => {
@@ -92,7 +101,7 @@ export function createAi(session: Session): AiDirector {
       taunts.update(dt);
     },
     dispose() {
-      offHit();
+      for (const off of offs) off();
       taunts.dispose();
       for (const b of brains.values()) b.fighter.release();
       brains.clear();

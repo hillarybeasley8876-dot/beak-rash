@@ -8,6 +8,7 @@ import type { TerrainField } from '../../terrain/field';
 import { finishDress, makeDress, type Dress } from '../dress';
 import { atSea, flags, gantryAt, gulls, lighthouseAt, pierAt, stands } from './event';
 import { farForest, hillsides, islands, palms, rocks } from './nature';
+import { hillVillages } from './hamlets';
 import { banners, billboards, chevrons, distanceMarkers, loadBillboardArt, roadSigns, warning } from './signage';
 import { beachLife, lamps, market, sandShoulder, villas } from './town';
 
@@ -76,6 +77,7 @@ export async function dressCoast(ctx: WorldCtx, field: TerrainField): Promise<vo
   distanceMarkers(d);
   billboards(d, art);
   hillsides(d, L.sMin, L.sMin + L.n - 1);
+  hillVillages(d, [330, 880, 1480, 2460, 3060]);
   farForest(d, L.sMin, L.sMin + L.n - 1);
   for (const name of ['bay', 'hillside', 'cliff', 'crest', 'descent']) {
     const z = zone(ctx, name);

@@ -1,5 +1,5 @@
 // The mixing graph shared by music, sfx and voice:
-//   musicIn ─(+musicVerb return)→ muffle LP → duck → hit duck → music vol ┐
+//   musicIn ─(+musicVerb return, delay-line reverb)→ muffle LP → duck → hit duck → music vol ┐
 //   stingIn ────────────────────────────────────────────────→ music vol ┤
 //   sfxIn   ─(+tunnel verb return)→ muffle LP ──────→ sfx vol         ├→ master vol → glue comp → ×0.5 → soft clip → out
 //   voiceIn ───────────────────────────────────────────────→ voice vol ┘
@@ -9,6 +9,7 @@
 // OfflineAudioContext (audio-check renders).
 import { softClipCurve, impulseResponse } from './dsp/curves';
 import { filter, holdAt, steer } from './dsp/env';
+import { createReverb } from './dsp/reverb';
 
 export interface Volumes { master: number; music: number; sfx: number; voice: number }
 
@@ -71,13 +72,11 @@ export class Engine {
     this.sfxDuck = g();
     this.vol = { master: g(), music: g(), sfx: g(), voice: g() };
 
-    // Mono 1.1 s plate: one convolution instead of two (audio-thread cost), widened by the
-    // stereo dry signal it sits under.
-    const musicConv = new ConvolverNode(ctx, {
-      buffer: impulseResponse(ctx, 1.1, 1.3, { preDelay: 0.018, bright: 0.5, seed: 11, channels: 1 }),
-      channelCount: 1, channelCountMode: 'explicit',
-    });
-    this.musicVerb.connect(musicConv).connect(g(0.6)).connect(this.musicLP);
+    // Stereo delay-line reverb, RT60 ≈ 1.1 s (decay and level matched to the former convolution
+    // plate, at a fraction of its audio-thread cost; left / right decorrelated).
+    const verb = createReverb(ctx, 1.1, { preDelay: 0.018, damp: 4200, level: 0.07 });
+    this.musicVerb.connect(verb.input);
+    verb.output.connect(this.musicLP);
     // Open road = dry sfx; the tunnel reverb is built on first use (setSfxSpace).
     this.sfxSpace = g(0);
     this.sfxVerb.connect(this.sfxSpace);
@@ -147,9 +146,9 @@ export class Engine {
     const active = start < this.duckEnd;
     const level = Math.min(active ? this.duckGain : 1, Math.pow(10, depthDb / 20));
     const end = Math.max(start + hold, active ? this.duckEnd : 0);
+    // Exponential approaches start from the gain at their own time, whatever came before.
     holdAt(g, start);
-    g.linearRampToValueAtTime(level, start + DUCK_ATTACK);
-    g.setValueAtTime(level, end);
+    g.setTargetAtTime(level, start, DUCK_ATTACK / 3);
     g.setTargetAtTime(1, end, DUCK_RELEASE);
     this.duckEnd = end;
     this.duckGain = level;

@@ -63,7 +63,8 @@ export function billboards(d: Dress, art: HTMLImageElement[], every = 230): void
     if (!sp) continue;
     const line = lines[k % lines.length] ?? '';
     const img = art.length ? art[k % art.length] ?? null : null;
-    const rect = d.face(`bb:${line}:${img?.src ?? ''}`, () => billboardFace(atlas, d.rng, line, img));
+    // The race seed picks the lines; a forked rng draws them so the rest of the dressing stays seed-free.
+    const rect = d.face(`bb:${line}:${img?.src ?? ''}`, () => billboardFace(atlas, d.rng.fork(k + 1), line, img));
     k++;
     if (!rect) return;
     billboard(b.props.at(sp.pos.x, sp.pos.z), b.faces.at(sp.pos.x, sp.pos.z), sp.pos.x, sp.pos.y, sp.pos.z, towardRiders(d, sp.s, sp.side, 0.42), 8, img ? 4.5 : 4, 2.6, rect);

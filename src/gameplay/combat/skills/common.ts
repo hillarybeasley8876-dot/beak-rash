@@ -1,9 +1,10 @@
 // Helpers shared by skill files: damaging skill hits, debuff-only hits, cone and radius queries.
 import type { RiderState, StatusId } from '../../../core/types';
-import { others, targetable, type CombatCtx } from '../ctx';
-import { applyHit, type HitOutcome } from '../damage';
+import { finished, others, targetable, type CombatCtx } from '../ctx';
+import { applyHit, credit, type HitOutcome } from '../damage';
 import type { ImpactKind } from '../feedback';
 import { addStatus } from '../statuses';
+import { swallowed } from './swallow';
 import { aheadAngle, sideOf } from './types';
 
 export interface SkillHitOpts {
@@ -31,16 +32,17 @@ export function skillHit(ctx: CombatCtx, a: RiderState, v: RiderState, skillId: 
   });
 }
 
-/** Debuff without damage (honk, whistle). Credits `a` if the victim crashes soon after. */
+/** Debuff without damage (honk, whistle). Credits `a` if the victim crashes soon after; an open pouch eats it. */
 export function skillAffect(ctx: CombatCtx, a: RiderState, v: RiderState, skillId: string, statuses: Array<[StatusId, number, number]>): boolean {
-  if (!targetable(ctx, v)) return false;
+  if (!targetable(ctx, v) || finished(a)) return false;
+  if (ctx.skills.swallowing(v)) {
+    swallowed(ctx, v, 'notes'); // the wave goes down the pouch instead
+    return false;
+  }
   let any = false;
   for (const [id, time, strength] of statuses) any = addStatus(v, id, time, strength, a.id) || any;
   if (!any) return false;
-  v.lastHitBy = a.id;
-  v.lastHitTime = ctx.now();
-  ctx.rd(v).hitByMirror = a.id;
-  ctx.rd(v).koBy = { attacker: a.id, skillId, weapon: 'none' };
+  credit(ctx, v, a, skillId, 'none');
   ctx.bus.emit('skill:hit', { riderId: a.id, skillId, victim: v.id, pos: ctx.pos(v) });
   if (statuses.some(([id]) => id === 'stun')) ctx.view(v)?.cue('stun');
   return true;

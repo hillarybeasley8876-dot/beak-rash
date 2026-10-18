@@ -17,11 +17,20 @@ const BURY = 4;            // terrain under the road sits this far below it
 export interface Bump { x: number; z: number; r: number; h: number; mat: 'sand' | 'grass' | 'rock' }
 export interface WorldSample { s: number; x: number; u: number; side: -1 | 1; h: number; g: GroundDef; bump: Bump | null }
 
+/** Optional per-layout terrain modifier (LayoutDef.terrainMod), e.g. the shared slope between switchback legs. */
+export interface TerrainMod {
+  /** Max near-ribbon extent beyond the drivable edge at (s, side), m (Infinity = unlimited). */
+  room(s: number, side: -1 | 1): number;
+  /** Final height at world (wx, wz), u m beyond the edge of the road at s; h = the profile height. */
+  height(s: number, side: -1 | 1, u: number, wx: number, wz: number, h: number): number;
+}
+
 export class TerrainField {
   readonly noise: Noise2;
   readonly bumps: Bump[];
   private readonly hash = new Map<number, number[]>();
   private readonly fr: TrackFrame;
+  readonly mod: TerrainMod | null;
 
   constructor(readonly L: BuiltLayout, readonly q: TrackQuery) {
     this.noise = new Noise2(hashString(`terrain:${L.def.id}`));
@@ -35,6 +44,7 @@ export class TerrainField {
       const f = q.frameVis(b.s);
       return { x: f.pos.x + f.right.x * b.x, z: f.pos.z + f.right.z * b.x, r: b.r, h: b.h, mat: b.mat ?? 'rock' };
     });
+    this.mod = L.def.terrainMod ? L.def.terrainMod(this) : null;
   }
 
   private key(cx: number, cz: number): number {
@@ -76,7 +86,8 @@ export class TerrainField {
     if (u < 0) return this.underRoad(s, fr.pos.y);
     const g = this.ground(s, side);
     const edgeY = fr.pos.y + fr.right.y * side * bound;
-    return this.shape(g, edgeY, fr.pos.y, u, wx, wz).h;
+    const h = this.shape(g, edgeY, fr.pos.y, u, wx, wz).h;
+    return this.mod ? this.mod.height(s, side, u, wx, wz, h) : h;
   }
 
   /** Profile + noise + far blend + landmark domes. */
@@ -157,6 +168,6 @@ export class TerrainField {
     if (u < 0) return { s, x, u, side, g, h: this.underRoad(s, fr.pos.y), bump: null };
     const edgeY = fr.pos.y + fr.right.y * side * bound;
     const { h, bump } = this.shape(g, edgeY, fr.pos.y, u, wx, wz);
-    return { s, x, u, side, g, h, bump };
+    return { s, x, u, side, g, h: this.mod ? this.mod.height(s, side, u, wx, wz, h) : h, bump };
   }
 }

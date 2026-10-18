@@ -2,9 +2,25 @@
 // measurements of the real final mix: level meter and a recording).
 import type { StingerId } from './music/stingers';
 
+export type TraceEntry = { ms: number; kind: string; id: string; gain: number };
+
+/** Recent triggers (for tests): what sounded, when (unrounded performance.now ms), at what gain. */
+export class Trace {
+  private list: TraceEntry[] = [];
+
+  note(kind: string, id: string, gain: number): void {
+    this.list.push({ ms: performance.now(), kind, id, gain: +gain.toFixed(3) });
+    if (this.list.length > 200) this.list.shift();
+  }
+
+  log(): TraceEntry[] {
+    return this.list.slice();
+  }
+}
+
 export interface AudioDebugTarget {
   debugState(): Record<string, unknown>;
-  traceLog(): Array<{ ms: number; kind: string; id: string; gain: number }>;
+  traceLog(): TraceEntry[];
   mixOutput(): { ctx: AudioContext; node: AudioNode } | null;
   unlock(): Promise<void>;
   play(id: string): void;

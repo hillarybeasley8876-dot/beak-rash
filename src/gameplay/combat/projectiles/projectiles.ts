@@ -2,7 +2,7 @@
 // first-contact hits against targetable riders, wall / timeout poofs. Swallowable by Big Gulp.
 import { Mesh, Quaternion, Vector3, type BufferGeometry, type ColorRepresentation } from 'three';
 import type { RiderState } from '../../../core/types';
-import { roadEdge, targetable, type CombatCtx } from '../ctx';
+import { finished, roadEdge, targetable, type CombatCtx } from '../ctx';
 import { toonMesh } from '../meshes/build';
 import { frameQuat } from '../visuals/frame';
 import { Trail } from '../visuals/trail';
@@ -30,11 +30,11 @@ export interface Projectile extends ProjectileSpec {
   tail: Trail;
 }
 
-let nextId = 1;
 const AXIS_X = new Vector3(1, 0, 0), AXIS_Y = new Vector3(0, 1, 0), AXIS_Z = new Vector3(0, 0, 1);
 
 export class ProjectileSystem {
   readonly list: Projectile[] = [];
+  private nextId = 1; // per session: same seed, same event ids after an in-page restart
   private q = new Quaternion();
   private back = new Vector3();
 
@@ -45,7 +45,7 @@ export class ProjectileSystem {
     mesh.name = `projectile:${spec.skillId}`;
     this.ctx.root.add(mesh);
     const p: Projectile = {
-      ...spec, id: nextId++, vs: spec.speed, vx: 0, vy: 0, age: 0, alive: true, mesh,
+      ...spec, id: this.nextId++, vs: spec.speed, vx: 0, vy: 0, age: 0, alive: true, mesh,
       tail: this.ctx.visuals.add(new Trail(this.ctx.visuals, (out) => this.tailPos(p, out), { color: spec.trail, width: 0.42, life: 0.3, max: 20, alpha: 0.9 })),
     };
     this.place(p);
@@ -80,6 +80,36 @@ export class ProjectileSystem {
 
   private step(p: Projectile, dt: number): void {
     p.age += dt;
+    if (finished(p.owner)) {
+      this.poof(p); // its owner crossed the line: nothing scores past it
+      return;
+    }
+    this.home(p, dt);
+    p.s += p.vs * dt;
+    p.x += p.vx * dt;
+    p.y = Math.max(0.35, p.y + p.vy * dt);
+    if (this.blocked(p)) {
+      this.end(p, null);
+      const at = this.ctx.world(p.s, p.x, p.y);
+      this.ctx.session.app.fx.burst('scales', at, { count: 10 });
+      this.ctx.session.app.fx.burst('poof', at, { scale: 0.6 });
+      return;
+    }
+    const victim = this.contact(p);
+    if (victim) {
+      this.end(p, victim);
+      p.onHit(victim, p);
+      return;
+    }
+    if (this.spent(p)) {
+      this.poof(p);
+      return;
+    }
+    this.place(p);
+  }
+
+  /** Steer toward a live target (constant speed), else level out at about 1 m. */
+  private home(p: Projectile, dt: number): void {
     const t = p.target && targetable(this.ctx, p.target) ? p.target : null;
     if (t) {
       const ds = t.s + t.speed * 0.12 - p.s, dx = t.x - p.x, dy = t.y + 1.0 - p.y;
@@ -93,21 +123,23 @@ export class ProjectileSystem {
     } else {
       p.vy += (1.0 - p.y) * 3 * dt - p.vy * 2 * dt;
     }
-    p.s += p.vs * dt;
-    p.x += p.vx * dt;
-    p.y = Math.max(0.35, p.y + p.vy * dt);
-    const victim = this.contact(p);
-    if (victim) {
-      this.end(p, victim);
-      p.onHit(victim, p);
-      return;
-    }
-    if (p.age >= p.life || Math.abs(p.x) > roadEdge(this.ctx, p.s, p.x) || p.s > this.ctx.session.track.length) {
-      this.end(p, null);
-      this.ctx.session.app.fx.burst('smoke', this.ctx.world(p.s, p.x, p.y), { count: 6 });
-      return;
-    }
-    this.place(p);
+  }
+
+  /** Timed out, off the road or past the line. */
+  private spent(p: Projectile): boolean {
+    return p.age >= p.life || Math.abs(p.x) > roadEdge(this.ctx, p.s, p.x) || p.s > this.ctx.session.track.length;
+  }
+
+  /** Inside a solid obstacle (car, truck, bus, barrier): projectiles never pass through traffic. */
+  private blocked(p: Projectile): boolean {
+    return this.ctx.session.obstacles.some((o) => o.active && o.solid && p.y < o.height + p.radius &&
+      Math.abs(o.s - p.s) < o.halfLength + p.radius && Math.abs(o.x - p.x) < o.halfWidth + p.radius);
+  }
+
+  /** End without a hit in a puff of smoke. */
+  private poof(p: Projectile): void {
+    this.end(p, null);
+    this.ctx.session.app.fx.burst('smoke', this.ctx.world(p.s, p.x, p.y), { count: 6 });
   }
 
   private contact(p: Projectile): RiderState | null {

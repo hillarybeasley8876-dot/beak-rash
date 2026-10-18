@@ -12,9 +12,8 @@ export interface BurstOpts {
   scale?: number;          // size/speed multiplier
   ground?: number;         // world Y of the road under the effect (debris lands there)
   vel?: Vec3Like;          // source velocity inherited by the particles (moving riders)
-  follow?: number;         // anchor slot for rider-attached effects (dizzy stars)
+  follow?: number;         // anchor slot for rider-attached effects (spin swirls)
   level?: number;          // drift level / intensity tiers
-  life?: number;           // explicit lifetime (dizzy stars = stun time)
   color2?: string;         // secondary tint
 }
 

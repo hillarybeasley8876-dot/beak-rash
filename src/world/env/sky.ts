@@ -134,7 +134,8 @@ function buildClouds(ctx: WorldCtx, sunDir: Vector3): Mesh {
   }
   // Clouds pick up the sky's mood: warm at sunset, dim violet at night.
   const tint = new Color('#ffffff').lerp(new Color(ctx.look.sky.horizon), 0.22);
-  if (ctx.look.grade.night) tint.lerp(new Color(ctx.look.sky.top), 0.62);
+  // Night (city only): dark clouds, silhouettes against the glowing horizon.
+  if (ctx.look.grade.night) tint.lerp(new Color(ctx.look.sky.top), 0.84);
   const mat = ctx.own(new MeshBasicMaterial({
     color: tint,
     // Cut-out (not transparent) so it stays in the opaque list and draws right after the dome.

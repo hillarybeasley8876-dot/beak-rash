@@ -21,20 +21,27 @@ export function statusStrength(r: RiderState, id: StatusId): number {
 }
 
 /**
- * Add or refresh a combat status: merges into our own entry of that id (time = max, strength = max,
- * latest source wins). Negative statuses are refused while protected unless `force`. Returns true if applied.
+ * Add or refresh a combat status. Combat keeps one own entry per (id, strength): an equal-strength entry is
+ * refreshed (time = max, latest source wins); a new strength gets its own entry, so a strong short slow never
+ * inherits a weak long slow's timer (applyMods takes the strongest live entry). Entries the new one fully covers
+ * (weaker or equal and shorter) are dropped. Negative statuses are refused while protected unless `force`.
+ * Returns true if the status is in force afterwards.
  */
 export function addStatus(
   r: RiderState, id: StatusId, time: number, strength = 1, source: RiderId | null = null, force = false,
 ): boolean {
   if (time <= 0) return false;
   if (!force && NEGATIVE.has(id) && protectedFromDebuffs(r)) return false;
-  const cur = r.statuses.find((st) => st.id === id && owned.has(st));
-  if (cur) {
-    cur.time = Math.max(cur.time, time);
-    cur.strength = Math.max(cur.strength, strength);
-    cur.source = source ?? cur.source;
-    return true;
+  for (let i = r.statuses.length - 1; i >= 0; i--) {
+    const st = r.statuses[i];
+    if (!st || st.id !== id || !owned.has(st)) continue;
+    if (st.strength === strength) {
+      st.time = Math.max(st.time, time);
+      st.source = source ?? st.source;
+      return true;
+    }
+    if (st.strength > strength && st.time >= time) return true; // already covered by a stronger, longer entry
+    if (st.strength < strength && st.time <= time) r.statuses.splice(i, 1); // the new entry covers this one
   }
   const st: StatusEffect = { id, time, strength, source };
   owned.add(st);

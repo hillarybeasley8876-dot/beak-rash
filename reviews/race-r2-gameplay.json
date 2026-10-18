@@ -1,0 +1,67 @@
+{
+ "pass": false,
+ "score": 6,
+ "summary": "Race fails round 2 on gameplay: 6/10, with two new major issues. Most round-1 fixes hold. (1) The mugging is gone: no hits on the player in the first 6 s in 6/6 seeds and in my 9 races, and a passive level-1 player takes 10-12 hits per race. (2) Races are close: median leader gap 5-66 m at L1, first to last 5-10 s apart, varied winners and last places. (3) finishLine place and time equal the final results in all 8 recorded races. (4) The launch is reported as 'launch'. (5) No AI skill fires before 6.7 s. (6) Places no longer flicker. (7) Pulses are no longer visible. (8) Traffic spawns at least 0.66 fogged. (9) Alert reasons and the intro duration are sent. (10) Corgi toasts are trimmed. Lifecycle events fire exactly once. Quit or restart mid-chase or mid-ticket, DNF while ticketed, SHOWTIME at the line and hits after finishing are all clean. tsc is clean, with 0 race console errors. The intro cards, GO, BUSTED/ticket, FINISH and results look commercial-grade. The two majors: (a) The police fix over-corrected into phantom chases. In 11 of 16 natural spawns (7 of 12 at career levels) the corgi was 'lost' 2-4 s after spawning, never seen. The player gets an 'escaped' toast, the police.lost cue and the 腿短不是借口 achievement for free, and no BUSTED happened in 9 natural races. (b) Rival pace is normalised to the player's own bike, so bike upgrades buy nothing: the 1500-coin fixie just makes the whole field faster. The unit's own suite is also red: race-soak seed 3 fails and race-scenarios passes 31/32. Other problems: the AI coasts into slow or stopped riders (rams of 14.8-16.6), rivals rarely hit back at an aggressive player, taunts come every 1.4-2.5 s, and +12% catch-up erases KOs within about 30 s. Evidence: shots/review/race/r2-gameplay/ (race.mjs, police.mjs, phantom.mjs, soak3*.mjs, stopped.mjs, brakecheck.mjs, bikes.mjs, retaliate.mjs, analyze.mjs, edge.mjs, visual.mjs, pack.mjs, ultline.mjs; *.txt logs, *.json race logs, *.png).",
+ "issues": [
+  {
+   "severity": "major",
+   "title": "Police chases are phantoms: the corgi is 'lost' 2 s after it spawns",
+   "detail": "police.ts spawns the corgi SPAWN_BEHIND = 45 m back. chase() counts lostT whenever the gap exceeds LOSE_GAP = 38 m and gives up with reason 'lost' after LOSE_TIME = 2 s, with no grace period. The sprint is capped at 1.28 x the player's flat top (25.6 m/s on the roadbike, police-chase.ts SPRINT_MUL), so a player on a slingshot, drift or skill boost (23-29 m/s) is never brought inside 38 m. phantom.txt (brawler seed 1): the corgi spawns 44.9 m back at 11.8 s, gets no closer than 41.7 m, and gives up at 13.8 s with heat 1.0. Across my natural races, 11 of 16 spawns ended 'lost' within 2-4 s (7 of 12 at career levels 1-3): brawler L1 s1 1/1, s2 1/2, s3 2/2; autopilot s2 2/3; passive L3 s5 1/1; brawler L5 s4 4/4. Only brawler L3 s3 got three real chases. Each phantom shows the arrival toast, then '甩掉了柯基警官！腿短不是借口' 2 s later. It plays police.lost and unlocks the 腿短不是借口 achievement, because rules-ride.ts:56 keys on reason 'lost'. It also resets heat to 0.3 and starts a 20 s cooldown, so the brawlers who earn the police never meet it. phantom-chase.png shows the POLICE banner and the corgi toast with no corgi anywhere. Real chases (outrun runs, non-boosting player) have the corgi alongside for only 3-6.5 s of a 25-35 s chase. None of 9 natural races produced a BUSTED. The brief's bar, 'police chases are funny', is not met.",
+   "fix": "Count lostT only after the corgi has been within LOSE_GAP at least once (a `reached` flag), or after the sprint window. Spawn 25-30 m back. During arrival let the sprint follow the player's current speed, e.g. max(1.28*top, player.speed + 4). Require 'lost' to reflect a lead built during the chase (for example the gap grew by 25 m or more from the closest approach). Add a scenario: a boosting brawler or autopilot with heat > 0.5 is reached (|gap| < 6) before any 'lost', and no 'lost' comes within 8 s of a spawn."
+  },
+  {
+   "severity": "major",
+   "title": "Rival pace follows the player's own bike, so bike upgrades are worthless",
+   "detail": "ai/pace.ts paceCap() caps every rival at topOf(player) * (1 + 0.02(lv-1) + offset). topOf(player) includes the player's bike top speed, so a faster bike makes the whole field faster by the same amount. bikes.mjs (seed 3, L1, same passive player): on the roadbike (20 m/s), rival caps are 19.6-20.4, the winner finishes in 156.8 s and the player is 7th. On the fixie (1500 coins, 22.5 m/s), caps are 22.1-23.0 (25.1 for a rider in catch-up), the winner finishes in 144.5 s and the player is 3rd. On the shared bike (17 m/s), caps are 16.5-17.1, the winner finishes in 170.9 s and the player is 7th. The winning time tracks the player's bike, so the garage loop (prices and stat bars, SPEC §10) buys no top-speed edge, only accel/handling. This is a side effect of the round-1 pace fix, which was applied at all distances.",
+   "fix": "Base the pace on a level reference instead of the player's bike, e.g. REF_TOP = BIKES.roadbike.topSpeed * (1 + 0.03(lv-1)), or the tier's expected bike. Keep the ±8% band, and keep each rival's own bike top as a hard cap. Add a scenario: same seed on roadbike vs fixie, where the fixie run must finish faster and place better while the rival caps stay the same."
+  },
+  {
+   "severity": "minor",
+   "title": "The unit's own regression suite is red (race-soak seed 3, race-scenarios outrun)",
+   "detail": "node tools/race-soak.mjs --seeds 1,2,3 prints 'FAIL [seed 3] police never busted the braking player' (soak.txt). The failure is deterministic: soak3.mjs reproduces the same end state, with bustT peaking at 1.81. node tools/race-scenarios.mjs passes 31/32, failing 'corgi tires at some point or is outrun before' (the corgi is lost at 32.4 s and never tires; scenarios-default.txt). status/race.md still reports both green. The soak failure has two causes (soak3b.txt). During __br.race.brake(0,6) the autopilot keeps firing skills, because holdBrake only zeroes throttle, brake and drift; a torpedo hit at 50.32 s. Then a rival rear-ends the stopped player at strength 14.8 at 50.56 s and shoves it to 12.2 m/s.",
+   "fix": "Make holdBrake also suppress skills and attacks, or have the soak set the controls directly. Fix the ram (next issue). Retune the 'tires or outrun before 25 s' check to match the intended design. Keep the suite green before marking fixes DONE."
+  },
+  {
+   "severity": "minor",
+   "title": "AI riders coast into slow or stopped riders instead of braking or steering around them",
+   "detail": "In brain.ts drive(), `soft` (ease off but never brake) is set when the pace cap binds, which is the case for most riders. It is not cleared after the hunt branch lowers the target to prey.speed + 5 or less. When following a rider, soft = followKind === 'rider' && followGap > 0.6, so riders do not brake for a rider ahead until they are 0.6 m away, and coasting only slows them by about 0.6 m/s². In stopped.mjs (player parked mid-lane on a straight), the goose rammed the player at strength 16.6 (about 20 m/s closing) in seed 1 and pushed it to 14.2 m/s. In the soak (seed 3), rival id 3 hit at 14.8. In brakecheck.mjs, a hard-braking player was bumped from behind in 3 of 4 seeds. Rear-end contacts deal 2-5 damage and shove the victim forward, which also defeats the 'slow next to the corgi' BUSTED rule.",
+   "fix": "Recompute soft after all target constraints. Treat it as soft only when the pace cap is the binding limit and the closing speed on any followed rider is under 2 m/s. A hunter closing on slow prey should brake like any follower. Add a planner cost for near-stationary riders (vs < 4 m/s) in the lane. Add a scenario: a rider stopped mid-lane as the pack arrives produces no bump stronger than 5."
+  },
+  {
+   "severity": "minor",
+   "title": "Rivals rarely hit back: an aggressive player beats the field with impunity at L1-L3",
+   "detail": "AI targeting ignores who hit you. 'angry' comes only from the bell (fight.ts chooseTarget), and the round-1 fairness gates (token, 2-hit budget, 3-5 s rest, 1.2 s grace) also throttle any response. Human-like brawler results: L1 seed 3 gave 32 hits and took 3, the last at 27 s, with only 2 of its 32 hits answered within 5 s; the pigeon and the sloth took 10 hits each. L1 seed 2 gave 32 and took 5 (last at 59 s). L3 seed 3 gave 33 and took 7 (last at 81 s). The autopilot gave 38, took 10 and scored 12 KOs. The goose (aggression 0.95, 'ANGRY brows') becomes a punching bag once you strike first, which weakens 'they jostle, fight'.",
+   "fix": "On combat:hit with attacker = player, give the victim a short grudge: 4-6 s of hunting the player, exempt from the token but still bound by the hit budget and grace. Scale the chance by species (goose, seagull and cat high; capybara and sloth low). Let the victim swing back on its first reaction tick after hit-stun if still in reach. Keep the opening calm: no grudge before 6 s."
+  },
+  {
+   "severity": "minor",
+   "title": "Taunt spam: a speech bubble and a voiced bark every 1.4-2.5 s",
+   "detail": "Taunts.update (ai/taunts.ts) schedules each rider on its own (8-14 s divided by taunty) with no global limit. Because racing is now close, 5-7 riders are always within 25 m. Race-owned taunts run at 17-24 per minute at L1 (median gap 1.8-2.5 s) and 31 per minute at L3 (1.4 s). Each race had 12-34 bursts of 3 or more bubbles within 3 s, and the same rider repeated the same line within 60 s 5-19 times. Each taunt within 30 m also plays a voiced bark (audio/system.ts bark()). Together with combat's 'MINE!' (10 times in one race), the chatter never stops. v-police-alongside.png shows two bubbles, the police banner and a toast at once.",
+   "fix": "Add a global gap: at least 4-5 s between idle taunts and 2 s for KO/respawn lines. Prefer the nearest on-screen rider. Draw lines from a no-repeat bag per rider. Skip riders that are invisible or behind the camera. Lengthen per-rider gaps when many riders are near."
+  },
+  {
+   "severity": "minor",
+   "title": "Catch-up erases KOs within about 30 s (+12% exceeds the SPEC's ±8%)",
+   "detail": "pace.ts sets CATCH_UP = 0.12 for riders more than 20 m behind under the chase cam; SPEC §9 asks for a gentle ±8%. A KO'd rival drops about 70 m and is level with the player again within 20-30 s (analyze.mjs on brawler seed 3). The sloth KO'd at 53 s went -75 m, then -23 m at +15 s, then +21 m at +30 s. The cat went from -72 m to +1 m within 30 s, and the pigeon from -57 m to 0. The autopilot made 12 KOs and still won by only 0.3 s. The KO, meant to be the game's money shot, has almost no effect on the race.",
+   "fix": "Cap catch-up at +8% per the SPEC, and suspend it for 10-15 s after a rider's own KO or respawn (or reduce it for riders the player KO'd). A KO then buys a real gap while the field still regroups by the final stretch."
+  },
+  {
+   "severity": "minor",
+   "title": "cross-unit: the results screen throws 'ctx.tracker.earned is not a function' at race end",
+   "detail": "In the autopilot race on seed 2 (race-auto-2.txt), race end logged '[ui] screen results failed to build ctx.tracker.earned is not a function'. This is not race-owned: race:end fired once with valid results.",
+   "fix": "ui-screens: fix the race-tracker API mismatch in the results screen."
+  },
+  {
+   "severity": "minor",
+   "title": "cross-unit: draft slingshots fire while braking, so the player cannot slow down next to riders or the corgi",
+   "detail": "In brakecheck.mjs seeds 2 and 4, under full brake (throttle 0, brake 1) the player sped up from 13.3 to 15.8 m/s and from 12.6 to 15.2 m/s with no bump. rider:boost kind 'draft' fired at 53.40 and 54.02 s on a nearly stopped player (soak3b.txt). This undermines the BUSTED rule and any deliberate slowdown.",
+   "fix": "sim: no slingshot while the brake is above 0.5 or below about 8 m/s; reset draft while braking."
+  },
+  {
+   "severity": "minor",
+   "title": "cross-unit: launch and penalty presentation are still generic",
+   "detail": "PERFECT START is still only the race's fallback toast (flow.ts:53), because the HUD has no 'launch' callout. After BUSTED the timer shows a '+4S' chip (v-busted.png, v-ticket.png). The 4 s penalty is now served on the road as the ticket stop, so players will expect 4 s to be added at the finish.",
+   "fix": "ui-hud: add a 'launch' callout (PERFECT START! 起步完美) and remove the race's toast. Show the ticket as a 4-3-2-1 hold countdown instead of a '+4S' time chip."
+  }
+ ]
+}

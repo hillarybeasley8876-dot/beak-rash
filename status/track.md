@@ -4,15 +4,15 @@
 1. [x] Layout system: segment format → smoothed curvature/slope/bank → 1 m samples (typed arrays);
        frameAt / toWorld / project (hintS + spatial hash); zones → bounds/surfaceAt. Coast layout.
        Replace stub re-export in world/index.ts with a basic road so others run on the real track.
-2. [ ] Road visuals: canvas asphalt+markings texture, shoulders, curbs, start/finish lines; rails/walls
+2. [x] Road visuals: canvas asphalt+markings texture, shoulders, curbs, start/finish lines; rails/walls
        exactly at bounds(); skirt.
-3. [ ] Terrain: near ribbons (exact road match) + far chunked grid; cliff rock walls; sea shader with
+3. [x] Terrain: near ribbons (exact road match) + far chunked grid; cliff rock walls; sea shader with
        heightmap-driven shallow colour + foam; sky dome (gradient, sun, toon clouds); lights + shadow
        following camera; fog from look.
-4. [ ] Features: ramp, tunnel, bridge, crest jump, oil, puddle, boost pads, pickupRow; meshes.
-5. [ ] Scenery: palms, rocks, umbrellas/towels, villas, lighthouse, pier, market stalls, boats, buoys,
+4. [x] Features: ramp, tunnel, bridge, crest jump, oil, puddle, boost pads, pickupRow; meshes.
+5. [x] Scenery: palms, rocks, umbrellas/towels, villas, lighthouse, pier, market stalls, boats, buoys,
        lamps, signs + billboards (memes, P5 frames), distance markers, crowd/banners, gantries, gulls, flags.
-6. [ ] city/mountain placeholder looks; __br.track; sandbox/track.html (fly-through + aerial); perf
+6. [x] city/mountain placeholder looks; __br.track; sandbox/track.html (fly-through + aerial); perf
        (≤250 calls, ≤800k tris); contact sheet of 8+ positions.
 
 ## Design notes
@@ -30,7 +30,10 @@
   islet); world-projected rock strata on steep faces; toon sea (heightmap shallow bands, shoreline
   foam, crest dashes, glints); sky dome + cartoon clouds; sun shadow following the camera; fog.
 - M4 features: ramp (matches sim wedge), tunnel (tube, lights, portals, hill cap), bridge (deck,
-  piers, red through-arches), crest jump, oil/puddles/boost pads, 9 pickup rows.
+  piers, red through-arches springing from concrete end pylons), crest jump, oil/puddles/boost pads,
+  15 pickup rows. Rock walls + tunnel walls sit WALL_TOE (0.06 m) beyond bounds().
+- Far terrain: farmland patchwork (fields, furrows, hedges) on gentle inland far ground
+  (terrain/farmland.ts, far-grid `farm` attribute) + 4 hill villages with bell towers (coast/hamlets.ts).
 - M5 scenery (dressing/coast/*): palms, umbrella pines, cypresses, bushes, boulders, far groves,
   terraced villas, beach umbrellas/loungers/towels, promenade lamps/benches, fish market (stalls,
   pennants, moored boats), pier, lighthouse + cottage, sailboats/buoys (bobbing), grandstands with a
@@ -40,27 +43,44 @@
   fog-distance culling (world/lod.ts); build ≈ 2.6 s.
 - `window.__br.track = { id, length, layout, features }`.
 
-## Next
-Polish: far terrain variety (farmland, hill villages), tunnel/bridge junction checks, city/mountain
-placeholder check, full-race restart check, final contact sheets.
+## Next (resume 10-18 plan; [x] = done)
+- [x] leak test: dressing must not depend on the race seed (billboard faces use a forked rng)
+- [x] sim F11: cliff/tunnel wall faces at bounds() + 0.05 m (WALL_TOE 0.06; portals narrowed before the plane)
+- [x] combat: a crate/can row about every 400 m; all rows inside halfWidth − 1 m
+- [x] Track.runoff = 250 m (frameAt/project/bounds/surfaceAt valid on [0, length + 250])
+- [x] far terrain variety: farmland patchwork shader on the far grid (terrain/farmland.ts), 4 hill villages (dressing/coast/hamlets.ts)
+- [x] tunnel/bridge junction checks (bridge end pylons close the rock/parapet seam, arch ribs spring from them) · full-race restart check (track.race.mjs + full autopilot race: finish, results, no errors) · city/mountain: now owned by env-city / env-mountain (wave 2)
+- [x] final contact sheets: shots/track/final-sheet.png (12 chase views), shots/track/game-sheet.png (16 in-game),
+  shots/track/aerial.png; perf after all changes ≤ 141 calls / ≤ 456k tris per chase view
+- [x] poster billboards: text band 0.30 → 0.38 of the face (2-line memes ≈ 25 % larger glyphs)
+- deferred (not small; core integration TODO for wave 2): coast tight corners R 45–70 m / hairpin / chicane.
+  Note: wave-2 units env-city / env-mountain now own the city / mountain layouts + dressings.
 
 ## Feature data (for sim / race / combat)
 - ramp: wedge 0 → data.height (1.2) from s0 to s1 across x0..x1 · jumpCrest: data.peak = crest s
 - boostPad: data.power/time (0.3 / 1.0) · oil, puddle: boxes · tunnel / bridge: s range, full width
-- pickupRow: diagonal row (s0,x0)→(s1,x1), data.kind = coin|fish|can|… (else mixed)
+- pickupRow: diagonal row (s0,x0)→(s1,x1), data.kind = coin|fish|crate|can (else mixed); 15 rows, all
+  |x| ≤ 6; crate/can rows at s ≈ 430 crate, 820 can, 1250 crate, 1480 can, 1825 can, 2240 crate,
+  2620 crate, 2990 can (+ mixed rows 1110, 2390 with one random special).
+- Track.runoff = 250 m: frameAt / toWorld / project / bounds / surfaceAt valid on [0, length + 250]
+  (barrier-lined straight past the FINISH gantry).
 - Start line (visual) at s = 46, grid slots painted at s = 40 / 33.5 / 27, x = −3.4 / 0 / 3.4.
 
 ## Known issues
--
+- Banked rail / seawall runs lean ≤ 2.6 cm into bounds at 0.5 m height (s≈1000 L, 2570–2700 L); harmless.
+- content: sandbox/content.world.ts mirrors the poster billboard layout; its band is still 0.30 (now 0.38).
 
 ## Core requests
 - (resolved by core: outline() now uses `normal`.) Note: outline() adds a plain Mesh hull, which is
   wrong for InstancedMesh; track builds its own hull geometry (geom.makeHull) for batched props.
-- Optional: frameAt clamps to [0, length]; the track samples 280 m of visual run-off past the finish,
-  so letting physics read frames past `length` would let finished riders roll on instead of stacking.
+- (resolved: core added Track.runoff; track implements it = 250 m.) sim may now read frames past `length`
+  instead of extrapolating (sim/pose.ts, crash.ts clamp to length today).
 
 ## How to test
 - `node sandbox/track.test.mjs` — API self-test (exit 1 on failure).
 - `node sandbox/track.shots.mjs --q "s=1300&x=2" --out shots/track/x.png` (also `view=aerial|high`,
   `sheet=0,400,…` contact sheet). Sandbox page: /sandbox/track.html.
-`node tools/shot.mjs --url "/?race=coast&seed=1&stub=actors,combat,race,fx&traffic=0" --out shots/track/a.png --step 600 --controls '{"throttle":1}'`
+- `node sandbox/track.race.mjs` — autopilot race, restart, quit (1 track group, fog restored, no errors).
+- `node sandbox/track.perf.mjs` — calls / tris per chase view along the track.
+- `node sandbox/track.game.mjs --out shots/track/game-sheet.png` — in-game contact sheet (16 positions).
+- `node tools/shot.mjs --url "/?race=coast&seed=1&stub=actors,combat,race,fx&traffic=0" --out shots/track/a.png --step 600 --controls '{"throttle":1}'`

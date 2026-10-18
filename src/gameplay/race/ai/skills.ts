@@ -11,6 +11,8 @@ export interface SkillView {
   player: RiderState;
   /** Race seconds since GO. */
   time: number;
+  /** Hunting the player out of a grudge: a valid chance is taken three times as eagerly. */
+  grudge: boolean;
 }
 
 /** Back on the bike after a crash (racing again for < 3 s, well after the start). */
@@ -55,7 +57,7 @@ export function useSkill(v: SkillView, c: Controls, eager: number, roll: number)
   if (me.mode !== 'racing' || !me.mods.canAttack || me.action !== null || me.airborne) return false;
   if (me.character === 'pelican') return roll < eager * 0.3 && pelican(v, c, roll / Math.max(0.01, eager * 0.3));
   const rule = SIG[ROSTER[me.character].skill];
-  if (!rule || me.cooldowns[0] > 0 || roll > eager * 0.25) return false;
+  if (!rule || me.cooldowns[0] > 0 || roll > eager * (v.grudge ? 0.75 : 0.25)) return false;
   if (!rule(v)) return false;
   c.skill1 = true;
   return true;

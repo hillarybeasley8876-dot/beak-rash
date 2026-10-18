@@ -1,7 +1,7 @@
 // Lead voices, each one persistent and monophonic (like a real mono synth): wah synth (saw +
 // square through an envelope band-pass), square synth (low-pass) and a breathy FM-free flute
 // (three sine partials + band-passed breath). Delayed vibrato via a shared LFO per voice.
-import { adsr, filter, holdAt } from '../../dsp/env';
+import { adsr, anchor, filter, holdAt, settle } from '../../dsp/env';
 import { midiToHz } from '../theory';
 import { NoiseVoice, osc, type Gate } from './voice';
 import type { Band } from '../band';
@@ -68,11 +68,12 @@ export class Lead {
       }
       const g = this.breath.vca.gain;
       const hold = t + Math.max(0.12, dur);
-      holdAt(g, t);
+      anchor(g, t);
       g.linearRampToValueAtTime(0.5 * vel, t + 0.02);
       g.exponentialRampToValueAtTime(0.09 * vel, t + 0.12);
-      g.setValueAtTime(0.09 * vel, hold);
+      g.linearRampToValueAtTime(0.09 * vel, hold);
       g.linearRampToValueAtTime(0, hold + 0.1);
+      settle(g, hold + 0.1, 0);
       this.breath.wake(hold + 0.1);
       this.gate.open(adsr(this.amp.gain, t, dur, 0.145 * vel, 0.035, 0.12, 0.82, 0.11, true));
       return;

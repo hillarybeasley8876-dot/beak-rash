@@ -4,31 +4,33 @@ import { ROSTER } from '../../data/roster';
 import { WEAPONS } from '../../data/weapons';
 import type { Controls, RiderAction, RiderState, Side, WeaponId } from '../../core/types';
 import { consumeUse, knockLoose } from './armory';
-import { active, others, targetable, type CombatCtx } from './ctx';
+import { active, others, posing, targetable, type CombatCtx, type SwingTiming } from './ctx';
 import { applyHit } from './damage';
-import { HEAVY_PHASES, INPUT_BUFFER, LIGHT_PHASES, MELEE, SWING_REF, powerMul } from './tuning';
+import { HEAVY_PHASES, HEAVY_TELL, INPUT_BUFFER, LIGHT_PHASES, MELEE, PRESS_HOLD, SWING_REF, powerMul } from './tuning';
+import { HeavyTell } from './visuals/tell';
 
-interface SwingPhases { windup: number; active: number; recover: number; total: number }
-
-function phases(weapon: WeaponId, heavy: boolean): SwingPhases {
-  const k = WEAPONS[weapon].swing / SWING_REF;
+/** Swing timing for this weapon; a rival's heavy near the player is telegraphed (longer windup + glint). */
+function timing(ctx: CombatCtx, r: RiderState, heavy: boolean): { ph: SwingTiming; tell: boolean } {
+  const k = WEAPONS[r.weapon].swing / SWING_REF;
   const p = heavy ? HEAVY_PHASES : LIGHT_PHASES;
-  const windup = p.windup * k, act = p.active * k, recover = p.recover * k;
-  return { windup, active: act, recover, total: windup + act + recover };
+  const me = ctx.session.player;
+  const tell = heavy && !r.isPlayer && Math.abs(r.s - me.s) < HEAVY_TELL.range && Math.abs(r.x - me.x) < HEAVY_TELL.range;
+  const windup = p.windup * k * (tell ? HEAVY_TELL.windupMul : 1), act = p.active * k, recover = p.recover * k;
+  return { ph: { windup, active: act, recover, total: windup + act + recover }, tell };
 }
 
 const isSwing = (a: RiderAction | null): a is RiderAction => a?.kind === 'attack' || a?.kind === 'heavy';
 
 /** True while `r` is winding up a swing (being hit now is a counter crit). */
-function inWindup(r: RiderState): boolean {
+function inWindup(ctx: CombatCtx, r: RiderState): boolean {
   const a = r.action;
-  return isSwing(a) && a.t < phases(a.weapon, a.kind === 'heavy').windup;
+  return isSwing(a) && a.t < ctx.rd(r).swing.windup;
 }
 
 /** preStep: advance the current action. Skill/ult actions belong to the skill runner. */
 export function tickAction(ctx: CombatCtx, r: RiderState, dt: number): void {
   const d = ctx.rd(r);
-  if (d.buffered && (d.buffered.age += dt) > INPUT_BUFFER + 0.1) d.buffered = null;
+  if (d.buffered && (d.buffered.age += dt) > PRESS_HOLD) d.buffered = null;
   const a = r.action;
   if (!a) return;
   a.t += dt;
@@ -36,8 +38,14 @@ export function tickAction(ctx: CombatCtx, r: RiderState, dt: number): void {
   if (a.t >= a.dur + (owned ? 1 : 0)) r.action = null;
 }
 
+/** Free to swing now: nothing running, or only a pose (bell, a cast pose) that the swing cuts short. */
 function canSwing(ctx: CombatCtx, r: RiderState): boolean {
-  return active(r) && r.mods.canAttack && r.action === null && !ctx.skills.busy(r);
+  return active(r) && r.mods.canAttack && !ctx.skills.busy(r) && (r.action === null || posing(ctx, r));
+}
+
+/** A press now is held (PRESS_HOLD) for the end of a hit stagger, or of the last INPUT_BUFFER s of any other action. */
+function holds(a: RiderAction): boolean {
+  return a.kind === 'hit' || (a.kind !== 'ult' && a.dur - a.t <= INPUT_BUFFER);
 }
 
 /** preStep: turn attack presses into swings (or buffer them while the current action finishes). */
@@ -49,9 +57,7 @@ export function requestSwing(ctx: CombatCtx, r: RiderState, c: Controls): void {
     return;
   }
   const a = r.action;
-  if (a && a.dur - a.t <= INPUT_BUFFER && a.kind !== 'skill' && a.kind !== 'ult') {
-    ctx.rd(r).buffered = { heavy: c.heavy, side, age: 0 };
-  }
+  if (a && holds(a)) ctx.rd(r).buffered = { heavy: c.heavy, side, age: 0 };
 }
 
 export function runBuffered(ctx: CombatCtx, r: RiderState): void {
@@ -64,9 +70,11 @@ export function runBuffered(ctx: CombatCtx, r: RiderState): void {
 /** Start a swing now (also used by the debug API). side 0 = auto. */
 export function startSwing(ctx: CombatCtx, r: RiderState, heavy: boolean, sideIn: Side | 0): void {
   const side = sideIn === 0 ? autoSide(ctx, r) : sideIn;
-  const ph = phases(r.weapon, heavy);
+  const { ph, tell } = timing(ctx, r, heavy);
+  ctx.rd(r).swing = ph;
   r.invuln = 0; // attacking gives up respawn protection
   r.action = { kind: heavy ? 'heavy' : 'attack', side, t: 0, dur: ph.total, weapon: r.weapon, skillId: null, resolved: false };
+  if (tell) ctx.visuals.add(new HeavyTell(ctx.visuals, r, side, ph.windup));
   ctx.view(r)?.cue(heavy ? 'heavy' : 'attack', { side, weapon: r.weapon });
   ctx.bus.emit('combat:swing', { riderId: r.id, side, heavy, weapon: r.weapon });
 }
@@ -102,7 +110,7 @@ function pickStrike(ctx: CombatCtx, r: RiderState): Strike | null {
   const a = r.action;
   if (!isSwing(a) || a.resolved) return null;
   const heavy = a.kind === 'heavy';
-  const ph = phases(a.weapon, heavy);
+  const ph = ctx.rd(r).swing;
   if (a.t < ph.windup) return null;
   if (a.t >= ph.windup + ph.active || !active(r) || !r.mods.canAttack) {
     a.resolved = true; // window over, or stunned / chilled / gone untouchable mid-swing: a whiff
@@ -132,7 +140,7 @@ function findTarget(ctx: CombatCtx, r: RiderState, side: Side, weapon: WeaponId)
 function strike(ctx: CombatCtx, r: RiderState, v: RiderState, side: Side, weapon: WeaponId, heavy: boolean): void {
   const w = WEAPONS[weapon];
   const d = ctx.rd(r);
-  const counter = inWindup(v);
+  const counter = inWindup(ctx, v);
   const bonus = d.nextCrit;
   d.nextCrit = false;
   const crit = ctx.force.crit ?? (counter || bonus || ctx.rng.chance(MELEE.critChance));

@@ -5,7 +5,8 @@
 // aX = drag, gravity, groundY, k
 // aF = frame velocity xyz (inherited from a moving rider, not slowed by drag), frame damping · aT = birth (real s).
 // Motion always runs on sim time; `realtime` particles animate (life/size/colour) on real time.
-// Modes: 0 billboard · 1 velocity-stretched · 2 flat on the ground · 3 flutter (sway + flip) · 4 orbit anchor.
+// Modes: 0 billboard · 1 velocity-stretched · 2 flat on the ground · 3 flutter (sway + flip) · 4 orbit anchor
+// · 5 world line along the velocity (wind streaks: the quad spans depth too, so lines converge in perspective).
 
 export const PARTICLE_VERT = /* glsl */ `
 attribute vec4 aP;
@@ -37,12 +38,13 @@ void main() {
   float mode = mod(aCB.w, 8.0);
   float follow = mod(floor(aCB.w / 8.0), 32.0) - 1.0;
   float erode = mod(floor(aCB.w / 256.0), 2.0);
+  bool orbit = mode > 3.5 && mode < 4.5;
   float seed = fract(sin(dot(aP.xyz, vec3(12.9898, 78.233, 37.719)) + aP.w * 17.0) * 43758.5453);
   float k = aX.x;
   vec3 gv = vec3(0.0, -aX.y, 0.0);
   vec3 p;
   vec3 vel;
-  if (mode > 3.5) {
+  if (orbit) {
     float a = aS.z + aS.w * simAge;
     p = aP.xyz + vec3(cos(a) * aV.x, sin(simAge * 6.0 + seed * 6.28) * aV.y, sin(a) * aV.x);
     vel = vec3(0.0);
@@ -55,7 +57,7 @@ void main() {
     p = aP.xyz + aV.xyz * simAge + 0.5 * gv * simAge * simAge;
     vel = aV.xyz + gv * simAge;
   }
-  if (mode < 3.5) {
+  if (!orbit) {
     float ef = exp(-aF.w * simAge);
     p += aF.w > 0.001 ? aF.xyz * (1.0 - ef) / aF.w : aF.xyz * simAge;
     vel += aF.xyz * ef;
@@ -69,7 +71,7 @@ void main() {
 #ifndef FX_ADDITIVE
   if (erode < 0.5) size *= 1.0 - smoothstep(0.72, 1.0, t);
 #endif
-  float rot = mode > 3.5 ? sin(age * 5.0 + seed * 6.28) * 0.35 : aS.z + aS.w * age;
+  float rot = orbit ? sin(age * 5.0 + seed * 6.28) * 0.35 : aS.z + aS.w * age;
   vec2 corner = position.xy;
   vec4 mv;
   if (mode > 1.5 && mode < 2.5) {
@@ -83,6 +85,14 @@ void main() {
     vec2 perp = vec2(-dir.y, dir.x);
     float len = max(size, sp * aX.w);
     mv.xy += dir * corner.y * len + perp * corner.x * size;
+  } else if (mode > 4.5) {
+    vec4 c = modelViewMatrix * vec4(p, 1.0);
+    vec3 vv = (modelViewMatrix * vec4(vel, 0.0)).xyz;
+    float sp = length(vv);
+    vec3 dir = sp > 1e-4 ? vv / sp : vec3(0.0, 1.0, 0.0);
+    vec3 side = cross(dir, normalize(c.xyz));
+    side = length(side) > 1e-4 ? normalize(side) : vec3(1.0, 0.0, 0.0);
+    mv = vec4(c.xyz + dir * corner.y * max(size, sp * aX.w) + side * corner.x * size, 1.0);
   } else {
     if (mode > 2.5) {
       float ph = age * (3.0 + seed * 4.0) + seed * 6.28;

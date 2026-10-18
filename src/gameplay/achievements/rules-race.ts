@@ -45,7 +45,7 @@ export function raceRules(ctx: RuleCtx): Array<() => void> {
       if (facts.wrecks >= 3) ctx.unlock('phoenix');
     }
     if (field() > 1 && place === field()) ctx.unlock('last_place');
-    if (!facts.attacked) ctx.unlock('pacifist');
+    if (!facts.attacked && facts.kos === 0) ctx.unlock('pacifist');   // a credited KO (bump → wreck) counts too
     if (!facts.hurt) ctx.unlock('untouched');
   };
 

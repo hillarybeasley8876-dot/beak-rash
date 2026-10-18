@@ -1,6 +1,8 @@
 // Vertical motion in road-relative coordinates: y'' = −g − v²·κv (κv = d(slope)/ds), so sharp crests
 // launch naturally when v²·|κv| > g and dips press the bike down. Hops, ramp lips and external lifts
-// (combat moving a rider up) all start an air episode; landings decide PERFECT / hard / crash.
+// (combat moving a rider up) all start an air episode; landings decide PERFECT / hard / crash. PERFECT is
+// earned at touchdown: hands calm (|steer| < 0.3 for the last 0.15 s) and the bike straight (|yaw| < 6°),
+// or Space pressed within 0.2 s before touching down (|yaw| < 12°); steering through the landing misses it.
 import { TUNING as T } from './tuning';
 import { giveBoost } from './drift';
 import { crashRider } from './crash';
@@ -14,6 +16,8 @@ export function startAir(sr: SimRider, kind: AirKind): void {
   sr.airKind = kind;
   sr.airOwn = true;
   sr.airPeak = r.y;
+  sr.airCalm = 0;
+  sr.hopPressAt = -1;
 }
 
 export function vertical(ctx: SimCtx, sr: SimRider, c: Controls, dt: number): void {
@@ -43,6 +47,8 @@ export function vertical(ctx: SimCtx, sr: SimRider, c: Controls, dt: number): vo
   r.y += r.vy * dt;
   r.airTime += dt;
   sr.airPeak = Math.max(sr.airPeak, r.y);
+  sr.airCalm = Math.abs(c.steer) < T.perfectSteerMax ? sr.airCalm + dt : 0;
+  if (c.hop) sr.hopPressAt = r.airTime;
   if (r.y <= 0) land(ctx, sr);
 }
 
@@ -61,7 +67,9 @@ function land(ctx: SimCtx, sr: SimRider): void {
     return;
   }
   const minAir = sr.airKind === 'hop' ? T.perfectMinAirHop : T.perfectMinAir;
-  const perfect = air >= minAir && yawAbs < T.perfectMaxYaw && r.mode === 'racing';
+  const calm = sr.airCalm >= T.perfectCalmTime && yawAbs < T.perfectCalmYaw;
+  const timed = sr.hopPressAt >= 0 && air - sr.hopPressAt <= T.perfectHopWindow && yawAbs < T.perfectMaxYaw;
+  const perfect = air >= minAir && (calm || timed) && r.mode === 'racing';
   if (perfect) giveBoost(ctx, sr, 'land', T.perfectPower, T.perfectTime);
   else if (air >= T.hardLandAir) r.speed *= 1 - T.hardLandLoss;
   if (perfect || sr.airKind === 'hop' || (air >= T.landEventMinAir && sr.airPeak >= T.landEventMinPeak)) {

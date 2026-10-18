@@ -117,3 +117,44 @@ Status per issue (append "DONE" lines as each lands):
   never ahead/in view. `--only pulses`: 0 unexplained boosts on rivals within −4…+80 m over 120 s.
 - [9 pop-in] DONE: spawn band [0.75·fog.far, +50 m] (coast 735–785 m), density scaled by window so per-metre density
   is unchanged (coast L1: 12 alive). `--only popin`: 18/18 in-view spawns ≥ 0.67 fogged (was 17–26 %).
+
+## Fix round 2
+Plan (critic reviews/race-r2-gameplay.json, 10 issues; 3 cross-unit). Order: 1 phantom police → 2 bike pace → 4 rear-end
+rams → 3 suite green (holdBrake + soak) → 7 catch-up → 5 grudges → 6 taunt spam → cross-unit notes (8 results, 9 draft
+brake, 10 launch/ticket HUD) → re-run scenarios + soak. Status per issue (append DONE lines as each lands):
+- [1 phantom police] DONE: spawn 28 m back (was 45); arrival sprint = max(1.28× player top, player speed + 4) so boosts
+  can't outrun the arrival; 'lost' (and the calm give-up) needs ≥ 8 s of chase and a lead of 25 m built from the corgi's
+  closest approach, then > 38 m for 2 s. Corgi traffic fix: it braked behind cars it was already beside (blocker used the
+  player's lane) → now brakes only in the car's lane, passes on its own side, dodges oncoming faster. New `--only arrive`
+  (brawler 1-4, autopilot 1-2: 13 chases, all reached in 3.9–7 s, alongside 4–15 s, no 'lost' < 15 s; was 11/16 phantoms).
+- [2 bike pace] DONE: ai/pace.ts pace = REF_TOP (roadbike 20 m/s) ×(1+0.02(lv−1)+offset), independent of the player's
+  bike (each rival still capped by its own bike in view). `--only bikes` (seed 3): rival caps identical on roadbike vs
+  fixie; player roadbike 5th 165.1 s → fixie 2nd 142.9 s.
+- [7 catch-up] DONE: CATCH_UP 0.12 → 0.08 (SPEC ±8 %); no catch-up (nor hunt sprint) for 12 s after a rider's respawn
+  (ai/index tracks rider:respawn → PaceInput.recovering). `--only koGap`: KO'd seagull −67/−55 m at +15/+30 s (was level
+  within 20–30 s).
+- [4 rear-end rams] DONE: brain.drive() recomputes `soft` after every limit (coast only while the pace cap binds or a
+  rider ahead closes < 2 m/s; hunters closing on slow prey brake); rider follow speed = stopping-distance speed
+  (√(2·4·room), binds at any gap) instead of only within 2.4 m; planner: riders < 4 m/s are roadblocks (×4 weight, +0.35 m
+  berth, not ignored even when hunted), no swinging across the nose of something reached within 1.5 s, and the current
+  lane still counts for following until left; drafters drop a wheel that slows 3 m/s below them; rubber pulses only on a
+  free road (sim boosts push even off the pedals). New tools/race-scenarios/contact.mjs: `--only stopped` 6/6 (was a 16.6
+  goose ram), `--only brakecheck` seeds 1-3,5,6 clean (seed 4: penguin rams at 12.8 under a sim draft slingshot, see
+  cross-unit 9).
+- [5 grudges] DONE: personality.grudge by species (goose .95, seagull .85, cat .8, shiba/pelican .6, penguin .45,
+  pigeon .35, capybara .15, sloth .1; ×(0.85+0.05·lv)); combat:hit by the player → Fighter.wronged(): never before 6 s
+  or while resting after the hit budget; swings back on the first chance in reach within 2 s (chance 0.9, grace still
+  respected) and hunts the player 4–6 s outside the token (budget/grace/low-HP rules kept). Hunters of the player no
+  longer ease off at the pace (pace.ts: cap ≥ pace×1.04, own bike + draft decide; pulses still unseen only).
+  While grudging, signature skills fire 3× as eagerly (SkillView.grudge). `--only grudge` (brawler, 100 s, seeds 1-6):
+  goose/seagull/cat/shiba land a hit back in 14/26 fights within 5 s (7/29 with personality.grudge forced to 0),
+  sloth/pigeon rarely; 0 hits on the player in the first 6 s.
+- [6 taunt spam] DONE: ai/taunts.ts rewritten: one idle line at a time across the field (4.5–6.5 s apart) from the
+  nearest due rider in front of the camera (not > 3 m behind, not invisible); per-rider gap 8–14 s ÷ taunty ×(1 + 0.15
+  per extra rider within 25 m); KO/respawn lines need 2 s since any line; any `taunt` (incl. combat's skill shouts /
+  bell) holds idle chatter ≥ 2.5 s; per-rider shuffled no-repeat bags. New `--only chatter` (L1/3/5, 90 s): race lines
+  7.7–10.4/min (was 17–31), min gap 2.5–5.3 s, 0 bursts of 3 in 3 s, 0 repeats within 60 s.
+- [3 suite red] DONE: Brain.holdBrake (debug `__br.race.brake`) now also drops skills, swings, heavy, hop, ult and bell
+  (the soak's braking autopilot fired a torpedo at 50.3 s); the ram is fixed by issue 4. Outrun check retuned to the
+  design: the corgi rides alongside ≥ 4 s first and the escape takes ≥ 15 s (no 'lost' < 8 s); calm escapes (heat < 0.3,
+  15 m ahead) count only after the corgi caught up (≤ 6 m). `node tools/race-soak.mjs --seeds 1,2,3` SOAK OK (busted 1/1/1).

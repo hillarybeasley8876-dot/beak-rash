@@ -1,9 +1,10 @@
 // fx check script (critics rerun it): particle presets, post looks and the KO cinematic as frame strips.
-//   node sandbox/fx.check.mjs [bursts|ko|ult|speed|gallery|closeups|all] [--q "&stub=world"] [--size 1280x720]
+//   node sandbox/fx.check.mjs [bursts|ko|ult|speed|gallery|closeups|real|replay|ride|all] [--q "&stub=world"] [--size 1280x720]
 //   ko: --variant ko|chain|wrecked, frame strip every 50 ms (3 frames at 60 fps) + cine event log.
 //   real: --kind swing|ult — the real combat path (pinned rivals via __br.combat).
 //   gallery: sandbox page (no race) — every preset on a grid, day and night, at 3 moments.
-//   ride: drift L1→L3 sparks, release boost streaks, hop + landing dust (traffic/rivals out of the way).
+//   ride: drift L1→L3 sparks + tyre smoke, release boost (ring, flare, wind lines), hop + landing dust ring;
+//         chronological frames shots/fx/ride-NN-*.png (sheet: python3 sandbox/fx.sheet.py "shots/fx/ride-*.png" shots/fx/sheet-ride.png 4 480).
 //   replay: sandbox page (no race) — the real KoCine on stand-in riders: --variant ko|chain|short|wrecked|ult|lite.
 import { BASE, parseArgs, withPage } from '../tools/lib.mjs';
 
@@ -132,21 +133,24 @@ async function ride(h) {
     br.teleport(s.player.id, s.player.s, 3.2);
   });
   await h.step(30);
-  await h.controls({ throttle: 1, steer: -0.32, drift: true });
-  for (const [tag, frames] of [['drift-a', 36], ['drift-l1', 30], ['drift-l2', 50], ['drift-l3', 40]]) {
-    await h.step(frames);
-    await h.shot(`${OUT}/ride-${tag}.png`);
-  }
-  await h.controls({ throttle: 1, steer: 0.1, drift: false });
-  for (const [tag, frames] of [['boost-a', 6], ['boost-b', 14], ['boost-c', 30]]) {
-    await h.step(frames);
-    await h.shot(`${OUT}/ride-${tag}.png`);
-  }
-  await h.controls({ throttle: 1, steer: 0 });
-  await h.press('hop');
-  for (const [tag, frames] of [['hop-a', 4], ['hop-air', 12], ['land-a', 10], ['land-b', 8], ['land-c', 14]]) {
-    await h.step(frames);
-    await h.shot(`${OUT}/ride-${tag}.png`);
+  // Straights barely charge (sim rewards bends), so the strip tops the charge up to each level threshold:
+  // the sim still emits the real level/end/boost events that fx reacts to.
+  const charge = (v) => h.eval(`(() => { const p = window.__br.session().player; p.driftCharge = Math.max(p.driftCharge, ${v}); })()`);
+  const strip = [
+    ['steer', { throttle: 1, steer: -0.45, drift: true }], ['01-drift', 20], ['L', 0.56], ['02-drift-l1', 24], ['L', 1.21],
+    ['03-drift-l2', 24], ['L', 2.01], ['04-drift-l3', 24], ['steer', { throttle: 1, steer: 0.1, drift: false }],
+    ['05-boost', 4], ['06-boost', 12], ['07-boost', 30], ['steer', { throttle: 1, steer: 0 }], ['wait', 40], ['hop'],
+    ['08-hop', 4], ['09-air', 12], ['10-land', 10], ['11-land', 8], ['12-land', 14],
+  ];
+  for (const [tag, arg] of strip) {
+    if (tag === 'steer') await h.controls(arg);
+    else if (tag === 'L') await charge(arg);
+    else if (tag === 'wait') await h.step(arg);
+    else if (tag === 'hop') await h.press('hop');
+    else {
+      await h.step(arg);
+      await h.shot(`${OUT}/ride-${tag}.png`);
+    }
   }
   console.log(JSON.stringify(await h.eval(() => window.__rideLog)));
 }
@@ -179,7 +183,7 @@ async function replay(h) {
 
 const CLOSEUPS = [
   ['hit', 'hitHeavy', 'crit', 'block'], ['dust', 'grass', 'sand', 'dirt'], ['landing', 'splash', 'oil', 'smoke'],
-  ['feathers', 'fur', 'debris', 'poof'], ['confetti', 'coin', 'sparkle', 'crate'], ['driftPop', 'boost', 'koFeathers', 'dizzy'],
+  ['feathers', 'fur', 'debris', 'poof'], ['confetti', 'coin', 'sparkle', 'crate'], ['driftPop', 'boost', 'koFeathers', 'streaks'],
   ['scales', 'crumbs', 'leaves', 'keys'], ['fries', 'heal', 'sparks', 'hopDust'],
 ];
 

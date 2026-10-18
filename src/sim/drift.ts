@@ -1,7 +1,8 @@
 // Drift: Shift + steer above 8 m/s. Slip builds to ~27°, the bike follows the bend (steering.ts), speed
 // bleeds ~4 %/s. Charge levels at 0.55 / 1.2 / 2.0 charge-seconds; the charge rate rewards commitment (steer
 // into the drift, a bend turning the same way), so counter-steered wiggles on a straight barely charge.
-// Releasing Shift fires the mini-turbo for that level and locks drifting out for 0.3 s.
+// Releasing Shift fires the mini-turbo for that level, locks drifting out for 0.3 s and hands the lateral
+// speed over to grip steering over 0.2 s (steering.ts), so a release with the stick held never darts inward.
 // Ends without a boost below 6 m/s or on a collision (endDrift(sr, false)).
 import { clamp, clamp01, lerp } from '../core/math';
 import { TUNING as T } from './tuning';
@@ -61,7 +62,11 @@ export function endDrift(ctx: SimCtx, sr: SimRider, reward: boolean): void {
   sr.driftDir = 0;
   sr.driftLevel = 0;
   ctx.bus.emit('rider:drift', { riderId: r.id, phase: 'end', level: reward ? level : 0 });
-  if (reward) sr.driftLock = T.driftLockout;
+  if (reward) {
+    sr.driftLock = T.driftLockout;
+    sr.driftExit = T.driftExitTime;
+    sr.driftExitVx = r.vx;
+  }
   if (reward && level > 0) {
     const time = T.driftBoostTime[level - 1] ?? 0;
     const power = T.driftBoostPower[level - 1] ?? 0;

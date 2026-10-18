@@ -1,5 +1,6 @@
 // Shared in-page helpers for the race unit's scenario/soak tools: an event recorder and a human-like
 // player controller (throttle + PID lane keeping + traffic dodge; 'brawler' also swings and fires skills).
+// Overrides for tests: window.__laneX (lane to hold), window.__throttle / window.__brake.
 
 /** In-page: record race-relevant bus events into window.__rl.log ({ t, p, time }). */
 export const RECORD = `(() => {
@@ -19,7 +20,7 @@ export const HUMAN = `window.__mkHuman = (mode) => {
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   return (dt) => {
     const hw = tr.bounds(Math.min(p.s, tr.length)).halfWidth;
-    let tx = 0;
+    let tx = window.__laneX ?? 0;
     for (const o of s.obstacles) {
       if (!o.active || !o.solid) continue;
       const ds = o.s - p.s, rel = p.speed - o.speed;
@@ -32,7 +33,7 @@ export const HUMAN = `window.__mkHuman = (mode) => {
     st.int = clamp(st.int + err * dt, -4, 4);
     const want = clamp(0.45 * err + 0.35 * st.int - 0.1 * p.vx, -1, 1);
     st.steer += (want - st.steer) * Math.min(1, dt * 14);
-    const c = { throttle: 1, steer: st.steer };
+    const c = { throttle: window.__throttle ?? 1, brake: window.__brake ?? 0, steer: st.steer };
     st.atkCd -= dt; st.skCd -= dt;
     if (mode === 'brawler' && p.mode === 'racing') {
       for (const r of s.riders) {

@@ -159,7 +159,7 @@ export function createCameraRig(app: AppContext): CameraRig {
     dbg.cam = {
       mode: rig.mode, fov: round(camera.fov, 2), trauma: round(fx.trauma), kick: round(fx.fov, 2), buzz: round(fx.buzz),
       dist: round(cs.dist ?? 0), height: round(cs.height ?? 0, 7), roll: round(cs.roll ?? 0), surge: round(cs.surge ?? 0),
-      offS: round(cs.offS ?? 0, 7), offX: round(cs.offX ?? 0, 7), dip: round(cs.dip ?? 0),
+      offS: round(cs.offS ?? 0, 7), offX: round(cs.offX ?? 0, 7), dip: round(cs.dip ?? 0), lift: round(cs.lift ?? 0),
       blending: blend.active, cuts: blend.cuts,
       gapDeg: round((blend.lastGap.angle * 180) / Math.PI, 1), gapM: round(blend.lastGap.dist, 2),
       x: round(camera.position.x), y: round(camera.position.y), z: round(camera.position.z),

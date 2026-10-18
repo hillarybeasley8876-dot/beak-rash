@@ -3,7 +3,7 @@
 import type { CombatSystem, Session } from '../../core/contracts';
 import type { RiderState } from '../../core/types';
 import { armRivals } from './armory';
-import { ringBell } from './bell';
+import { requestBell } from './bell';
 import { active, CombatCtx } from './ctx';
 import { applyPin, installCombatDebug } from './debug';
 import { flushImpacts } from './feedback';
@@ -33,7 +33,8 @@ function onCrash(ctx: CombatCtx, r: RiderState): void {
   ctx.skills.interrupt(r);
   r.action = null;
   ctx.rd(r).buffered = null;
-  ctx.rd(r).skillBuf = null;
+  ctx.rd(r).skillBuf.length = 0;
+  ctx.rd(r).bellBuf = null;
   r.combo = 0;
   r.comboTimer = 0;
   for (let i = r.statuses.length - 1; i >= 0; i--) if (r.statuses[i]?.id !== 'angry') r.statuses.splice(i, 1);
@@ -62,7 +63,7 @@ export function createCombat(session: Session): CombatSystem {
         tickAction(ctx, r, dt);
         const c = session.controls.get(r.id);
         if (ctx.racing && active(r) && c) {
-          if (c.bell) ringBell(ctx, r);
+          requestBell(ctx, r, c.bell, dt);
           ctx.skills.request(r, c, dt);
           requestSwing(ctx, r, c);
           runBuffered(ctx, r);

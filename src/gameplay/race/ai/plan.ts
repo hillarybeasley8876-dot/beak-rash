@@ -29,6 +29,8 @@ export interface PlanOutput {
 const CLEAR: Record<Blip['kind'], number> = { rider: 0.35, traffic: 0.75, police: 0.6, hazard: 0.25, solid: 0.55, boost: 0, ramp: 0 };
 const WEIGHT: Record<Blip['kind'], number> = { rider: 7, traffic: 45, police: 30, hazard: 5, solid: 45, boost: -2.5, ramp: -1.5 };
 const STEP = 0.35;
+const STOPPED = 4;         // m/s: a rider this slow is a roadblock (wider berth, weighted like a prop)
+const CROSS_T = 1.5;       // s: don't swing across the line of something we reach this soon
 const SWITCH_COST = 0.8;   // commit to a lane instead of flip-flopping between two similar ones
 
 /** Seconds until we reach the blip's near end, 0 when alongside, Infinity when not closing. */
@@ -41,16 +43,24 @@ function timeTo(b: Blip, v: number): number {
   return closing > 0.2 ? gap / closing : Infinity;
 }
 
+/** A rider (possibly the hunted one) slow enough to be a roadblock rather than traffic to race. */
+const stopped = (b: Blip): boolean => b.kind === 'rider' && b.vs < STOPPED;
+/** The hunted rider is ignored (we want to get close) unless it is stopped in the road. */
+const ignored = (b: Blip, inp: PlanInput): boolean => !!b.rider && b.rider.id === inp.ignore && !stopped(b);
+
 function blipCost(b: Blip, x: number, inp: PlanInput, out: { block: boolean }): number {
-  if (b.rider && b.rider.id === inp.ignore) return 0;
+  if (ignored(b, inp)) return 0;
   const t = timeTo(b, inp.v);
   if (t > inp.horizon) return 0;
   const urgency = Math.pow(1 - t / inp.horizon, 0.7);
   const oncoming = b.vs < -1;
   const bx = b.x + (b.rider ? b.rider.vx * Math.min(t, 0.6) : 0);
-  const clear = b.hw + RIDER_HW + CLEAR[b.kind] + (oncoming ? 0.4 : 0);
-  const d = Math.abs(x - bx);
-  const w = WEIGHT[b.kind] * (oncoming ? 1.4 : 1) * (b.kind === 'hazard' && inp.canHop ? 0.5 : 1);
+  const roadblock = stopped(b);
+  const clear = b.hw + RIDER_HW + CLEAR[b.kind] + (oncoming ? 0.4 : 0) + (roadblock ? 0.35 : 0);
+  // A lane on the far side of a blip we are beside (not behind) means cutting across its nose: as bad as hitting it.
+  const crossing = t < CROSS_T && Math.abs(inp.x - bx) >= b.hw + RIDER_HW && (bx - inp.x) * (bx - x) < 0;
+  const d = crossing ? 0 : Math.abs(x - bx);
+  const w = WEIGHT[b.kind] * (oncoming ? 1.4 : 1) * (b.kind === 'hazard' && inp.canHop ? 0.5 : 1) * (roadblock ? 4 : 1);
   if (w < 0) return d < b.hw ? w * urgency : 0;
   if (d < clear) {
     out.block = true;
@@ -74,21 +84,24 @@ export function planLateral(inp: PlanInput, blips: readonly Blip[]): PlanOutput 
   return { x: bestX, ...blockage(bestX, inp, blips) };
 }
 
-/** What still sits in the chosen lane: who to follow and what to hop. */
+/**
+ * What still sits in the chosen lane (and, until we are out of it, in the current lane when we reach it
+ * within CROSS_T): who to follow and what to hop.
+ */
 function blockage(x: number, inp: PlanInput, blips: readonly Blip[]): Omit<PlanOutput, 'x'> {
   let followSpeed: number | null = null, followGap = Infinity, hopAt: number | null = null;
   let followKind: Blip['kind'] | null = null;
   for (const b of blips) {
-    if (b.ds <= 0 || (b.rider && b.rider.id === inp.ignore)) continue;
+    if (b.ds <= 0 || ignored(b, inp) || b.kind === 'boost' || b.kind === 'ramp') continue;
     const clear = b.hw + RIDER_HW + CLEAR[b.kind] * 0.5;
-    if (Math.abs(x - b.x) >= clear) continue;
+    const chosen = Math.abs(x - b.x) < clear;
     const gap = b.ds - b.hl - RIDER_HL;
     if (b.kind === 'hazard') {
-      if (inp.canHop && gap > 0 && gap < inp.v * 0.22 + 1.5 && b.hl * 2 < inp.v * 0.36) hopAt = gap;
+      if (chosen && inp.canHop && gap > 0 && gap < inp.v * 0.22 + 1.5 && b.hl * 2 < inp.v * 0.36) hopAt = gap;
       continue;
     }
-    if (b.kind === 'boost' || b.kind === 'ramp') continue;
     const t = timeTo(b, inp.v);
+    if (!chosen && !(t < CROSS_T && Math.abs(inp.x - b.x) < clear)) continue;
     if (t > inp.horizon * 0.8 || gap >= followGap) continue;
     followGap = gap;
     followKind = b.kind;

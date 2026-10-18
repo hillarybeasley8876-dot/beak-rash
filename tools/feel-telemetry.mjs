@@ -4,7 +4,7 @@
 //   node tools/feel-telemetry.mjs [--only accel,steer,...] [--strips] [--out shots/sim/telemetry]
 //        [--stub world,actors,combat,race,fx,ui,audio] [--seed 1] [--browser webkit]
 // Scenarios: accel coastBrake steer keyboard slalom curveHold drift air wall bump press slipstream crash
-//            driftWall knock snake wallEvents slope jitter camera handoff
+//            driftWall knock snake wallEvents slope wallPin driftTiming jitter camera handoff
 import path from 'node:path';
 import { parseArgs, withPage } from './lib.mjs';
 import { installFeel, installPatches, saveDataUrl, writeCsv, writeJson } from './feel-lib.mjs';
@@ -13,8 +13,9 @@ import { WORLD } from './feel-scenarios-world.mjs';
 import { CAMERA } from './feel-scenarios-camera.mjs';
 import { HANDOFF } from './feel-scenarios-blend.mjs';
 import { ABUSE } from './feel-scenarios-abuse.mjs';
+import { REVIEW2 } from './feel-scenarios-r2.mjs';
 
-const SCENARIOS = [...HANDLING, ...WORLD, ...ABUSE, ...CAMERA, ...HANDOFF];
+const SCENARIOS = [...HANDLING, ...WORLD, ...ABUSE, ...REVIEW2, ...CAMERA, ...HANDOFF];
 
 const a = parseArgs(process.argv.slice(2));
 const OUT = a.out ?? 'shots/sim/telemetry';
@@ -45,6 +46,13 @@ const CHECKS = [
   ['snake', 'gainInto', -1, 0.03], ['snake', 'gainCounter', -1, 0.03],
   ['wallEvents', 'minGap_30', 0.25, 9], ['wallEvents', 'minGap_60', 0.25, 9], ['wallEvents', 'minGap_144', 0.25, 9],
   ['wallEvents', 'carry_60', 0.4, 1], ['slope', 'v13', 22.5, 24], ['slope', 'v055', 21, 22],
+  // review r2: pressing into a wall = one impact then a scrape (no pinball), steering away shows within 3
+  // frames, the bounce eases the heading; drift charge on real bend radii matches SPEC §6 with full commitment
+  ['wallPin', 'hits_3', 1, 1], ['wallPin', 'hits_6', 1, 1], ['wallPin', 'hits_10', 1, 1],
+  ['wallPin', 'yawRevPerSec_3', 0, 0.5], ['wallPin', 'yawRevPerSec_6', 0, 0.5], ['wallPin', 'yawRevPerSec_10', 0, 0.5],
+  ['wallPin', 'impactYawStepDeg_6', 0, 5.5], ['wallPin', 'impactYawStepDeg_10', 0, 5.5], ['wallPin', 'steerAwayFrames', 0, 3],
+  ['driftTiming', 'R300_L1', 0.45, 0.7], ['driftTiming', 'R300_L2', 1.0, 1.45], ['driftTiming', 'R300_L3', 1.7, 2.4],
+  ['driftTiming', 'R150_L1', 0.45, 0.7], ['driftTiming', 'R150_L2', 1.0, 1.45], ['driftTiming', 'R150_L3', 1.7, 2.4],
   // camera hand-offs: ≤ 8°/frame and no frame > 3× its neighbours (cuts are counted, not hidden)
   ['handoff', 'back_cuts', 1, 1], ['handoff', 'back_maxRotDeg', 0, 8],
   ['handoff', 'side_cuts', 0, 0], ['handoff', 'side_maxRotDeg', 0, 8], ['handoff', 'side_rotPopRatio', 0, 3],

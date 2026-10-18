@@ -1,7 +1,7 @@
 // credits: meme credit roll (auto-scrolls, ↑↓ nudge), pelican taking a bow. Esc / Enter → menu.
 import './credits.css';
-import { CREDITS, CREDIT_OUTRO } from '../copy';
 import { ART } from '../../data/assets';
+import { CREDITS, CREDIT_OUTRO } from '../../data/strings';
 import { HINT_BACK, HINT_NAV, artImage, backdrop, h, jagged, pelicanSvg, ransom, svg } from '../p5';
 import { frame, type ScreenFactory } from '../screen';
 

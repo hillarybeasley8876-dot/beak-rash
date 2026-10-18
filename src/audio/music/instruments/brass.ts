@@ -1,7 +1,7 @@
 // Brass section: two alternating persistent chord voices (5 detuned saws spread left/right, a
 // shared "bwah" filter + VCA), so stabs can overlap their release tails without creating nodes.
 // Chords with fewer than 5 notes double their top notes an octave down to fill the section.
-import { adsr, filter, holdAt } from '../../dsp/env';
+import { adsr, anchor, filter, holdAt, settle } from '../../dsp/env';
 import { midiToHz } from '../theory';
 import { osc, type Gate } from './voice';
 import type { Band } from '../band';
@@ -60,8 +60,9 @@ export class Brass {
     const off = t + Math.max(dur, 0.05);
     if (v.busyUntil > t) {
       // Re-using a voice that is still releasing: close it just before the new onset.
-      holdAt(v.amp.gain, t - 0.006);
+      anchor(v.amp.gain, t - 0.006);
       v.amp.gain.linearRampToValueAtTime(0, t);
+      settle(v.amp.gain, t, 0);
     }
     v.saws.forEach((o, s) => {
       const f = midiToHz(notes[s] ?? 60);

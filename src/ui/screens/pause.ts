@@ -53,7 +53,6 @@ function resume(ctx: ScreenCtx): void {
 async function leaveRace(ctx: ScreenCtx, kind: 'restart' | 'quit'): Promise<void> {
   const ok = await ctx.confirm(kind === 'restart' ? '重新开始？' : '退出比赛？', kind === 'restart' ? '这一局的进度会清零。' : '本局不计成绩，小鱼干也不发。', kind === 'restart' ? '重来' : '退出', '再想想');
   if (!ok) return;
-  ctx.app.audio.setMuffle(0);
   ctx.app.bus.emit(kind === 'restart' ? 'flow:restartRace' : 'flow:quitRace', {});
 }
 

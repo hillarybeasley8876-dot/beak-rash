@@ -33,7 +33,7 @@ post.grade.bloom = night ? 0.9 : 0.25;
 post.grade.threshold = night ? 0.7 : 1;
 
 /** Presets that happen at road level (wheel contact) rather than body height. */
-const AT_GROUND = new Set(['dust', 'grass', 'sand', 'dirt', 'landing', 'splash', 'oil', 'hopDust', 'shockwave']);
+const AT_GROUND = new Set(['dust', 'grass', 'sand', 'dirt', 'landing', 'splash', 'oil', 'hopDust', 'shockwave', 'driftSmoke', 'driftSpark']);
 
 function fire(name: string, x = 0, z = -4, opts: BurstOpts = {}): void {
   const preset = PRESETS[name];

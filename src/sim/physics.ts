@@ -7,7 +7,8 @@ import type { PhysicsSystem, Session } from '../core/contracts';
 import type { RiderState } from '../core/types';
 import { createSimRider, emptyFrame, hasStatus, type SimCtx, type SimRider } from './state';
 import { longitudinal, tickBoost } from './forces';
-import { attitude, lateral, startCarry } from './steering';
+import { lateral, startCarry } from './steering';
+import { attitude } from './attitude';
 import { endDrift, updateDrift } from './drift';
 import { vertical } from './air';
 import { groundEffects, tickSimStatuses } from './features';
@@ -113,12 +114,14 @@ export function createPhysics(session: Session): PhysicsSystem {
     },
     applyImpulse(r, imp) {
       const sr = simOf(r);
+      const lat = imp.lateral ?? 0;
       r.speed = Math.max(0, r.speed + (imp.forward ?? 0));
-      r.vx += imp.lateral ?? 0;
-      // The shove carries the rider for a moment instead of being eaten by the 0.07 s grip lag.
-      if (sr && Math.abs(imp.lateral ?? 0) >= T.knockMin) startCarry(sr, T.knockTime, T.knockSteer, T.knockTau);
+      r.vx += lat;
+      // The shove carries the rider for a moment instead of being eaten by the 0.07 s grip lag; steering back
+      // toward the hitter is muted during it, steering away is not.
+      if (sr && Math.abs(lat) >= T.knockMin) startCarry(sr, T.knockTime, T.knockSteer, T.knockTau, lat > 0 ? -1 : 1);
       if (imp.up) r.vy = Math.max(r.vy, 0) + imp.up;
-      if (sr && (Math.abs(imp.lateral ?? 0) >= 3 || (imp.forward ?? 0) <= -3)) endDrift(ctx, sr, false);
+      if (sr && (Math.abs(lat) >= 3 || (imp.forward ?? 0) <= -3)) endDrift(ctx, sr, false);
     },
     crash(r, cause, attacker) {
       const sr = simOf(r);

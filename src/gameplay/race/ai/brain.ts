@@ -25,6 +25,8 @@ export interface AiWorld {
 
 const PLAN_EVERY = 0.05;
 const SKILL_EVERY = 0.5;
+const SOFT_CLOSING = 2;     // m/s: closing on a rider faster than this brakes instead of coasting
+const FOLLOW_DECEL = 4;     // m/s²: planned deceleration when closing on a rider ahead
 
 export class Brain {
   readonly driver = new Driver();
@@ -46,8 +48,11 @@ export class Brain {
   private draft: RiderState | null = null;
   private draftT = 0;
   private stepDt = 0;
+  private wantX = 0;              // last desired lane before the planner (debug summary)
   /** Rubber band: top-speed cap (m/s before mods/boosts) set by the director; Infinity = none. */
   paceTop = Infinity;
+  /** Last tick wanted its full pace (no corner, rider, traffic or hunt limit): rubber-band pulses allowed. */
+  free = false;
   /** Ring the bell on the next racing tick (after passing the player). */
   ringBell = false;
   /** Debug/test: seconds of forced braking (e.g. let the police catch the autopilot). */
@@ -75,6 +80,7 @@ export class Brain {
       c.throttle = w.phase === 'countdown' && w.countdownTime >= this.launchAt ? 1 : 0;
       return;
     }
+    this.free = false;
     if (r.mode !== 'racing' && r.mode !== 'finished') {
       c.throttle = c.brake = 0;
       this.driver.reset();
@@ -98,10 +104,12 @@ export class Brain {
     this.grip.update(r, c.steer, r.x - w.line.x(r.s), w.line.curv(r.s), dt);
     this.unstick(dt, c);
     if (this.holdBrake > 0) {
+      // Debug/test brake: a full stop with hands off everything (no skills, swings, hops or bell).
       this.holdBrake -= dt;
+      this.free = false;
       c.throttle = 0;
       c.brake = 1;
-      c.drift = false;
+      c.drift = c.hop = c.attackL = c.attackR = c.heavy = c.skill1 = c.skill2 = c.skill3 = c.ult = c.bell = false;
     }
   }
 
@@ -121,7 +129,8 @@ export class Brain {
   private updateDraft(w: AiWorld, bend: number): void {
     const d = this.draft;
     const gap = d ? d.s - this.r.s : 0;
-    if (d && (d.mode !== 'racing' || gap < 1.2 || gap > 18 || bend > 0.6)) this.draft = null;
+    // Drop the wheel when it brakes or slows (closing fast): never follow a braking rider into its lane.
+    if (d && (d.mode !== 'racing' || gap < 1.2 || gap > 18 || bend > 0.6 || d.speed < this.r.speed - 3)) this.draft = null;
     this.draftT -= PLAN_EVERY;
     if (this.draftT > 0) return;
     this.draftT = this.rng.range(2, 4);
@@ -143,8 +152,9 @@ export class Brain {
     const lo = -Math.min(b0.left, b1.left) + 0.9, hi = Math.min(b0.right, b1.right) - 0.9;
     this.fighter.chooseTarget(w.riders, w.player, w.time);
     const hunting = this.fighter.hunt;
+    this.wantX = clamp(this.desiredX(w, hw), lo, hi);
     this.plan = planLateral({
-      desiredX: clamp(this.desiredX(w, hw), lo, hi), prevX: this.plan.x, x: r.x, v: r.speed, lo, hi, asphalt: hw,
+      desiredX: this.wantX, prevX: this.plan.x, x: r.x, v: r.speed, lo, hi, asphalt: hw,
       horizon: (1 + 1.4 * p.skill) * (hunting ? 0.75 : 1), ignore: hunting ? hunting.id : null,
       canHop: this.hopCd <= 0 && p.skill > 0.35,
     }, w.senses.blips);
@@ -154,7 +164,8 @@ export class Brain {
     if (this.skillT <= 0 && w.time >= this.firstSkillAt) {
       this.skillT = SKILL_EVERY;
       const straight = this.straightAhead(w);
-      useSkill({ me: r, blips: w.senses.blips, blocked: this.plan.followGap < 8, straight, player: w.player, time: w.time }, this.c, p.skillUse, this.rng.next());
+      const view = { me: r, blips: w.senses.blips, blocked: this.plan.followGap < 8, straight, player: w.player, time: w.time, grudge: this.fighter.grudging };
+      useSkill(view, this.c, p.skillUse, this.rng.next());
     }
     if (this.ringBell) {
       this.ringBell = false;
@@ -166,7 +177,7 @@ export class Brain {
     const { r } = this;
     return {
       id: r.id, c: r.character, mode: r.mode, s: Math.round(r.s), x: +r.x.toFixed(2), v: +r.speed.toFixed(1),
-      planX: +this.plan.x.toFixed(2), follow: this.plan.followSpeed, hunt: this.fighter.hunt?.id ?? null,
+      planX: +this.plan.x.toFixed(2), wantX: +this.wantX.toFixed(2), draft: this.draft?.id ?? null, follow: this.plan.followSpeed, hunt: this.fighter.hunt?.id ?? null,
       pace: Number.isFinite(this.paceTop) ? +this.paceTop.toFixed(2) : null, aLat: +this.grip.aLat.toFixed(2), drift: this.drift.active,
       steer: +this.c.steer.toFixed(2), throttle: +this.c.throttle.toFixed(2), brake: +this.c.brake.toFixed(2),
     };
@@ -197,20 +208,31 @@ export class Brain {
     const inside = (r.x - this.tx) * (this.drift.active ? this.drift.dir : 1);
     updateDrift(this.drift, r, w.line, p.drifter, p.skill, this.driftRoll, inside, this.stepDt);
     let target = targetSpeed(base, cornerSpeed(w.line, r.s, r.speed, this.grip.aLat), this.drift.active);
+    // Soft (ease off, never brake) only while the pace cap is the binding limit or a rider ahead closes slowly;
+    // anything slow or stopped in front gets real braking.
     let soft = cap < top + 2 && target >= base - 0.01;
     const { followSpeed, followGap, followKind } = this.plan;
     if (followSpeed !== null) {
-      // Riders in a pack sit close (drafting); traffic and props get a real safety gap.
-      const want = followKind === 'rider' ? 1.2 : 3.5 + r.speed * 0.3;
-      if (followGap < want * 2) target = Math.min(target, followSpeed + (followGap - want) * 0.6);
-      soft = followKind === 'rider' && followGap > 0.6;
+      // Riders in a pack sit close (drafting), but closing fast on one brakes in time (stopping-distance
+      // speed); traffic and props get a real safety gap.
+      const rider = followKind === 'rider';
+      const room = followGap - (rider ? 1.2 : 3.5 + r.speed * 0.3);
+      const t = followSpeed + (rider && room > 0 ? Math.sqrt(2 * FOLLOW_DECEL * room) : room * 0.6);
+      if ((rider || room < 3.5 + r.speed * 0.3) && t < target) {
+        target = t;
+        soft = followKind === 'rider' && followGap > 0.6 && r.speed - followSpeed < SOFT_CLOSING;
+      }
     }
     const goal = this.fighter.huntGoal();
     const prey = this.fighter.hunt;
     if (goal && prey && Math.abs(goal.ds) < 25) {
-      target = Math.min(target, prey.speed + clamp(goal.ds * 0.8, -2.5, 5));
-      soft = soft || goal.ds < 0;
+      const t = prey.speed + clamp(goal.ds * 0.8, -2.5, 5);
+      if (t < target) {
+        target = t;
+        soft = goal.ds < 0 || r.speed - prey.speed < SOFT_CLOSING;
+      }
     }
+    this.free = target >= base - 0.01;
     this.driver.speedTo(r, Math.max(0, target), c, soft);
     c.drift = this.drift.active && c.brake === 0;
     // The sim picks the drift direction from the steer sign on the press: lean into the bend first.

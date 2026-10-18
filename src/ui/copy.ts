@@ -1,4 +1,5 @@
-// UI copy owned by ui-screens (menu blurbs, career cups, settings help, credits). Kind, meme-flavoured.
+// UI copy owned by ui-screens (menu blurbs, career cups). Kind, meme-flavoured; credits, how-to and
+// calendar copy come from the content unit's data/strings.ts.
 import type { ScreenId } from '../core/contracts';
 
 export interface MenuEntry { cn: string; en: string; to: ScreenId; blurb: string }
@@ -19,24 +20,3 @@ export const CUPS: Cup[] = [
   { tier: 2, cn: '内卷杯', en: 'GRIND CUP', motto: '对手开始带武器了，还会记仇。' },
   { tier: 3, cn: '鹈鹕神杯', en: 'PELICAN GOD CUP', motto: '传说中只有嘴最大的才能夺冠。' },
 ];
-
-export const CREDITS: Array<[string, string]> = [
-  ['总导演', '一只想吃鱼的鹈鹕'],
-  ['物理顾问', '牛顿的苹果（未到场）'],
-  ['大鹅协调员', '职位空缺（没人敢应聘）'],
-  ['卡皮巴拉情绪管理', '卡皮巴拉本人'],
-  ['首席转圈官', '哈基米'],
-  ['墨镜赞助', '神烦狗的私人收藏'],
-  ['准时到场率统计', '咕咕（下次一定）'],
-  ['冰面采购', '滑总（至今未到货）'],
-  ['餐饮', '薯条大盗（已自行取用）'],
-  ['进度管理', '闪电（马……上……好……）'],
-  ['交通安全顾问', '柯基警官'],
-  ['链条位置审核', '所有画过鹈鹕骑车的大模型'],
-  ['咸鱼供应', '鹈鹕湾海鲜市场'],
-  ['拖鞋提供', '每一位妈妈'],
-  ['测试员', '摔了 999 次的阿鹕'],
-  ['特别感谢', '正在玩这个游戏的你'],
-];
-
-export const CREDIT_OUTRO = '本游戏中没有任何真实鹈鹕受到伤害。大鹅表示保留追究的权利。';

@@ -1,0 +1,64 @@
+{
+  "unit": "combat",
+  "round": 2,
+  "lens": "gameplay",
+  "score": 7.5,
+  "summary": "Combat is now rule-solid. combat-check passes 41/41 in isolated mode and 41/41 with every real unit, and tsc is clean. I ran 38 manual-step scenarios of my own and 10 autopilot races (coast x8 with traffic and police, plus city and mountain, all real units). They showed no double hits, no hits from or onto untouchable riders, exactly one KO per wreck (including two riders KO'ing each other on the same substep), a skill:end for every cast, exactly one projectile:end per spawn, no stuck actions or statuses, and 0 console errors. Measured rules match SPEC: crit share 12.7 % (n=221), knock-loose 31 %/61 %, hit-stop 0.045/0.08/0.1 s, same-frame trades land both ways, and knockback shoves victims 1.5-2.1 m. 10 of the 11 round-1 gameplay issues are really fixed: ult SP refund (7 full-HP victims, SP 0.26 afterwards), Wing Dash braking/grass, pouch at the finish, ghost attacks, skill buffering, on-screen gulp spit with a forward catch zone, stunned swings and ties, forced downgrades, missing events, and near-camera pickups. The bell is fixed only on an empty road. Ringing again at a rival who is already angry still pays +5 every 3 s. In real races 77 % of rings paid (about 99 SP per race), and pressing B on cooldown nearly doubled SHOWTIMEs (7 vs 4) and player KOs (24 vs 11) over 4 seeds with no extra damage taken. That is still a major issue. The minor issues are: presses dropped during skill cast poses, the bell and early staggers; skills that keep scoring after the caster has finished; slow statuses merging; the torpedo flying through cars; a counter-crit window too short to react to; fish and cans wasted at full HP/SP; Big Gulp having nothing to swallow; and the HUD cut-in covering the torpedo. Visuals read well: melee bursts with damage numbers, CRIT flash, BLOCK plus reflect, steal tether, spit at the beak, and SHOWTIME into QUADRA KNOCK OUT. Evidence is in shots/review/combat/r2-gameplay/ (out-*.txt, soak-*.txt, sheet-*.png).",
+  "issues": [
+    {
+      "severity": "major",
+      "title": "Bell is still an SP faucet in real races (round-1 fix only covers an empty road)",
+      "detail": "bell.ts ringBell() pays SP.bell whenever addStatus(o,'angry',...,force=true) returns true. For a rival who is already angry, that call refreshes the entry and returns true, so every ring at the same rival pays. A2 (out-a.txt): with a passive rival 10 m behind, 21/21 rings paid, 0 -> 100 SP in 63 s. Autopilot races with B pressed every 3 s (soak-bell.txt, soak-bell2.txt) paid 79/103 rings (77 %), about 99 SP per race, roughly one extra SHOWTIME. Compared with the same seeds without the bell (soak-coast.txt, soak-base2.txt): 7 vs 4 SHOWTIMEs, 24 vs 11 player KOs, and 2 wins vs 0. Damage taken did not rise (87/40 vs 82/85 HP on seeds 5/21), so being angered costs nothing. Pressing B on cooldown earns about as much SP as all of the player's hits combined.",
+      "fix": "Pay +5 only for a fresh provocation: a rival who was not already angry at the ringer (check the existing 'angry' entry's source before addStatus). Pay at most once per rival per BELL.angry (8 s), and only for rivals ahead or within melee distance (|ds| < 6 m). Alternatively, use diminishing 5/3/1/0 for rings within 20 s. Add a combat-check scenario: three rings at the same angry rival pay 5 SP once."
+    },
+    {
+      "severity": "minor",
+      "title": "Swing, bell and second-skill presses are silently dropped during non-swing actions",
+      "detail": "melee.ts requestSwing() buffers only in the last INPUT_BUFFER (0.18 s) and never while the action kind is 'skill'. bell.ts needs r.action === null. runner.tryCast() overwrites skillBuf. Measured: J 3 frames after U (torpedo cast pose 0.3 s) gives no swing (A6). B during a cast pose gives no bell (A7). J 3 frames into a bell (0.45 s action) is dropped (B3). J 2 frames into a hit stagger is dropped (B4). U then I during one swing casts only I, and U is lost with no skill:denied (D6). Skill presses were fixed in round 1, but mashing J/B around casts and bells still drops inputs.",
+      "fix": "Buffer attack and bell presses for the whole remaining duration of any non-exclusive action (skill cast pose, bell, stagger), or let a swing cancel a cast pose or bell the way a cast cancels swing recovery. Keep one buffered press per skill slot, or emit skill:denied for an overwritten press. Add checks for J after U and J after B."
+    },
+    {
+      "severity": "minor",
+      "title": "Race end mid-action: the finished pelican's skills keep damaging and scoring KOs after the line",
+      "detail": "SHOWTIME cast at L-13 crosses the line at y 8 and lands at L+5. Its shockwave KOs three racing rivals behind, giving TRIPLE KNOCK OUT, +3 KOs and +150 coins in the results, plus 0.12x slow-mo over the finish moment (out-afterfinish.txt, sheet-afterfinish.png). The Big Gulp spit's 25 dmg also lands after the pelican has finished (C3, out-c.txt). Nothing gets stuck, but a finished rider is still wrecking racers and KO cinematics play over the FINISH.",
+      "fix": "When the caster's finishTime is set, end its running skills with a new EndReason 'finish': movement and visuals only, no further damage. In ko.ts award(), give no KO, coins or SP to attackers that have finished. Optionally deny SHOWTIME when the impact would land past the line."
+    },
+    {
+      "severity": "minor",
+      "title": "Same-id statuses merge to max strength and max time (honk slow + whistle slow = 35 % for 1.8 s)",
+      "detail": "statuses.ts addStatus() merges into combat's own entry with time = max and strength = max. A HONK slow (15 %, 2 s) followed by a WHISTLE slow (35 %, 1 s) leaves one entry of 0.35 with 1.81 s left, and speedMul stays at 0.60-0.65 for the full 1.7 s window (F2, out-f.txt). This is the same merge flaw round 1 found for boosts; it was fixed there but not for slow/stun/wobble.",
+      "fix": "Merge only when the new strength is <= the current one. Otherwise push a separate owned entry (applyMods already takes the max per id), or keep one entry per (id, source skill)."
+    },
+    {
+      "severity": "minor",
+      "title": "Torpedo flies through cars and trucks",
+      "detail": "projectiles.ts contact() tests only riders and the road edge. G1 (out-g.txt, traffic=1): the salted fish spent 11 frames inside a car's box (car height 1.55 m, fish at y 1.3-1.1) and still hit the goose 26 m ahead. You can snipe through a bus, and the fish visibly passes through vehicles.",
+      "fix": "Each step, test ctx.session.obstacles (active && solid, |ds| < halfLength + radius, |dx| < halfWidth + radius, y < height). On contact, end the projectile with hit null, a smoke/scales burst and projectile:end."
+    },
+    {
+      "severity": "minor",
+      "title": "Counter-crit against rival heavies is too fast to react to and has no tell",
+      "detail": "E3 (out-e.txt): against a baguette heavy (windup 0.19 s), a J pressed 0-6 frames after the windup starts counter-crits; at 8 frames or later the rival hits first. That leaves a window of about 0.1 s, under human reaction time. The windup shows only a raised weapon (hurt-010.png, sheet-hurt.png), so SPEC's 'hitting a rival mid-windup = counter crit' only happens by mashing, never as a read.",
+      "fix": "Give non-player heavies within about 6 m of the player a longer, telegraphed windup: tuning AI heavy windup x1.6, plus a VisualSystem glint or '!' flash at swing start. Alternatively, count the attacker's first 0.1 s of active as counterable for the player."
+    },
+    {
+      "severity": "minor",
+      "title": "Fish and energy cans are consumed when they do nothing",
+      "detail": "pickups.ts accepts() only refuses weapons and crates for armed riders. At 108/108 HP and 100 SP the pelican rode through a fish and a can and consumed both (D4, out-d.txt). The heal and the SP are wasted, and the slot is empty for 6 s for riders behind. Big Gulp's vacuum also pulls them.",
+      "fix": "Skip fish when hp >= maxHp and cans when sp >= SP.max in accepts(), so tryCollect and vacuum leave them on the road."
+    },
+    {
+      "severity": "minor",
+      "title": "Big Gulp's 'swallows projectiles' never has anything to swallow",
+      "detail": "Only the pelican fires projectiles, and ProjectileSystem.swallow() skips the caster's own, so the defensive half of BIG GULP (SPEC 7) never triggers in a race. The brief lists honk soundwave rings as projectiles, but HONK and WHISTLE are cone queries plus ConeWave visuals, not swallowable objects.",
+      "fix": "Let an open pouch eat wave skills: when a HONK or WHISTLE wave front reaches a rider with Big Gulp open inside its cone, cancel that rider's stun/slow, emit a swallow burst plus small SP, and end the wave for that rider."
+    },
+    {
+      "severity": "minor",
+      "title": "cross-unit: HUD skill cut-in still hides the torpedo flight; the hit reads small",
+      "detail": "ui-hud: the FISH TORPEDO band covers the road ahead from cast until the fish lands (sheet-torp2.png, frames 006-038; the band fades on the impact frame). The 14 dmg hit on a goose 16 m ahead then shows only as a tiny tag (torp2-046). The round-1 request for thin/corner cut-ins while a projectile is in flight is still open. ONE MORE! on every third hit is fixed (layer.ts).",
+      "fix": "ui-hud: use a thin corner cut-in for player projectile skills, or delay the band until projectile:end. fx: a larger burst and stun stars on skill:hit for pelican.torpedo."
+    }
+  ],
+  "pass": false
+}

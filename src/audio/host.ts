@@ -3,6 +3,7 @@ import type { AppContext, Session } from '../core/contracts';
 import type { RiderId, Vec3Like } from '../core/types';
 import type { StingerId } from './music/stingers';
 import type { PlayOpts } from './sfx/bank';
+import type { Placement } from './sfx/spatial';
 
 /** Where a sound comes from: a rider (player = centred), a world position, or nowhere (UI). */
 export type Where = RiderId | Vec3Like | null;
@@ -18,6 +19,8 @@ export interface Host {
   isPlayer(id: RiderId | null): boolean;
   /** 'race-<trackId>' for the attached session, else null. */
   raceSong(): string | null;
+  /** Gain / pan / air absorption of `where` as heard from the camera (the player = centred). */
+  place(where: Where): Placement;
   play(id: string, where?: Where, opts?: PlayOpts): void;
   /** A sub-heavy impact: only one owns the low end at a time (a second within 0.4 s is high-passed). */
   boom(id: string, where?: Where, opts?: PlayOpts): void;

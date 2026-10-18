@@ -12,6 +12,8 @@ import type { Engine } from '../engine';
 import type { Channel } from './types';
 
 const STING_DUCK_DB = -7.5;
+/** A count arriving this far (s) from the predicted GO re-phases the song (stall, missed pause). */
+const DRIFT = 0.06;
 
 export class Conductor {
   private current: SongPlayer | null = null;
@@ -22,6 +24,8 @@ export class Conductor {
   private lastKey: Tonality = { tonic: 0, mode: 'major' };
   /** Predicted GO time (audio clock) while a race countdown runs. */
   private goAt: number | null = null;
+  /** The last GO downbeat (audio clock), for tests. */
+  private lastGo: number | null = null;
   /** SongPlayers created so far (tests: resuming a race must not restart its song). */
   created = 0;
 
@@ -36,18 +40,21 @@ export class Conductor {
   }
 
   /**
-   * Switch songs (crossfade over `fade` s). Same id = no-op; null = fade to silence.
-   * `vamp`: start in the song's vamp and wait for countdown()/go() (race intro).
+   * Switch songs (crossfade over `fade` s, from `at`). Same id = no-op unless `force`; null = fade
+   * to silence. `vamp`: start in the song's vamp and wait for countdown()/go() (race intro).
    */
-  play(id: string | null, fade = 0.8, opts: { section?: number; at?: number; vamp?: boolean; mix?: Partial<Record<Channel, number>> } = {}): void {
-    if (id === this.currentId) return;
+  play(
+    id: string | null, fade = 0.8,
+    opts: { section?: number; at?: number; vamp?: boolean; force?: boolean; mix?: Partial<Record<Channel, number>> } = {},
+  ): void {
+    if (id === this.currentId && !opts.force) return;
     if (id !== null && !SONGS[id]) {
       console.warn(`[audio] unknown song "${id}"`);
       return;
     }
     const at = opts.at ?? this.engine.now + 0.05;
     if (this.current) {
-      this.current.stop(Math.max(0.05, fade));
+      this.current.stop(Math.max(0.05, fade), Math.max(this.engine.now, at - 0.05));
       this.fading.push(this.current);
     }
     this.current = null;
@@ -59,6 +66,28 @@ export class Conductor {
     this.current = new SongPlayer(this.engine, song, at, { section: opts.section, fadeIn: Math.min(fade, 1.2), vamp: opts.vamp, mix: opts.mix });
     this.lastKey = parseKey(song.key);
     this.created++;
+  }
+
+  /**
+   * Same-track restart: a fresh copy of the song in its vamp from the running one's next bar line
+   * (short crossfade), so the new race's intro → count-in → GO sync starts over.
+   */
+  restart(id: string): void {
+    const p = this.current;
+    this.play(id, 0.3, { vamp: true, force: true, at: p ? p.grid(this.engine.now + 0.05, 16) : undefined });
+  }
+
+  /** The game paused mid-countdown: back to the vamp; the next count re-cues GO from scratch. */
+  pauseCountdown(): void {
+    const p = this.current;
+    if (!p || this.goAt === null) return;
+    p.hold(this.engine.now + 0.03);
+    this.goAt = null;
+  }
+
+  /** Race-start sync state for tests: predicted / last GO and the song's recent section starts. */
+  sync(): { goAt: number | null; lastGo: number | null; starts: Array<{ section: string; at: number }> } {
+    return { goAt: this.goAt, lastGo: this.lastGo, starts: this.current ? this.current.starts.slice() : [] };
   }
 
   /** 0 base · 1 top-3 · 2 final stretch. */
@@ -78,7 +107,8 @@ export class Conductor {
     const now = this.engine.now;
     const first = this.goAt === null;
     const goAt = now + n * step;
-    if (p && (p.holding || (this.goAt !== null && p.scheduledUntil <= this.goAt + 0.001))) {
+    const drifted = this.goAt !== null && Math.abs(this.goAt - goAt) > DRIFT;
+    if (p && (p.holding || drifted || (this.goAt !== null && p.scheduledUntil <= this.goAt + 0.001))) {
       p.cue(p.song.form[p.song.loopFrom] ?? 'A', goAt);
     }
     this.goAt = goAt;
@@ -95,6 +125,7 @@ export class Conductor {
     if (p && this.goAt !== null && p.scheduledUntil > this.goAt + 0.001) at = Math.max(this.goAt, now + 0.005);
     else if (p && (p.holding || this.goAt !== null)) p.cue(sectionA, at);
     this.goAt = null;
+    this.lastGo = at;
     this.stinger('go', at);
   }
 

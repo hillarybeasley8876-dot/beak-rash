@@ -3,7 +3,7 @@
 // toms) and rare long ones (crash, swell) create short-lived nodes. Gains are calibrated so the
 // drum strip at trim 1 peaks around −10 dBFS on accents.
 import { noise } from '../../dsp/noise';
-import { filter, holdAt, perc } from '../../dsp/env';
+import { anchor, filter, perc, settle } from '../../dsp/env';
 import { NoiseVoice, osc, type Gate } from './voice';
 import type { Band } from '../band';
 
@@ -85,7 +85,7 @@ export class DrumKit {
     const v = this.voice('clap', () => new NoiseVoice(this.b, [{ type: 'bandpass', frequency: 1150, Q: 1.1 }], this.out, 0.05));
     const p = v.vca.gain;
     const peak = 0.55 * vel;
-    holdAt(p, t);
+    anchor(p, t);
     for (let k = 0; k < 3; k++) {
       const at = t + k * 0.011;
       p.linearRampToValueAtTime(peak, at + 0.001);
@@ -94,6 +94,7 @@ export class DrumKit {
     p.linearRampToValueAtTime(peak * 0.8, t + 0.034);
     p.exponentialRampToValueAtTime(0.0001, t + 0.22);
     p.linearRampToValueAtTime(0, t + 0.225);
+    settle(p, t + 0.225, 0);
     v.wake(t + 0.23);
   }
 
@@ -114,13 +115,14 @@ export class DrumKit {
     ], this.out, 0.42));
     const p = v.vca.gain;
     const peak = 0.36 * vel;
-    holdAt(p, t);
+    anchor(p, t);
     for (let k = 0; k < 3; k++) {
       p.linearRampToValueAtTime(peak * (1 - k * 0.22), t + k * 0.016 + 0.001);
       p.exponentialRampToValueAtTime(peak * 0.3, t + k * 0.016 + 0.012);
     }
     p.exponentialRampToValueAtTime(0.0001, t + 0.17);
     p.linearRampToValueAtTime(0, t + 0.175);
+    settle(p, t + 0.175, 0);
     v.wake(t + 0.18);
   }
 

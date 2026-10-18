@@ -1,8 +1,10 @@
-// How-to pages: keyboard map, gamepad map (code-drawn controller with callouts), skills.
+// How-to pages: keyboard map, gamepad map (code-drawn controller with callouts), skills. The words come from
+// the content unit's data/strings.ts (HOWTO_*); this file owns the drawings and the layout.
 import { PLAYER_SKILLS, PLAYER_ULT, SKILLS } from '../../data/skills';
+import { HOWTO_BASICS, HOWTO_GAMEPAD, HOWTO_KEYBOARD, HOWTO_SKILL_TIPS, HOWTO_SP, type HowtoGroup } from '../../data/strings';
 import { h, svg } from '../p5';
 
-type Group = 'ride' | 'fight' | 'skill' | 'sys' | null;
+type Group = HowtoGroup['id'] | null;
 type Key = [label: string, units: number, group: Group];
 
 const ROWS: Key[][] = [
@@ -13,13 +15,6 @@ const ROWS: Key[][] = [
   [['SPACE', 6.2, 'ride'], ['←', 1, 'ride'], ['↑', 1, 'ride'], ['↓', 1, 'ride'], ['→', 1, 'ride']],
 ];
 
-const LEGEND: Array<[Exclude<Group, null>, string, string, Array<[string, string]>]> = [
-  ['ride', '骑行', 'RIDE', [['W / ↑', '踩踏'], ['S / ↓', '刹车'], ['A D / ← →', '转向'], ['SHIFT + 转向', '漂移（松开加速）'], ['SPACE', '跳跃'], ['C', '回头看']]],
-  ['fight', '战斗', 'FIGHT', [['J / L', '往左扇 / 往右扇'], ['K', '重击（自动选边）'], ['B', '打铃嘲讽 +SP']]],
-  ['skill', '技能', 'SKILL', [['U I O', '三个技能'], ['P', 'SHOWTIME（SP 满）']]],
-  ['sys', '系统', 'SYSTEM', [['ESC', '暂停 / 返回'], ['ENTER', '确定']]],
-];
-
 export function keyboardPage(): HTMLDivElement {
   const board = h('div', { class: 'br-ht-board' });
   ROWS.forEach((row, r) => {
@@ -28,25 +23,36 @@ export function keyboardPage(): HTMLDivElement {
     board.append(line);
   });
   const legend = h('div', { class: 'br-ht-legend' });
-  for (const [group, cn, en, rows] of LEGEND) {
-    const box = h('div', { class: `br-ht-group is-${group}` }, h('div', { class: 'br-ht-gtitle' }, h('b', { text: cn }), h('span', { text: en })));
-    for (const [k, v] of rows) box.append(h('div', { class: 'br-ht-line' }, h('kbd', { text: k }), h('span', { text: v })));
+  for (const g of HOWTO_KEYBOARD) {
+    const box = h('div', { class: `br-ht-group is-${g.id}` }, h('div', { class: 'br-ht-gtitle' }, h('b', { text: g.cn }), h('span', { text: g.en })));
+    for (const r of g.rows) box.append(h('div', { class: 'br-ht-line' }, h('kbd', { text: r.keys }), h('span', { text: r.text })));
     legend.append(box);
   }
-  return h('div', { class: 'br-ht-page is-kb' }, board, legend);
+  const basics = h('div', { class: 'br-ht-basics' }, h('span', { class: 'br-tag is-red br-ht-btag', text: '新手须知 BASICS' }),
+    ...HOWTO_BASICS.map((line, i) => h('p', { vars: { '--i': i } }, h('b', { text: String(i + 1).padStart(2, '0') }), h('span', { text: line }))));
+  return h('div', { class: 'br-ht-page is-kb' }, board, legend, basics);
 }
 
 // Gamepad page geometry, in .br-ht-body pixels (1760×740). Controller art is drawn in a 600×420 box.
 const PAD = { x: 500, y: 92, k: 1.267 };
-type Callout = [bx: number, by: number, side: 'l' | 'r' | 't' | 'b', row: number, key: string, text: string];
+/** A callout's lines are HOWTO_GAMEPAD rows looked up by their `keys`, one line per row. */
+type Callout = [bx: number, by: number, side: 'l' | 'r' | 't' | 'b', row: number, key: string, rows: string[]];
 const CALLOUTS: Callout[] = [
-  [188, 71, 'l', 0, 'LT', '刹车'], [190, 101, 'l', 1, 'LB', '技能 U（鱼雷）'],
-  [200, 196, 'l', 3, 'L 摇杆', '转向 · 按下回头看'], [240, 266, 'l', 4, '十字键', '↑ 技能 I　↓ 技能 O'],
-  [268, 167, 't', 0, 'BACK', '打铃'], [332, 167, 't', 1, 'START', '暂停'],
-  [412, 71, 'r', 0, 'RT', '踩踏'], [410, 101, 'r', 1, 'RB', '漂移'], [440, 150, 'r', 2, 'Y', '重击'],
-  [474, 184, 'r', 3, 'B', '往右扇 / 返回'], [406, 184, 'r', 4, 'X', '往左扇'], [440, 218, 'r', 5, 'A', '跳跃 / 确定'],
-  [350, 270, 'b', 0, 'R 摇杆', '按下 = SHOWTIME'],
+  [188, 71, 'l', 0, 'LT', ['LT']], [190, 101, 'l', 1, 'LB', ['LB']],
+  [200, 196, 'l', 3, 'L 摇杆', ['左摇杆', '左摇杆按下']], [240, 266, 'l', 4, '十字键', ['十字键 ↑', '十字键 ↓']],
+  [268, 167, 't', 0, 'BACK', ['BACK']], [332, 167, 't', 1, 'START', ['START']],
+  [412, 71, 'r', 0, 'RT', ['RT']], [410, 101, 'r', 1, 'RB', ['RB']], [440, 150, 'r', 2, 'Y', ['Y']],
+  [474, 184, 'r', 3, 'B', ['B']], [406, 184, 'r', 4, 'X', ['X']], [440, 218, 'r', 5, 'A', ['A']],
+  [350, 270, 'b', 0, 'R 摇杆', ['右摇杆按下']],
 ];
+/** Which part of a multi-function control a row means, shown before its text. */
+const PREFIX: Record<string, string> = { '左摇杆按下': '按下 ', '右摇杆按下': '按下 ', '十字键 ↑': '↑ ', '十字键 ↓': '↓ ' };
+
+function padLine(key: string): string | null {
+  const row = HOWTO_GAMEPAD.find((r) => r.keys === key);
+  if (!row) console.warn(`[ui] howto: no HOWTO_GAMEPAD row for "${key}"`);
+  return row ? `${PREFIX[key] ?? ''}${row.text}` : null;
+}
 const LABEL_L = 430;
 const LABEL_R = 1330;
 const rowY = (row: number): number => 40 + row * 92;
@@ -62,10 +68,12 @@ export function gamepadPage(): HTMLDivElement {
   <circle cx="440" cy="150" r="16" fill="#fff"/><circle cx="474" cy="184" r="16" fill="#e5191c"/><circle cx="406" cy="184" r="16" fill="#fff"/><circle cx="440" cy="218" r="16" fill="#e5191c"/>`;
   page.append(svg(`<svg viewBox="0 0 600 420" xmlns="http://www.w3.org/2000/svg">${body}</svg>`, 'br-ht-pad'));
   const lines: string[] = [];
-  for (const [bx, by, side, row, key, text] of CALLOUTS) {
+  for (const [bx, by, side, row, key, rows] of CALLOUTS) {
     const px = PAD.x + bx * PAD.k;
     const py = PAD.y + by * PAD.k;
-    const label = h('div', { class: `br-ht-call is-${side}${side === 't' && row === 0 ? ' is-l' : ''}` }, h('kbd', { text: key }), h('span', { text }));
+    const text = rows.map(padLine).filter((t): t is string => t !== null);
+    const cls = `br-ht-call is-${side}${side === 't' && row === 0 ? ' is-l' : ''}${text.length > 1 ? ' is-multi' : ''}`;
+    const label = h('div', { class: cls }, h('kbd', { text: key }), h('div', { class: 'br-ht-ctext' }, ...text.map((t) => h('span', { text: t }))));
     if (side === 'b') {
       label.style.cssText = 'left:1010px;top:650px';
       lines.push(`M${px} ${py} L 1000 672`);
@@ -92,15 +100,17 @@ export function skillsPage(): HTMLDivElement {
     const s = SKILLS[id];
     if (!s) return null;
     const ult = id === PLAYER_ULT;
+    const tip = HOWTO_SKILL_TIPS[id];
     return h('div', { class: `br-ht-skill${ult ? ' is-ult' : ''}`, vars: { '--i': i } },
       h('div', { class: 'br-ht-diamond' }, h('b', { text: s.glyph })),
       h('kbd', { class: 'br-ht-skey', text: ult ? 'P' : keys[i] ?? '' }),
       h('div', { class: 'br-ht-sname', text: s.name }),
       h('div', { class: 'br-ht-sen', text: s.nameEn }),
       h('p', { class: 'br-ht-sdesc', text: s.desc }),
+      tip ? h('p', { class: 'br-ht-stip' }, h('b', { text: 'TIP' }), h('span', { text: tip })) : null,
       h('div', { class: 'br-ht-scd', text: ult ? `SP ${s.spCost}` : `冷却 ${s.cooldown}s` }));
   });
   const sp = h('div', { class: 'br-ht-sp' }, h('span', { class: 'br-tag is-yellow', text: 'SP' }),
-    h('span', { text: '命中 +6 · 被打 +3 · 击倒 +20 · 尾流 +1/秒 · 擦肩 +4 · 完美落地 +8 · 三级漂移 +5 · 打铃 +5' }));
+    h('span', { text: HOWTO_SP }));
   return h('div', { class: 'br-ht-page is-skills' }, h('div', { class: 'br-ht-cards' }, ...cards), sp);
 }

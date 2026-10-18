@@ -3,10 +3,10 @@
 // later in postStep (ko.ts) so a rider can only be knocked out once per wreck.
 import { WEAPONS } from '../../data/weapons';
 import type { RiderState, Side, Vec3Like, WeaponId } from '../../core/types';
-import { targetable, type CombatCtx } from './ctx';
+import { finished, targetable, type CombatCtx } from './ctx';
 import { impact, nudge, type ImpactKind } from './feedback';
 import { gainSp, spRefund } from './sp';
-import { addStatus, removeStatus, statusStrength } from './statuses';
+import { addStatus, statusStrength } from './statuses';
 import { COMBO, MELEE, SHIELD_IMMUNE, SHIELD_REFLECT, SP } from './tuning';
 
 export interface Hit {
@@ -37,7 +37,7 @@ export function pushDir(a: RiderState, v: RiderState, fallback: Side): Side {
 
 export function applyHit(ctx: CombatCtx, h: Hit): HitOutcome {
   const { victim: v } = h;
-  if (!targetable(ctx, v)) return 'ignored';
+  if (!targetable(ctx, v) || finished(h.attacker)) return 'ignored';
   const pos = ctx.pos(v);
   if (h.melee) {
     const shield = statusStrength(v, 'shield');
@@ -45,8 +45,7 @@ export function applyHit(ctx: CombatCtx, h: Hit): HitOutcome {
       reflect(ctx, h, pos);
       return 'reflected';
     }
-    if (shield > 0 || weaponBlocks(ctx, v)) {
-      if (shield > 0 && shield < SHIELD_IMMUNE) removeStatus(v, 'shield');
+    if (shield >= SHIELD_IMMUNE || weaponBlocks(ctx, v)) {
       block(ctx, h, pos);
       return 'blocked';
     }
@@ -58,12 +57,8 @@ export function applyHit(ctx: CombatCtx, h: Hit): HitOutcome {
 function land(ctx: CombatCtx, h: Hit, pos: Vec3Like): void {
   const { attacker: a, victim: v } = h;
   const damage = Math.max(1, Math.round(h.damage * (h.crit ? MELEE.critMul : 1)));
+  credit(ctx, v, a, h.skillId, h.weapon);
   v.hp = Math.max(0, v.hp - damage);
-  v.lastHitBy = a.id;
-  v.lastHitTime = ctx.now();
-  const vd = ctx.rd(v);
-  vd.hitByMirror = a.id;
-  vd.koBy = { attacker: a.id, skillId: h.skillId, weapon: h.weapon };
   ctx.rd(a).lastAttack = ctx.now();
   const dir = pushDir(a, v, h.side);
   ctx.session.physics.applyImpulse(v, { lateral: dir * h.knock, forward: -v.speed * h.speedLoss });
@@ -82,6 +77,19 @@ function land(ctx: CombatCtx, h: Hit, pos: Vec3Like): void {
   if (h.skillId) ctx.bus.emit('skill:hit', { riderId: a.id, skillId: h.skillId, victim: v.id, pos });
   if (h.countCombo !== false) countCombo(ctx, a, refund);
   impact(ctx, h.crit ? 'crit' : h.impact, a, v);
+}
+
+/**
+ * Record `a` as the victim's last attacker (KO credit within KO.creditWindow, with the skill / weapon used).
+ * Call before applying damage: a rider already down this substep keeps the killing blow's credit.
+ */
+export function credit(ctx: CombatCtx, v: RiderState, a: RiderState, skillId: string | null, weapon: WeaponId): void {
+  if (v.hp <= 0 && v.lastHitBy !== null) return;
+  v.lastHitBy = a.id;
+  v.lastHitTime = ctx.now();
+  const vd = ctx.rd(v);
+  vd.hitByMirror = a.id;
+  vd.koBy = { attacker: a.id, skillId, weapon };
 }
 
 /** Victim reaction: a short 'hit' action cancels any swing; views get hit/stun cues. */

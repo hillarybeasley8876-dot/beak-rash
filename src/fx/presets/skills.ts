@@ -40,13 +40,12 @@ export const aura: Preset = (k, pos, o) => {
 
 /** Swirls orbiting a rider (needs `follow`) + fur flying off: the OIIA spin. */
 export const spin: Preset = (k, pos, o) => {
-  const life = o.life ?? 0.8;
   for (let i = 0; i < 4; i++) {
     const s = k.p.spec();
     if (o.follow === undefined) { s.x = pos.x; s.y = pos.y - 0.4; s.z = pos.z; } else { s.y = -0.4; s.follow = o.follow; }
     k.p.colors(s, i % 2 ? '#ffffff' : (o.color ?? '#f2a03d'));
     s.frame = FRAME.swirl; s.mode = 4; s.vx = 1.1 * (o.scale ?? 1); s.vy = 0.15;
-    s.rot = (i / 4) * Math.PI * 2; s.spin = 14; s.life = life; s.size0 = 0.4; s.size1 = 0.3;
+    s.rot = (i / 4) * Math.PI * 2; s.spin = 14; s.life = 0.8; s.size0 = 0.4; // the 0.8 s OIIA spin s.size1 = 0.3;
     k.p.emit(s);
   }
   for (let i = 0; i < k.n(8, o); i++) {

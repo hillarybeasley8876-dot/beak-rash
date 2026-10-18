@@ -16,10 +16,11 @@ export const NEUTRAL_SURFACE: Readonly<SurfaceMods> = { top: 1, grip: 1, wobble:
 
 const MAX_SPEED = 60;
 
-/** Flat-road top speed right now, before boosts (bike, statuses, surface, draft). */
+/** Flat-road top speed right now, before boosts (bike, race rubber band, statuses, surface, draft). */
 export function baseTop(sr: SimRider, surf: SurfaceMods): number {
   const r = sr.r;
-  return Math.max(0.1, sr.tune.top * r.mods.speedMul * surf.top * (1 + T.draftTop * r.draft));
+  const rubber = r.rubber > 0 ? Math.min(r.rubber, T.rubberMax) : 1;
+  return Math.max(0.1, sr.tune.top * rubber * r.mods.speedMul * surf.top * (1 + T.draftTop * r.draft));
 }
 
 export function longitudinal(sr: SimRider, c: Controls, surf: SurfaceMods, dt: number): void {

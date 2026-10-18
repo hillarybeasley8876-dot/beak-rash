@@ -4,10 +4,10 @@
 export const SWING_REF = 0.32;
 export const LIGHT_PHASES = { windup: 0.06, active: 0.1, recover: 0.16 } as const;
 export const HEAVY_PHASES = { windup: 0.16, active: 0.12, recover: 0.24 } as const;
-/** Presses during the last part of a swing are buffered and fire when it ends. */
+/** Swing presses during the last part of a swing are buffered and fire when it ends. */
 export const INPUT_BUFFER = 0.18;
-/** A skill pressed while a swing or hit stagger (0.28 s) blocks it is retried this long before skill:denied. */
-export const SKILL_BUFFER = 0.3;
+/** A buffered press (swing, bell, skill) waits this long for the swing / hit stagger (0.28 s) blocking it. */
+export const PRESS_HOLD = 0.32;
 
 export const MELEE = {
   minLateral: 0.4,      // m, closer than this is a bump, not a swing hit
@@ -25,6 +25,9 @@ export const MELEE = {
 
 /** power stat 1..5 → damage multiplier (3 = 1.0). */
 export const powerMul = (power: number): number => 0.7 + 0.1 * power;
+
+/** Rival heavies within `range` m of the player wind up `windupMul`× longer behind a glint (a readable counter). */
+export const HEAVY_TELL = { windupMul: 1.6, range: 6 } as const;
 
 export const HITSTOP = { light: 0.045, heavy: 0.08, crit: 0.1, skill: 0.06, ult: 0.12 } as const;
 export const SHAKE = { light: 0.25, heavy: 0.45, crit: 0.5, skill: 0.35, ult: 0.7 } as const;
@@ -46,7 +49,8 @@ export const WEAPON_RULES = {
   armedByLevel: [0.35, 0.35, 0.55, 0.75, 0.9] as const,
 } as const;
 
-export const BELL = { radius: 15, cooldown: 3, angry: 8, action: 0.45 } as const;
+/** payReach: a rival this far behind (m) or more is no provocation worth SP. */
+export const BELL = { radius: 15, cooldown: 3, angry: 8, action: 0.45, payReach: 6 } as const;
 
 export const PICKUP = {
   float: 0.95,          // m above the road
@@ -64,8 +68,7 @@ export const PICKUP = {
   autoRowEvery: 260,    // m between generated rows when the track defines none
 } as const;
 
-/** Status magnitudes. Shield strength: block-once / immune for the duration / reflect melee. */
-export const SHIELD_BLOCK_ONCE = 0.5;
+/** Shield strengths: melee-immune for the duration (penguin slide) / reflect melee (doge). */
 export const SHIELD_IMMUNE = 1;
 export const SHIELD_REFLECT = 2;
 

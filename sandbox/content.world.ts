@@ -1,6 +1,7 @@
-// World text previews: billboard faces (512×256, ransom glyphs like world/scenery/signs) and road signs
-// (256×160). Reports the glyph size each line ends up with so unreadable-at-speed lines stand out.
+// World text previews mirroring world/scenery/signs: billboard faces (plain 512×256 or poster 512×288,
+// ransom glyphs) and road signs (256×160). Reports each line's glyph size so unreadable-at-speed lines stand out.
 import { Rng, hashString } from '../src/core/rng';
+import { assetUrl } from '../src/data/assets';
 import { check, h } from './content.kit';
 
 const STYLES: Array<[string, string]> = [['#fff', '#0b0b0f'], ['#0b0b0f', '#fff'], ['#fff', '#e5191c']];
@@ -60,27 +61,62 @@ function canvas(w: number, hgt: number, scale: number): [HTMLCanvasElement, Canv
   return [c, g];
 }
 
-/** Billboard face; `art` reserves the left panel the track fills with generated poster art. */
-export function billboard(text: string, where: string, art: boolean): HTMLElement {
+const MIN_GLYPH = 34;   // px on the 512-px face ≈ 0.3 m tall letters on a 4–4.5 m board
+
+/** Poster art for the billboard previews (assets manifest); a missing file falls back to a plain fill. */
+export async function loadPosters(rels: string[]): Promise<Array<HTMLImageElement | null>> {
+  return Promise.all(rels.map((rel) => new Promise<HTMLImageElement | null>((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => {
+      console.warn(`[content] poster ${rel} did not load; previewing a plain fill`);
+      resolve(null);
+    };
+    img.src = assetUrl(rel);
+  })));
+}
+
+function face(c: HTMLCanvasElement, where: string, text: string, size: number, tag: string): HTMLElement {
+  const box = h('div', { class: 'cg-face' }, c, h('small', { text: `${tag}glyph ${Math.round(size)} px` }));
+  check(box, where, text, () => (size < MIN_GLYPH ? `glyphs ${Math.round(size)} px (min ${MIN_GLYPH})` : null));
+  return box;
+}
+
+/** Plain billboard like world billboardFace() without art: 512×256, white panel, ransom line. */
+export function billboard(text: string, where: string): HTMLElement {
   const [c, g] = canvas(512, 256, 0.82);
   const rng = new Rng(hashString(text));
   g.fillStyle = rng.chance(0.5) ? '#0b0b0f' : '#e5191c';
   g.fillRect(0, 0, 512, 256);
-  let tx = 0, tw = 512;
-  if (art) {
-    g.fillStyle = '#f2efe6';
-    g.beginPath(); g.moveTo(10, 10); g.lineTo(240, 10); g.lineTo(215, 246); g.lineTo(10, 246); g.closePath(); g.fill();
-    g.fillStyle = '#c9c4b8'; g.font = `400 26px ${EN}`; g.fillText('ART', 80, 135);
-    tx = 512 * 0.44; tw = 512 * 0.56;
-  }
   g.fillStyle = '#fff';
-  g.fillRect(tx + tw * 0.04, 256 * 0.06, tw * 0.92, 256 * 0.88);
-  const size = ransom(g, rng, text, tx + tw * 0.12, 256 * 0.2, tw * 0.76, 256 * 0.6);
+  g.fillRect(512 * 0.04, 256 * 0.06, 512 * 0.92, 256 * 0.88);
+  const size = ransom(g, rng, text, 512 * 0.12, 256 * 0.2, 512 * 0.76, 256 * 0.6);
   g.lineWidth = 10; g.strokeStyle = '#0b0b0f'; g.strokeRect(5, 5, 502, 246);
-  const minSize = art ? 22 : 34;
-  const box = h('div', { class: 'cg-face' }, c, h('small', { text: `${art ? 'with art · ' : ''}glyph ${Math.round(size)} px` }));
-  check(box, where, text, () => (size < minSize ? `glyphs ${Math.round(size)} px (min ${minSize})` : null));
-  return box;
+  return face(c, where, text, size, '');
+}
+
+/** Poster billboard like world artBillboard(): 512×288 art, the line on a tilted red/black band on top. */
+export function posterBillboard(text: string, where: string, art: HTMLImageElement | null): HTMLElement {
+  const w = 512, ht = 288, band = ht * 0.3;
+  const [c, g] = canvas(w, ht, 0.82);
+  const rng = new Rng(hashString(text));
+  if (art) {
+    const k = Math.max(w / art.width, ht / art.height);
+    g.drawImage(art, (w - art.width * k) / 2, 0, art.width * k, art.height * k);
+  } else {
+    g.fillStyle = '#f2efe6'; g.fillRect(0, 0, w, ht);
+  }
+  g.save();
+  g.translate(w / 2, 14 + band / 2);
+  g.rotate(-0.04);
+  g.fillStyle = '#e5191c';
+  g.beginPath(); g.moveTo(-w * 0.47, -band / 2 + 6); g.lineTo(w * 0.47, -band / 2 - 2); g.lineTo(w * 0.45, band / 2 + 4); g.lineTo(-w * 0.46, band / 2 + 8); g.closePath(); g.fill();
+  g.fillStyle = '#0b0b0f';
+  g.beginPath(); g.moveTo(-w * 0.45, -band / 2); g.lineTo(w * 0.455, -band / 2 - 6); g.lineTo(w * 0.44, band / 2 - 2); g.lineTo(-w * 0.44, band / 2 + 2); g.closePath(); g.fill();
+  g.restore();
+  const size = ransom(g, rng, text, w * 0.08, 10, w * 0.84, band + 6);
+  g.lineWidth = 12; g.strokeStyle = '#0b0b0f'; g.strokeRect(6, 6, w - 12, ht - 12);
+  return face(c, where, text, size, 'poster · ');
 }
 
 /** Road sign face like roadSignFace(): red header bar, one line of text. */

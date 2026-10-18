@@ -10,23 +10,28 @@ export const CURB_W = 0.9;           // curb strip width just outside the asphal
 const CURB_KAPPA = 1 / 430;          // curves tighter than this get curbs
 const HASH_CELL = 24;
 const HINT_WINDOW = 30;
+const RUNOFF = 250;                  // drivable road past the finish line (m)
+const RUNOFF_MARGIN = 30;            // visual road kept beyond the drivable run-off (m)
 
 export interface Bounds { halfWidth: number; left: number; right: number; leftKind: Surface; rightKind: Surface }
 
 export class TrackQuery {
   readonly length: number;
+  /** Drivable run-off past the finish (m): the sampled visual road minus a margin. */
+  readonly runoff: number;
   /** Curb flags per sample (1 = curb strip on that side). */
   readonly curbL: Uint8Array;
   readonly curbR: Uint8Array;
   private readonly i0: number;        // sample index of s = 0
-  private readonly iL: number;        // sample index of s = length
+  private readonly iL: number;        // sample index of s = length + runoff
   private readonly hash = new Map<number, number[]>();
   private readonly tmp: TrackFrame;
 
   constructor(readonly L: BuiltLayout) {
     this.length = L.length;
     this.i0 = Math.round(-L.sMin);
-    this.iL = Math.min(L.n - 1, this.i0 + Math.round(L.length));
+    this.runoff = Math.max(0, Math.min(RUNOFF, L.n - 1 - this.i0 - Math.round(L.length) - RUNOFF_MARGIN));
+    this.iL = Math.min(L.n - 1, this.i0 + Math.round(L.length + this.runoff));
     this.curbL = new Uint8Array(L.n);
     this.curbR = new Uint8Array(L.n);
     this.markCurbs();
@@ -58,7 +63,8 @@ export class TrackQuery {
   }
 
   private clampS(s: number): number {
-    return s < 0 ? 0 : s > this.length ? this.length : Number.isFinite(s) ? s : 0;
+    const end = this.length + this.runoff;
+    return s < 0 ? 0 : s > end ? end : Number.isFinite(s) ? s : 0;
   }
 
   frameAt(sIn: number, out?: TrackFrame): TrackFrame {

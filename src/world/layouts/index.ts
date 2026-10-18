@@ -3,7 +3,11 @@
 import type { TrackId } from '../../core/types';
 import type { LayoutDef } from '../layout/types';
 import { COAST } from './coast';
+import { CITY } from './city';
+import { MOUNTAIN } from './mountain';
 
 export function layoutFor(id: TrackId): LayoutDef {
+  if (id === 'mountain') return MOUNTAIN;
+  if (id === 'city') return CITY;
   return id === 'coast' ? COAST : { ...COAST, id };
 }

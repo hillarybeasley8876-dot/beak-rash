@@ -1,0 +1,154 @@
+// Switchback terrain (env-mountain). Where two road legs run side by side (switchback legs, the
+// infield of hairpins and of the chicane) the near ribbons of both would overlap and bury each
+// other's road. This modifier (LayoutDef.terrainMod → TerrainField.mod) finds, per road row and
+// side, the first other leg whose region the outward ray enters: ribbons stop at that mid-line
+// (room) and the ground between the legs follows one shared surface — a ruled slope from one road
+// edge to the other plus gentle noise — so both legs' ribbons and the far grid meet seamlessly.
+import { smoothstep } from '../../core/math';
+import type { TrackFrame } from '../../core/types';
+import type { TerrainField, TerrainMod } from '../terrain/field';
+import { isShore } from '../terrain/profile';
+
+const ROW = 2;          // precomputed rows every 2 m
+const ARC = 40;         // samples closer than this along the road belong to the same leg (m)
+const RAY = 180;        // how far beyond the edge to look for another leg (m)
+const G0 = 130, G1 = 230; // centre-to-centre gap where the shared surface fades out (m)
+const FOOT_WIN = 34;    // ±window around the hint when finding the other leg's foot point (m)
+
+export class LegBlend implements TerrainMod {
+  private readonly sMin: number;
+  private readonly rows: number;
+  /** Per side (0 = left, 1 = right): s of the other leg near the mid-line (NaN = none) and room. */
+  private readonly other: [Float32Array, Float32Array];
+  private readonly roomU: [Float32Array, Float32Array];
+  private readonly fr: TrackFrame;
+
+  constructor(private readonly field: TerrainField) {
+    const L = field.L;
+    this.sMin = L.sMin;
+    this.rows = Math.floor((L.n - 1) / ROW) + 1;
+    const mk = (v: number): Float32Array => new Float32Array(this.rows).fill(v);
+    this.other = [mk(Number.NaN), mk(Number.NaN)];
+    this.roomU = [mk(Infinity), mk(Infinity)];
+    this.fr = field.q.frameVis(0);
+    const t0 = performance.now();
+    const found = this.scan();
+    console.info(`[mountain] leg blend: ${found} rows next to another leg (${Math.round(performance.now() - t0)} ms)`);
+  }
+
+  /** For every row: candidates from other legs near it, then march the outward rays. */
+  private scan(): number {
+    const L = this.field.L;
+    const step = ROW;
+    const idx: number[] = [];
+    for (let i = 0; i < L.n; i += step) idx.push(i);
+    let found = 0;
+    for (let r = 0; r < this.rows; r++) {
+      const i = Math.min(L.n - 1, r * ROW);
+      const xi = L.px[i] ?? 0, zi = L.pz[i] ?? 0;
+      const cand: number[] = [];
+      for (const j of idx) {
+        if (Math.abs(j - i) <= ARC) continue;
+        const dx = (L.px[j] ?? 0) - xi, dz = (L.pz[j] ?? 0) - zi;
+        if (dx * dx + dz * dz < (RAY + 40) ** 2) cand.push(j);
+      }
+      if (!cand.length) continue;
+      for (const side of [-1, 1] as const) if (this.march(r, i, side, cand)) found++;
+    }
+    return found;
+  }
+
+  /** March the outward ray of row r until a candidate sample is nearer than the own centre line. */
+  private march(r: number, i: number, side: -1 | 1, cand: number[]): boolean {
+    const L = this.field.L;
+    const s = L.sMin + i;
+    const fr = this.field.q.frameVis(s, this.fr);
+    const rl = Math.hypot(fr.right.x, fr.right.z) || 1;
+    const rx = (fr.right.x / rl) * side, rz = (fr.right.z / rl) * side;
+    const bound = this.field.bound(s, side);
+    const nearest = (u: number): { d: number; j: number } => {
+      const px = fr.pos.x + rx * (bound + u), pz = fr.pos.z + rz * (bound + u);
+      let d = Infinity, jb = -1;
+      for (const j of cand) {
+        const dd = ((L.px[j] ?? 0) - px) ** 2 + ((L.pz[j] ?? 0) - pz) ** 2;
+        if (dd < d) { d = dd; jb = j; }
+      }
+      return { d: Math.sqrt(d), j: jb };
+    };
+    let prev = 0;
+    for (let u = 0; u <= RAY; u += 3) {
+      const n = nearest(u);
+      if (n.d > bound + u) { prev = u; continue; }
+      // Bisect the crossing between prev and u.
+      let a = prev, b = u, jb = n.j;
+      for (let k = 0; k < 5; k++) {
+        const m = (a + b) / 2, nm = nearest(m);
+        if (nm.d > bound + m) a = m; else { b = m; jb = nm.j; }
+      }
+      const k = side < 0 ? 0 : 1;
+      (this.roomU[k] as Float32Array)[r] = (a + b) / 2;
+      (this.other[k] as Float32Array)[r] = L.sMin + jb;
+      return true;
+    }
+    return false;
+  }
+
+  private row(s: number): number {
+    return Math.min(this.rows - 1, Math.max(0, Math.round((s - this.sMin) / ROW)));
+  }
+
+  room(s: number, side: -1 | 1): number {
+    return (this.roomU[side < 0 ? 0 : 1] as Float32Array)[this.row(s)] ?? Infinity;
+  }
+
+  /** Horizontal foot point on the road near `hint`: s and signed lateral offset x. */
+  private foot(wx: number, wz: number, hint: number): { s: number; x: number } {
+    const L = this.field.L;
+    const c = Math.round(hint - L.sMin);
+    let best = c, bestD = Infinity;
+    for (let i = Math.max(0, c - FOOT_WIN); i <= Math.min(L.n - 1, c + FOOT_WIN); i++) {
+      const d = ((L.px[i] ?? 0) - wx) ** 2 + ((L.pz[i] ?? 0) - wz) ** 2;
+      if (d < bestD) { bestD = d; best = i; }
+    }
+    let s = L.sMin + best, segD = Infinity;
+    for (const a of [best - 1, best]) {
+      const b = a + 1;
+      if (a < 0 || b >= L.n) continue;
+      const ax = L.px[a] ?? 0, az = L.pz[a] ?? 0, ex = (L.px[b] ?? 0) - ax, ez = (L.pz[b] ?? 0) - az;
+      const t = Math.min(1, Math.max(0, ((wx - ax) * ex + (wz - az) * ez) / (ex * ex + ez * ez || 1)));
+      const d = (ax + ex * t - wx) ** 2 + (az + ez * t - wz) ** 2;
+      if (d < segD) { segD = d; s = L.sMin + a + t; }
+    }
+    const fr = this.field.q.frameVis(s, this.fr);
+    const rl = Math.hypot(fr.right.x, fr.right.z) || 1;
+    return { s, x: ((wx - fr.pos.x) * fr.right.x + (wz - fr.pos.z) * fr.right.z) / rl };
+  }
+
+  /** Sides that keep their own profile: bridges (detached), shores (lake/river) and tunnels. */
+  private keeps(s: number, side: -1 | 1): boolean {
+    const g = this.field.ground(s, side);
+    const L = this.field.L;
+    return g.detached || isShore(g) || (L.roof[this.field.q.sampleAt(s)] ?? 0) > 0;
+  }
+
+  height(s: number, side: -1 | 1, u: number, wx: number, wz: number, h: number): number {
+    const k = side < 0 ? 0 : 1;
+    const hint = (this.other[k] as Float32Array)[this.row(s)] ?? Number.NaN;
+    if (!Number.isFinite(hint) || u <= 0 || this.keeps(s, side)) return h;
+    const f = this.foot(wx, wz, hint);
+    const sideB: -1 | 1 = f.x < 0 ? -1 : 1;
+    if (this.keeps(f.s, sideB)) return h;
+    const bA = this.field.bound(s, side), bB = this.field.bound(f.s, sideB);
+    const dB = Math.abs(f.x), uB = Math.max(0, dB - bB);
+    const w = 1 - smoothstep(G0, G1, bA + u + dB);
+    if (w <= 0) return h;
+    const t = u / (u + uB + 1e-6);
+    const yA = this.field.edgeY(s, side), yB = this.field.edgeY(f.s, sideB);
+    const n = this.field.noise;
+    const amp = Math.min(3, 0.05 * (u + uB));
+    let ruled = yA + (yB - yA) * t + amp * Math.sin(Math.PI * t) * (n.fbm(wx / 45, wz / 45, 2) + 0.3);
+    // Inside the other leg's drivable area (ribbon overreach): stay under its road.
+    if (dB < bB) ruled = Math.min(ruled, yB - 0.6);
+    return h + (ruled - h) * w;
+  }
+}

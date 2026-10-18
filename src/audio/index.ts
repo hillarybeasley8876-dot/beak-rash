@@ -7,7 +7,6 @@ export function createAudio(app: AppContext): AudioSystem {
 }
 
 /** Boot warm-up: build the (suspended, silent) context and graph so the first key press is instant. */
-export function preload(app: AppContext): Promise<void> {
+export async function preload(app: AppContext): Promise<void> {
   if (app.audio instanceof AudioRuntime) app.audio.prepare();
-  return Promise.resolve();
 }

@@ -6,7 +6,7 @@ import { equip, rollWeapon } from '../armory';
 import { clampToRoad, type CombatCtx } from '../ctx';
 import type { PropLibrary } from '../meshes/library';
 import { gainSp } from '../sp';
-import { PICKUP } from '../tuning';
+import { PICKUP, SP } from '../tuning';
 import { autoRows, layRow, makeItem, type Item, type PickupKind } from './items';
 import { PickupRenderer } from './render';
 
@@ -19,13 +19,15 @@ export class PickupSystem {
   private renderer: PickupRenderer;
   private time = 0;
   private drawnFrame = -1;
+  private lastId = 0;
+  private readonly nextId = (): number => ++this.lastId;
 
   constructor(private ctx: CombatCtx, lib: PropLibrary) {
     const { track } = ctx.session;
     const rng = ctx.rng.fork(0x91c4);
     const rows = track.features.filter((f) => f.kind === 'pickupRow');
     const list = rows.length > 0 ? rows : autoRows(track.length, (s) => track.bounds(s).halfWidth, rng);
-    for (const f of list) layRow(f, rng, this.items);
+    for (const f of list) layRow(f, rng, this.items, this.nextId);
     for (const it of this.items) this.keepOnRoad(it);
     const counts = { coin: 0, fish: 0, crate: 0, can: 0 };
     for (const it of this.items) if (it.kind !== 'weapon') counts[it.kind]++;
@@ -89,9 +91,19 @@ export class PickupSystem {
     }
   }
 
-  /** Can `r` take `it`? Armed riders leave road weapons and crates alone (no forced downgrades). */
+  /**
+   * Can `r` take `it`? Armed riders leave road weapons and crates alone (no forced downgrades); fish at full HP
+   * and cans at full SP stay on the road for the riders behind (normal pickup and Big Gulp's vacuum alike).
+   */
   accepts(r: RiderState, it: Item): boolean {
-    return it.alive && !((it.kind === 'weapon' || it.kind === 'crate') && r.weapon !== 'none');
+    if (!it.alive) return false;
+    switch (it.kind) {
+      case 'weapon':
+      case 'crate': return r.weapon === 'none';
+      case 'fish': return r.hp < r.maxHp;
+      case 'can': return r.sp < SP.max;
+      case 'coin': return true;
+    }
   }
 
   /** Apply the item to `r`. Returns false if `r` can't take it. */
@@ -127,7 +139,7 @@ export class PickupSystem {
   /** A knocked-loose weapon flies off the rider and lands on the road ahead. */
   dropWeapon(weapon: WeaponId, uses: number, from: RiderState): void {
     if (weapon === 'none') return;
-    const it = makeItem('weapon', from.s, from.x, this.ctx.rng.next() * 6);
+    const it = makeItem(this.nextId(), 'weapon', from.s, from.x, this.ctx.rng.next() * 6);
     it.weapon = weapon;
     it.uses = uses;
     it.y = from.y + 1.3;
@@ -172,7 +184,7 @@ export class PickupSystem {
 
   /** Debug/test: place an item (weapon kind needs `weapon`). */
   spawn(kind: PickupKind, s: number, x: number, weapon: WeaponId = 'saltfish'): Item {
-    const it = makeItem(kind, s, x, this.ctx.rng.next() * 6);
+    const it = makeItem(this.nextId(), kind, s, x, this.ctx.rng.next() * 6);
     if (kind === 'weapon') {
       it.weapon = weapon;
       it.life = PICKUP.dropLife;

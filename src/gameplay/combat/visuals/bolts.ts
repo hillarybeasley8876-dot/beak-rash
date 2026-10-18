@@ -36,8 +36,6 @@ abstract class RibbonSet implements Visual {
     return this.vs.local(this.r, x, y, z, out);
   }
 
-
-
   dispose(): void {
     for (const rb of this.ribbons) rb.dispose();
   }

@@ -1,5 +1,6 @@
 // Riding event reactions: crashes, landings, hops, drift levels, boosts, bumps, near misses,
 // off-road puffs, obstacle hits, respawns, finish confetti, busted.
+import { Vector3 } from 'three';
 import { clamp } from '../../core/math';
 import { DRIFT_COLORS } from '../presets/speed';
 import { bodyBits } from './species';
@@ -9,11 +10,13 @@ import type { FxContext } from '../context';
 const SURFACE_PUFF: Record<string, string> = { grass: 'grass', sand: 'sand', dirt: 'dirt', water: 'splash', curb: 'dust' };
 const BOOST_COLOR: Record<string, string> = { pad: '#2ad1ff', land: '#ffe600', draft: '#ffffff', skill: '#ff1e3c', pickup: '#ffe600' };
 const OBSTACLE_PUFF: Record<string, string> = { oil: 'oil', puddle: 'splash', cone: 'poof', crate: 'crate', barrel: 'debris' };
+const flat = new Vector3(); // landing bursts inherit only the horizontal speed (the fall would sink them into the road)
 
 export function subscribeRide(ctx: FxContext): Array<() => void> {
   const { bus } = ctx.app;
   const isPlayer = (id: RiderId | null): boolean => id !== null && ctx.session()?.player.id === id;
   const rider = (id: RiderId) => ctx.session()?.rider(id);
+  const driftLevel = new Map<RiderId, number>(); // level of the drift that just ended (its boost follows)
 
   return [
     bus.on('rider:crash', (e) => {
@@ -33,23 +36,24 @@ export function subscribeRide(ctx: FxContext): Array<() => void> {
     bus.on('rider:land', (e) => {
       const t = ctx.tracker.get(e.riderId);
       if (!t) return;
-      ctx.burst('landing', t.pos, { vel: t.vel, ground: t.ground, scale: clamp(0.55 + e.airTime * 0.9, 0.55, 1.6) });
-      if (e.perfect) ctx.burst('sparkle', t.body, { vel: t.vel, color: '#ffe600' });
+      flat.copy(t.vel).setY(0);
+      ctx.burst('landing', t.pos, { vel: flat, ground: t.ground, scale: clamp(0.4 + e.airTime, 0.4, 1.5) });
+      if (e.perfect) ctx.burst('sparkle', t.body, { vel: flat, color: '#ffe600' });
     }),
     bus.on('rider:hop', (e) => {
       const t = ctx.tracker.get(e.riderId);
       if (t) ctx.burst('hopDust', t.pos, { vel: t.vel, ground: t.ground });
     }),
     bus.on('rider:drift', (e) => {
+      if (e.phase === 'end') driftLevel.set(e.riderId, e.level);
       const t = ctx.tracker.get(e.riderId);
       if (t && e.phase === 'level') ctx.burst('driftPop', t.wheelR, { vel: t.vel, level: e.level, dir: t.fwd.clone().negate() });
     }),
     bus.on('rider:boost', (e) => {
       const t = ctx.tracker.get(e.riderId);
       if (!t) return;
-      const level = clamp(Math.round(e.power / 0.1) - 1, 1, 3);
-      const color = e.kind === 'drift' ? DRIFT_COLORS[level]?.[1] : BOOST_COLOR[e.kind];
-      ctx.burst('boost', t.body, { vel: t.vel, dir: t.fwd, color });
+      const color = e.kind === 'drift' ? DRIFT_COLORS[clamp(driftLevel.get(e.riderId) ?? 1, 1, 3)]?.[1] : BOOST_COLOR[e.kind];
+      ctx.burst('boost', t.body, { vel: t.vel, dir: t.fwd, color, ground: t.ground });
       if (isPlayer(e.riderId)) ctx.post.punch(0.008);
     }),
     bus.on('rider:bump', (e) => {

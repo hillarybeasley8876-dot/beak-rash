@@ -1,0 +1,66 @@
+{
+ "unit": "sim",
+ "round": 2,
+ "lens": "feel",
+ "score": 6.5,
+ "pass": false,
+ "summary": "Most of round 1 is properly fixed, and the core handling is now commercial grade. feel-telemetry passes 60/60 (shots/review/sim/r2-feel/tele2): 0-60 km/h in 4.42 s, top 20.0 m/s, brake 12.5 m/s2, tau63 0.083 s, yaw visible in 1 frame (2 on keyboard), no release overshoot, hop 0.375 s, ramp 0.675 s PERFECT, slow-mo step 0.72 px. With real keyboard input in realtime (122 fps), yaw shows 19-21 ms after a keydown and a hop shows 6 ms after Space. The same 10.5 s scripted run at dt 1/30, 1/60, 1/144 and with uneven frame times gives events within one frame of each other and no NaN, overshoot or oscillation on release. Soaks with 8 riders, traffic and police (90 s at 60 fps, 60 s at 30, 45 s at 144) show 0 NaN, 0 out-of-bounds, 0 tunnelling and no page errors. Round 1 checks: F1 drift into wall FIXED (18 real-track cases, 0 crashes); F3 knockback FIXED (a heavy hit shoves the live AI goose 1.25 m); F4 snaking FIXED (best pattern +3.0-3.5 %); F6 slopes, F7 oil/puddle and F8 landing dip FIXED; F2 hand-backs pass the new per-frame rotation checks. Still open: F5 has turned into a wall pinball with dead steering, which is a major; drift charging on the real coast curves runs about twice as slow as SPEC (major); F9 cruise hero size is still waiting on the core request; and telemetry still misses both majors. Two majors, so this fails.",
+ "issues": [
+  {
+   "severity": "major",
+   "title": "Steering into a wall pinballs (a new impact every 0.42 s, a 2.4 Hz yaw rock) and steering is dead for 0.3 s after each hit",
+   "detail": "scripts/wallpin.mjs runs the real cliff at s 1200 for 4 s and gives the same result at dt 1/30, 1/60 and 1/144. With steer 0.3, 0.45 or 1.0 into the wall there are 9 'wall' impacts each (0.57, 0.98, 1.40 ... 3.80 s) and 0 scrapes. Speed falls 20 -> 15.1 / 13.8 / 10.1 m/s, and at full lock yaw swings -11.3..+24.9 deg (4.4-4.8 reversals/s). Only steer <= 0.15 reaches the designed scrape (2 hits, then 14 wallScrape events). Camera trauma spikes to 0.17-0.32 at every impact (scripts/wallstrip.mjs), and each impact also fires fx/audio hit feedback. The feel-tour cliffwall stop itself logs 6 impacts at steer 0.45. strips/wall-steer10.png shows the bike nose rocking into and away from the rock. Cause: surfaces.ts impact() bounces (vx x -0.35) and opens startCarry(sr, 0.3 s, steer 0, tau 0.4); when the carry ends, the held steer drives the bike back in above wallBounceMin 1.2 m/s, and that counts as a new impact. The zero-steer carry also ignores the player. In scripts/walldead.mjs full steer away from the wall does nothing for 18 frames: vx decays -1.65 -> -0.71 back toward the wall, against 3 frames on open road. That breaks 'input -> visible <= 2 frames'. Vehicle side-swipes (obstacles.ts) use the same carry. On top of that, the bounce snaps the heading 8.8 deg in one frame (scripts/posespike.mjs). As a live test, wallBounceMin 4.5 turns steer <= 0.45 into a smooth scrape (0 impacts, yaw 0) but full lock still pinballs, so a threshold alone does not fix it.",
+   "fix": "Add contact hysteresis in surfaces.ts. After an impact, store sr.wallSide until the rider is more than 0.4 m off the limit or 0.8 s has passed with no contact. While it is set, send every re-contact on that side through the scrape path (vx = 0, friction by pressure, buzz, wallScrape events): no bounce, no 'wall' event, no shake. During any carry window (wall, vehicle swipe), clamp only the steering component that points into the wall or obstacle and keep full authority away from it. Ease the visual yaw for about 0.08 s after a bounce instead of snapping. Acceptance, added to feel-scenarios-abuse: 4 s at steer 0.3, 0.6 and 1.0 into a wall gives exactly 1 'wall' event, yaw reversals <= 0.5/s, and steering away gives |vx| >= 2 m/s within 3 frames of the impact."
+  },
+  {
+   "severity": "major",
+   "title": "Drift charge on the real coast curves is about 2x slower than SPEC (L3 only after a 3.4-3.8 s edge-to-edge slide); L1 spam beats L3",
+   "detail": "SPEC 6: L1 0.55 s, L2 1.2 s, L3 2.0 s. scripts/driftwide.mjs (real track, full commitment from the outside edge) measures R380 1.03/2.27/3.77 s, R319 0.97/2.12/3.52, R300 0.95/2.05/3.42, R340 1.00/2.17/3.62, and only the R150 chicane gets close at 0.70/1.47/2.42. At commit 0.6, L3 takes 4.0-4.4 s. Starting from the centre (scripts/driftreal.mjs), holding into R380/R319 ends at L2 at the inside edge, and straights reach L1 only at 1.70 s. A real Shift+A held for 1.8 s reaches only L1, charge 0.68 (scripts/keysrt.mjs, keys/d-drift2.png). Cause: drift.ts chargeRate uses bend = clamp01(kappa*d*driftChargeKappa 80), which gives a factor of 0.44 on a R319 curve. Telemetry 'drift' passes only because it runs at kappa 1/45 (0.55/1.18/1.97), a curve the track does not have. Payoff ordering is also inverted: scripts/cornervalue.mjs shows drifting gains only 0.4-1.0 s per corner section, and on R380/R319 repeated L1 drifts gain more (0.60/0.72 s) than going for L3 (0.40/0.38 s). Live check with __br.sim.tuning.driftChargeKappa = 320: every coast curve charges 0.43-0.48 / 0.93-1.05 / 1.53-1.75 s, straights are unchanged (snaking stays <= +3.5 %), and L2/L3 now beat L1 spam (1.6-1.9 s vs 1.1 s per section).",
+   "fix": "Raise driftChargeKappa from 80 to about 200, so a committed drift on R319 reaches L1 0.59 / L2 1.28 / L3 2.13 s (SPEC), with a full rate at R <= 200. Keep driftChargeStraight 0.25 so straights stay unfarmable. Re-run cornervalue so the gain per corner stays <= ~10 % and is ordered L3 > L2 > L1. Move the telemetry drift timing check to kappa 1/300 and 1/150 with windows L1 0.45-0.7, L2 1.0-1.45, L3 1.7-2.4 s."
+  },
+  {
+   "severity": "minor",
+   "title": "F9 still open at cruise: the hero is 149 px tall (20.7 % of 720p)",
+   "detail": "scripts/framing.mjs: cruise at 20 m/s gives 149x41 px, unchanged since round 1. The counter-dolly part is fixed: an L3 boost at FOV 87.8 keeps 141 px (was 113), and 6 m/s gives 197 px. Swings, the pouch and wing skills read small at speed (keys/a-cruise.png). The fix depends on the pending core request (SPEC camera numbers).",
+   "fix": "Integrator: apply the status/sim.md core request (dist 4.6->5.6 => 4.3->5.1 m, FOV 62->74 => 60->70), then edit CHASE.dist/fov. Target >= 175 px at cruise and re-run framing.mjs."
+  },
+  {
+   "severity": "minor",
+   "title": "PERFECT landings are unconditional: steering cannot fail them",
+   "detail": "scripts/slopesreal.mjs, real ramp at s 1812: straight gives PERFECT; full steer held through the whole flight gives PERFECT (air 0.54 s); steer 0.6 into the lip gives PERFECT; every crest and ramp in the tour also lands PERFECT. Air control (0.35 x 7.5 = 2.6 m/s lateral, tau x3) caps the landing yaw at about 7 deg, below perfectMaxYaw 12 deg, so only drifting at takeoff can miss. The +20 % boost and +8 SP are free, so jumps carry no skill.",
+   "fix": "Judge the landing on touchdown, not on yaw alone. Require |steer| < 0.3 over the last 0.15 s of air and |yaw| < 6 deg, or a hop press within 0.2 s before touchdown as a 'stick the landing' input. Add a ramp case with full air steer that must NOT be PERFECT."
+  },
+  {
+   "severity": "minor",
+   "title": "Drift is on rails at any curvature and turns less than plain steering (SPEC: authority x1.35)",
+   "detail": "steering.ts drops the curve push entirely while drifting, and driftLatIn caps the inward speed at 3.2 m/s (grip allows 7.5). scripts/hairpin.mjs (stub, 20 m/s): on R15 (2.7 g) plain riding wrecks on the wall, while a neutral drift follows the bend at x <= 2.74 m with no extra speed loss (vEnd 18.6, same as on R150). The mountain switchbacks (data/tracks.ts '十八弯') would be taken flat out holding Shift. On the coast, a committed drift crosses only 3.0 m/s (driftreal R150) against 5.4 m/s net for grip. Releasing Shift while still holding the steer then darts inward at up to 6.3 m/s: scripts/driftexit.mjs, R319 L3 with a 0.3 s release lag goes x 5.42 -> 7.41 with the wall at 8.05.",
+   "fix": "While drifting, cancel the curve push only up to a hold capacity: target -= sign(k)*max(0, k*v^2*0.8 - 1.35*steerAuthHigh*handling*vn). Drifts then run wide beyond about R32 at top speed. Raise driftLatIn to about 4.5 so a committed drift tightens the line, and keep the driftMaxAngle clamp. On release, ramp authority from the drift lateral speed to grip over about 0.2 s."
+  },
+  {
+   "severity": "minor",
+   "title": "Light hits barely shove an AI that is pressing in (0.29 m)",
+   "detail": "scripts/knockreal.mjs with live combat and race AI: a wing light hit (3.2 m/s) moves the goose only 0.29 m while its AI steers -0.8..-1.0 toward the player, after which it closes in again. The carry window keeps 30 % steer (knockSteer 0.3) in every direction. Heavy hits read well (4.8 m/s -> 1.25 m, strips/knock-heavy.png), and telemetry's 0.60 m light value assumes the victim does not steer.",
+   "fix": "During a knock carry, scale only the steering component pointing back toward the hit source by about 0.1 and leave steering away at 0.3. This is the same direction-aware clamp as the wall fix. Add a knock case with the victim steering into the attacker that expects >= 0.45 m for 3.2 m/s."
+  },
+  {
+   "severity": "minor",
+   "title": "Telemetry is still green over both majors",
+   "detail": "Telemetry passes 60/60 while both majors are present. wallEvents only asserts a minimum gap >= 0.25 s, so 2 impacts in 1.2 s at full lock pass and the pinball is invisible. The drift timing check runs at kappa 1/45 only, and driftWall checks a level only at k150 hold. Nothing measures steer-away latency after an impact, a failed PERFECT, or the light-knock case against a steering victim.",
+   "fix": "Add: (a) 4 s of steer 0.3/0.6/1 into a wall: impacts <= 1, yaw reversals <= 0.5/s; (b) steer away at impact: |vx| >= 2 m/s within 3 frames; (c) drift L1/L2/L3 at kappa 1/300 and 1/150 against SPEC windows; (d) ramp with full air steer is not PERFECT; (e) light knock against a steering victim >= 0.45 m."
+  },
+  {
+   "severity": "minor",
+   "title": "cross-unit: coast bends are still R >= 150 m, so SPEC curve-steering targets never occur",
+   "detail": "scripts/profile.mjs: the curves are R380, R319, R150, R150, R300 and R340. At top speed they need <= 28 % steer (sbend tour steer <= 0.28), so the SPEC's 'fast corners need ~60-80 % steer' never happens in a race. curveHold R60 = 71 % holds only on the patched stub road. Round 1 F12 is unchanged.",
+   "fix": "Track unit: add 2-3 corners of R 45-70 m with run-off (after the tunnel, at the market chicane). Sim then re-validates the drift charge and curve push there."
+  }
+ ],
+ "verified_ok": [
+  "F1: 18 drift cases on the real track (hold/neutral/counter at 6 places) give 0 crashes; only the straight hold touches the wall, after 2.75-2.97 s at 2.9 m/s (scripts/driftreal.mjs, strips/drift-hold-R150-dt60.png)",
+  "F3: a heavy hit shoves the live AI 1.25 m with a big lean (strips/knock-heavy.png); telemetry gives 0.60 / 1.69 m",
+  "F4: best snaking pattern over 24 s is +3.0-3.5 %; neutral +0.1 %; counter-steer patterns lose 0.8-2.2 % (scripts/exploit3.mjs)",
+  "F6: the real -13 % drop takes 19.25 -> 21.1 m/s and -5.5 % settles at 21.4; F7: oil yaw -11.9..+10.7 deg, 20 -> 18.7 m/s; F8: ramp landing dip -0.20 m, the bike drops 49 px below its cruise line and recovers",
+  "Pack contacts: shoulder pressing is smooth (max 2nd difference 0.009 m), rear-ends and charges separate cleanly, no teleports (scripts/bumps.mjs)",
+  "Frame-rate independence and soaks: 0 NaN, 0 out-of-bounds, 0 tunnelling at 30/60/144 fps; tsc clean for sim and camera"
+ ]
+}

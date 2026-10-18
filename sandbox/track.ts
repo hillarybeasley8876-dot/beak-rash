@@ -126,6 +126,14 @@ async function main(): Promise<void> {
       rc.setFromCamera(new Vector2((px / w) * 2 - 1, -(py / h) * 2 + 1), camera);
       return rc.intersectObject(api.track.group, true).slice(0, 4).map((i) => `${i.object.name}@${i.distance.toFixed(1)}`);
     },
+    /** Lateral x of the first surface hit from track point (s, x, y) going sideways (`side` = ±1). */
+    rayX: (sv: number, xv: number, yv: number, side: -1 | 1): { x: number; name: string } | null => {
+      const f = api.track.frameAt(sv);
+      const o = api.track.toWorld(sv, xv, yv, new Vector3());
+      const dir = new Vector3(f.right.x, 0, f.right.z).normalize().multiplyScalar(side);
+      const hit = new Raycaster(o, dir, 0, 40).intersectObject(api.track.group, true)[0];
+      return hit ? { x: +(xv + side * hit.distance).toFixed(3), name: hit.object.name } : null;
+    },
     /** Dispose only, then render once (memory should drop to the baseline). */
     dispose: (): void => {
       api.track.dispose();

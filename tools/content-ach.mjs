@@ -140,6 +140,22 @@ scenario('bump-damage-is-not-untouched', (expect) => {
   expect(v.has('untouched'), 'a soft shove keeps untouched');
 });
 
+scenario('credited-ko-is-not-pacifist', (expect) => {
+  // A hard bump writes lastHitBy; the rival wrecks within 3 s → combat credits the KO without a swing.
+  const w = makeWorld();
+  w.emit('race:start', {});
+  w.emit('rider:bump', { a: 0, b: ID.goose, strength: 6, pos: P });
+  w.ko(ID.goose);
+  w.finish(2);
+  expect(w.has('first_ko') && w.has('goose'), 'the credited KO counts');
+  expect(!w.has('pacifist'), 'a KO to your name is not 情绪稳定');
+  const v = makeWorld();
+  v.emit('race:start', {});
+  v.ko(ID.cat, { attacker: ID.goose });                        // rivals fighting each other
+  v.finish(2);
+  expect(v.has('pacifist') && !v.has('first_ko'), 'rival-on-rival KOs keep pacifist');
+});
+
 scenario('last-place-and-phoenix', (expect) => {
   const w = makeWorld();
   for (let i = 0; i < 3; i++) w.emit('rider:crash', { riderId: 0, cause: 'wall', speed: 15, pos: P, attacker: null });

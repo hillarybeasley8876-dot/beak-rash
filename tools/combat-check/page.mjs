@@ -65,7 +65,7 @@ export function installHelpers() {
       br.app.clock.clearScale('ko');
       br.app.clock.clearScale('ult');
       for (const r of s.riders) {
-        Object.assign(r, { hp: r.maxHp, sp: 0, action: null, combo: 0, comboTimer: 0, lastHitBy: null, invuln: 0, heat: 0 });
+        Object.assign(r, { hp: r.maxHp, sp: 0, action: null, combo: 0, comboTimer: 0, lastHitBy: null, invuln: 0, heat: 0, draft: 0 });
         r.statuses.length = 0;
         c.give(r.id, 'none');
         if (!r.isPlayer && !keep.includes(r.id)) c.pin(r.id, -60 - r.id * 12, 0, true);

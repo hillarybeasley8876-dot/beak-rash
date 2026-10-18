@@ -1,0 +1,74 @@
+{
+  "unit": "sim",
+  "round": 2,
+  "lens": "camera",
+  "pass": false,
+  "score": 6.5,
+  "summary": "All eight round-1 camera issues are fixed and verified by measurement. Blends now rotate along a smooth smootherstep bell with the same ~325 deg/s peak at 30/60/144 fps. Starts more than 90 deg or 12 m away hard-cut, and every KO, WRECKED and SHOWTIME exit lands on the fx flash frame without a visible pop. Hit-stop freezes the chase. Skill and drift boosts kick the FOV with a counter-dolly. The road crash cam is close and centred, landings compress, and rough-ground buzz is visible. Follow smoothness is sub-pixel at every frame rate, and curves, drifts, jumps, wall-hugging and look-back are commercial-grade. One major remains: after a traffic crash the crash cam follows the wreck straight into the vehicle it hit. The screen fills with van interior or goes black inside a bus for 0.3-0.5 s, seen in every lap run that had a player traffic crash plus a deterministic repro. Minors: the respawn glide reverses past the rider and hides it for 8-14 frames; the SHOWTIME exit cut lands on a crane-high, unsettled pose; pause does not freeze shake, kicks or buzz; water crashes frame the body 10 m away; telemetry does not cover any of these. Evidence: shots/review/sim/r2-camera/.",
+  "r1_followup": {
+    "C1 blocker blend slerp alias": "FIXED. blend.ts slerps into scratch quats. Synthetic overrides at 30/60/85 deg blend in 20 frames, peaking at 2.75/5.42/7.61 deg/frame as a smooth bell, with the same peak rate at 30/60/144 fps (t3-blend.json, t3-az60-strip.png).",
+    "C2 major straight blend path": "FIXED for cinematics. The arc runs in the rider frame; > 90 deg or > 12 m starts cut; all KO/wrecked/ult exits cut (gaps 100-126 deg); 0 rotation spikes outside cuts in 2 full laps; blends stay >= 3.8 m from the rider. Residual: the respawn glide still takes the rider off-screen (issue 2).",
+    "C3 major skill boosts no FOV": "FIXED. pelican.wing gives rider:boost 'skill' + a 12 deg kick for 2.2 s, then +3 deg overspeed FOV at 25 m/s (t21t22.json).",
+    "C4 hit-stop slide": "FIXED. Camera moves 0 m during a 0.1 s hit-stop (t10t11.json).",
+    "C5 crash cam far/small": "FIXED on the road: 4.3-5.9 m from the body, centred (t4-crash.json). Water crash is still far (issue 5). New: it clips into vehicles (issue 1).",
+    "C6 low-trauma imperceptible": "FIXED. Landing dip 0.20-0.25 m (t9-*.csv); rough/curb buzz 3.4 px mean, 6 px peak (t11-curb.json).",
+    "C7 telemetry blind to rotation pops": "FIXED. The handoff scenario checks per-frame rotation and passes 20/20 (tele/metrics.json). New blind spots: issue 6.",
+    "C8 cross-unit rider:boost skill": "FIXED. Combat emits rider:boost 'skill' on pelican.wing."
+  },
+  "issues": [
+    {
+      "severity": "major",
+      "title": "Crash cam follows the wreck into the vehicle you hit: 0.3-0.5 s of van/car interior or a black screen inside a bus (src/camera/chase.ts crashed mode + src/sim/obstacles.ts isSolid gate)",
+      "detail": "obstacleContacts() returns early for non-solid riders (obstacles.ts: if (!isSolid(r))), so after a traffic crash the sliding body passes straight through the vehicle. The crashed ChaseCam then puts the eye 4.3 m behind the tumbling body anchor at 1.6 m, clamped only to bounds() and never tested against session.obstacles, so it drives into the vehicle box. Real autopilot lap, seed 7, traffic + police (t17b-grab.mjs 7): both player traffic crashes clipped. (1) Stopped ice-cream van: eye inside the box for 17 frames (60.38-60.65 s). The screen shows the van's dark inner faces and fragments of the cabin (t17b-s7-ev1.png 60.38-60.58 s, t17b-s7-ev2.png 60.62 s). (2) Oncoming bus, 10 m long and 3.05 m tall: eye inside for at least 20 frames. The screen goes black with a few stray faces from 154.72 s to at least 155.05 s (t17b-s7-ev3.png). Separate lap runs: seed 7 had 14 frames inside a van and seed 3 had 16 frames inside a car and then a van (t17-lap-7/3.json inObs). Deterministic repro (t7-traffic.mjs 5, case 0: stationary car): crash at frame 96, eye inside the car box at frames 149-174 (0.43 s), and the yellow body fills the frame (t7-traffic-0-car-g142.png 2.38-2.65 s). Case 1 skims 0.4 m over an oncoming car's roof (t7-traffic-1-car.png 0.97-1.12 s). Racing-mode near misses at 0.5-0.7 m are clean (t9n-swerve-s5/s9.json), so only the crash cam is affected. Traffic crashes are one of the most frequent events in a Road Rash-style race, so this glitch happens in a typical session.",
+      "fix": "Camera: while crashBlend > 0 (and as a safety net in racing chase), test the eye and the eye->body segment against active solid session.obstacles boxes inflated by 0.5 m plus the near plane. When the eye is inside or the segment is blocked, spring the eye to o.height + 0.7 m above the road (omega ~12) and/or toward the free lateral side, still looking at the body, so it never enters. Physics: give crashed bodies a response against solid vehicles in crash.ts (stop or bounce, or vault the roof using o.height), so the wreck piles against the van instead of tunnelling. Regression: add feel scenarios that crash into a stationary car, a stopped van and an oncoming bus, and assert 0 frames with the eye inside a box and the body never occluded for more than 6 frames."
+    },
+    {
+      "severity": "minor",
+      "title": "Respawn glide reverses past the rider: the hero is off-screen for 8-14 of its 27 frames (src/camera/listeners.ts rider:respawn -> blend.start)",
+      "detail": "The crash cam ends 2.8-3.3 m AHEAD of the respawn spot because it followed the body flung forward. The 0.45 s glide then arcs from in front of the rider, around its side (camX -2.2 -> -3.6 -> +0.5), to behind it, while still looking down the road. Traffic crash: the rider is behind or beside the lens for 14/27 frames. The frame shows an empty road for about 0.25 s, then the pelican slides in from the right edge (t4-traffic-glide.png 2.62-2.88 s). Water crash: 8/27 frames (t4-water-glide.png 3.12-3.38 s). Real laps: 8 off-screen frames per respawn glide (t17-lap-3/7.json blendOff). Max 2.3 deg/frame, so this is not a pop, but it is the r1 'rider leaves the frame during blends' symptom on every respawn, at the moment the player needs to find their bike.",
+      "fix": "Hard-cut on respawn (the respawn blink masks it) when the start eye is in front of the rider (anchor-local z < 0) or the rider is outside the start frustum. Otherwise keep the rider in frame by slerping from a look-at-rider orientation at the start eye to the chase orientation. Telemetry: require the rider on screen for >= 90 % of blend frames."
+    },
+    {
+      "severity": "minor",
+      "title": "SHOWTIME exit cuts to an unsettled chase pose: eye 4.6 m high, rider pinned to the bottom edge, then a 0.5 s sink (src/camera/chase.ts springs on dtSim)",
+      "detail": "Follow springs integrate dtSim. Between ult:impact (1.60 s) and the hand-back (2.87 s), the 0.12x ult slow-mo gives the y spring only ~0.15 s of sim time to recover from the 8 m leap. The 125 deg hand-back is correctly a cut, but it lands with the eye 4.58 m above the road (rest 2.2 m). The pelican's feet are at 673/720 px under the fx shockwave ring, and the camera sinks until ~3.45 s (t5u-ult.json, t5u-ult-handback.png 2.87-3.30 s). KO and wrecked cuts are fine because nothing moved far vertically during them.",
+      "fix": "Add ChaseCam.settle(session), which snaps the x/y/lx/ly/dip springs and the dist/height/fov dampers to their current targets (like reset() but keeping the crash/orbit state). Call it when Blend chooses the cut path (blend.ts fresh && cut) or when an override ends. Alternatively, integrate the follow springs on dtReal while st.cine is active, since nothing shows the chase then."
+    },
+    {
+      "severity": "minor",
+      "title": "Pause does not freeze the camera: shakes, FOV kicks and buzz keep running behind the pause menu (src/camera/rig.ts update)",
+      "detail": "game.ts pauses with clock layer 'pause' = 0, but rig.update() always runs fx.update(dtReal), and buzzOf() still sees the frozen rider at speed. Measured over 1 s of pause (t8-pause.json): an active crash shake keeps moving the frame up to 0.86 deg/frame (rider sx 627-646 px). A boost kick keeps releasing, FOV 86 -> 80 deg, with the counter-dolly moving the eye 7 cm/frame. The speed buzz keeps jittering at 0.06 deg/frame. The frozen scene behind the pause menu visibly shakes and zooms.",
+      "fix": "In rig.update: const live = app.clock.getScale('pause') > 0. When not live, skip fx.update() and set fx.buzz = 0, which freezes the noise time and envelopes. Keep hit-stop and KO/ult slow-mo on real time as they are now."
+    },
+    {
+      "severity": "minor",
+      "title": "Water / off-edge crashes frame the wreck as a speck 10 m away for ~1.5 s (chase.ts edgeMargin clamp in crashed mode)",
+      "detail": "The crash cam eye is clamped 1.0 m inside bounds(), so when the body is thrown off the beach into the sea the eye stops at the edge. The camera-to-body distance grows 5.3 -> 10.4 m and stays there. For the rest of the crashed window the pelican is a 20-30 px blob in an empty sea (t4-water-strip.png 1.62-3.02 s; t4-crash.json water crashBodyDist). This is the r1 C5 symptom on the coast track's signature hazard.",
+      "fix": "When the clamped eye is farther than crashDist + 1 m from the body, narrow the FOV to keep the body's angular size: fov = 2*atan(tan(29 deg)*4.3/d), with a floor of ~30 deg. Raise the eye ~0.15 m per extra metre so the splash reads. Alternatively, let only the crash cam leave the bounds by up to 3 m over water/void edges, where nothing solid exists."
+    },
+    {
+      "severity": "minor",
+      "title": "Camera telemetry passes 20/20 while issues 1-4 are present (tools/feel-scenarios-blend.mjs, feel-scenarios-camera.mjs)",
+      "detail": "Re-run: handoff + camera + jitter pass 20/20 (shots/review/sim/r2-camera/tele/metrics.json). No scenario crashes into traffic or checks the eye against obstacle boxes. Rider visibility during blends is never checked: respawn passes with 14 off-screen frames, since only respawn_maxRotDeg 2.28 is tested. The pose on the first frame after a cut is never checked (ult), and nothing covers pause.",
+      "fix": "Add scenarios: crashes into a stationary car, a stopped van and an oncoming bus (eye-in-box frames = 0); respawn after a traffic and a water crash (rider on screen >= 90 % of blend frames); SHOWTIME hand-back (first chase frame within 0.3 m of the rest eye height); pause during a shake and a kick (0 camera motion)."
+    },
+    {
+      "severity": "minor",
+      "title": "cross-unit: hero-framing core request is still open; the cruise rider spans ~150-158 px (21-22 %) at 720p",
+      "detail": "status/sim.md 'Core requests' proposes SPEC section 6 distance 4.3->5.1 m and FOV 60->70; neither has been applied. At cruise, head-to-wheel projects to ~158 px (t5u-ult.csv first rows: head 346 / foot 504; t0-cruise.png), so pouch, wing and swing animations read small at speed. Boosts no longer shrink the rider (counter-dolly holds 164 px at L3).",
+      "fix": "Integrator: decide the section 6 numbers. Sim then only edits CHASE.dist/fov in src/camera/chase.ts and re-runs t23-size/feel-telemetry."
+    }
+  ],
+  "verified_ok": [
+    "Frame-rate independence: slalom, S-bend and drift at dt 1/30, 1/60, 1/144 and random 1/30-1/144 pacing. Bike screen residual <= 0.43 px; roll, pitch and yaw residual <= 0.05 deg; FOV <= 0.0006 deg; cross-rate framing within 3.3 px (t1.json). Slow-mo max step 0.72 px (tele/metrics.json).",
+    "Cinematic hand-offs: 0.35 s smootherstep blends with no pop at 30/60/144 fps (t3-blend.json); KO/wrecked/ult exits hard-cut on the fx flash frame (t2-ko-handback.png 1.32 s, t2-wrecked-handback.png 0.92 s); intro -> GO <= 0.27 deg/frame (t5.json); 0 rotation spikes > 6 deg outside cuts in 2 autopilot laps with traffic + police (t17-lap-3/7.json).",
+    "Boost sensation: drift L3 (L1 0.67 s, L2 1.43 s, L3 2.38 s on the real R150 bend) release gives a 12 deg kick in 5 frames (<= 3.7 deg/frame), the counter-dolly holds the rider at 164 px, and speed lines read well (t6c-drift-release.png). pelican.wing gives a 12 deg kick for 2.2 s, then +3 deg overspeed FOV (t21t22.json).",
+    "Curves and drift: S-bend rider at sx 610-664 px with the bend ahead visible (t6c-sbend-strip.png). Roll = lean x 0.18 in the lean direction (-34 deg lean -> 6.1 deg). In a drift the view yaws ~10 deg into the slide for a readable 3/4 angle and recovers smoothly (t6c-drift-strip.png).",
+    "Jumps and landings: crest (0.82 s air) and ramp (0.63/0.72 s) keep the rider framed (head >= 262 px), <= 0.35 deg/frame; landing dip 0.20-0.25 m peaks ~70 ms after touchdown, then the PERFECT kick (t9.json, t9-*-strip.png).",
+    "Hits and shake: hit-stop freezes the chase with a -3 deg punch-in. Hit / heavy / crash / landing shake = 0.34 / 1.13 / 1.25 / 0.25 deg peaks. settings.shake honoured (t10t11.json).",
+    "Clearance: >= 2.1 m over road while wall-hugging cliff, cutting, tunnel and bridge; eye 0.4-1.0 m inside the walls (t12.json, t12-cuttingR.png, t12-tunnelL.png). Tight racing near misses (0.5-0.7 m) past vans, trucks and buses never clip (t9n-swerve-*.json).",
+    "Crash cam on the road: 4.3-5.9 m from the tumbling body, centred, with a slow 12 deg/s orbit; reads well (t4-traffic-strip.png, t2-wrecked-strip.png).",
+    "Look-back (C): clean 180 deg cuts in and out; the pelican is large in front with the drafting goose readable behind (t14-lookback-drafter.png).",
+    "Typecheck: npx tsc --noEmit -p tsconfig.json reports 0 errors (none in src/camera or src/sim)."
+  ]
+}

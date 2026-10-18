@@ -1,5 +1,6 @@
 // results: RESULTS slam, standings table, podium, grade stamp + meme title, coin count-up (saved once),
-// achievements, buttons 再来一局 / 下一站 / 车库 / 主菜单. Without race props it shows demo data (no save).
+// achievements (unlocked + saved by gameplay/achievements), buttons 再来一局 / 下一站 / 车库 / 主菜单.
+// Without race props it shows demo data (no save).
 import './results.css';
 import type { RaceConfig, RaceResult } from '../../core/contracts';
 import type { CharacterId } from '../../core/types';
@@ -10,6 +11,8 @@ import { HINT_LR, HINT_OK, backdrop, button, h } from '../p5';
 import { CAREER, applyRewards, careerEvent, isUnlocked } from '../progress';
 import { frame, type ScreenCtx, type ScreenFactory } from '../screen';
 import { achievementChips, coinCounter, gradeBlock, podium, standingsTable } from './results-parts';
+
+const DEMO_ACHIEVEMENTS = ['first_ko', 'double', 'goose', 'perfect_start', 'drift3'];
 
 function demoResults(): RaceResult[] {
   const field: CharacterId[] = ['goose', 'pelican', ...RACER_POOL.filter((c) => c !== 'goose').slice(0, 6)];
@@ -35,9 +38,9 @@ export const resultsScreen: ScreenFactory = (ctx) => {
   const demo = !ctx.props.results?.length;
   const results = demo ? demoResults() : ctx.props.results ?? [];
   const config = ctx.props.config ?? ctx.session()?.config;
-  const me = results.find((r) => r.isPlayer);
-  const earned = demo ? ['double', 'goose'] : ctx.tracker.earned(me?.place ?? null, me?.time != null);
-  const reward = applyRewards(ctx.app.save, config, results, earned, !demo);
+  const unlocked = demo ? DEMO_ACHIEVEMENTS : ctx.tracker.unlocked();
+  const reward = applyRewards(ctx.app.save, config, results, !demo);
+  const seed = config?.seed ?? 0;
   const track = TRACKS[config?.trackId ?? 'coast'];
   const bg = backdrop({ tone: 'red', seed: 'results', star: { x: '78%', y: '34%', size: 1500, color: '#ff1e3c', spin: 50 } });
   bg.append(h('div', { class: 'br-res-slab' }));
@@ -48,19 +51,16 @@ export const resultsScreen: ScreenFactory = (ctx) => {
   f.stage.append(
     h('div', { class: 'br-res-title' }, h('span', { class: 'br-res-word', text: 'RESULTS' }), h('span', { class: 'br-tag is-white br-res-sub', text: sub })),
     standingsTable(results),
-    podium(results),
-    h('div', { class: 'br-res-reward' }, gradeBlock(reward), counter.el),
-    achievementChips(reward.achievements),
+    podium(results, seed),
+    h('div', { class: 'br-res-reward' }, gradeBlock(reward, seed), counter.el),
+    achievementChips(unlocked),
   );
   if (demo) f.stage.append(h('div', { class: 'br-tag is-yellow br-res-demo', text: 'DEMO 示例数据' }));
   if (reward.newBest) f.stage.append(h('div', { class: 'br-tag is-red br-res-best', text: '新纪录 NEW BEST!' }));
   if (reward.unlocked) ctx.toast(`解锁新赛事：${TRACKS[reward.unlocked.trackId].name}（TIER ${reward.unlocked.tier}）`, 'meme');
 
   const next = nextRace(ctx, config);
-  const quit = (): void => {
-    ctx.app.audio.setMuffle(0);
-    ctx.app.bus.emit('flow:quitRace', {});
-  };
+  const quit = (): void => ctx.app.bus.emit('flow:quitRace', {});
   const actions = [
     { label: '再来一局', sub: 'RETRY', run: () => ctx.app.bus.emit('flow:restartRace', {}) },
     { label: '下一站', sub: 'NEXT', run: () => next && ctx.app.bus.emit('flow:startRace', { config: next }), disabled: () => next === null },

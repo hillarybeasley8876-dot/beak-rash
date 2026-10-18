@@ -51,6 +51,30 @@ export const maxLines = (el: HTMLElement, n: number) => (): string | null => {
   return lines > n ? `${lines} lines (max ${n})` : null;
 };
 
+/** Letters/digits on the last rendered line of a block whose text is one text node. */
+export function lastLineGlyphs(el: HTMLElement): number {
+  const node = el.firstChild;
+  if (!(node instanceof Text)) return Infinity;
+  const half = (parseFloat(getComputedStyle(el).lineHeight) || 20) / 2;
+  const range = document.createRange();
+  const glyphs: Array<{ top: number; ch: string }> = [];
+  for (let i = 0; i < node.data.length; i++) {
+    range.setStart(node, i);
+    range.setEnd(node, i + 1);
+    const rect = range.getClientRects()[0];
+    if (rect) glyphs.push({ top: rect.top, ch: node.data[i] ?? '' });
+  }
+  const last = Math.max(...glyphs.map((g) => g.top));
+  return glyphs.filter((g) => g.top > last - half && /[\p{L}\p{N}]/u.test(g.ch)).length;
+}
+
+/** A wrapped block must not end on a lone glyph (孤字: 「用。」 alone under a full line reads as a slip). */
+export const noOrphan = (el: HTMLElement, min = 2) => (): string | null => {
+  if (lineCount(el) < 2) return null;
+  const n = lastLineGlyphs(el);
+  return n < min ? `last line holds ${n} glyph (min ${min})` : null;
+};
+
 export const maxWidth = (el: HTMLElement, px: number) => (): string | null => {
   const w = el.getBoundingClientRect().width;
   return w > px + 0.5 ? `${Math.round(w)} px wide (max ${px})` : null;

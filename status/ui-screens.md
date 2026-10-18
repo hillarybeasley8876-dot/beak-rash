@@ -32,15 +32,26 @@
   coin count-up credited once, achievements, retry/next/garage/menu), settings, howto (keyboard /
   gamepad / skills), credits.
 - progress.ts (career ladder: tier 1–3 × tracks, top 3 unlocks next; grade S–D; rewards), race-tracker.ts
-  (achievement detection from bus events).
+  (collects `achievement:unlock` ids per race).
 - tools/ui-tour.mjs (keyboard-only full tour 1280×720 + 1920×1080, spot 2560×1440 + 1440×900; checks
   errors, visible focus, controls inside viewport) — last run: all checks passed.
 - sandbox/ui.html (+ui.ts): screen buttons, size presets, stub toggle.
 - Verified: real-unit flow menu → quick race → loading → race (real HUD) → pause → resume, 0 errors;
   career rewards/unlock/next; mouse paths; reduced motion; gamepad glyphs.
+- Resume pass (content requests 2 + 5, core follow-ups):
+  - [x] achievements: `race-tracker.ts` now only collects `achievement:unlock` ids of the attached race
+    (gameplay/achievements saves them); own rules + `applyRewards` achievement saving removed. Results
+    chips: catalogue order, icon glyph in a star, max 3 + red “+N MORE” (descriptions hidden at ≥3).
+  - [x] strings.ts adopted: loading card 宜/忌 (`calendarFor`, long entries shrink), GRADE_QUOTES under the
+    grade title, podium victory line (finished winner) / defeat line (player on podium, not 1st), CREDITS +
+    CREDIT_OUTRO (ui copy.ts credits removed), HOWTO_KEYBOARD legend, HOWTO_BASICS block, HOWTO_GAMEPAD
+    callouts, HOWTO_SKILL_TIPS on skill cards, HOWTO_SP. Line picks seeded by config.seed (stable re-mount).
+  - [x] core applied muffle reset in endSession + Input.press isolation → ui's own setMuffle(0) calls removed.
+  - [x] `tools/ui-results.mjs` (real achievements system → results chips / +N / no leak into next race).
+  - Verified: ui-tour (stubs, 4 sizes) + ui-tour --real 1920×1080 all checks passed; ui-results passed; tsc clean.
 
 ## Next
-- polish only (see known issues).
+- nothing open for ui-screens (remaining known issues are accepted).
 
 ## Known issues
 - ZCOOL QingKe's stylised 公 reads oddly in ransom titles (font design, accepted).
@@ -48,14 +59,12 @@
 - Results demo data shows when `?screen=results` has no race props (never saves).
 
 ## Core requests
-- `src/core/game.ts`: `flow:quitRace`/`flow:restartRace` from pause leave audio muffled (only
-  `flow:pause {paused:false}` calls setMuffle(0)); ui calls `app.audio.setMuffle(0)` itself before
-  emitting — consider resetting muffle in `endSession()`.
-- `src/core/input.ts`: `Input.press()` loops listeners without try/catch; ui guards its own handler.
+- (done by core 21:55) muffle reset in endSession; Input.press listener isolation.
 - Coins: ui-screens credits `RaceResult.coins` of the player to `save.coins` on the results screen;
   race unit saves `save.stats` (agreed in race/results.ts comment).
 
 ## How to test
 - `node tools/ui-tour.mjs` (add `--real` to use every real unit) → shots/ui-tour/<size>/NN-*.png.
+- `node tools/ui-results.mjs [--real]` → achievements → results chips check, shots/ui-screens/results-ach.png.
 - `/sandbox/ui.html?screen=menu` or `/?screen=<id>` (`&stub=world,sim,camera,actors,combat,race,fx,audio`).
 - `npx tsc --noEmit -p tsconfig.json` (ui files clean).

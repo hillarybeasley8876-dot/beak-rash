@@ -65,7 +65,8 @@ export async function game() {
       unlocks: window.__unlocks.slice(), fresh: window.__ach.fresh().slice(), screen: window.__br.app.ui.screen,
       saved: JSON.parse(localStorage.getItem('beak-rash.save.v1') ?? '{}').achievements ?? [], errors: window.__br.errors.slice(),
     }));
-    expectAll(problems, end.unlocks, ['first_win', 'podium', 'pacifist', 'untouched'], 'race 1 finish');
+    expectAll(problems, end.unlocks, ['first_win', 'podium', 'untouched'], 'race 1 finish');
+    if (end.unlocks.includes('pacifist')) problems.push('pacifist despite two KOs to the player');
     if (end.screen !== 'results') problems.push(`expected results screen, got ${end.screen}`);
     if (new Set(end.saved).size !== end.saved.length) problems.push(`duplicate ids in save: ${end.saved}`);
     for (const id of end.unlocks) if (!end.saved.includes(id)) problems.push(`unlocked ${id} not in localStorage`);

@@ -11,7 +11,8 @@ const PULSE_CHECK = `window.__pulseCheck = (frames, dt) => {
   const until = window.__boostUntil ??= new Map();
   if (!window.__pulseHooked) {
     window.__pulseHooked = true;
-    br.app.bus.on('rider:boost', (e) => until.set(e.riderId, s.time + e.time + 0.1));
+    // Boosts merge (max time, max power): a short boost after a long one must not shorten the explained window.
+    br.app.bus.on('rider:boost', (e) => until.set(e.riderId, Math.max(until.get(e.riderId) ?? -1, s.time + e.time + 0.1)));
   }
   let vis = 0, total = 0;
   for (let i = 0; i < frames; i++) {
@@ -64,6 +65,41 @@ export const fairScenarios = {
       check(`close race seed ${seed}: median leader gap < 120 m`, med < 120, info);
     }
     check('last place varies across seeds', new Set(lasts).size > 1, lasts);
+  },
+
+  /** Critic r2: a faster bike is a real edge — rival pace caps ignore the player's bike; the fixie run wins time and places. */
+  async bikes(page, h, { check, stub, a }) {
+    const out = {};
+    for (const bike of ['roadbike', 'fixie']) {
+      await openRace(h, `race=coast&seed=${a.seed ?? 3}&level=1&manual=1&intro=0&traffic=0&police=0&bike=${bike}${stub}`);
+      await rideUntil(h, 2);
+      const caps = await h.eval('window.__br.race.ai().filter((b) => b.pace !== null).map((b) => b.pace)');
+      for (let i = 0; i < 40 && !(await h.eval('!!window.__rl.end')); i++) await h.eval(`window.__runHuman(300, ${DT}, 1000, 'passive')`);
+      const res = await h.eval('window.__rl.end ?? window.__br.race.results()');
+      const me = res.find((r) => r.isPlayer);
+      out[bike] = { caps, place: me.place, time: me.time, winner: res[0].time };
+    }
+    const { roadbike: r, fixie: f } = out;
+    const same = r.caps.length === f.caps.length && r.caps.every((c, i) => Math.abs(c - f.caps[i]) < 0.01);
+    check('rival pace caps do not follow the player bike', same, { roadbike: r.caps, fixie: f.caps });
+    check('the fixie finishes faster and places at least as well', f.time < r.time - 3 && f.place <= r.place,
+      { roadbike: [r.place, r.time, r.winner], fixie: [f.place, f.time, f.winner] });
+  },
+
+  /** Critic r2: a KO buys a real gap — the KO'd rival is still ≥ 25 m behind 30 s later (catch-up ≤ 8 %, none for 12 s). */
+  async koGap(page, h, { check, stub, a }) {
+    await openRace(h, `race=coast&seed=${a.seed ?? 3}&level=1&manual=1&intro=0&traffic=0&police=0${stub}`);
+    await rideUntil(h, 40);
+    const id = await h.eval(`(() => { const s = window.__br.session(), p = s.player;
+      const r = s.riders.filter((q) => !q.isPlayer && q.mode === 'racing').sort((x, y) => Math.abs(x.s - p.s) - Math.abs(y.s - p.s))[0];
+      window.__br.ko(r.id, 0); return r.id; })()`);
+    const t0 = await h.eval('window.__br.session().time');
+    const gaps = [];
+    for (const dt of [15, 30, 45]) {
+      await rideUntil(h, t0 + dt);
+      gaps.push(await h.eval(`+(window.__br.session().rider(${id}).s - window.__br.session().player.s).toFixed(1)`));
+    }
+    check("KO'd rival still ≥ 25 m behind 30 s after the KO", gaps[1] <= -25, { id, gaps });
   },
 
   /** Passive player, level 1, seeds 1–6: ≤ 2 hits in the first 6 s and no KO in the first 30 s. */

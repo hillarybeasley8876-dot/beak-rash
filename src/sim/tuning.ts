@@ -17,6 +17,7 @@ export const TUNING = {
   boostAccel: 16,         // m/s² extra push while a boost is active and below the boosted top
   airDrag: 0.15,          // m/s² forward drag while airborne
   finishBrake: 2.5,       // m/s² auto-brake after crossing the finish line
+  rubberMax: 1.5,         // cap on the race-owned top-speed factor rider.rubber (≤ 0 / NaN → neutral)
   // ---- steering
   steerAuthLow: 4.5,      // m/s lateral authority at standstill-ish speed …
   steerAuthHigh: 7.5,     // … and at top speed
@@ -27,7 +28,7 @@ export const TUNING = {
   airControl: 0.35,       // steering authority in the air
   airTauMul: 3,           // lateral time constant multiplier in the air
   knockTime: 0.22,        // s carry window after a lateral impulse / hard bump: the shove reads on screen …
-  knockSteer: 0.3,        // … steering ×this …
+  knockSteer: 0.1,        // … steering back toward the hitter ×this (steering away keeps full authority) …
   knockTau: 0.3,          // … and the grip lag is at least this (≈ 0.19 s × knock m/s of travel: 9 → 1.7 m)
   knockMin: 0.5,          // m/s lateral impulse below which no carry window opens
   leanLambda: 12,         // 1/s smoothing of the visual lean
@@ -45,17 +46,20 @@ export const TUNING = {
   driftLean: 9 * DEG,     // extra lean into the drift
   // Road-relative drift: the bike follows the bend (no curve push) and steering only sets how fast it moves
   // across the road (at top speed): full into the drift → driftLatIn inward, full counter → driftLatOut.
-  driftLatIn: 3.2,        // m/s (≈ 2.7 s from the centre to a wall: time to reach L3 holding into it)
+  driftLatIn: 4.5,        // m/s (a committed drift crosses the road like plain grip steering would)
   driftLatOut: -1.0,      // m/s (negative = running wide)
   driftMaxAngle: 20 * DEG, // |vx| ≤ v·tan(this) while drifting: below wallCrashAngle, so a drift bounces off walls
+  driftCurveCancel: 1.35, // a drift cancels the curve push only up to this × steerAuthHigh × handling × v/top
+                          // (turn authority ×1.35): beyond ≈ R32 at top speed a drift runs wide
+  driftExitTime: 0.2,     // s after a release over which grip steering takes over from the drift's lateral speed
   driftBleed: 0.04,       // 1/s speed bleed while drifting
   // Charge by commitment: rate lerp(low, high, u) × (straight … 1 as the bend into the drift tightens to
-  // 1/80 m⁻¹). Holding into a tight bend reaches L3 in 1.5 s, an R150 sweeper in 2.4 s; snaking on a
-  // straight nets ≤ +3 % (measured over 20 s), counter-steered wiggles lose speed.
+  // 1/250 m⁻¹). Full commitment: R ≤ 250 → L3 in 1.74 s, R319 2.07 s, R380 2.34 s; snaking on a straight
+  // nets ≤ +3 % (measured over 20 s), counter-steered wiggles lose speed.
   driftChargeLow: 0.35,   // full counter-steer
-  driftChargeHigh: 1.3,   // full steer into the drift
+  driftChargeHigh: 1.15,  // full steer into the drift
   driftChargeStraight: 0.25,
-  driftChargeKappa: 80,
+  driftChargeKappa: 250,
   driftLockout: 0.3,      // s after a release before the next drift can start (no snake-farming)
   driftPedalMul: 0.45,    // pedalling effectiveness while drifting
   driftLevels: [0.55, 1.2, 2.0],
@@ -76,7 +80,11 @@ export const TUNING = {
   perfectMinAirHop: 0.55, // a plain 0.38 s hop on flat road must not farm PERFECT boosts
   landEventMinAir: 0.12,  // micro crest hops below this air time …
   landEventMinPeak: 0.12, // … or this height stay silent (no rider:land)
-  perfectMaxYaw: 12 * DEG,
+  perfectMaxYaw: 12 * DEG, // hop-timed landings (hop pressed ≤ perfectHopWindow s before touchdown) …
+  perfectCalmYaw: 6 * DEG, // … otherwise |yaw| below this and |steer| < perfectSteerMax for the last perfectCalmTime s
+  perfectSteerMax: 0.3,
+  perfectCalmTime: 0.15,
+  perfectHopWindow: 0.2,
   perfectPower: 0.2,
   perfectTime: 0.6,
   hardLandAir: 0.7,       // non-perfect landings after this much air lose speed
@@ -127,6 +135,11 @@ export const TUNING = {
   wallHitEvery: 0.3,      // s: one 'wall' impact event per approach (re-hits inside merge silently)
   wallCarryTime: 0.3,     // s the bounce carries the rider off the wall (no steering, slow grip) …
   wallCarryTau: 0.4,      // … grip lag during it (≈ 0.5 m of visible bounce from a full-lock hit)
+  wallLatchGap: 0.4,      // contact hysteresis: after an impact, re-contacts on that side scrape (no bounce, no
+  wallLatchTime: 0.8,     // event) until the rider steers > this m away from it or stays off it this many s …
+  wallLatchFar: 1.0,      // … or is this far from it whatever the steering (a full-lock bounce carries ≈ 0.5 m)
+  yawEaseTime: 0.15,      // s after a bounce flips the lateral velocity during which the heading turns at most …
+  yawEaseRate: 300 * DEG, // … this fast (rad/s): a full-lock wall hit swings ≈ 28° over ≈ 0.09 s instead of one frame
   riderHalfWidth: 0.35,
   // ---- rider contacts
   contactDs: 1.7,
@@ -157,6 +170,9 @@ export const TUNING = {
   crashForward: 0.7,
   crashUp: [4, 7],
   crashSpin: [4, 9],
+  crashBodyHeight: 1.0,   // m: the tumbling body starts about here (actors' spine bone) …
+  crashVaultGravity: 15,  // … and falls with the actors' tumble gravity, so a vehicle crash launches it at
+  crashVaultMargin: 0.45, // ≥ √(2g·(roof + margin − start)) and it clears the roof instead of tunnelling
   crashSlideDecel: 7,
   crashedTime: 2.6,
   respawnTime: 0.6,

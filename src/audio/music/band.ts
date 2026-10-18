@@ -5,7 +5,7 @@
 // the nodes its song actually needs (CPU).
 import { Rng } from '../../core/rng';
 import { driveCurve } from '../dsp/curves';
-import { filter, holdAt, steer } from '../dsp/env';
+import { anchor, filter, holdAt, settle, steer } from '../dsp/env';
 import { noise } from '../dsp/noise';
 import { Brass } from './instruments/brass';
 import { DrumKit } from './instruments/drums';
@@ -39,6 +39,7 @@ export class Band {
   private sc: GainNode;          // side-chain gain shared by bass / keys / pad / clav
   private under: GainNode;       // lead side-chain for keys / pad / clav
   private hp: BiquadFilterNode;  // bass drop
+  private sends: GainNode;       // reverb send bus, post-fader (follows fade())
   private delayIn: GainNode | null = null;
   private delayLine: DelayNode | null = null;
   private tremolo: OscillatorNode | null = null;
@@ -68,6 +69,8 @@ export class Band {
     this.sc.connect(this.out);
     this.under = new GainNode(ctx, { gain: 1 });
     this.under.connect(this.sc);
+    this.sends = new GainNode(ctx, { gain: 0 });
+    this.sends.connect(engine.musicVerb);
   }
 
   /** Channel input for instrument voices (strip created on first use). */
@@ -112,7 +115,7 @@ export class Band {
       head = head.connect(pan);
     }
     head.connect(UNDER_LEAD.has(ch) ? this.under : DUCKED.has(ch) ? this.sc : this.out);
-    if (VERB[ch] > 0) head.connect(new GainNode(ctx, { gain: VERB[ch] })).connect(this.engine.musicVerb);
+    if (VERB[ch] > 0) head.connect(new GainNode(ctx, { gain: VERB[ch] })).connect(this.sends);
     if (DELAY[ch] > 0) head.connect(new GainNode(ctx, { gain: DELAY[ch] })).connect(this.delay());
     const strip = { input, trim };
     this.strips.set(ch, strip);
@@ -187,9 +190,10 @@ export class Band {
 
   /** Kick side-chain: dip the sustained instruments for a beat fraction. */
   duck(t: number, amount: number): void {
+    // setTarget starts from whatever the gain is at t (a ramp would start at the previous event).
     const g = this.sc.gain;
     holdAt(g, t);
-    g.linearRampToValueAtTime(1 - amount, t + 0.008);
+    g.setTargetAtTime(1 - amount, t, 0.003);
     g.setTargetAtTime(1, t + 0.03, 0.06);
   }
 
@@ -197,15 +201,18 @@ export class Band {
   underLead(t: number, dur: number): void {
     const g = this.under.gain;
     holdAt(g, t);
-    g.linearRampToValueAtTime(UNDER_LEAD_GAIN, t + 0.03);
-    g.setValueAtTime(UNDER_LEAD_GAIN, t + Math.max(0.03, dur));
+    g.setTargetAtTime(UNDER_LEAD_GAIN, t, 0.01);
     g.setTargetAtTime(1, t + Math.max(0.03, dur), 0.18);
   }
 
+  /** Linear fade from the level the band has at `at` (not from the previous fade's end time). */
   fade(to: number, seconds: number, at = this.ctx.currentTime): void {
-    const g = this.out.gain;
-    holdAt(g, at);
-    g.linearRampToValueAtTime(to, at + Math.max(0.01, seconds));
+    const end = at + Math.max(0.01, seconds);
+    for (const g of [this.out.gain, this.sends.gain]) {
+      anchor(g, at);
+      g.linearRampToValueAtTime(to, end);
+      settle(g, end, to);
+    }
   }
 
   /** KO: high-pass the band (kick + bass vanish), 0 = full range; `tau` = response time constant. */
@@ -224,7 +231,11 @@ export class Band {
     const last = this.owned[0];
     for (const src of this.owned) src.stop(at);
     this.owned = [];
-    if (last) last.onended = () => this.out.disconnect();
-    else this.out.disconnect();
+    const unplug = (): void => {
+      this.out.disconnect();
+      this.sends.disconnect();
+    };
+    if (last) last.onended = unplug;
+    else unplug();
   }
 }

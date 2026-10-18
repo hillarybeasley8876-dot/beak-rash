@@ -40,13 +40,33 @@
 - Pelican re-rolled on-model (red hooked beak tip, S-neck): main cand6 (+3 wheel holes), smug cand3,
   hurt cand3 (+flip so busts all face left). {PELICAN} token now insists on the red tip.
 
+- Title red tip: re-rolls cand6–8 tried (cand8 checked in game) → kept cand2; the missing red hooked tip is
+  painted by `tools/cutout.py --tint X,Y,RX,RY` (orange → crimson inside an ellipse, shading kept). Tints on
+  title, menu, loading_1..3, results (`> cutout: --tint` lines in PROMPTS.md); verified zoomed + in game.
+- Consumers re-checked after the pelican re-roll + tints (2026-10-18): title, menu (cut-out wheelie),
+  loading (vignette), results podium, race HUD cluster portrait, skill cut-in eyes band, rival cut-in:
+  shots/assets/game_{title,menu,loading,results}.png, race_*.png, hud/rt_{skill,rival}.png; __br.errors [].
+- Contact sheet regenerated: shots/assets/sheet.png (65 assets; CJK header font fixed). Gallery 65/65 load.
+- Size audit: portraits 8.2 MB + art 2.2 MB + billboards 1.7 MB = 12.1 MB (≤ 25 MB); runtime uses WebP
+  only (6.5 MB); PNG twins (5.7 MB) kept because SPEC §10 names the .png paths.
+
 ## Next
-- title re-roll (cand6–9) for the red tip; else keep cand2
-- check consumers in the game (title, menu, HUD cluster + cut-ins, results) → contact sheet → size audit
-- polish if time: title pelican beak lacks the red hook tip
+- (none: wave-1 deliverables complete)
 
 ## Known issues
+- Title screen (ui-screens framing, not an asset bug): `.br-title-art` is a 64 %-wide box with
+  object-position 42 % 50 %, so the pelican's red beak tip (x ≈ 92 % of the art) is cropped off-screen.
+  Tried in-page (shots/assets/review/title_pos{75,85}.png, bin/titlepos.mjs): 85 % 50 % shows the whole
+  pelican incl. the tip, but the goose/capybara slide behind the tagline band. ui-screens' call.
+- Step-mode screenshots (`--step`) can catch the HUD before images decode (blank cut-in band); use real
+  time (shots/assets/bin/cutin.mjs) to judge portraits in the HUD.
 
 ## Core requests
+- none
 
 ## How to test
+- Gallery: /sandbox/assets.html (backdrops split/red/black/checker/white) · `node sandbox/assets.shots.mjs`.
+- Regenerate/re-cut: `node tools/gen-image.mjs [--recut] [files…]`, `--pick out=i`, `--manifest`.
+- Contact sheet: `python3 -E shots/assets/bin/sheet.py shots/assets/sheet.png`.
+- In game: `node shots/assets/bin/screens.mjs title menu loading results`, `node shots/assets/bin/race.mjs`,
+  `node shots/assets/bin/cutin.mjs`.

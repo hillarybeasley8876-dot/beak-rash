@@ -2,7 +2,7 @@
 // to lastHitBy within 3 s (+1 KO, +50 coins, +20 SP). A crash of any other cause within 3 s of being hit
 // (knocked into a wall / traffic) is credited the same way. Respawned riders return at ≥ 70 % HP.
 import type { CrashCause, RiderState, Vec3Like, WeaponId } from '../../core/types';
-import type { CombatCtx } from './ctx';
+import { finished, type CombatCtx } from './ctx';
 import { gainSp, spRefund } from './sp';
 import { KO, SP } from './tuning';
 
@@ -19,7 +19,8 @@ function syncMirror(ctx: CombatCtx, r: RiderState): void {
 function creditFor(ctx: CombatCtx, r: RiderState): RiderState | null {
   if (r.lastHitBy === null || r.lastHitBy === r.id) return null;
   if (ctx.now() - r.lastHitTime > KO.creditWindow) return null;
-  return ctx.session.rider(r.lastHitBy) ?? null;
+  const a = ctx.session.rider(r.lastHitBy);
+  return a && !finished(a) ? a : null; // a rider past the line scores nothing more (no KO, coins or SP)
 }
 
 interface KoMethod { skillId: string | null; weapon: WeaponId }
@@ -57,8 +58,8 @@ export function checkKos(ctx: CombatCtx): void {
     const how = koMethod(ctx, r, attacker);
     award(r, attacker, how);
     ctx.view(r)?.cue('ko');
+    emitKo(ctx, r, attacker, 'ko', pos, how); // SPEC §7 order: combat:ko, then the crash (rider:crash)
     ctx.session.physics.crash(r, 'ko', attacker?.id ?? null);
-    emitKo(ctx, r, attacker, 'ko', pos, how);
   }
 }
 

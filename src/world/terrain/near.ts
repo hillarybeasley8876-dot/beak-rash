@@ -7,10 +7,10 @@ import type { WorldCtx } from '../ctx';
 import { GridGeo, frameOffset } from '../geom';
 import { terrainMat } from './material';
 import type { TerrainField } from './field';
-import { groundColor, isShore } from './profile';
+import { WALL_TOE, groundColor, isShore } from './profile';
 
 /** Column offsets beyond the drivable edge (m). Dense near the edge for walls, steps and beaches. */
-export const NEAR_U = [0, 0.15, 0.35, 0.6, 0.9, 1.25, 1.8, 2.4, 3, 4.6, 6.6, 9, 12, 16, 21, 27, 34, 42, 52];
+export const NEAR_U = [0, WALL_TOE, 0.15, 0.35, 0.6, 0.9, 1.25, 1.8, 2.4, 3, 4.6, 6.6, 9, 12, 16, 21, 27, 34, 42, 52];
 export const NEAR_EXTENT = NEAR_U[NEAR_U.length - 1] as number;
 const ROW_STEP = 2;
 const CHUNK_ROWS = 96;
@@ -36,7 +36,8 @@ function foldScale(ctx: WorldCtx, field: TerrainField, side: -1 | 1, s0: number,
   for (let r = 0; r < rows; r++) {
     const s = s0 + r * ROW_STEP;
     const k = ctx.q.frameVis(s).curvature * side;
-    const room = k > 1e-5 ? 0.75 / k - field.bound(s, side) : Infinity;
+    const curveRoom = k > 1e-5 ? 0.75 / k - field.bound(s, side) : Infinity;
+    const room = field.mod ? Math.min(curveRoom, field.mod.room(s, side)) : curveRoom;
     raw[r] = Math.min(1, Math.max(0, (room - 12) / (NEAR_EXTENT - 12)));
   }
   // Moving minimum (±30 m) then a box blur (±16 m) keeps the outer edge smooth.
@@ -84,6 +85,7 @@ export function buildNearTerrain(ctx: WorldCtx, field: TerrainField): NearRibbon
         const u = colU(c, scale[r] ?? 1);
         p.copy(edge).addScaledVector(rh, u);
         const res = c === 0 && !g.detached ? { h: edgeY, bump: null } : field.shape(g, edgeY, fr.pos.y, u, p.x, p.z);
+        if (field.mod && c > 0) res.h = field.mod.height(s, side, u, p.x, p.z, res.h);
         const k = r * cols + c;
         h[k] = res.h;
         pos[k * 3] = p.x; pos[k * 3 + 1] = res.h; pos[k * 3 + 2] = p.z;
@@ -127,11 +129,20 @@ function colorize(nrm: Float32Array, geo: GridGeo, mats: string[], shore: Uint8A
       const x = geo.pos[vi * 3] ?? 0, y = geo.pos[vi * 3 + 1] ?? 0, z = geo.pos[vi * 3 + 2] ?? 0;
       const n = field.noise.get(x / 23, z / 23);
       const mat = (mats[r * cols + col] ?? 'grass') as 'sand' | 'grass' | 'rock' | 'dirt' | 'stone';
-      groundColor(mat, y, nrm[vi * 3 + 1] ?? 1, NEAR_U[col] ?? 0, n, shore[r] === 1, c);
+      // The flat toe at a wall's foot takes the face's colour (no grass seam along rock walls).
+      const ny = (NEAR_U[col] ?? 0) <= WALL_TOE ? Math.min(nrm[vi * 3 + 1] ?? 1, nrm[toeFace(vi, side) * 3 + 1] ?? 1) : nrm[vi * 3 + 1] ?? 1;
+      groundColor(mat, y, ny, NEAR_U[col] ?? 0, n, shore[r] === 1, c);
       geo.color(r - r0, cc, c);
     }
   }
 }
+
+/** Vertex index of the first column beyond the wall toe in the same row (columns stored reversed on the left). */
+const TOE_COL = NEAR_U.findIndex((u) => u > WALL_TOE);
+const toeFace = (vi: number, side: -1 | 1): number => {
+  const cols = NEAR_U.length, row = Math.floor(vi / cols);
+  return row * cols + (side < 0 ? cols - 1 - TOE_COL : TOE_COL);
+};
 
 /** Exact rendered height of a ribbon at (s, u ≥ 0 beyond the edge), or null outside it. */
 export function ribbonHeight(rb: NearRibbon, s: number, u: number): number | null {

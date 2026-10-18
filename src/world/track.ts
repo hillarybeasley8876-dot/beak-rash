@@ -54,6 +54,7 @@ export async function createTrack(app: AppContext, id: TrackId, rng: Rng): Promi
   return {
     id,
     length: L.length,
+    runoff: q.runoff,
     look: ctx.look,
     group,
     features: L.features,

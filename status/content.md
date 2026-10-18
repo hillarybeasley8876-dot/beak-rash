@@ -20,45 +20,53 @@
   `race:end` never unlock. Debug: `__br.ach.{fresh, facts, allowAutopilot, forget}`.
 - `sandbox/content.html` (+ content.ts / .kit.ts / .world.ts / .css): gallery of every line in the game's fonts at
   the game's sizes (bubbles, toasts, tip boxes, calendar, grade stamps, chips, callouts, billboard/sign faces);
-  overflow outlined yellow + `window.__content.overflow`.
+  overflow (and lone-glyph tip endings) outlined yellow + `window.__content.overflow`; billboard faces use the real
+  poster art.
 - tools: `content-lint.mjs` (+ `content-ts.mjs` TS import hook, `content-fonts.mjs` WOFF cmap glyph coverage),
-  `content-ach.mjs` (21 node rule scenarios), `content-shots.mjs gallery|game` (+ `content-game.mjs`).
+  `content-ach.mjs` (22 node rule scenarios), `content-shots.mjs gallery|game` (+ `content-game.mjs`).
 
 ## Done
-- All deliverables above; lint 0 errors (977 strings), 21/21 rule scenarios, gallery 732 checks 0 overflow,
-  in-game check OK (real units; audio+camera stubbed because their files were mid-edit by other agents).
+- All deliverables above; lint 0 errors (977 strings), 22/22 rule scenarios, gallery 756 checks 0 overflow.
+- Resume (10-18): in-game check re-run through game.ts's own instance (`__br.game.achievements`) with NO stubs:
+  OK — race 1 unlocks 9 (perfect_start, first_ko, goose, double, first_win, clutch, podium, untouched, blowout),
+  restart race unlocks only triple + hat_trick, autopilot none, save has no duplicates, 0 page errors. Shots
+  (shots/content/game-*.png): taunt bubbles, results (3 chips + “+6 MORE”, podium victory line, grade quote),
+  loading card with the 宜/忌 calendar line — all from content data via ui-screens.
+- Fix: 情绪稳定 (pacifist) unlocked next to 开饭了/一鱼两吃 when combat credited a KO without a swing (hard bump →
+  rival wrecks within 3 s). Rule now also needs 0 player KOs. Regression `credited-ko-is-not-pacifist` (failed
+  before the fix, passes after; rival-on-rival KOs keep pacifist); content-game.mjs asserts no pacifist in race 1.
+- Polish: gallery world section now mirrors world/scenery/signs as it is today — plain 512×256 faces and poster
+  faces (512×288, line on the tilted band over the real poster art from data/assets.ts BILLBOARDS, as every track
+  draws them): all billboard lines 37–74 px (min 34), track extras shown on their own track's posters.
+- Polish: new gallery check `noOrphan` (no lone glyph under a full line, 孤字) on loading tips; reworded 6 tips
+  (Shift drift colours, ONE MORE!, capybara + 温泉, penguin slide, corgi 风阻, 滑总 借力) → 0 orphans.
+- WRECK_LINES.obstacle[0] duplicated ANNOUNCER.wrecked alt 「人仰车翻……」 → 「锥桶表示很无辜……」.
 
 ## Next
-- Polish pass from screenshots; after core wiring, re-run `content-shots.mjs game` against game.ts's instance.
+- Nothing open on the content side. Remaining work is other units adopting requests 3, 4, 6, 7 below.
 
 ## Known issues
 - New roster lines have no voice clips yet (audio falls back to animal calls / existing clips).
-- Billboards drawn next to poster art shrink 12+ glyph lines to ~22–25 px (track layout; see gallery world section).
+- `clutch` + `blowout` both unlock in the scripted game check only because it teleports the player past 85 %.
 
 ## Core requests
-1. core/game.ts — wire the achievements system like the other app systems:
-   `import { createAchievements } from '../gameplay/achievements';` · constructor: `this.achievements =
-   createAchievements(app)` · startRace after `audio.attach?.(session)`: `this.achievements.attach(session)` ·
-   endSession next to the other `attach(null)` calls, i.e. BEFORE `session.dispose()` (police teardown emits
-   `police:alert` level 0 during dispose): `this.achievements.attach(null)`.
-2. ui-screens — my system now saves unlocks itself, so `progress.applyRewards`' `fresh` filter (not yet in save)
-   will drop them and the chips say 本场无新成就. Please collect `achievement:unlock` ids while a race is attached
-   and show those (RaceTracker's achievement rules can go; ids are unchanged). A results row of 1000 px holds ~3
-   chips; a first race can unlock 6–9 → show 3 + “+N”. Optional: `AchievementDef.icon` glyph in the chip.
-3. ui-hud — toast/chip on `achievement:unlock` (成就解锁 + icon + name). `hudCnText()` font warm-up lists only
+1. DONE (core 22:25) — core/game.ts wires the achievements system: created once, `attach(session)` after
+   `audio.attach`, `attach(null)` before `session.dispose()`.
+2. DONE (ui-screens race-tracker.ts) — results show the `achievement:unlock` ids of the race, 3 chips + “+N”.
+3. OPEN, ui-hud — toast/chip on `achievement:unlock` (成就解锁 + icon + name). `hudCnText()` font warm-up lists only
    taunts; bubbles also show koLines / hurtLines (race taunts.ts) → add koLines, hurtLines, skillLines. Splash text
    can come from strings.ts ANNOUNCER / PLACE_CALLOUTS / WRECK_LINES (alt lines are sub-captions).
-4. race — `police:alert` `reason` ('spawn' | 'lost' | 'busted') and launch boosts as kind 'launch' (both handled
+4. OPEN, race — `police:alert` `reason` ('spawn' | 'lost' | 'busted') and launch boosts as kind 'launch' (both handled
    already, legacy payloads too); corgi toasts can use `POLICE_LINES[phase]`; `skillLines` for rivals' sig casts.
-5. ui-screens — adopt strings.ts: loading card `calendarFor(trackId, new Date())` → 「宜：撞鹅 忌：放鸽子」 (free
-   space above the weather line), GRADE_QUOTES under the grade title, CREDITS (24 entries), victory/defeat lines on
-   the podium, HOWTO_* (keyboard legend identical to howto-pages LEGEND).
-6. track — TRACK_BILLBOARDS / TRACK_SIGNS for city & mountain dressing; ROAD_SIGNS[5] is now 「连续弯道 弯弯有鹅」
+5. DONE (ui-screens) — loading calendar 宜/忌 (`calendarFor`), GRADE_QUOTES, CREDITS, podium victory/defeat lines,
+   HOWTO_* are on screen (checked in game-loading.png / game-results.png).
+6. OPEN, track — TRACK_BILLBOARDS / TRACK_SIGNS for city & mountain dressing; ROAD_SIGNS[5] is now 「连续弯道 弯弯有鹅」
    (was too long for the 256 px sign: 22 px → 30 px glyphs).
-7. audio — regenerate barks for the new lines with tools/gen-tts.mjs when convenient (clip texts unchanged).
+7. OPEN, audio — regenerate barks for the new lines with tools/gen-tts.mjs when convenient (clip texts unchanged).
 
 ## How to test
 - `node tools/content-lint.mjs [--verbose]` · `node tools/content-ach.mjs [--only name]`
 - `node tools/content-shots.mjs gallery` → shots/content/gallery-*.png (exit 1 on overflow) ·
   open http://127.0.0.1:5300/sandbox/content.html
-- `CONTENT_STUB=audio,camera node tools/content-shots.mjs game` (default stub: audio; `CONTENT_STUB=` for none)
+- `CONTENT_STUB= node tools/content-shots.mjs game` (all real units; default stubs audio; e.g. `CONTENT_STUB=audio,camera`
+  isolates units that are mid-edit)

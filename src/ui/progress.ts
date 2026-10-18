@@ -1,9 +1,10 @@
-// Career ladder, grades and race rewards (coins, bests, unlocks, achievements) written to app.save.
-// ui-screens credits the player's RaceResult.coins; race logic owns save.stats (see status file).
+// Career ladder, grades and race rewards (coins, bests, unlocks) written to app.save.
+// ui-screens credits the player's RaceResult.coins; race logic owns save.stats and gameplay/achievements
+// saves its own unlocks (see status file).
 import type { RaceConfig, RaceResult } from '../core/contracts';
 import type { SaveStore } from '../core/save';
 import type { TrackId } from '../core/types';
-import { ACHIEVEMENTS, GRADES, type AchievementDef, type Grade } from '../data/memes';
+import { GRADES, type Grade } from '../data/memes';
 import { TRACK_ORDER } from '../data/tracks';
 
 export type Tier = 1 | 2 | 3;
@@ -46,7 +47,6 @@ export interface Reward {
   grade: Grade;
   newBest: boolean;
   unlocked: CareerEvent | null;
-  achievements: AchievementDef[];   // newly earned this race
   balanceBefore: number;
   balanceAfter: number;
 }
@@ -65,16 +65,15 @@ function breakdown(r: RaceResult): Reward['breakdown'] {
 const credited = new WeakMap<RaceResult[], Reward>();
 
 /** Credit one race exactly once (re-mounting the results screen returns the first reward, never pays twice). */
-export function applyRewards(save: SaveStore, config: RaceConfig | undefined, results: RaceResult[], earned: string[], persist: boolean): Reward {
+export function applyRewards(save: SaveStore, config: RaceConfig | undefined, results: RaceResult[], persist: boolean): Reward {
   const cached = credited.get(results);
   if (cached) return cached;
   const me = results.find((r) => r.isPlayer);
   const before = save.data.coins;
   const ev = careerEvent(config);
-  const fresh = ACHIEVEMENTS.filter((a) => earned.includes(a.id) && !save.data.achievements.includes(a.id));
   const reward: Reward = {
     coins: me?.coins ?? 0, breakdown: me ? breakdown(me) : [], grade: me ? gradeFor(me, results.length) : { grade: 'D', title: '咸鱼' },
-    newBest: false, unlocked: null, achievements: fresh, balanceBefore: before, balanceAfter: before,
+    newBest: false, unlocked: null, balanceBefore: before, balanceAfter: before,
   };
   if (!me) return reward;
   const prevBest = ev ? bestPlace(save, ev) : null;
@@ -89,7 +88,6 @@ export function applyRewards(save: SaveStore, config: RaceConfig | undefined, re
     d.coins = reward.balanceAfter;
     if (ev && reward.newBest) d.career.best[ev.key] = me.place;
     if (reward.unlocked) d.career.unlocked = Math.max(d.career.unlocked, reward.unlocked.index);
-    for (const a of fresh) d.achievements.push(a.id);
   });
   return reward;
 }

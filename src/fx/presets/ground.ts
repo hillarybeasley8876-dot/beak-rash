@@ -6,14 +6,16 @@ import type { Vec3Like } from '../../core/types';
 
 const d = new Vector3();
 
-interface PuffLook { a: string; b: string; size: number; grow: number; life: number; rise: number; spread: number }
+/** `carry` = share of the source's velocity a puff keeps (high = it hangs by the wheel instead of rushing at the camera). */
+interface PuffLook { a: string; b: string; size: number; grow: number; life: number; rise: number; spread: number; carry?: number }
 
-const LOOKS: Record<'dust' | 'grass' | 'sand' | 'dirt' | 'smoke', PuffLook> = {
+const LOOKS: Record<'dust' | 'grass' | 'sand' | 'dirt' | 'smoke' | 'tyre', PuffLook> = {
   dust: { a: '#f4ede0', b: '#d9cdb8', size: 0.2, grow: 2.6, life: 0.7, rise: 0.9, spread: 1.0 },
   grass: { a: '#c9e8a8', b: '#93c46c', size: 0.16, grow: 2.2, life: 0.5, rise: 0.7, spread: 0.8 },
   sand: { a: '#fbecc4', b: '#e8cf91', size: 0.22, grow: 2.8, life: 0.8, rise: 1.0, spread: 1.1 },
   dirt: { a: '#c9a57a', b: '#9a7650', size: 0.2, grow: 2.4, life: 0.7, rise: 0.8, spread: 0.9 },
   smoke: { a: '#9a9aa4', b: '#5c5c66', size: 0.3, grow: 3.0, life: 1.1, rise: 1.4, spread: 0.7 },
+  tyre: { a: '#ffffff', b: '#d4d4dc', size: 0.13, grow: 3.0, life: 0.42, rise: 0.45, spread: 0.5, carry: 0.75 },
 };
 
 function puffs(k: Kit, pos: Vec3Like, o: BurstOpts, count: number, look: PuffLook): void {
@@ -29,7 +31,7 @@ function puffs(k: Kit, pos: Vec3Like, o: BurstOpts, count: number, look: PuffLoo
     s.size1 = s.size0 * look.grow;
     s.rot = k.range(0, 6.28); s.spin = k.range(-1.5, 1.5);
     s.drag = 3; s.gravity = -0.4;
-    inherit(s, o, 0.2, 2);
+    inherit(s, o, look.carry ?? 0.2, 2);
     k.p.emit(s);
   }
 }
@@ -53,6 +55,8 @@ function bits(k: Kit, pos: Vec3Like, o: BurstOpts, count: number, frame: number,
 
 export const dust: Preset = (k, pos, o) => puffs(k, pos, o, k.n(4, o), LOOKS.dust);
 export const smoke: Preset = (k, pos, o) => puffs(k, pos, o, k.n(5, o), LOOKS.smoke);
+/** White tyre smoke behind a drifting wheel (continuous; one puff per call). */
+export const driftSmoke: Preset = (k, pos, o) => puffs(k, pos, o, k.n(1, o), LOOKS.tyre);
 
 export const grass: Preset = (k, pos, o) => {
   puffs(k, pos, o, k.n(2, o), LOOKS.grass);
@@ -69,30 +73,32 @@ export const dirt: Preset = (k, pos, o) => {
   bits(k, pos, o, k.n(3, o), FRAME.puff, '#7a5530', '#5a3b1e', 0.09);
 };
 
-function groundRing(k: Kit, pos: Vec3Like, o: BurstOpts, from: number, to: number, life: number, color: string): void {
+function groundRing(k: Kit, pos: Vec3Like, o: BurstOpts, from: number, to: number, life: number, color: string, carry = 0.6): void {
   const s = k.at(pos);
   s.y = o.ground ?? pos.y;
   k.p.colors(s, color);
   s.frame = FRAME.ring; s.mode = 2; s.erode = true;
   s.life = life; s.size0 = from; s.size1 = to; s.rot = k.range(0, 6.28);
-  inherit(s, o, 0.6, 3);
+  inherit(s, o, carry, 3);
   k.p.emit(s);
 }
 
-/** Landing: dust ring on the road + puffs pushed outward along the ground. */
+/** Landing: dust ring on the road + puffs swooshing out along the ground. They keep most of the rider's speed
+ *  so the dust stays round the wheel long enough to read from the chase camera. */
 export const landing: Preset = (k, pos, o) => {
   const sc = o.scale ?? 1;
-  groundRing(k, pos, o, 0.5 * sc, 3.2 * sc, 0.42, '#f6efe2');
-  const count = k.n(10, o);
+  groundRing(k, pos, o, 0.4 * sc, 2.4 * sc, 0.32, '#f6efe2', 0.85);
+  const count = k.n(14, o);
   for (let i = 0; i < count; i++) {
     const a = (i / count) * Math.PI * 2 + k.range(-0.2, 0.2);
     const s = k.at({ x: pos.x + Math.cos(a) * 0.4, y: (o.ground ?? pos.y) + 0.12, z: pos.z + Math.sin(a) * 0.4 });
     k.p.colors(s, LOOKS.dust.a, LOOKS.dust.b);
     s.frame = FRAME.puff;
-    s.vx = Math.cos(a) * 3.2 * sc; s.vy = k.range(0.3, 0.9); s.vz = Math.sin(a) * 3.2 * sc;
-    s.life = k.range(0.45, 0.65); s.size0 = 0.22 * sc; s.size1 = 0.5 * sc;
-    s.rot = k.range(0, 6.28); s.spin = k.range(-2, 2); s.drag = 4;
-    inherit(s, o, 0.5, 3);
+    const v = k.range(2.6, 4.2) * sc;
+    s.vx = Math.cos(a) * v; s.vy = k.range(0.3, 0.9); s.vz = Math.sin(a) * v;
+    s.life = k.range(0.4, 0.55); s.size0 = 0.24 * sc; s.size1 = 0.55 * sc;
+    s.rot = k.range(0, 6.28); s.spin = k.range(-2, 2); s.drag = 3.5;
+    inherit(s, o, 0.85, 1.5);
     k.p.emit(s);
   }
 };

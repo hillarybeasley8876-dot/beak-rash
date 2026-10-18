@@ -5,6 +5,7 @@ import { Rng } from '../../core/rng';
 import { toonRamp } from '../../render/toon';
 import type { WorldCtx } from '../ctx';
 import { grainTexture } from '../road/textures';
+import { FARM_FRAG_BODY, FARM_FRAG_HEAD, FARM_UNIFORMS, FARM_VERT_BODY, FARM_VERT_HEAD } from './farmland';
 
 /** Light-neutral strata (multiplied with the vertex colour): bands, ledges and cracks. */
 function strataTexture(renderer: WebGLRenderer): CanvasTexture {
@@ -52,29 +53,33 @@ function strataTexture(renderer: WebGLRenderer): CanvasTexture {
   return t;
 }
 
-export function terrainMat(ctx: WorldCtx): MeshToonMaterial {
-  return ctx.shared('mat:terrain', () => {
+/** Shared terrain material; `farm` adds the farmland patchwork (far grid only: needs the `farm` attribute). */
+export function terrainMat(ctx: WorldCtx, farm = false): MeshToonMaterial {
+  return ctx.shared(farm ? 'mat:terrain:farm' : 'mat:terrain', () => {
     const grain = ctx.shared('tex:grain', () => grainTexture(ctx.app.renderer));
     const strata = ctx.shared('tex:strata', () => strataTexture(ctx.app.renderer));
     const m = new MeshToonMaterial({ vertexColors: true, gradientMap: toonRamp(), map: grain });
     m.onBeforeCompile = (shader) => {
       shader.uniforms.uStrata = { value: strata };
+      if (farm) Object.assign(shader.uniforms, FARM_UNIFORMS);
       shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;\nvarying vec3 vWNrm;')
+        .replace('#include <common>', `#include <common>\nvarying vec3 vWPos;\nvarying vec3 vWNrm;\n${farm ? FARM_VERT_HEAD : ''}`)
         .replace('#include <begin_vertex>', `#include <begin_vertex>
           vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
-          vWNrm = normalize(mat3(modelMatrix) * normal);`);
+          vWNrm = normalize(mat3(modelMatrix) * normal);
+          ${farm ? FARM_VERT_BODY : ''}`);
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', '#include <common>\nuniform sampler2D uStrata;\nvarying vec3 vWPos;\nvarying vec3 vWNrm;')
+        .replace('#include <common>', `#include <common>\nuniform sampler2D uStrata;\nvarying vec3 vWPos;\nvarying vec3 vWNrm;\n${farm ? FARM_FRAG_HEAD : ''}`)
         .replace('#include <map_fragment>', `
           vec4 grainC = texture2D(map, vMapUv);
           // Strata run horizontally along the face: u along the wall, v up it.
           vec2 th = normalize(vec2(-vWNrm.z, vWNrm.x) + vec2(1e-4, 0.0));
           vec4 strataC = texture2D(uStrata, vec2(dot(vWPos.xz, th), vWPos.y) / 7.0);
           float steep = smoothstep(0.35, 0.6, 1.0 - abs(vWNrm.y));
-          diffuseColor *= mix(grainC, strataC, steep);`);
+          diffuseColor *= mix(grainC, strataC, steep);`)
+        .replace('#include <color_fragment>', `#include <color_fragment>\n${farm ? FARM_FRAG_BODY : ''}`);
     };
-    m.customProgramCacheKey = () => 'track-terrain';
+    m.customProgramCacheKey = () => (farm ? 'track-terrain-farm' : 'track-terrain');
     return m;
   });
 }

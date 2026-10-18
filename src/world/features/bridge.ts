@@ -11,6 +11,8 @@ import type { TerrainField } from '../terrain/field';
 const COL = { deck: new Color('#d3d0c8'), under: new Color('#9e9b94'), stripe: new Color('#e5191c'), pier: new Color('#c9c5bb'), arch: new Color('#e3242b'), hanger: new Color('#2b2b31') };
 const DECK_T = 1.5;
 const APEX = 19;
+/** End pylons sit this far inside the bridge ends (m along the road). */
+const PYLON_AT = 0.6;
 
 const A = new Vector3(), B = new Vector3(), C = new Vector3(), D = new Vector3(), N = new Vector3(), E = new Vector3();
 
@@ -59,6 +61,25 @@ export function buildBridge(ctx: WorldCtx, batch: PropBatch, field: TerrainField
     box(batch.at(out.x, out.z), trs(out.x, out.y, out.z, ry, 10.5, 1.2, 2.2, m), COL.pier);
   }
   buildArches(ctx, batch, field, f);
+  for (const [s, dir] of [[f.s0, -1], [f.s1, 1]] as Array<[number, -1 | 1]>) endPylons(ctx, batch, field, s, dir);
+}
+
+/**
+ * Concrete pylons at the bridge ends, just outside the drivable bound: they close the seam between the
+ * parapet start and the neighbouring rock / shore, and hold the arch ribs' feet.
+ */
+function endPylons(ctx: WorldCtx, batch: PropBatch, field: TerrainField, s: number, dir: -1 | 1): void {
+  const m = new Matrix4(), p = new Vector3();
+  const sc = s - dir * PYLON_AT;
+  const fr = ctx.q.frameVis(sc);
+  const ry = Math.atan2(fr.tangent.x, fr.tangent.z);
+  for (const side of [-1, 1] as const) {
+    const b = Math.max(field.bound(s - 2, side), field.bound(s, side), field.bound(s + 2, side));
+    ctx.q.toWorld(sc, side * (b + 0.06 + 0.8), 0, p);
+    const buf = batch.at(p.x, p.z);
+    box(buf, trs(p.x, p.y - 0.6, p.z, ry, 1.6, 5.2, 2.6, m), COL.pier);
+    box(buf, trs(p.x, p.y + 2.15, p.z, ry, 1.7, 0.3, 2.7, m), COL.stripe);
+  }
 }
 
 function pairs(rows: number[]): Array<[number, number]> {
@@ -69,7 +90,8 @@ function pairs(rows: number[]): Array<[number, number]> {
 
 function buildArches(ctx: WorldCtx, batch: PropBatch, field: TerrainField, f: TrackFeature): void {
   const q = ctx.q;
-  const sA = f.s0 + 3, sB = f.s1 - 3, span = sB - sA;
+  // The ribs spring from the end pylons (see endPylons).
+  const sA = f.s0 + PYLON_AT, sB = f.s1 - PYLON_AT, span = sB - sA;
   const W = 0.8, Dp = 1.3, SEG = 28;
   const xOf = (s: number, side: -1 | 1): number => side * (field.bound(s, side) + 1.0);
   const h = (t: number): number => 4 * APEX * t * (1 - t) + 1.2;

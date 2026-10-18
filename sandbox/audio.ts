@@ -2,6 +2,7 @@
 // render-check API (window.__audioCheck) used by tools/audio-check.mjs.
 import { renderAllSfx, renderSfx, renderSong, renderStinger, formSeconds, songInfo } from '../src/audio/check';
 import { hookMask, stems } from '../src/audio/check-mix';
+import { fadeOutCheck, retriggerChecks, stingerIdleChecks } from '../src/audio/check-onsets';
 import { SFX } from '../src/audio/sfx/bank';
 import { mountLab } from '../src/audio/lab/panel';
 import { SONGS } from '../src/audio/music/songs';
@@ -22,6 +23,9 @@ declare global {
       renderAllSfx: typeof renderAllSfx;
       stems: typeof stems;
       hookMask: typeof hookMask;
+      retriggerChecks: typeof retriggerChecks;
+      stingerIdleChecks: typeof stingerIdleChecks;
+      fadeOutCheck: typeof fadeOutCheck;
     };
   }
 }
@@ -39,6 +43,9 @@ window.__audioCheck = {
   renderAllSfx,
   stems,
   hookMask,
+  retriggerChecks,
+  stingerIdleChecks,
+  fadeOutCheck,
 };
 
 const root = document.getElementById('app');

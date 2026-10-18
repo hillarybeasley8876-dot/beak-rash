@@ -10,7 +10,6 @@ import type { Visual, VisualSystem } from './visuals';
 
 const FLAT = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), Math.PI / 2);
 
-
 /** Unit ring / open cylinder shared through the session prop library. */
 const ringGeo = (vs: VisualSystem): BufferGeometry => vs.ctx.lib.get('wave:ring', () => new TorusGeometry(1, 0.07, 6, 48));
 const wallGeo = (vs: VisualSystem): BufferGeometry =>

@@ -1,5 +1,5 @@
 // Shared combat context: session handles, the combat clock, per-rider private data and track-space queries.
-// Subsystems (pickups, projectiles, visuals, skills) are attached by index.ts after construction.
+// Subsystems (pickups, projectiles, visuals, skills) are attached by system.ts after construction.
 import { Group, Quaternion, Vector3 } from 'three';
 import type { RiderView, Session } from '../../core/contracts';
 import type { Rng } from '../../core/rng';
@@ -10,12 +10,18 @@ import type { ProjectileSystem } from './projectiles/projectiles';
 import type { SkillRunner } from './skills/runner';
 import type { VisualSystem } from './visuals/visuals';
 
+/** Phase lengths (s) of a swing. */
+export interface SwingTiming { windup: number; active: number; recover: number; total: number }
+
 /** Combat bookkeeping that is private to this unit (RiderState only carries the shared fields). */
 export interface RiderCombat {
+  swing: SwingTiming;                             // timing of the current / last swing
   uses: number;                                   // hits left on the current weapon
-  buffered: { heavy: boolean; side: Side | 0; age: number } | null;
-  skillBuf: { slot: number; age: number } | null; // skill pressed mid-swing / mid-stagger, retried briefly
+  buffered: { heavy: boolean; side: Side | 0; age: number } | null; // swing pressed during a swing tail / stagger
+  skillBuf: Array<{ slot: number; age: number }>; // skills pressed mid-swing / mid-stagger (one per slot), retried
+  bellBuf: number | null;                         // age of a bell press held while a swing / stagger finishes
   bellCd: number;
+  bellPaid: number[];                             // combat time the bell last paid SP for provoking rider [id]
   nextCrit: boolean;                              // ONE MORE! grants a guaranteed crit
   koFired: boolean;                               // combat:ko already emitted for this wreck
   hpAtCrash: number;                              // HP when the current wreck started
@@ -50,8 +56,8 @@ export class CombatCtx {
     this.root.name = 'combat';
     session.world.add(this.root);
     this.data = session.riders.map(() => ({
-      uses: Infinity, buffered: null, skillBuf: null, bellCd: 0, nextCrit: false, koFired: false, hpAtCrash: 0, lastAttack: -999,
-      hitByMirror: null, koBy: null, pin: null,
+      swing: { windup: 0, active: 0, recover: 0, total: 0 }, uses: Infinity, buffered: null, skillBuf: [], bellBuf: null, bellCd: 0, bellPaid: session.riders.map(() => -Infinity),
+      nextCrit: false, koFired: false, hpAtCrash: 0, lastAttack: -999, hitByMirror: null, koBy: null, pin: null,
     }));
   }
 
@@ -99,6 +105,15 @@ export class CombatCtx {
 
 /** Can this rider act (swing, cast, collect)? */
 export const active = (r: RiderState): boolean => r.mode === 'racing';
+
+/** The rider is only striking a pose (bell, or a non-exclusive skill's cast pose): a swing or the bell may cut it. */
+export function posing(ctx: CombatCtx, r: RiderState): boolean {
+  const a = r.action;
+  return a !== null && (a.kind === 'bell' || (a.kind === 'skill' && !ctx.skills.busy(r)));
+}
+
+/** Past the line: whatever the rider still has running moves and shows, but never scores (hits, debuffs, KOs). */
+export const finished = (r: RiderState): boolean => r.mode === 'finished' || r.finishTime !== null;
 
 /** Can this rider be hit by melee, skills or projectiles right now? */
 export function targetable(ctx: CombatCtx, r: RiderState): boolean {
