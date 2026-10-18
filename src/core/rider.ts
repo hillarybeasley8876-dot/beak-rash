@@ -15,7 +15,7 @@ export function createRiderState(
     airborne: false, airTime: 0, drifting: false, driftCharge: 0, boostTime: 0, boostPower: 0,
     surface: 'road', draft: 0,
     mode: 'grid', modeTime: 0, place: id + 1, progress: 0, finishTime: null, rubber: 1,
-    hp: maxHp, maxHp, sp: 0, weapon: 'none', statuses: [], mods: defaultMods(), action: null,
+    hp: maxHp, maxHp, sp: 0, weapon: 'none', weaponUses: Infinity, statuses: [], mods: defaultMods(), action: null,
     cooldowns: [0, 0, 0], combo: 0, comboTimer: 0, kos: 0, wrecked: 0,
     lastHitBy: null, lastHitTime: -999, invuln: 0, coins: 0, heat: 0, crash: null,
   };

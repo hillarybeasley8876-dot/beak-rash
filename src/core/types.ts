@@ -129,6 +129,7 @@ export interface RiderState {
   maxHp: number;
   sp: number;          // 0..100 skill/ult meter
   weapon: WeaponId;
+  weaponUses: number;  // hits left on the held weapon (Infinity for 'none'); combat owns it
   statuses: StatusEffect[];
   mods: RiderMods;
   action: RiderAction | null;

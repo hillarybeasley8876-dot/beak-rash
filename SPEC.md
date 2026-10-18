@@ -151,8 +151,8 @@ jagged clip-path polygons, star bursts, halftone dot fields, torn edges, thick o
   then 'respawning' 0.6 s blink at a safe x near the crash point, invuln 2 s, HP refilled to 70 %.
 - Boost API: anyone may set `boostTime = max(boostTime, t)` and `boostPower = max(...)`; physics applies it.
 - Camera: spring-follow (critically damped, ω 9–12) behind along a blend of track tangent (70 %) and
-  bike heading; distance 4.6→5.6 m and height 1.9→2.2 m with speed; look 5→9 m ahead at 1 m; FOV
-  62→74 with speed, +8…12 kick on boost; roll = lean·0.18; never below 1.2 m above road. Trauma shake
+  bike heading; distance 4.3→5.1 m and height 1.9→2.2 m with speed; look 5→9 m ahead at 1 m; FOV
+  60→70 with speed, boost kick counter-dollied so the rider never shrinks (hero ≥ 24 % of screen height); roll = lean·0.18; never below 1.2 m above road. Trauma shake
   (hits .25, heavy .45, crash .6, landing .15·air, curb .05). C = look back. Cinematic override blends
   back in ≤ 0.35 s with no pops. Listens to `cam:shake` / `cam:kick` / `hitstop` bus events.
 

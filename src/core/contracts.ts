@@ -118,6 +118,8 @@ export interface PhysicsSystem {
 export interface CombatSystem {
   preStep(dt: number): void;   // statuses → mods, start swings/skills from controls
   postStep(dt: number): void;  // resolve hits, projectiles, pickups, KOs
+  /** Optional, once per rendered frame after the rider views updated (visual sync, hit-stop re-facing). */
+  frame?(dtReal: number): void;
   dispose(): void;
 }
 
@@ -141,6 +143,8 @@ export interface CameraRig {
   /** Hand the camera to a cinematic until the callback returns false; blends back over blendOut s. */
   override(fn: CameraOverride | null, blendOut?: number): void;
   resize(width: number, height: number): void;
+  /** Optional: the pose the chase camera would have right now (for cinematics flying home); returns its FOV. */
+  chasePose?(outPos: Vector3, outQuat: Quaternion): number;
 }
 
 // ---------------------------------------------------------------- actors/

@@ -54,3 +54,20 @@
   Regressions: `node tools/test-core-guard.mjs` (unit), `node tools/core-check.mjs` (browser: broken
   AudioContext still boots + races; normal race has no console errors).
 - 11:20 species unit now owns all of src/actors/** except bikes (actors maker done; its critics never ran).
+- 11:40 (10-18) applied: `CombatSystem.frame?(dtReal)` (session calls it once per rendered frame after the
+  rider views); `CameraRig.chasePose?(outPos, outQuat): fov` (optional); `RiderState.weaponUses` (Infinity
+  for 'none'; combat owns it); SPEC §6 camera numbers updated per sim's proposal (4.3→5.1 m, FOV 60→70,
+  counter-dollied boost kick, hero ≥ 24 % of screen height).
+
+## Requests from core to units, round 2 (fixers: grep your unit name here)
+- combat: write `rider.weaponUses` whenever a weapon is picked/stolen/used/broken (Infinity for 'none').
+- ui-hud: read `rider.weaponUses` for the weapon slot (fixes "full uses after stealing a worn weapon");
+  also add the 成就解锁 chip on `achievement:unlock` (content request 3).
+- sim: implement `CameraRig.chasePose` if cheap; apply the new SPEC §6 camera numbers; sim may read track
+  frames up to `length + runoff` (track implements runoff = 250 m) instead of extrapolating past the finish.
+- race: core keeps rivals on their signature bikes (character identity, matches the portraits). Derive the
+  rival pace from a per-level baseline (e.g. BIKES.roadbike.topSpeed × level factor), never from the
+  player's current bike, so buying a faster bike is a real upgrade. Corgi toasts may use content's POLICE_LINES.
+- env-city / env-mountain: use content's TRACK_BILLBOARDS / TRACK_SIGNS (src/data/strings.ts or memes.ts)
+  for neon signs / billboards / road signs.
+- audio: regenerate barks for content's new roster lines with tools/gen-tts.mjs when convenient.

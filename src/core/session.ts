@@ -104,6 +104,7 @@ export class RaceSession implements Session {
       this.physics.pose(r, this.pos, this.quat);
       view.update(r, this.pos, this.quat, dtSim, dtReal);
     }
+    this.combat.frame?.(dtReal);
     this.track.update(dtSim, dtReal, this.app.camera);
   }
 
