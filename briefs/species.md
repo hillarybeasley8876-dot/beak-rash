@@ -1,8 +1,9 @@
 # Unit: species — wave 2 — character appeal pass (all 10 riders)
-Read SPEC.md (§0, §5 characters, §7 skills), status/actors.md (kit, rig, cues, how to test) and the latest
-reviews/actors-*.json. You own `src/actors/species/**`, `src/actors/kit/{bird,mammal,ears-tails,props,face,gear,wing,limbs}.ts`
-and `sandbox/actors*` (the actors unit is finished; its core files view.ts / rig/* / crash.ts may get small
-fixes from you only when a species needs them — keep the RiderView contract and the shared skeleton).
+Read SPEC.md (§0, §5 characters, §7 skills, §8 victim tumble), status/actors.md (kit, rig, cues, crash, how to test)
+and status/core.md. The actors unit's maker is finished but its critics never ran: you are now the owner of
+ALL of `src/actors/**` except `src/actors/bikes/**` (bikes unit), plus `sandbox/actors*` and `tools/actors-*`.
+Keep the RiderView contract (core/contracts.ts) and the shared skeleton working for every species.
+Your critics review the whole actors unit (looks AND animation: pedalling IK, cues, weapons, crash tumble).
 
 ## Goal
 Make every rider look like a collectible designer-vinyl toy you would want on a shelf, consistent with

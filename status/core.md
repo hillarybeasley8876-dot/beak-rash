@@ -49,3 +49,8 @@
   with the vector fallback until it is ready.
 - track (wave 2 note): coast's tightest curve is R 150 m, so nothing calls for a drift. When the track unit
   next touches layouts, add 2–3 tight corners (R 35–70 m) incl. one near-hairpin and an S-chicane.
+- 11:20 (10-18) core: unit factories are wrapped by src/core/guard.ts (guard/guardAsync) — a factory that
+  throws logs `[modules] unit "<name>" threw …` and the game continues on that unit's stub.
+  Regressions: `node tools/test-core-guard.mjs` (unit), `node tools/core-check.mjs` (browser: broken
+  AudioContext still boots + races; normal race has no console errors).
+- 11:20 species unit now owns all of src/actors/** except bikes (actors maker done; its critics never ran).
