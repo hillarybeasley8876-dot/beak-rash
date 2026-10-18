@@ -1,11 +1,12 @@
-// trackSelect (quick race): three skewed track cards (scene art, names, blurb, ★ difficulty, weather,
+// trackSelect (quick race): three skewed track cards (in-engine still, names, blurb, ★ difficulty, weather,
 // length). ←→ choose, Enter → flow:startRace, Esc → menu.
 import './track-select.css';
 import type { TrackId } from '../../core/types';
 import { TRACKS, TRACK_ORDER } from '../../data/tracks';
 import { Nav } from '../nav';
-import { HINT_BACK, HINT_LR, HINT_OK, backdrop, h, jagged, starSvg, svg, torn, trackArtSvg } from '../p5';
+import { HINT_BACK, HINT_LR, HINT_OK, backdrop, h, jagged, starSvg, svg, torn } from '../p5';
 import { frame, type ScreenFactory } from '../screen';
+import { trackArt } from '../track-stills';
 import { recall, remember } from './memory';
 
 export function trackCard(id: TrackId, i: number): HTMLDivElement {
@@ -13,7 +14,7 @@ export function trackCard(id: TrackId, i: number): HTMLDivElement {
   const stars = h('span', { class: 'br-tc-stars', attrs: { 'aria-label': `难度 ${t.difficulty}/3` } });
   for (let k = 1; k <= 3; k++) stars.append(svg(starSvg({ points: 5, inner: 0.45, fill: k <= t.difficulty ? '#e5191c' : 'none', stroke: '#0b0b0f', strokeWidth: 14 }), 'br-tc-star'));
   return h('div', { class: `br-tc is-${id}`, vars: { '--i': i, '--clip': jagged(`tc-${id}`, { jx: 1.5, jy: 2, notches: 2 }) } },
-    h('div', { class: 'br-tc-art', vars: { '--clip': torn(`art-${id}`, 'bottom', 6, 22) } }, svg(trackArtSvg(id))),
+    h('div', { class: 'br-tc-art', vars: { '--clip': torn(`art-${id}`, 'bottom', 6, 22) } }, trackArt(id)),
     h('div', { class: 'br-tc-num', text: String(i + 1).padStart(2, '0') }),
     h('div', { class: 'br-tc-body' },
       h('div', { class: 'br-tc-name', text: t.name }),

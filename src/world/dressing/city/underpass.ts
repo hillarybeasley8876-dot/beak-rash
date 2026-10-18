@@ -1,32 +1,46 @@
 // Underpass and tunnel fit-out: concrete panel skin on the cutting's retaining walls (hazard-striped
 // kerb, coping, railing at street level, wall lights, P5 posters) and inside the tunnel glazed tiles,
-// LED strips that streak in the wet road, jet fans, exit signs and light pools under the vault lamps.
-import { Color, Matrix4, Mesh, MeshToonMaterial, Vector3, type Texture } from 'three';
-import { toonRamp } from '../../../render/toon';
+// LED strips that streak in the wet road, jet fans, exit signs and a navy vault skin (vault.ts).
+import { Color, DoubleSide, Matrix4, Mesh, MeshBasicMaterial, Vector3 } from 'three';
 import type { WorldCtx } from '../../ctx';
-import { MeshBuf } from '../../geom';
+import { GridGeo, MeshBuf } from '../../geom';
 import { cylinder, trs, box } from '../../kit/shapes';
+import { vaultY, WALL_H } from '../../features/tunnel';
 import { STREET } from '../../layouts/city';
+import { WALL_TOE } from '../../terrain/profile';
+import { REFLECT_LAYER } from './batch';
 import type { City } from './city';
-import { quadToward, runsWhere, wallRibbon } from './geo';
+import { quadToward, runsWhere, texMesh, wallRibbon } from './geo';
 import { sign } from './neon';
 import { p5Face } from './neon-faces';
-import type { Pools } from './paint';
 import { hdr, segment } from './util';
+import { vaultSkin } from './vault';
 import { CONCRETE_M, TILE_M, concreteTexture, tileTexture } from './wall-tex';
 
 const COL = { yellow: new Color('#ffd21f'), black: new Color('#1c1c22'), coping: new Color('#a9a7b6'), rail: new Color('#2a2c36'), fan: new Color('#8b93a3'), fanIn: new Color('#2a2c36') };
 const POSTERS = ['SHOWTIME!', '暴力鹈鹕', 'ONE MORE!', '今日宜：撞人'];
 const m = new Matrix4();
+const VAULT_STEPS = 8;
+const UP = new Vector3(0, 1, 0);
 const A = new Vector3(), B = new Vector3(), C = new Vector3(), D = new Vector3();
 
-/** One textured toon mesh from a buffer (a single draw call). */
-function texMesh(ctx: WorldCtx, name: string, buf: MeshBuf, map: Texture): void {
-  if (!buf.idx.length) return;
-  const mat = ctx.own(new MeshToonMaterial({ map, vertexColors: true, gradientMap: toonRamp() }));
-  const mesh = new Mesh(ctx.own(buf.build()), mat);
-  mesh.name = name;
-  mesh.receiveShadow = true;
+/** Black tube (walls + vault) seen only by the wet-road mirror, so the street above never reflects into the tunnel. */
+function vaultOccluder(ctx: WorldCtx, s0: number, s1: number, halfW: number): void {
+  const xs: Array<[number, number]> = [[-1, 0]];
+  for (let i = 0; i <= VAULT_STEPS; i++) {
+    const x = -1 + (2 * i) / VAULT_STEPS;
+    xs.push([x, vaultY(x * halfW, halfW)]);
+  }
+  xs.push([1, 0]);
+  const rows = Math.max(2, Math.ceil((s1 - s0) / 2) + 1);
+  const g = new GridGeo(rows, xs.length);
+  for (let r = 0; r < rows; r++) {
+    const s = s0 + ((s1 - s0) * r) / (rows - 1);
+    xs.forEach(([x, y], k) => g.set(r, k, ctx.q.toWorld(s, x * (halfW + 0.08), y + (y > 0 ? 0.08 : 0), A), UP, k, s));
+  }
+  const mesh = new Mesh(ctx.own(g.build()), ctx.own(new MeshBasicMaterial({ color: 0x000000, side: DoubleSide, fog: false })));
+  mesh.name = 'city:vaultMirror';
+  mesh.layers.set(REFLECT_LAYER);
   ctx.group.add(mesh);
 }
 
@@ -80,19 +94,16 @@ export function retainingWalls(c: City): void {
   texMesh(ctx, 'city:walls', buf, ctx.own(concreteTexture(ctx.app.renderer)));
 }
 
-/** Tunnel tube geometry (mirrors features/tunnel.ts): wall height, crown and the vault profile. */
-const WALL_H = 3.6, CROWN = 7.4, TOE = 0.06;
-const vaultY = (x: number, halfW: number): number => WALL_H + Math.sqrt(Math.max(0, 1 - (x / halfW) ** 2)) * (CROWN - WALL_H);
 
-/** Tiles, LED strips, jet fans, exit signs and road pools inside every tunnel feature. */
-export function tunnelFitOut(c: City, pools: Pools): void {
+/** Tiles, LED strips, jet fans, exit signs and the vault skin inside every tunnel feature (no floor pools: the strips and vault lamps reflect). */
+export function tunnelFitOut(c: City): void {
   const { ctx, field, b } = c.d;
   const { q } = ctx;
   const tiles = new MeshBuf();
   const strips = [hdr('#22e8ff', 2.6), hdr('#ff2d95', 2.6)];
   for (const f of ctx.L.features.filter((ft) => ft.kind === 'tunnel')) {
     const mid = (f.s0 + f.s1) / 2;
-    const halfW = Math.max(field.bound(mid, -1), field.bound(mid, 1)) + TOE;
+    const halfW = Math.max(field.bound(mid, -1), field.bound(mid, 1)) + WALL_TOE;
     for (const side of [-1, 1] as const) {
       const xw = side * (halfW - 0.02);
       wallRibbon(ctx, tiles, f.s0 + 0.5, f.s1 - 0.5, side, () => xw, () => 1.3, () => WALL_H - 0.05, TILE_M);
@@ -108,6 +119,7 @@ export function tunnelFitOut(c: City, pools: Pools): void {
         }
       }
     }
+    vaultOccluder(ctx, f.s0 - 1, f.s1 + 1, halfW);
     for (let s = f.s0 + 22; s < f.s1 - 15; s += 46) jetFans(c, s, halfW);
     for (let s = f.s0 + 30, k = 0; s < f.s1 - 10; s += 50, k++) {
       const side: -1 | 1 = k % 2 ? 1 : -1;
@@ -115,8 +127,7 @@ export function tunnelFitOut(c: City, pools: Pools): void {
       const fr = q.frameVis(s);
       box(b.glow.at(p.x, p.z), trs(p.x, p.y, p.z, Math.atan2(fr.tangent.x, fr.tangent.z), 0.1, 0.36, 0.9, m), hdr('#2bff88', 2.0));
     }
-    // Pools under the vault light strips (features/tunnel.ts puts them every 9 m at x = ±2.2).
-    for (let s = f.s0 + 5; s < f.s1 - 3; s += 9) for (const x of [-2.2, 2.2]) pools.add(s + 1.2, x, 3.6, new Color(0.9, 0.8, 0.6));
+    vaultSkin(c, f.s0 + 0.5, f.s1 - 0.5, halfW);
   }
   texMesh(ctx, 'city:tiles', tiles, ctx.own(tileTexture(ctx.app.renderer)));
 }

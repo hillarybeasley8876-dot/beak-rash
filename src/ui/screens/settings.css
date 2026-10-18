@@ -23,7 +23,16 @@
 .br-set-row.is-focus .br-set-arrow { color: var(--white); animation: br-jitter 0.5s steps(6) infinite; }
 .br-set-row.is-focus .br-meter i.is-on, .br-set-row.is-focus .br-pill.is-on { background: var(--white); color: var(--ink); }
 .br-set-row.is-focus .br-meter i { border-color: var(--ink); }
-.br-set-row.is-focus .br-pill { border-color: rgba(255, 255, 255, 0.5); color: rgba(255, 255, 255, 0.8); }
+/* Values: the current one is a big skewed slab (ink on white, red offset shadow, slams in on change);
+   the other options stay readable ghosts beside it. */
+.br-set-row .br-choice { gap: 14px; align-items: center; }
+.br-set-row .br-pill { font-size: 30px; color: rgba(255, 255, 255, 0.8); border-color: rgba(255, 255, 255, 0.4); }
+.br-set-row .br-pill.is-on { padding: 6px 26px 3px; font-size: 38px; color: var(--ink); background: var(--white); border-color: var(--white); box-shadow: 5px 5px 0 var(--red); animation: br-set-slam 0.2s var(--ease-slam); }
+.br-set-row.is-focus .br-pill { border-color: rgba(255, 255, 255, 0.65); color: var(--white); }
+.br-set-row.is-focus .br-pill.is-on { box-shadow: 5px 5px 0 var(--ink); }
+@keyframes br-set-slam { 0% { scale: 1.4; } 60% { scale: 0.94; } 100% { scale: 1; } }
+.br-set-row.is-disabled .br-set-label b, .br-set-row.is-disabled .br-set-danger { color: #6c6c74; }
+.br-set-row.is-disabled.is-focus { background: #3a3a42; }
 .br-set-danger { font-family: var(--f-cn-block); font-size: 30px; color: rgba(255, 255, 255, 0.55); }
 .br-set-row.is-action.is-focus .br-set-danger { color: var(--white); }
 .br-set-row.is-action .br-set-label b { color: #ff8c8c; }
@@ -31,6 +40,6 @@
 
 .br-set-desc { position: absolute; left: 1260px; top: 250px; width: 580px; height: 700px; }
 .br-set-desc-box { position: relative; padding: 30px 38px 40px; background: var(--white); color: var(--ink); clip-path: var(--clip); rotate: 3deg; }
-.br-set-desc-text { margin: 18px 0 0; min-height: 3.9em; font-family: var(--f-cn-play); font-weight: 400; font-size: 38px; line-height: 1.3; }
+.br-set-desc-text { margin: 18px 0 0; min-height: 3.9em; font-family: var(--f-cn-play); font-weight: 400; font-size: 38px; line-height: 1.3; text-wrap: balance; word-break: keep-all; overflow-wrap: anywhere; }
 .br-set-pelican { position: absolute; left: 60px; top: 290px; width: 480px; height: 470px; filter: drop-shadow(10px 10px 0 var(--red)); animation: br-float 2.8s ease-in-out infinite; }
 .br-set-pelican.is-fallback { background: none; }

@@ -7,6 +7,7 @@
 import { smoothstep } from '../../core/math';
 import type { TrackFrame } from '../../core/types';
 import type { TerrainField, TerrainMod } from '../terrain/field';
+import { flatAxes, type FlatAxes } from './mountain-frame';
 import { isShore } from '../terrain/profile';
 
 const ROW = 2;          // precomputed rows every 2 m
@@ -22,6 +23,9 @@ export class LegBlend implements TerrainMod {
   private readonly other: [Float32Array, Float32Array];
   private readonly roomU: [Float32Array, Float32Array];
   private readonly fr: TrackFrame;
+  private readonly ax: FlatAxes = { tx: 0, tz: 0, rx: 0, rz: 0 };
+  /** Build summary for the debug log (ctx.log). */
+  readonly summary: string;
 
   constructor(private readonly field: TerrainField) {
     const L = field.L;
@@ -33,7 +37,7 @@ export class LegBlend implements TerrainMod {
     this.fr = field.q.frameVis(0);
     const t0 = performance.now();
     const found = this.scan();
-    console.info(`[mountain] leg blend: ${found} rows next to another leg (${Math.round(performance.now() - t0)} ms)`);
+    this.summary = `leg blend: ${found} rows next to another leg (${Math.round(performance.now() - t0)} ms)`;
   }
 
   /** For every row: candidates from other legs near it, then march the outward rays. */
@@ -63,8 +67,8 @@ export class LegBlend implements TerrainMod {
     const L = this.field.L;
     const s = L.sMin + i;
     const fr = this.field.q.frameVis(s, this.fr);
-    const rl = Math.hypot(fr.right.x, fr.right.z) || 1;
-    const rx = (fr.right.x / rl) * side, rz = (fr.right.z / rl) * side;
+    const a = flatAxes(fr, this.ax);
+    const rx = a.rx * side, rz = a.rz * side;
     const bound = this.field.bound(s, side);
     const nearest = (u: number): { d: number; j: number } => {
       const px = fr.pos.x + rx * (bound + u), pz = fr.pos.z + rz * (bound + u);
@@ -120,8 +124,8 @@ export class LegBlend implements TerrainMod {
       if (d < segD) { segD = d; s = L.sMin + a + t; }
     }
     const fr = this.field.q.frameVis(s, this.fr);
-    const rl = Math.hypot(fr.right.x, fr.right.z) || 1;
-    return { s, x: ((wx - fr.pos.x) * fr.right.x + (wz - fr.pos.z) * fr.right.z) / rl };
+    const a = flatAxes(fr, this.ax);
+    return { s, x: (wx - fr.pos.x) * a.rx + (wz - fr.pos.z) * a.rz };
   }
 
   /** Sides that keep their own profile: bridges (detached), shores (lake/river) and tunnels. */

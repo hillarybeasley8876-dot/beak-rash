@@ -41,6 +41,18 @@
 }
 .bd-key { position: absolute; left: 470px; top: 64px; font: 400 90px/1 "Anton", sans-serif; color: var(--red); -webkit-text-stroke: 3px var(--paper); paint-order: stroke fill; }
 
+/* Projectile skills: a slim corner band (upper left, ends before the centre) so the shot and its target
+   stay in view while it flies. Strip spans x -360…1200 at y ~270–390 (1080p stage). */
+.ci-band.is-thin .bd-strip {
+  left: -360px; top: 268px; width: 1560px; height: 124px;
+  box-shadow: 0 -8px 0 0 var(--red), 0 8px 0 0 var(--red), 0 -13px 0 0 var(--paper), 0 13px 0 0 var(--paper);
+}
+.ci-band.is-thin .bd-key { left: 396px; top: 24px; font-size: 64px; }
+.ci-band.is-thin .bd-eyes { left: 470px; top: 12px; width: 470px; height: 100px; }
+.ci-band.is-thin .bd-txt { left: 960px; top: 10px; gap: 4px; }
+.ci-band.is-thin .bd-en { font-size: 62px; -webkit-text-stroke-width: 3px; }
+.ci-band.is-thin .bd-cn { padding: 4px 10px 1px; font-size: 28px; box-shadow: 0 0 0 3px var(--paper), 5px 5px 0 3px var(--ink); }
+
 /* Rival skill chips (top-right, under the counters). Positioned in viewport px by the chips module. */
 .chips { position: absolute; right: calc(var(--k) * 34px); top: calc(var(--k) * 150px); width: 0; height: 0; }
 .chip { position: absolute; right: 0; top: 0; display: flex; align-items: center; gap: 10px; transform-origin: 100% 0; }
@@ -53,10 +65,11 @@
 .chip-en { font: 400 34px/0.9 "Anton", sans-serif; letter-spacing: 1px; white-space: nowrap; }
 .chip-cn { font: 400 20px/1 "ZCOOL QingKe HuangYou", sans-serif; color: var(--sp); white-space: nowrap; }
 .chip-who { font: 900 16px/1 "Noto Sans SC", sans-serif; color: #bbb; white-space: nowrap; }
-.chip-ach .chip-card { box-shadow: 0 0 0 3px var(--sp), 6px 6px 0 3px var(--red); }
+.chip-ach .chip-card { background: var(--red); box-shadow: 0 0 0 3px var(--paper), 0 0 0 6px var(--ink), 6px 6px 0 6px var(--ink); }
+.chip-ach .chip-who { color: var(--paper); }
 .chip-ico {
   flex: none; width: 46px; height: 46px; display: grid; place-items: center; background: var(--sp); color: var(--ink);
   font: 400 32px/1 "ZCOOL QingKe HuangYou", sans-serif; box-shadow: 0 0 0 3px var(--paper);
 }
-.chip-kick { font: 400 15px/1 "Bebas Neue", "ZCOOL QingKe HuangYou", sans-serif; letter-spacing: 1px; color: var(--sp); white-space: nowrap; }
+.chip-kick { font: 400 15px/1 "Bebas Neue", "ZCOOL QingKe HuangYou", sans-serif; letter-spacing: 1px; color: var(--paper); white-space: nowrap; }
 .chip-ach .chip-en { font: 400 30px/1 "ZCOOL QingKe HuangYou", sans-serif; letter-spacing: 0; }

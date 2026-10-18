@@ -2,8 +2,9 @@
 // bike into ONE indexed, rigidly skinned BufferGeometry (each part follows one bone: frame, wheels, crank,
 // pedals, steer…), so a bike costs two draw calls. Outlined parts come first so the hull can draw only
 // them (it shares the attributes and index, with a shorter drawRange).
-import { BufferAttribute, BufferGeometry, Color } from 'three';
+import { BufferAttribute, BufferGeometry, Color, SRGBColorSpace } from 'three';
 import { WHITE_UV, type UvRect } from './atlas';
+import { GLOW, glossOf } from './palette';
 
 export interface PartOpts {
   /** Flat colour; omitted = keep the geometry's own 'color' attribute (white if none). */
@@ -12,6 +13,10 @@ export interface PartOpts {
   outline?: number;
   /** > 0: tintable frame paint; the tint is multiplied by this shade. */
   paint?: number;
+  /** Surface finish 0 (matte) … 1 (chrome); default from the palette (build/palette.ts). */
+  gloss?: number;
+  /** Self-lit (tail lights, lamp lenses): full colour in shade and at night, no shading. */
+  glow?: boolean;
   /** Map the geometry's uv (0..1) into this atlas rectangle. */
   decal?: UvRect;
   /** Skeleton bone the part follows (set by PartSet.absorb; 0 = frame). */
@@ -74,7 +79,7 @@ export class PartSet {
       ni += geo.index ? geo.index.count : geo.getAttribute('position').count;
     }
     const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), col = new Float32Array(nv * 3);
-    const uv = new Float32Array(nv * 2), ow = new Float32Array(nv), on = new Float32Array(nv * 3);
+    const uv = new Float32Array(nv * 2), ow = new Float32Array(nv), on = new Float32Array(nv * 3), gl = new Float32Array(nv);
     const skinIndex = new Uint16Array(nv * 4), skinWeight = new Float32Array(nv * 4);
     const index = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
     const paintIdx: number[] = [], paintShade: number[] = [];
@@ -85,6 +90,7 @@ export class PartSet {
       const width = o.outline ?? 0;
       const sn = width > 0 ? smoothNormals(geo) : null;
       const flat = o.color !== undefined ? tmpC.set(o.color).clone() : null;
+      const gloss = o.glow ? GLOW : o.gloss ?? glossOf(o.color, o.paint);
       for (let i = 0; i < p.count; i++) {
         const k = vo + i;
         pos[k * 3] = p.getX(i); pos[k * 3 + 1] = p.getY(i); pos[k * 3 + 2] = p.getZ(i);
@@ -98,6 +104,7 @@ export class PartSet {
           uv[k * 2 + 1] = o.decal.v0 + gu.getY(i) * (o.decal.v1 - o.decal.v0);
         } else { uv[k * 2] = WHITE_UV[0]; uv[k * 2 + 1] = WHITE_UV[1]; }
         ow[k] = width;
+        gl[k] = gloss;
         const src = sn ?? null;
         on[k * 3] = src ? (src[i * 3] as number) : n.getX(i);
         on[k * 3 + 1] = src ? (src[i * 3 + 1] as number) : n.getY(i);
@@ -118,6 +125,7 @@ export class PartSet {
     geo.setAttribute('normal', new BufferAttribute(nor, 3));
     geo.setAttribute('color', new BufferAttribute(col, 3));
     geo.setAttribute('uv', new BufferAttribute(uv, 2));
+    geo.setAttribute('gloss', new BufferAttribute(gl, 1));
     const si = new BufferAttribute(skinIndex, 4), sw = new BufferAttribute(skinWeight, 4);
     geo.setAttribute('skinIndex', si);
     geo.setAttribute('skinWeight', sw);
@@ -140,11 +148,20 @@ export class PartSet {
   }
 }
 
-/** A colour attribute for `g` with its paint vertices recoloured to `tint` × shade. */
+const hsl = { h: 0, s: 0, l: 0 };
+/** Tint colour with very dark tints lifted (sRGB lightness ≥ .3) so a black rival frame still shows its shape. */
+export function liftTint(tint: string): Color {
+  const c = new Color(tint);
+  c.getHSL(hsl, SRGBColorSpace);
+  if (hsl.l < 0.3) c.setHSL(hsl.h, hsl.s, 0.3, SRGBColorSpace);
+  return c;
+}
+
+/** A colour attribute for `g` with its paint vertices (the main frame tubes) recoloured to `tint` × shade. */
 export function tintColors(g: BuiltGroup, tint: string): BufferAttribute {
   const base = g.geo.getAttribute('color').array as Float32Array;
   const out = new Float32Array(base);
-  const c = tmpC.set(tint);
+  const c = liftTint(tint);
   for (let i = 0; i < g.paintIdx.length; i++) {
     const k = g.paintIdx[i] as number, s = g.paintShade[i] as number;
     out[k * 3] = c.r * s; out[k * 3 + 1] = c.g * s; out[k * 3 + 2] = c.b * s;

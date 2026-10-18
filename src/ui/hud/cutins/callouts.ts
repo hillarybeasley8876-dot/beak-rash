@@ -24,7 +24,12 @@ export interface CalloutSpec {
   count?: boolean;
 }
 
-interface Item { spec: CalloutSpec | null; root: HTMLDivElement; en: HTMLSpanElement; cn: HTMLSpanElement; x: HTMLSpanElement; t: number; life: number; n: number; y: number; bumpT: number }
+interface Item {
+  spec: CalloutSpec | null; root: HTMLDivElement; en: HTMLSpanElement; cn: HTMLSpanElement; x: HTMLSpanElement;
+  t: number; life: number; n: number; y: number; bumpT: number;
+  /** Pushed or merged but not yet seen: `onShow` fires once it is live (after a cinematic / splash). */
+  cue: boolean;
+}
 
 const MAX = 3;
 const GAP = 96;
@@ -35,7 +40,8 @@ export class Callouts {
   readonly root: HTMLDivElement;
   private items: Item[] = [];
 
-  constructor(stage: HTMLElement) {
+  /** `onShow` runs when a pushed (or merged) callout actually plays: its sound cue. */
+  constructor(stage: HTMLElement, private onShow: (spec: CalloutSpec) => void = () => {}) {
     this.root = el('div', 'co-stack', stage);
   }
 
@@ -46,6 +52,7 @@ export class Callouts {
       same.n++;
       same.t = Math.min(same.t, 0.15);
       same.bumpT = 0;
+      same.cue = true;
       this.fill(same, spec);
       return;
     }
@@ -55,7 +62,7 @@ export class Callouts {
     const en = el('span', 'co-en', root);
     const cn = el('span', 'co-cn', root);
     const x = el('span', 'co-x', root);
-    const item: Item = { spec: null, root, en, cn, x, t: 0, life: spec.life ?? 1.15, n: 1, y: -GAP, bumpT: 9 };
+    const item: Item = { spec: null, root, en, cn, x, t: 0, life: spec.life ?? 1.15, n: 1, y: -GAP, bumpT: 9, cue: true };
     this.fill(item, spec);
     this.items.unshift(item);
     while (this.items.length > MAX) this.items.pop()?.root.remove();
@@ -86,10 +93,19 @@ export class Callouts {
 
   /** `alpha` dims the whole stack (0 while a cinematic plays). Lifetimes freeze while dimmed, so a callout
    *  raised during a KO / SHOWTIME cinematic (ONE MORE!, a place change) plays once the HUD is back. */
+  /** Callouts on the stack right now. */
+  get count(): number {
+    return this.items.length;
+  }
+
   update(dt: number, alpha: number): void {
     this.root.style.opacity = alpha >= 0.999 ? '' : alpha.toFixed(3);
     const live = alpha >= 0.999 ? dt : 0;
     this.items = this.items.filter((it, idx) => {
+      if (live > 0 && it.cue && it.spec) {
+        it.cue = false;
+        this.onShow(it.spec);
+      }
       it.t += live;
       it.bumpT += live;
       if (it.t >= it.life) {

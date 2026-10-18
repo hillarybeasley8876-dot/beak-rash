@@ -1,9 +1,16 @@
 .br-res-slab { position: absolute; left: -5%; top: -5%; width: 64%; height: 110%; background: var(--ink); clip-path: polygon(0 0, 100% 0, 96% 100%, 0 100%); }
 .br-res-title { position: absolute; left: 64px; top: 10px; rotate: -5deg; display: flex; align-items: flex-end; gap: 26px; }
 .br-res-word { font-family: var(--f-display); font-weight: 400; font-size: 196px; line-height: 1; color: var(--white); text-shadow: 10px 10px 0 var(--red); animation: br-slam 0.42s var(--ease-slam) both; }
-.br-res-sub { margin-bottom: 30px; font-size: 30px; animation: br-in-right 0.3s var(--ease-out) 0.18s both; }
+.br-res-tags { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; margin-bottom: 30px; }
+.br-res-sub { font-size: 30px; animation: br-in-right 0.3s var(--ease-out) 0.18s both; }
 .br-res-demo { position: absolute; right: 70px; top: 36px; font-size: 26px; }
-.br-res-best { position: absolute; left: 820px; top: 236px; font-size: 32px; rotate: -6deg; animation: br-pop 0.3s var(--ease-slam) 1.2s both; }
+.br-res-best { font-size: 32px; rotate: -3deg; box-shadow: 6px 6px 0 var(--white); animation: br-pop 0.3s var(--ease-slam) 1.2s both; }
+/* Career unlock: part of the result (a toast here would sit on the winner's speech bubble). Three tags
+   (unlock + best + sub) pack tighter so the top one stays inside the stage under the -5° title tilt. */
+.br-res-unlock { font-size: 30px; color: var(--red); rotate: 2deg; box-shadow: 6px 6px 0 var(--red); animation: br-pop 0.3s var(--ease-slam) 1.5s both; }
+.br-res-tags.is-three { gap: 6px; margin-bottom: 18px; }
+.br-res-tags.is-three .br-tag { font-size: 26px; }
+.br-scr-results .br-stage.is-thump { animation: br-shake 0.26s var(--ease-out); }
 
 /* ---------- table ---------- */
 .br-res-table { position: absolute; left: 70px; top: 250px; width: 1000px; }
@@ -66,9 +73,13 @@
 .br-grade-stamp { grid-row: 1 / span 3; position: relative; width: 220px; height: 220px; animation: br-stamp-in 0.46s var(--ease-slam) 0.95s both; }
 .br-grade-ring { position: absolute; inset: 0; width: 100%; height: 100%; animation: br-spin 30s linear infinite; }
 .br-grade-stamp::before { content: ''; position: absolute; inset: 26px; border-radius: 50%; background: var(--white); box-shadow: 0 0 0 8px var(--ink); }
-.br-grade-stamp b { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--f-display); font-weight: 400; font-size: 150px; line-height: 1; color: var(--red); }
-.br-grade.is-s .br-grade-stamp b { color: var(--red); text-shadow: 5px 5px 0 var(--ink); }
-.br-grade.is-d .br-grade-stamp b, .br-grade.is-c .br-grade-stamp b { color: var(--ink); }
+.br-grade-defs { position: absolute; width: 0; height: 0; }
+/* Inked rubber stamp: red double ring + letter, speckled and wobbly through the #br-ink SVG filter. */
+.br-grade-ink { position: absolute; inset: 34px; display: grid; place-items: center; border: 18px double var(--red); border-radius: 50%; rotate: -12deg; filter: url(#br-ink); }
+.br-grade-ink b { font-family: var(--f-display); font-weight: 400; font-size: 128px; line-height: 1; color: var(--red); }
+.br-grade.is-s .br-grade-ink b { text-shadow: 4px 4px 0 var(--ink); }
+.br-grade.is-d .br-grade-ink, .br-grade.is-c .br-grade-ink { border-color: var(--ink); }
+.br-grade.is-d .br-grade-ink b, .br-grade.is-c .br-grade-ink b { color: var(--ink); }
 .br-grade-title { display: flex; align-items: baseline; gap: 16px; animation: br-in-right 0.3s var(--ease-out) 1.1s both; }
 .br-grade-title small { font-family: var(--f-display); font-size: 30px; color: var(--ink); background: var(--white); padding: 0 10px; transform: skewX(var(--skew)); }
 .br-grade-title span { font-family: var(--f-cn-brush); font-weight: 400; font-size: 80px; line-height: 1.05; color: var(--white); text-shadow: 6px 6px 0 var(--ink); }
@@ -100,5 +111,22 @@
 .br-ach-more { flex: none; display: flex; align-items: baseline; gap: 6px; padding: 2px 16px 0; background: var(--red); color: var(--white); transform: skewX(var(--skew)); box-shadow: 5px 5px 0 var(--white); animation: br-pop 0.3s var(--ease-slam) both; animation-delay: var(--delay); }
 .br-ach-more b { font-family: var(--f-display); font-weight: 400; font-size: 34px; }
 .br-ach-more span { font-family: var(--f-display); font-size: 18px; letter-spacing: 0.08em; }
-.br-res-actions { position: absolute; left: 70px; top: 950px; display: flex; gap: 14px; }
+.br-ach-more { transition: transform 0.12s var(--ease-out); }
+.br-ach-more.is-focus { background: var(--white); color: var(--red); box-shadow: 6px 6px 0 var(--red); transform: skewX(var(--skew)) scale(1.14); }
+.br-ach-all { position: absolute; inset: 0; z-index: 15; display: none; place-items: center; background: rgba(11, 11, 15, 0.7); }
+.br-ach-all.is-open { display: grid; }
+.br-ach-sheet { width: 980px; max-height: 760px; padding: 36px 48px 30px; rotate: -2deg; animation: br-pop 0.24s var(--ease-slam) both; }
+.br-ach-sheet-head { display: flex; align-items: baseline; gap: 18px; margin-bottom: 18px; }
+.br-ach-sheet-head b { font-family: var(--f-cn-block); font-size: 56px; }
+.br-ach-sheet-head span { font-family: var(--f-display); font-size: 30px; color: var(--red); letter-spacing: 0.05em; }
+.br-ach-sheet-list { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 30px; }
+.br-ach-line { display: grid; grid-template-columns: 52px 1fr; column-gap: 12px; align-items: center; }
+.br-ach-line .br-ach-icon { grid-row: span 2; width: 52px; height: 52px; }
+.br-ach-line b { font-family: var(--f-cn-block); font-size: 32px; line-height: 1.1; }
+.br-ach-line span { font-size: 20px; line-height: 1.3; color: #55555e; }
+.br-ach-sheet-foot { margin-top: 22px; display: flex; justify-content: flex-end; align-items: center; gap: 14px; font-family: var(--f-cn-block); font-size: 26px; color: #55555e; }
+.br-ach-sheet-foot .br-key { background: var(--ink); color: var(--white); }
+/* Hidden until results.ts arms the row (show over + a quiet beat), then it slams in from the left. */
+.br-res-actions { position: absolute; left: 70px; top: 950px; display: flex; gap: 14px; opacity: 0; translate: -160px 0; pointer-events: none; }
+.br-res-actions.is-armed { opacity: 1; translate: 0 0; pointer-events: auto; transition: translate 0.22s var(--ease-slam), opacity 0.1s linear; }
 .br-res-actions .br-btn { font-size: 42px; }

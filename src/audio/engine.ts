@@ -1,5 +1,5 @@
 // The mixing graph shared by music, sfx and voice:
-//   musicIn ─(+musicVerb return, convolution plate)→ [muffle LP] → duck → hit duck → music vol ┐
+//   musicIn ─(+musicVerb return, diffused loop reverb)→ [muffle LP] → duck → hit duck → music vol ┐
 //   stingIn ────────────────────────────────────────────────→ music vol ┤
 //   sfxIn   ─(+tunnel verb return)→ [muffle LP] ────→ sfx vol         ├→ master vol → glue comp → ×0.5 → soft clip → out
 //   voiceIn ───────────────────────────────────────────────→ voice vol ┘
@@ -10,6 +10,7 @@
 // AudioContext or an OfflineAudioContext (audio-check renders).
 import { softClipCurve, impulseResponse } from './dsp/curves';
 import { filter, holdAt, steer } from './dsp/env';
+import { loopReverb } from './dsp/plate';
 import { FilterSwitch } from './dsp/switch';
 
 export interface Volumes { master: number; music: number; sfx: number; voice: number }
@@ -24,6 +25,8 @@ const MUSIC_LP_MIN = 360;   // Hz at full muffle (slow-mo / pause)
 const SFX_LP_MIN = 2200;
 const DUCK_ATTACK = 0.005;
 const DUCK_RELEASE = 0.12;  // s time constant back to unity
+const VERB_TAIL = 4;        // s after the last music before the reverb loop is unplugged
+const VERB_RETURN = 0.18;   // reverb return: the tail level the 0.39 convolution plate had (±1 dB)
 
 export class Engine {
   readonly musicIn: GainNode;
@@ -50,6 +53,10 @@ export class Engine {
   private sfxDuck: GainNode;
   private sfxSpace: GainNode;
   private sfxConv: ConvolverNode | null = null;
+  /** The music reverb's return: a feedback loop always renders while connected, so it is unplugged when idle. */
+  private verbReturn: GainNode;
+  private verbLive = true;
+  private verbUntil = 0;
   private vol: Record<keyof Volumes, GainNode>;
   private muffle = 0;
   private voiceDuck = 0;
@@ -77,12 +84,11 @@ export class Engine {
     this.sfxDuck = g();
     this.vol = { master: g(), music: g(), sfx: g(), voice: g() };
 
-    // Music reverb: a 1.1 s stereo convolution plate fed in mono. Chromium runs most of a
-    // ConvolverNode's FFT work on a background thread, so the audio thread pays ≈ 0.1 % for it
-    // (a delay-line network measured 0.8 %); the left / right IRs are decorrelated (width).
+    // Music reverb (dsp/plate.ts): a diffused feedback loop, ≈ 0.9 s, decorrelated L / R; a third
+    // of the audio-thread cost of a convolution plate (whose early FFT stages run on that thread).
     const verbIn = new GainNode(ctx, { gain: 1, channelCount: 1, channelCountMode: 'explicit' });
-    const plate = new ConvolverNode(ctx, { buffer: impulseResponse(ctx, 1.1, 1.1, { preDelay: 0.018, bright: 0.6, seed: 7 }) });
-    this.musicVerb.connect(verbIn).connect(plate).connect(new GainNode(ctx, { gain: 0.39 })).connect(this.musicIn);
+    this.musicVerb.connect(verbIn);
+    this.verbReturn = loopReverb(ctx, verbIn, this.musicIn, VERB_RETURN);
     // Open road = dry sfx; the tunnel reverb is built on first use (setSfxSpace).
     this.sfxSpace = g(0);
     this.sfxVerb.connect(this.sfxSpace);
@@ -107,6 +113,21 @@ export class Engine {
 
   get now(): number {
     return this.ctx.currentTime;
+  }
+
+  /** Music will sound until `until`: keep the reverb loop running (plugged back in if idle). */
+  keepReverb(until: number): void {
+    this.verbUntil = Math.max(this.verbUntil, until);
+    if (this.verbLive) return;
+    this.verbReturn.connect(this.musicIn);
+    this.verbLive = true;
+  }
+
+  /** Unplug the reverb loop once the music has been silent for its tail (realtime contexts only). */
+  tick(): void {
+    if (!this.verbLive || !(this.ctx instanceof AudioContext) || this.now < this.verbUntil + VERB_TAIL) return;
+    this.verbReturn.disconnect();
+    this.verbLive = false;
   }
 
   /** Slider values 0..1 → perceptual gain (squared). */

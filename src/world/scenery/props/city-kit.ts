@@ -63,6 +63,9 @@ export function winSpec(style: number, seed: number, lit: number, led = 0, bay =
   return { style, seed, lit, led, bay, floor, y0 };
 }
 
+/** Colour from a hex string (shared by the city prop files). */
+export const C = (h: string): Color => new Color(h);
+
 export const CPAL = {
   walls: [new Color('#4a4e7a'), new Color('#5a6182'), new Color('#6e4a74'), new Color('#3d6670'), new Color('#7a7684'), new Color('#844a4e'), new Color('#9a8f7c')],
   towers: [new Color('#3c4470'), new Color('#4a5378'), new Color('#30596a'), new Color('#5a4c78'), new Color('#62667c')],

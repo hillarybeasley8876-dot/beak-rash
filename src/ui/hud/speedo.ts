@@ -102,7 +102,8 @@ export class Speedo {
     }
     const f = clamp01(kmh / MAX_KMH);
     this.speedArc.attr('stroke-dashoffset', (100 - f * 100).toFixed(1));
-    this.speedArc.attr('stroke', r.boostTime > 0 ? '#FFE600' : kmh >= RED_KMH ? '#FF1E3C' : '#FFFFFF');
+    // Boost and redline go hot red (yellow is reserved for SP and hazards); the BOOST tag says which.
+    this.speedArc.attr('stroke', r.boostTime > 0 || kmh >= RED_KMH ? '#FF1E3C' : '#FFFFFF');
     this.needle.attr('transform', `rotate(${(A0 + SWEEP * f).toFixed(1)} ${CX} ${CY})`);
     this.updateDrift(r);
     this.updateTags(r, dt);

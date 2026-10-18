@@ -4,25 +4,27 @@
 // cables strung across the narrow streets.
 import { Color, Matrix4, Vector3 } from 'three';
 import type { Rng } from '../../../core/rng';
-import { box, trs } from '../../kit/shapes';
+import { box, cylinder, sphere, trs } from '../../kit/shapes';
 import { pedestrian } from '../../scenery/props/city-people';
 import { foodStall } from '../../scenery/props/city-shops';
 import type { City } from './city';
 import { gateFace } from './faces';
 import { fasciaFace } from './neon-faces';
 import { board, sign } from './neon';
-import { catenary, hdr, mount, segment, zoneRuns } from './util';
+import { ahead, catenary, hdr, mount, segment, zoneRuns } from './util';
 
 const m = new Matrix4();
 const CABLE = new Color('#0b0b10');
 const LANTERNS = [hdr('#ff3b2f', 2.4), hdr('#ff8a1f', 2.4), hdr('#ffd23d', 2.2)];
-const ahead = (p: Vector3, yaw: number, d: number): Vector3 => new Vector3(p.x - Math.sin(yaw) * d, p.y, p.z - Math.cos(yaw) * d);
+const UMBRELLA_REACH = 1.0;
 
 /** n pedestrians around (s ± ds, side) at u0..u1 beyond the kerb, facing the road. Returns how many. */
 export function crowd(c: City, rng: Rng, s: number, side: -1 | 1, n: number, ds: number, u0: number, u1: number, umbrella = 0.55): number {
   let placed = 0;
+  // Open umbrellas reach ~0.8 m from the pedestrian: keep their rims off the drivable shoulder.
+  const lo = umbrella > 0 ? Math.max(u0, UMBRELLA_REACH) : u0, hi = Math.max(u1, lo + 0.3);
   for (let i = 0; i < n * 3 && placed < n; i++) {
-    const mt = mount(c, s + rng.range(-ds, ds), side, rng.range(u0, u1));
+    const mt = mount(c, s + rng.range(-ds, ds), side, rng.range(lo, hi));
     if (!mt || mt.onDeck) continue;
     const { sp } = mt;
     // One pedestrian per 1 m occupancy cell (dense crowds), never inside a lot or on the road.
@@ -80,7 +82,12 @@ export function marketGate(c: City, s: number, title: string, sub: string): void
   const { d } = c;
   const l = d.place.spot(s, -1, 0.15), r = d.place.spot(s, 1, 0.15);
   const y = d.field.edgeY(s, -1);
-  for (const p of [l, r]) box(d.b.props.at(p.pos.x, p.pos.z), trs(p.pos.x, y + 3.6, p.pos.z, p.along, 0.36, 7.2, 0.36, m), new Color('#e5191c'));
+  // Self-lit red pillars (toon + emissive): the outer lanes pass them at arm's length.
+  for (const p of [l, r]) {
+    const lit = c.cb.lit.at(p.pos.x, p.pos.z).setAux(5, 0.5);
+    box(lit, trs(p.pos.x, y + 3.6, p.pos.z, p.along, 0.36, 7.2, 0.36, m), new Color('#e5191c'));
+    lit.setAux(0);
+  }
   const mid = new Vector3().lerpVectors(l.pos, r.pos, 0.5).setY(y + 7.6);
   const span = l.pos.distanceTo(r.pos);
   const toRiders = d.place.spot(s, 1, 0).along + Math.PI;
@@ -88,6 +95,16 @@ export function marketGate(c: City, s: number, title: string, sub: string): void
   const rect = d.face(`gate:${title}`, () => gateFace(c.neonAtlas, title, sub));
   if (!rect) return;
   for (const yaw of [toRiders, toRiders + Math.PI]) sign(c.cb.neon.at(mid.x, mid.z), ahead(mid, yaw, 0.22), yaw, span, span / 5, rect, 2.4);
+}
+
+/** Paper lantern hanging under p: bulged glowing body, dark caps, tassel. */
+function lantern(c: City, p: Vector3, col: Color): void {
+  const { b } = c.d;
+  const ly = p.y - 0.48;
+  box(b.far.at(p.x, p.z), trs(p.x, p.y - 0.12, p.z, 0, 0.05, 0.16, 0.05, m), CABLE);
+  sphere(b.glow.at(p.x, p.z), trs(p.x, ly, p.z, 0, 0.23, 0.28, 0.23, m), col, 8, 6);
+  for (const dy of [0.24, -0.3]) cylinder(b.far.at(p.x, p.z), trs(p.x, ly + dy, p.z, 0, 0.13, 0.06, 0.13, m), CABLE, 8);
+  box(b.glow.at(p.x, p.z), trs(p.x, ly - 0.45, p.z, 0, 0.04, 0.26, 0.04, m), col);
 }
 
 /** Paper lanterns on zig-zag strings across the street between s0 and s1. */
@@ -103,8 +120,7 @@ export function lanternStrings(c: City, s0: number, s1: number): void {
     for (let i = 0; i < pts.length - 1; i++) segment(d.b.far.at(a.x, a.z), pts[i] as Vector3, pts[i + 1] as Vector3, 0.035, CABLE);
     for (let i = 1; i < pts.length - 1; i++) {
       const p = pts[i] as Vector3;
-      box(d.b.far.at(p.x, p.z), trs(p.x, p.y - 0.12, p.z, 0, 0.16, 0.1, 0.16, m), CABLE);
-      box(d.b.glow.at(p.x, p.z), trs(p.x, p.y - 0.42, p.z, i * 0.7, 0.34, 0.46, 0.34, m), rng.pick(LANTERNS));
+      lantern(c, p, rng.pick(LANTERNS));
     }
   }
 }

@@ -10,20 +10,32 @@ const G = (g: Partial<GroundDef>): GroundDef => ({
 });
 
 // ---- sea side presets (left)
-const startL: SideDef = { shoulder: 3, surface: 'road', edge: 'barrier', ground: G({ abs: true, step: 0.6, stepW: 0.5, flat: 10, slope: -0.05, target: -18, rough: 0.4, mat: 'sand' }) };
-const seawallL: SideDef = { shoulder: 2.2, surface: 'road', edge: 'seawall', ground: G({ abs: true, step: 0.35, stepW: 0.35, flat: 4, slope: -0.05, target: -18, rough: 0.4, mat: 'sand' }) };
-const beachL: SideDef = { shoulder: 7, surface: 'sand', edge: 'water', ground: G({ abs: true, step: -0.45, stepW: 0.35, flat: 0, slope: -0.06, target: -18, rough: 0.4, mat: 'sand' }) };
-const rocksL: SideDef = { shoulder: 1.8, surface: 'road', edge: 'rail', ground: G({ abs: true, step: 1.2, stepW: 7, flat: 2, slope: -0.22, target: -18, rough: 1.5, mat: 'rock' }) };
-const cliffL: SideDef = { shoulder: 1.6, surface: 'road', edge: 'rail', ground: G({ abs: true, step: 2.5, stepW: 15, flat: 3, slope: -0.35, target: -18, rough: 2, mat: 'rock' }) };
-const quayL: SideDef = { shoulder: 3.4, surface: 'road', edge: 'quay', ground: G({ abs: true, step: -2.6, stepW: 0.25, flat: 0, slope: -0.25, target: -18, rough: 0.3, mat: 'stone' }) };
+const startL: SideDef = { shoulder: 3, surface: 'road', edge: 'barrier', ground: G({ abs: true, step: 0.6, stepW: 0.5, flat: 10, slope: -0.05,
+  target: -18, rough: 0.4, mat: 'sand' }) };
+const seawallL: SideDef = { shoulder: 2.2, surface: 'road', edge: 'seawall', ground: G({ abs: true, step: 0.35, stepW: 0.35, flat: 4, slope: -0.05,
+  target: -18, rough: 0.4, mat: 'sand' }) };
+const beachL: SideDef = { shoulder: 7, surface: 'sand', edge: 'water', ground: G({ abs: true, step: -0.45, stepW: 0.35, flat: 0, slope: -0.06,
+  target: -18, rough: 0.4, mat: 'sand' }) };
+const rocksL: SideDef = { shoulder: 1.8, surface: 'road', edge: 'rail', ground: G({ abs: true, step: 1.2, stepW: 7, flat: 2, slope: -0.22,
+  target: -18, rough: 1.5, mat: 'rock' }) };
+const cliffL: SideDef = { shoulder: 1.6, surface: 'road', edge: 'rail', ground: G({ abs: true, step: 2.5, stepW: 15, flat: 3, slope: -0.35,
+  target: -18, rough: 2, mat: 'rock' }) };
+const quayL: SideDef = { shoulder: 3.4, surface: 'road', edge: 'quay', ground: G({ abs: true, step: -2.6, stepW: 0.25, flat: 0, slope: -0.25,
+  target: -18, rough: 0.3, mat: 'stone' }) };
 
 // ---- land side presets (right)
-const startR: SideDef = { shoulder: 3, surface: 'road', edge: 'barrier', ground: G({ step: 0, stepW: 1, flat: 34, slope: 0.22, target: 38, rough: 3, mat: 'grass' }) };
-const villasR: SideDef = { shoulder: 3.5, surface: 'grass', edge: 'stone', ground: G({ step: 0, stepW: 1, flat: 7, slope: 0.3, target: 42, rough: 4, mat: 'grass' }) };
-const hillsR: SideDef = { shoulder: 3, surface: 'grass', edge: 'stone', ground: G({ step: 0, stepW: 1, flat: 4, slope: 0.42, target: 50, rough: 5, mat: 'grass' }) };
-const rockWallR: SideDef = { shoulder: 1.4, surface: 'road', edge: 'rock', ground: G({ step: 13, stepW: 1.6, flat: 3, slope: 0.55, target: 55, rough: 6, mat: 'rock' }) };
-const marketR: SideDef = { shoulder: 3.6, surface: 'road', edge: 'stalls', ground: G({ step: 0, stepW: 1, flat: 9, slope: 0.3, target: 34, rough: 3, mat: 'stone' }) };
-const finishR: SideDef = { shoulder: 3, surface: 'road', edge: 'barrier', ground: G({ step: 0, stepW: 1, flat: 30, slope: 0.25, target: 30, rough: 3, mat: 'grass' }) };
+const startR: SideDef = { shoulder: 3, surface: 'road', edge: 'barrier', ground: G({ step: 0, stepW: 1, flat: 34, slope: 0.22, target: 38, rough: 3,
+  mat: 'grass' }) };
+const villasR: SideDef = { shoulder: 3.5, surface: 'grass', edge: 'stone', ground: G({ step: 0, stepW: 1, flat: 7, slope: 0.3, target: 42, rough: 4,
+  mat: 'grass' }) };
+const hillsR: SideDef = { shoulder: 3, surface: 'grass', edge: 'stone', ground: G({ step: 0, stepW: 1, flat: 4, slope: 0.42, target: 50, rough: 5,
+  mat: 'grass' }) };
+const rockWallR: SideDef = { shoulder: 1.4, surface: 'road', edge: 'rock', ground: G({ step: 13, stepW: 1.6, flat: 3, slope: 0.55, target: 55,
+  rough: 6, mat: 'rock' }) };
+const marketR: SideDef = { shoulder: 3.6, surface: 'road', edge: 'stalls', ground: G({ step: 0, stepW: 1, flat: 9, slope: 0.3, target: 34, rough: 3,
+  mat: 'stone' }) };
+const finishR: SideDef = { shoulder: 3, surface: 'road', edge: 'barrier', ground: G({ step: 0, stepW: 1, flat: 30, slope: 0.25, target: 30,
+  rough: 3, mat: 'grass' }) };
 
 export const COAST: LayoutDef = {
   id: 'coast',
@@ -34,6 +46,7 @@ export const COAST: LayoutDef = {
   post: 280,
   left: startL,
   right: startR,
+  crags: true,
   bumps: [
     { s: 1514, x: -86, r: 44, h: 14, mat: 'rock' },     // lighthouse headland (calanque mouth)
     { s: 640, x: -430, r: 70, h: 16, mat: 'grass' },    // palm island
@@ -48,6 +61,7 @@ export const COAST: LayoutDef = {
         { kind: 'startGantry', at: 46, x: 0 },
         { kind: 'stands', at: 8, x: -1, data: { len: 120 } },
         { kind: 'stands', at: 8, x: 1, data: { len: 120 } },
+        { kind: 'umbrellas', at: 0, x: -1, data: { len: 150 } },
       ],
     },
     {
@@ -77,7 +91,7 @@ export const COAST: LayoutDef = {
       ],
       marks: [
         { kind: 'palms', at: 0, x: 1, data: { len: 280 } }, { kind: 'village', at: 180, x: 1 },
-        { kind: 'sign', at: 230, x: 1, data: { sign: 'curves' } },
+        { kind: 'sign', at: 230, x: 1, data: { sign: 'curves' } }, { kind: 'paint', at: 248, x: 0, data: { text: '慢' } },
       ],
     },
     // S-chicane: an R 60 left-right flick over the bay headland; run-off outside both apexes
@@ -105,7 +119,10 @@ export const COAST: LayoutDef = {
     // past the lighthouse headland. Net turn ≈ 0, so the coast road continues north afterwards.
     {
       len: 94, name: 'cliff', radius: 90, rise: 3.5, bank: 4, ease: 30,
-      marks: [{ kind: 'chevrons', at: 8, x: -1, data: { len: 80 } }, { kind: 'sign', at: 26, x: 1, data: { sign: 'sharp' } }],
+      marks: [
+        { kind: 'chevrons', at: 8, x: -1, data: { len: 80 } }, { kind: 'sign', at: 26, x: 1, data: { sign: 'sharp' } },
+        { kind: 'paint', at: 60, x: 0, data: { text: '慢' } },
+      ],
     },
     { len: 24, name: 'hairpin', rise: 1, ease: 24, right: { shoulder: 3.6 }, sideEase: 24 },
     {
@@ -126,7 +143,7 @@ export const COAST: LayoutDef = {
       len: 46, name: 'cliff', rise: 1.5, ease: 30,
       marks: [{ kind: 'lighthouse', at: -20, x: -84 }, { kind: 'warnCrest', at: 20, x: 1 }],
     },
-    { len: 60, name: 'crest', rise: 6, vEase: 24, right: hillsR, sideEase: 40 },
+    { len: 60, name: 'crest', rise: 6, vEase: 24, right: hillsR, sideEase: 40, marks: [{ kind: 'paint', at: 26, x: 0, data: { text: '飞' } }] },
     {
       len: 60, name: 'crest', rise: -8, vEase: 5,
       features: [{ kind: 'jumpCrest', at: -8, len: 16, x0: -7, x1: 7, data: { peak: 1640 } }],
@@ -141,8 +158,10 @@ export const COAST: LayoutDef = {
     },
     {
       len: 36, name: 'cutting', rise: -0.9, ease: 30,
-      left: { shoulder: 1.4, surface: 'road', edge: 'rock', ground: { abs: true, step: 30, stepW: 1.8, flat: 30, slope: -0.4, target: -18, rough: 4, mat: 'rock' } },
-      right: { shoulder: 1.4, surface: 'road', edge: 'rock', ground: { abs: false, step: 15, stepW: 1.8, flat: 4, slope: 0.5, target: 48, rough: 5, mat: 'rock' } },
+      left: { shoulder: 1.4, surface: 'road', edge: 'rock', ground: { abs: true, step: 30, stepW: 1.8, flat: 30, slope: -0.4, target: -18, rough: 4,
+        mat: 'rock' } },
+      right: { shoulder: 1.4, surface: 'road', edge: 'rock', ground: { abs: false, step: 15, stepW: 1.8, flat: 4, slope: 0.5, target: 48, rough: 5,
+        mat: 'rock' } },
       sideEase: 36,
     },
     // The cutting narrows to the tunnel's bound before the portal plane (portal arch never inside bounds).
@@ -162,8 +181,10 @@ export const COAST: LayoutDef = {
     },
     {
       len: 160, name: 'bridge', radius: -2400, sideEase: 2,
-      left: { shoulder: 1.2, surface: 'road', edge: 'parapet', ground: { abs: true, detached: true, step: -9, stepW: 0, flat: 0, slope: -0.1, target: -18, rough: 1, mat: 'sand' } },
-      right: { shoulder: 1.2, surface: 'road', edge: 'parapet', ground: { abs: true, detached: true, step: -6, stepW: 0, flat: 64, slope: 0.45, target: 32, rough: 3, mat: 'rock' } },
+      left: { shoulder: 1.2, surface: 'road', edge: 'parapet', ground: { abs: true, detached: true, step: -9, stepW: 0, flat: 0, slope: -0.1,
+        target: -18, rough: 1, mat: 'sand' } },
+      right: { shoulder: 1.2, surface: 'road', edge: 'parapet', ground: { abs: true, detached: true, step: -6, stepW: 0, flat: 64, slope: 0.45,
+        target: 32, rough: 3, mat: 'rock' } },
       features: [
         { kind: 'bridge', at: 0, len: 160, x0: -8.2, x1: 8.2 },
         { kind: 'boostPad', at: 66, len: 6, x0: -5.2, x1: -1.8, data: { power: 0.3, time: 1 } },
@@ -209,7 +230,7 @@ export const COAST: LayoutDef = {
     {
       len: 120, name: 'sprint', radius: 420, ease: 50, left: seawallL, right: villasR,
       features: [{ kind: 'pickupRow', at: 50, len: 15, x0: 0, x1: 0, data: { kind: 'coin' } }],
-      marks: [{ kind: 'village', at: 40, x: 1 }],
+      marks: [{ kind: 'village', at: 40, x: 1 }, { kind: 'umbrellas', at: 0, x: -1, data: { len: 120 } }],
     },
     {
       len: 160, name: 'finish', left: startL, right: finishR,
@@ -217,6 +238,7 @@ export const COAST: LayoutDef = {
         { kind: 'stands', at: 40, x: -1, data: { len: 150 } },
         { kind: 'stands', at: 40, x: 1, data: { len: 150 } },
         { kind: 'finishGantry', at: 160, x: 0 }, { kind: 'gulls', at: 80, x: -20 },
+        { kind: 'umbrellas', at: 0, x: -1, data: { len: 290 } },
       ],
     },
   ],

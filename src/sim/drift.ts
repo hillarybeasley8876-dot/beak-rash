@@ -1,9 +1,10 @@
 // Drift: Shift + steer above 8 m/s. Slip builds to ~27°, the bike follows the bend (steering.ts), speed
 // bleeds ~4 %/s. Charge levels at 0.55 / 1.2 / 2.0 charge-seconds; the charge rate rewards commitment (steer
 // into the drift, a bend turning the same way), so counter-steered wiggles on a straight barely charge.
-// Releasing Shift fires the mini-turbo for that level, locks drifting out for 0.3 s and hands the lateral
-// speed over to grip steering over 0.2 s (steering.ts), so a release with the stick held never darts inward.
-// Ends without a boost below 6 m/s or on a collision (endDrift(sr, false)).
+// Releasing Shift fires the mini-turbo for that level and hands the lateral speed over to grip steering
+// over 0.35 s (steering.ts), so a release with the stick held never darts inward. Ends without a boost below
+// 6 m/s or on a collision (endDrift(sr, false)). Any end locks drifting out for 0.3 s, and no drift starts
+// toward a wall the rider is pressed against.
 import { clamp, clamp01, lerp } from '../core/math';
 import { TUNING as T } from './tuning';
 import { hasStatus, type SimCtx, type SimRider } from './state';
@@ -13,8 +14,10 @@ export function updateDrift(ctx: SimCtx, sr: SimRider, c: Controls, dt: number):
   const r = sr.r;
   sr.driftLock = Math.max(0, sr.driftLock - dt);
   if (!r.drifting) {
+    // No drift into a wall the rider is pressed against (it would only scrape along it with no charge).
+    const intoWall = sr.wallSide !== 0 && Math.sign(c.steer) === sr.wallSide;
     const canStart = c.drift && sr.driftLock <= 0 && !r.airborne && r.mode === 'racing' && r.speed > T.driftMinSpeed
-      && Math.abs(c.steer) > T.driftSteerMin && r.mods.steerMul > 0 && !hasStatus(r, 'stun');
+      && Math.abs(c.steer) > T.driftSteerMin && r.mods.steerMul > 0 && !hasStatus(r, 'stun') && !intoWall;
     if (canStart) startDrift(ctx, sr, c.steer > 0 ? 1 : -1);
     return;
   }
@@ -35,12 +38,16 @@ export function updateDrift(ctx: SimCtx, sr: SimRider, c: Controls, dt: number):
   }
 }
 
-/** Charge-seconds per second: steering into the drift and a bend turning the drift's way charge fastest. */
+/**
+ * Charge-seconds per second: steering into the drift and a bend turning the drift's way charge fastest; on
+ * such a bend a drift that holds its line (counter-steering) still charges at ~75 % of the full rate.
+ */
 export function chargeRate(sr: SimRider, steer: number): number {
   const d = sr.driftDir;
   const u = (clamp(steer, -1, 1) * d + 1) / 2;
   const bend = clamp01(sr.frame.curvature * d * T.driftChargeKappa);
-  return lerp(T.driftChargeLow, T.driftChargeHigh, u) * lerp(T.driftChargeStraight, 1, bend);
+  const low = lerp(T.driftChargeLow, T.driftChargeLowBend, bend);
+  return lerp(low, T.driftChargeHigh, u) * lerp(T.driftChargeStraight, 1, bend);
 }
 
 function startDrift(ctx: SimCtx, sr: SimRider, dir: -1 | 1): void {
@@ -62,9 +69,9 @@ export function endDrift(ctx: SimCtx, sr: SimRider, reward: boolean): void {
   sr.driftDir = 0;
   sr.driftLevel = 0;
   ctx.bus.emit('rider:drift', { riderId: r.id, phase: 'end', level: reward ? level : 0 });
+  sr.driftLock = T.driftLockout; // forced ends too: a wall or bump never restarts the drift on the next frame
   if (reward) {
-    sr.driftLock = T.driftLockout;
-    sr.driftExit = T.driftExitTime;
+    sr.driftExit = T.driftExitGuard;
     sr.driftExitVx = r.vx;
   }
   if (reward && level > 0) {

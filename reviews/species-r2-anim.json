@@ -1,0 +1,64 @@
+{
+  "unit": "species",
+  "round": 2,
+  "lens": "anim",
+  "pass": false,
+  "score": 6.5,
+  "summary": "Anim critic, species r2. Fix round 1 really landed for most r1 issues. IK is now exact in the REAL game: 25 s of mountain racing, all 8 riders, 0.0 cm feet and 0.0 cm hands (game-contact.mjs); tools/actors-check.mjs is OK on 10 species x 7 bikes. Squash no longer moves the feet in any cue. land, boost, respawn, taunt, victory and defeat all fire in races (finish.jpg, game2.jpg, game-pops clip logs). Strikes now go into the rival lane from the chase cam (game-swing.jpg). Interrupt pops are down to <= 19 cm. The 0.1x crash has 0 limb pops and no sinking on the flat sandbox, and the in-game KO slow-mo reads well (ko.jpg). OIIA legs keep 20 cm apart, held weapons are visible, and corgi/penguin use extenders. One major problem remains: the reworked signature poses only work in the sandbox. In real races, combat holds non-lockout skill actions for 0.35 s, so doge, chill, flash, honk, whistle, ghost, steal and torpedo flash by in ~0.3 s while the effect lasts up to 4 s (r1 issue 6 is not fixed in game). Minors: in races the crash ground plane is off by about 10 cm (body sinks into the road, bike floats); the respawn/invuln fade shows x-ray internals and the ink outline blinks; the weapon teleports between hands; swings stop dead at every key; the defeat pose doesn't read from behind; the hop has no takeoff pose. Evidence: shots/review/species/r2-anim/*.jpg and *.mjs probes. No console errors; tsc is clean.",
+  "issues": [
+    {
+      "severity": "major",
+      "title": "Signature skill poses last ~0.3 s in the real game (8 of 12 crushed); r1 issue 6 not fixed in game",
+      "detail": "Combat (skills/types.ts TimedSkill) holds state.action for min(duration, 0.35) s for non-lockout skills and calls view.cue('skill'). In src/actors/rig/cues.ts, fromAction() maps the pose to u = t/0.35, so the 2.0 s chill choreography is squeezed into 0.35 s. covers() hides the cue clip, and trackAction() culls that clip (SKILL_DUR) when the short action ends. Measured by driving the poses the way combat does (probe-skilldur.mjs): doge shown 0.30 s while the shield lasts 3 s (sandbox clip 1.03 s); chill 0.30 s vs a 4 s aura (1.75 s); flash 0.32 s vs 3 s (0.88 s); honk 0.28; whistle 0.30; steal 0.23; ghost 0.10. game-skills.jpg (rivals pinned beside the player, real casts): shiba at +0.70/+1.40 s shows 'no action' and rides normally inside its shield bubble; capybara and sloth are also back to plain riding while their aura/boost runs. Compressing the poses also makes them pop (game-pops.mjs): chill paws snap 29 cm in one frame at t 0.31/0.35, the doge paw shoots up 29 cm/frame, steal 26, and the ghost flaps at 22 cm/frame. Only the lockout skills (gulp, wing, spin, slide, ult) play as designed.",
+      "fix": "For action.kind 'skill', let the clip own the timing whenever SKILL_DUR[pose] > action.dur. Skip fromAction for it, don't let covers() hide the clip, and in trackAction cull covered clips only when the action was cut short, not when it ends naturally. Better still, hold sustained poses from state: doge paw-up then a relaxed smug hold while 'shield' is active, the flash crouch while sloth.flash's 'boost' runs, chill for the aura duration (or ask core for the skill duration in the cue opts). Add a sandbox check that drives every skill exactly like combat (0.35 s action + cue) and asserts >= 0.8 s of readable pose with no hand moving > 15 cm/frame."
+    },
+    {
+      "severity": "minor",
+      "title": "In-game crash ground plane comes from the sim pose: bodies sink ~10 cm into the road and bikes float up to 13 cm",
+      "detail": "src/actors/crash.ts update(): g.P = live sim pose, and g.N comes from the sim quaternion (lean/bank included; anything with N.y >= 0.6 is accepted). The r1 fix was verified only on the flat sandbox plane. In races, measured against track.project() at each body's own (s, x) with KO'd riders on the road (game-crash-ground.mjs). Mountain: seagull body rests -10.2 cm inside the asphalt (x 1.72), cat -11.4 cm (bike +13.4 cm in the air at the end), capybara -5.8 cm at rest, penguin bike -7.3 cm. Coast: shiba body -8.4 cm (bike +9.5 cm), goose bike -5.2 cm. The camera passes these wrecks right after every KO.",
+      "fix": "Build the ground per rigid body (or per contact) from the track: project the RB position onto the track (track.project, then frameAt for the road normal) each step, and never take the plane from the rider's pose quaternion. Clamp contacts to the road/terrain height. Add an in-game regression on mountain and coast: lowest body and bike vertex within +-2 cm of the road surface while resting."
+    },
+    {
+      "severity": "minor",
+      "title": "Respawn/invuln fade shows x-ray internals and blinks the ink outline at ~2 Hz",
+      "detail": "fade.ts swaps every rider material for a transparent clone with depthWrite=false and hides the outline hulls below alpha 0.9. view.ts updateFade pulses invuln alpha between 0.62 and 1 (cos(invuln*13)). fade.jpg: at alpha 0.26-0.82 the internal SDF limb and joint balls, the far leg and wing, and the bike frame show through the body. During the 2 s invuln the rider alternates between 'inked, opaque' and 'outline-less translucent' (hulls3 vs hulls0), and the opaque/transparent material swap also flips at alpha 0.995. game-respawn.jpg (chase cam, real game) shows the same flip between racing t0.00 (outlines ON), t0.07-0.33 (off) and t0.40 (ON). It is softer than the r1 hard blink, but it reads as a rendering glitch on the hero after every crash.",
+      "fix": "Keep depth: render the rider in a depth-only pre-pass, then draw the colour pass with depthFunc LessEqual so only the outer surface blends. Or use screen-door/alpha-hash dithering in riderMaterial (discard by a Bayer threshold, depthWrite kept on). Fade the outline hull with the same alpha or dither instead of toggling it. Keep the invuln pulse in one material state (e.g. alpha 0.7-0.95, never crossing a swap threshold)."
+    },
+    {
+      "severity": "minor",
+      "title": "Weapon teleports between hands (85-132 cm in one frame) on off-side swings",
+      "detail": "src/actors/extras.ts update(): if (st.weight > 0 && st.side !== weapon.hand) weapon.attach(st.side) reparents the weapon on the first swing frame. tiles3.jpg: the goose's umbrella sits on the right shoulder at frame 0 and lies in the LEFT hand at +1 frame while that wing is still on the bar. probe-swing.mjs: the tip jumps 83-88 cm at frame 0 of every off-side light or heavy swing. game-pops.mjs, real race: a 'WEAPON HAND SWAP' of 132 cm on the cat. With a 4-frame windup, the bright weapon visibly pops across the body.",
+      "fix": "Don't reparent in one frame. Either swing off-side as a cross-body backhand with the current weapon hand, or pass the weapon across during the windup: lerp the pivot's world transform from the old hand to the new one over 3-4 frames in a small toss arc, then attach. Add an actors-check assertion that the tip moves < 30 cm in any non-strike frame."
+    },
+    {
+      "severity": "minor",
+      "title": "Swing curves stop dead at every key; the first windup frame is the fastest frame of the swing",
+      "detail": "cues.ts swing()/heavy() use cue-math keys(), which applies easeInOutCubic to EACH segment, so the hand stops at every key. probe-swing.mjs (pelican fish, 1x) gives hand travel per frame for a light attack: 7, 42, 21, 0, 17, 22, 2, 8, 15, 1, 1, 1, 4, 8, 15. The windup's 42 cm frame is faster than the strike (<= 22 cm), the hand halts in the middle of the active window (u 0.35), and it holds for 3 frames at u 0.5. The heavy also stops at u 0.42, right after a 49 cm / 92 cm (hand / tip) frame. In races the windup's first frame jumps 48 cm (game-pops.mjs). Swings look stepped rather than whippy, and the smear is still a flat grey card (pel-cues.jpg 'heavy L strike'), so it doesn't hide the jump.",
+      "fix": "Use a velocity-continuous curve (Hermite/Catmull-Rom over the same keys). Ease out into a short anticipation hold at the windup apex, accelerate into contact, carry the momentum through the active window, and ease out only in the follow-through. Cap the first windup frame at ~15 cm. Draw the smear as a curved ribbon along the last 3-4 tip positions for the fastest frames."
+    },
+    {
+      "severity": "minor",
+      "title": "Defeat pose does not read from the chase camera",
+      "detail": "cues.ts defeat() is only spinePitch 0.3, headPitch -0.45, blink and brow, with hands still on the bars. finish.jpg (real finish, pelican 5th): from behind the pelican looks exactly like normal riding, while the victory pose (both wings up) reads clearly on the pelican, goose, capybara and cat.",
+      "fix": "Give defeat a silhouette that reads from behind: clavicles dropped and shoulders slumped, elbows out and limp, head hanging with a slow shake, cadence slowing to a coast, an occasional sigh puff or sweat-drop sprite, and a lower body (lift -0.03)."
+    },
+    {
+      "severity": "minor",
+      "title": "Hop/jump has no takeoff spring or air pose",
+      "detail": "Only the landing has a cue (state-cues.ts). In the air, ride.ts just damps stand toward 0.35 (lambda 4), so during the 0.38 s hop the rider is still slowly rising when it lands. game2.jpg 'hop air': the pelican sits rigid, exactly as when riding. A polished stylised racer gives every hop a compress-and-pop with the arms pulling the bars and the knees tucking.",
+      "fix": "In StateCues, on the airborne rising edge trigger a 'takeoff' clip: 0.06 s compress, then extend with the arms pulling the bars up, knees tucked and head up. When air > 0.3 s, add a small air pose (birds flare their wings a little), blending into the existing land squash."
+    },
+    {
+      "severity": "minor",
+      "title": "cross-unit: KO victim's tumbling body still fills the edge of the chase view after the slow-mo",
+      "detail": "ko.jpg +1400..+1750 ms: after the whoosh back to 1x, the shiba's tumbling body sits large at the right edge of the chase frame while the player overtakes it. The actors' near-camera fade only acts within 1.9 m. Causes: sim launch velocity vs camera path vs the free visual tumble body.",
+      "fix": "Sim/camera/actors together: pull the visual tumble body toward the sim's crashed-rider lane over time, or widen the fade to a screen-coverage test (fade when the body covers > ~10 % of the screen within 3 m)."
+    },
+    {
+      "severity": "minor",
+      "title": "cross-unit: kid bike's crank markers trace a flat ellipse, so the penguin's extender rods hang down to the road",
+      "detail": "probe-crank.mjs (penguin, kidbike, character space): pedalR stays at y -0.372..-0.377 while z sweeps -0.15..+0.06, and pedalL moves only between y -0.29 and -0.35. The pedal path is a 0.28 x 0.08 m ellipse, not a circle, and the low pedal is only 4 cm above the road (ground y -0.42). pedal.jpg row 2: the penguin's red extender rods (extenders.ts, correct pedal-to-foot) look like stilts scraping the asphalt.",
+      "fix": "Bikes: make the kid bike crank rotate on a true circle (no non-uniform scale on the crank group), with the bottom bracket ~0.18 m above the ground. Actors: re-check penguin extenders and ankleLift afterwards."
+    }
+  ]
+}

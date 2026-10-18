@@ -1,0 +1,84 @@
+{
+  "unit": "env-mountain",
+  "round": 2,
+  "lens": "art",
+  "pass": false,
+  "score": 6,
+  "summary": "Clearly better than round 1 (5/10), but still short of a polished commercial stylised racer, so it does not pass. Fixed for real: (1) The grade no longer floods the frame red. The sky zenith is now violet (#7b489d, hue 276-296) where r1 frames were maroon (#62344e), violet is 15-40 % of each frame (r1 1-7 %), and pine or meadow stretches reach 7-16 % green. (2) The sun was re-aimed. sunface.mjs with the new direction puts the chase view within 50 deg of the sun on 46 % of the lap (r1 22 %). The disc and god rays now frame the hairpin legs, the cliff, the summit, the crest with the pagoda dead ahead, and the cable-car descent, and the cliff drop side is open. (3) The tunnel interior is lit: sodium lamps, light pools, exit boxes and a meme sign. (4) The start banner is clean and mid-screen at GO. (5) I saw no roof acne at chase distance and no far-forest spikes by the road. Strong moments: the red suspension bridge with prayer flags framed by the tunnel exit, the crest jump into the sun past the pagoda, and the gondolas over the descent. Not fixed: (a) Rock faces are still flat. The cliff and cutting walls are perfect planes with plank-like strata, those strata turn into wood-grain pinstripes at mid range, and fogged hills are soft smears. (b) From the bridge deck the waterfall is still a blotchy blue camouflage card. (c) The three hairpins still look the same at speed: the new landmarks are props of 2-3 m on identical lawn islands, and the slopes are bare. Also not fixed or not effective: hot-spring capybaras are hidden, birch trunks still look like barber poles, the tea terraces are not terraced, and the lake is a pale flat sheet. 0 runtime errors in 4 game loads, and tsc is clean. Evidence is in shots/review/env-mountain/r2-art/: A-D.jpg (lap chase, 1920x1080, HUD hidden), I.jpg (intro to GO), K.jpg (HUD plus rivals), E/F/G.jpg (graded in-game close-ups), H/J/L/M.jpg (full-res crops), hue.py, sunface.mjs, g.mjs, cu.mjs.",
+  "r1Check": [
+    {"r1": 0, "title": "grade floods red", "status": "fixed", "evidence": "hue.py: sky #7b489d vs r1 #62344e; violet 15-40 % (r1 1-7 %); A-D.jpg"},
+    {"r1": 1, "title": "sun behind camera 78 %", "status": "fixed", "evidence": "sunface.mjs 46 % toward / 25 % away; g_760, g_1250, g_2330, cu_pagoda"},
+    {"r1": 2, "title": "tunnel black tube, bare portal", "status": "partly fixed", "evidence": "interior good (g_1720, g_1820); ridge/headwall still missing -> issue 4"},
+    {"r1": 3, "title": "waterfall noise card", "status": "not fixed in the gameplay view", "evidence": "g_2050, s_2030_hud, cu_falls; only cu_fallsclose improved -> issue 2"},
+    {"r1": 4, "title": "terrain generic noise / plywood cliffs", "status": "partly fixed", "evidence": "bands broader but cliff = plank siding, mid-range pinstripes -> issue 1"},
+    {"r1": 5, "title": "motorway read, identical hairpins", "status": "partly fixed (too small to read)", "evidence": "cu_shrine, cu_viewpt, cu_outcrop, g_640/870/1100 -> issues 3 and 9"},
+    {"r1": 6, "title": "hot-spring capybaras hidden", "status": "not effective", "evidence": "g_3250, cv_spring2 -> issue 5"},
+    {"r1": 7, "title": "faceted trees, barber-pole birches, far spikes", "status": "partly fixed (spikes gone)", "evidence": "cu_birch, cv_cows, cu_lake0 -> issue 6"},
+    {"r1": 8, "title": "tea terraces are lily pads", "status": "not fixed", "evidence": "cu_tea, g_420 -> issue 8"},
+    {"r1": 9, "title": "start banner 'SUNSET ?ASS' / hidden by HUD", "status": "fixed", "evidence": "g_60, I.jpg g_intro430"},
+    {"r1": 10, "title": "lake pale sheet, surf foam, stepped shore", "status": "partly (foam mostly gone)", "evidence": "cu_lake0, g_3060, M.jpg -> issue 7"},
+    {"r1": 11, "title": "roof shadow acne", "status": "fixed at chase distance", "evidence": "J.jpg 'g_200 village roofs'"}
+  ],
+  "issues": [
+    {
+      "severity": "major",
+      "title": "Rock faces still read as flat plywood: planar cliff/cutting walls with plank-like strata, pinstriped mid-range slopes, smeared fogged hills (env/mountain-terrain-mat.ts, mountain-relief.ts, mountain-grade.ts)",
+      "detail": "r1 #4 is only partly fixed. The strata shader draws 2.6 m horizontal bands with a thin dark ledge on perfectly planar faces. Close up, the 480 m cliff wall (s 1171-1651, about 25 s filling the left 40 % of the frame) and the tunnel cutting look like painted plank siding or stucco. They have no relief, overhangs, cracks or crags, and their top edge is ruler-straight (cu_cliff.png, M.jpg 'cliff wall close', g_1450.png, cu_portalwide.png). At 100-300 m the same bands collapse into dense wood-grain pinstripes, because the fwidth fade only starts when a band is below about 8 px (M.jpg 'cu_lake1 right slope', J.jpg 'g_200 left hillside'). Fogged mid-distance hills are soft pink/green gradient smears with no toon value step (g_200, g_3060, cv_cows, cu_lake0). A commercial stylised racer would build these faces from chunky faceted rock masses.",
+      "fix": "Break the cliff and cut faces with instanced chunky rock slabs and columns: 3-8 m, 2-3 flat toon tones, 0.04 m outlines, stacked along the wall every 6-10 m, with a ragged crag top line and a few pines or tufts on ledges. Keep the strata shader only within about 80 m and fade the whole band pattern, not just the ledge, once a band is under about 20 px. Replace the dark ledge line with a lighter top-bevel tone. Quantise the fog factor (or the vertex shade) on far terrain into 2-3 steps so the hill silhouettes read."
+    },
+    {
+      "severity": "major",
+      "title": "Waterfall still reads as a flat blue camouflage card from the bridge deck (env/mountain-waterfall.ts; waterfall mark at the bridge end, x -36)",
+      "detail": "r1 #3 is fixed only for the side view. From the bridge end the new rounded lip and narrow ribbon look good (cu_fallsclose.png). From the deck, which is the only view at speed (about 6 s), the fall is still a rectangle of round blue and white blotches with ragged edges, seen through the rail. It reads as camouflage, an ice block or a missing texture, not falling water (g_2000, g_2050, s_2030_hud, cu_falls.png, H.jpg 'waterfall from deck', J.jpg 'g_2050 waterfall'). Cause: the three noise octaves are stretched only about 3:1 vertically (vUv.x*12/27/53 against v*0.2/0.45/1.0 per metre on an 18 m sheet), so they draw blobs instead of streaks. The fall still stands at the bridge end against the striped gorge wall. The parapet hides the foot, foam pool and mist, and the rail cuts off the top, so the water has no visible source.",
+      "fix": "Stretch the streak noise to about 10-15:1 (v*0.03-0.06), draw thin step() streak lines (white over mid blue, deep blue only in narrow gaps) and add a darker wet-rock backing strip. Move the mark 50-80 m upstream into a visible notch in the gorge wall, angled 30-45 deg toward the deck, so the lip, the full drop and the foam pool with mist all read over the parapet. Alternatively, swap the parapet for an open rail on that side."
+    },
+    {
+      "severity": "major",
+      "title": "The three hairpins still look identical at speed and roadside density is low: the landmarks are tiny props on the same lawn islands (dressing/mountain/hairpins.ts, props/mountain-roadside.ts, forest.ts)",
+      "detail": "The unit-owned part of r1 #5 is not resolved. The new landmarks are a 2.2 x 2.7 m shrine (mountain-roadside.ts shrine), two benches with a coin binocular, and three boulders with a cairn. They sit on the same flat lawn island, with the same concrete curb, the same kerb and the same W-beam rail. In the chase cam the shrine is not visible at all, the lay-by is just a brown sign, and H3 shows one boulder (g_640, g_870, g_1100, s_880_hud). In the free-camera close-ups the shrine is about 20 px (cu_shrine, cu_viewpt, cu_outcrop). Elsewhere the slopes are bare flat grass with no tufts, flowers, stones or walls (g_420, g_2200, cv_cows, cu_tea), and the ropeway stations are plain boxes (cu_birch). The signature switchbacks have no identity, and the pass reads as a lawn-lined road.",
+      "fix": "Scale each landmark to read from 40-60 m. H1: a 5-6 m red paifang/torii gate at the island tip and stone lanterns along the curb. H2: a parked camper van and 4-6 spectator animals with flags on a timber deck. H3: a 6-8 m rock spire with a trickle and moss. Give each island its own ground cover (gravel, flower bed, scree) instead of the default lawn. Add instanced near-cell scatter (tufts, wildflowers, ferns, pebbles, km stones) and low dry-stone walls on the uphill side. Pay for it with the per-tile distance LOD (tree tiers become cones, no hulls beyond about 180 m) that the status already lists."
+    },
+    {
+      "severity": "minor",
+      "title": "Tunnel portal sits in a small ribbed dome with no ridge mass or headwall above it (tunnel cap; dressing/mountain/tunnel.ts)",
+      "detail": "The interior is fixed: sodium lamps, light pools, exit boxes and the meme sign read well (g_1720, g_1820). The portal gained the 落日隧道 plaque and two lamps (cu_portal). The 'mountain' above is still a smooth orange dome with fine vertical stretched-grain stripes over a flat dark headwall (H.jpg 'portal headwall'). From 100 m it is a small hump peeking between two flat cut walls (cu_portalwide, g_1640), so you never feel you are punching through a ridge.",
+      "fix": "Dress over the cap from the unit's own files. Build a 12-16 m stone headwall with a block pattern, coping and wing walls. Stack rock slabs and 6-10 pines over and behind the cap so the silhouette rises 25-40 m above the road. Give the cap the mountain rock material, or bury it under rock meshes, so the stretched-grain stripes go."
+    },
+    {
+      "severity": "minor",
+      "title": "Hot-spring capybaras are still invisible from the road, and the steam is a soft photo-blur blob (dressing/mountain/landmarks.ts hotSpring, env/mountain-mist.ts)",
+      "detail": "The r1 #6 fix had no visible effect. The board moved, but the pool is at ground level behind a 0.7 m ring of boulders and the capybaras sit at water level. From the chase cam (g_3250), and even from 12 m away at 2.6 m height (cv_spring2), you see only a stone ring and a big soft white gaussian steam cloud: no capybara heads, no yuzu (H.jpg 'hot spring from chase height'). The soft blur is off-style next to the cel-shaded scene.",
+      "fix": "Raise the pool on a 1-1.2 m stone terrace, or drop the road-side rim to 0.2 m. Seat the capybaras with heads and yuzu 0.4-0.6 m above the rim, facing the road. Halve the steam size and opacity and draw it as 2-tone toon puffs. Optionally add one capybara with a towel at the roadside fence."
+    },
+    {
+      "severity": "minor",
+      "title": "Birch 'barber-pole' trunks with lollipop crowns still read as road delineator posts; pine tiers are faceted (props/mountain-trees.ts)",
+      "detail": "Of r1 #7 only the far-forest move was done, and the spikes by the road are gone. The birches and orange autumn trees are still faceted round blobs on black/white striped poles, lined up along the shoulder like delineators (cu_lake0, cv_cows, cu_birch, g_2500, g_3060). Pines are 8-sided faceted tiers (J.jpg 'birch/pine close').",
+      "fix": "Use white trunks with 3-5 short dark dashes instead of full bands. Build crowns from 3-4 merged rounded blobs with 2-tone toon shading, at irregular spacing set back 3-6 m. Give pines 10-12 segments, smooth normals and a slight droop per tier."
+    },
+    {
+      "severity": "minor",
+      "title": "Lake is a pale flat lilac sheet with no reflected ridges and a stair-stepped shore against steep terrain (env/mountain-lake.ts)",
+      "detail": "r1 #10 was skipped. Beside the village and along the lakeside straight, the lake is a flat pale lilac band close to the fog colour. It shows no reflection of the ridges or sun and no ripple bands (cu_lake0, g_200, g_3060, g_3250). Where it meets steep terrain the waterline is a jagged stair-step (M.jpg 'cu_lake1 right slope'). The heavy surf foam from r1 is mostly gone (M.jpg 'aerial shoreline').",
+      "fix": "Give the near body a deeper, more saturated colour (violet grading to gold toward the sun), fresnel toward the ridge colour, a few hard-edged toon ripple bands and a cheap mirrored-ridge silhouette band. Hide the stair-step with a thin pebble or reed strip mesh along the waterline."
+    },
+    {
+      "severity": "minor",
+      "title": "Tea terraces are still felt pads on a smooth slope (dressing/mountain/farm.ts)",
+      "detail": "r1 #8 was not done. The hedges are now longer segments, but they are still flat-topped green pads on a continuous slope, with no contour steps or risers (cu_tea, g_420).",
+      "fix": "Cut 1-1.5 m contour steps with earth or stone risers, or fake them with a riser strip under each row. Run continuous rounded hedge rows along the contours with thinner outlines, and add pickers or baskets for scale."
+    },
+    {
+      "severity": "minor",
+      "title": "cross-unit: automatic red/white racing kerbs and 4-lane paint keep the 'racetrack' read (track unit, layout/query.ts)",
+      "detail": "Every curve tighter than R430 gets continuous red/white racing kerbs, plus 4-lane paint with a double-yellow centre line, so the hairpins and the chicane look like a circuit (g_640, g_870, g_1100, g_2700, cu_air). env-mountain has filed the core request.",
+      "fix": "Track unit: add the requested LayoutDef option (kerbs off, or a painted rumble edge / stone gutter) and a 2-lane-plus-shoulder paint style. env-mountain then enables it for the mountain."
+    },
+    {
+      "severity": "minor",
+      "title": "cross-unit: START road decals read upside down from the chase camera (track unit, features/decals.ts)",
+      "detail": "The 'START' words painted at s 49-55 are rotated 180 deg for riders travelling +s, so every race opens on upside-down text (M.jpg 'g_60 left START decal', g_60). This applies to every track.",
+      "fix": "Track unit: flip the word texture's UV (or the decal's s direction) so the letter bottoms face the approaching rider."
+    }
+  ]
+}

@@ -41,10 +41,17 @@
 .pg-h.is-wreck::before { content: "翻车"; background: var(--ink); }
 .pg-h.is-busted::before { content: "罚停"; background: #1F4FD1; }
 .pg-h.is-hidden { opacity: 0.35; }
-.pg-h.me { top: 55px; z-index: 2; }
+.pg-h.me { top: 55px; z-index: 30; }
 .pg-h.me::after { display: none; }
 .pg-h.me .bdg { left: -25px; top: -25px; width: 50px; height: 50px; box-shadow: 0 0 0 4px var(--ink), 0 0 0 7px var(--red), 4px 5px 0 7px var(--ink); }
 .pg-me-tag {
   position: absolute; left: -20px; top: 27px; font: 400 20px/1 "Bebas Neue", sans-serif; color: var(--paper);
   background: var(--red); padding: 3px 6px 0; transform: skewX(-12deg); box-shadow: 0 0 0 2px var(--ink);
 }
+/* Gaps (m) to the nearest rival ahead (right, red) and behind (left, ink), beside the player's badge. */
+.pg-gap {
+  position: absolute; top: -11px; padding: 3px 6px 0; font: 400 21px/1 "Bebas Neue", sans-serif; color: var(--paper);
+  background: var(--ink); white-space: nowrap; transform: skewX(-12deg); box-shadow: 0 0 0 2px var(--paper); visibility: hidden;
+}
+.pg-gap.ahead { left: 31px; background: var(--red); }
+.pg-gap.behind { right: 31px; }

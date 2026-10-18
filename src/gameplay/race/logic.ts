@@ -65,6 +65,7 @@ export function createRaceLogic(session: Session): RaceLogic {
     },
     postStep(dt) {
       if (!ctx.ended) standings.update(dt);
+      else standings.rollOutLate();
       flow.postStep(dt);
       traffic?.sync();
       police?.sync();

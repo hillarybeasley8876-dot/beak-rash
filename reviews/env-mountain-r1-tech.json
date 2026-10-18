@@ -1,0 +1,73 @@
+{
+ "pass": true,
+ "score": 8,
+ "summary": "Pass at 8/10: 11 minor issues, no blocker or major. Technically this is a solid unit and every hard gate I measured passes. tsc is clean, there is no `any`, and all 34 unit files are 236 lines or fewer, each with one job. I saw 0 console errors across about 30 page loads (Chromium at low/medium/high quality, WebKit at high, 2D plan bench). The track API test has 0 fails: round-trip error is 8 mm and no bounds discontinuities larger than 1 m/m. A NaN/Inf scan found 0 bad values among 8.2M geometry values. Memory: over 5 race-then-endSession cycles, geometries, textures and programs settle to the same 12/10/28 every time, and the JS heap goes back to about 107 MB after a forced GC, so nothing leaks. Determinism: two seed-5 stepped races produced identical progress traces, crash logs and obstacle events. The track geometry checksum does not change with the seed. Performance: the build takes 2.26-2.89 s (budget 4 s). A real-time autopilot race at 1920x1080 ran at 121 fps on average (minimum 111), with 3 frames over 25 ms in 169 s. The chase camera never lost sight of the rider (0 of 5,525 raycast samples blocked) and never went under the terrain outside the tunnel. Autopilot races finish; the crest gives about 0.8 s of air with PERFECT landings. What keeps the score at 8: (1) The approach chevrons before hairpin 2 point right while the hairpin turns left, because the arrows follow the curvature at each board. (2) The guard rail covers the bottom of every chevron board. (3) In the real chase camera the track peaks at 768k of the 800k triangles. Trees have no distance LOD, 'low' quality barely lowers the cost, and the unit's own perf gate under-reports by about 15 %. (4) Maintainability: hard-coded s and world positions for sky life and lake peaks, positional picks from content arrays, three copies of the sag maths and two of the time uniform, and post-hoc swaps of the track unit's materials by mesh name. Evidence and scripts are in shots/review/env-mountain/r1-tech/ and its r2/ folder.",
+ "issues": [
+  {
+   "severity": "minor",
+   "title": "Approach chevrons before hairpin 2 point the wrong way",
+   "detail": "dressing/mountain/signage.ts chevronRow sets mirror = curvature(s) < 0 at each board's own s. The approach row on leg 1 (mark at 110, x +1, s 825-855) sits on the straight, where curvature is 0, 0 and -0.008 at s 830/840/850. The first two boards therefore keep the default right-pointing '>>' arrows, but hairpin 2 (radius -30) turns LEFT. Only the third board is correct. The approach rows for hairpins 1 and 3 are right only because those bends happen to turn right. Seen at sandbox chase s=812 x=2.5: shots/review/env-mountain/r1-tech/r2/chev_a.png and chev_a_crop.jpg.",
+   "fix": "Get the arrow direction from the bend the row warns about, not from the board's own s. For example, use the sign of the curvature with the largest |k| over [s0, s1 + 40], or add data.dir to the chevron marks in layouts/mountain.ts and pass it through marks.ts."
+  },
+  {
+   "severity": "minor",
+   "title": "Guard rail hides the bottom of every chevron board",
+   "detail": "chevronRow mounts its boards at u 0.3 behind the edge with lift 0.5 and h 1.05, so the face spans 0.5-1.55 m. The rail beam and posts (road/edges.ts 'rail', posts 0.78 m) cover about the bottom quarter of each board. In the hairpins, the rail runs across the arrows at chase distance (chev_a_crop.jpg). Commercial racers mount chevrons fully above the barrier.",
+   "fix": "Use lift >= 0.9 where edgeKindAt is 'rail' or 'stone' (or u >= 0.6 with lift 0.85), or mount the boards on the rail posts."
+  },
+  {
+   "severity": "minor",
+   "title": "Only 4 % triangle headroom in the real game; no distance LOD, and quality 'low' barely helps",
+   "detail": "Measured in the game's own chase camera at 1920x1080 (stepped autopilot race, seed 3, a sample every 90 frames, direct renders with the track group shown and hidden). The track alone peaks at 207 calls (s 1169) and 768k triangles (s 779; cliff s 1256-1342 is about 755k), against a budget of 250 / 800k. Toggling categories at s 779 shows the cost: props batches 299k triangles and 29 calls, near terrain 128k, edges 80k, crowds 49k, shadow pass 226k. Roadside pines, firs and birches are full tiered meshes with outline hulls all the way out to the fog cull at 940 m; the far-forest cones are a separate set, not a distance LOD. With quality=low the whole scene is still 188 calls / 628k triangles at s 1450, versus 216 / 844k at medium. Any extra dressing will break the budget.",
+   "fix": "Add a distance LOD per props tile: beyond about 180 m, swap tree tiers for farPine cones and drop the hull children (or keep a hull-less far copy of each tile). Scale roadside spacing and far-forest density with ctx.quality, for example x0.6 at low."
+  },
+  {
+   "severity": "minor",
+   "title": "The unit's perf gate under-reports the in-game cost by about 15 %",
+   "detail": "sandbox/mountain.perf.mjs measures in the track sandbox: fixed FOV 66, a fixed 5 m / 2.1 m offset, no riders. It reports a maximum of 181 calls / 666k triangles (s 750/800). The same stretch in the game measures 207 / 768k, because the game's chase FOV is 67-77 degrees with speed and boost, and the shadow frustum follows the real camera. A change that adds about 100k triangles would pass the gate and still break the 800k budget in the game.",
+   "fix": "Measure through the game instead: run an autopilot race in manual steps and diff renderer.info with session.track.group visible versus hidden (see shots/review/env-mountain/r1-tech/perfgame.mjs). Alternatively, use FOV 77 in the sweep and gate at 85 % of the budget."
+  },
+  {
+   "severity": "minor",
+   "title": "Sky-life and lake-peak placements are hard-coded s and world coordinates, not layout marks",
+   "detail": "dressing/mountain/index.ts calls turbines(d, -1, 2450, 3300), cableCar(d, 2560, 1) and balloons(d, [[140,-1],[420,-1],[2480,1],...]). env/mountain-relief.ts places LAKE_PEAKS at absolute world x/z. Everything else in the dressing is driven by marks. Any edit to segment lengths or heading silently moves the cable car (for example over the chicane or the tunnel) or puts a 300-400 m peak bump next to the road, and nothing fails.",
+   "fix": "Add 'cableCar' / 'turbines' / 'balloons' marks to layouts/mountain.ts and dispatch them in marks.ts. Express the lake peaks in track space (s, x, r, h) and convert them with q.frameVis, the way TerrainField does for LayoutDef.bumps. Add an assert or warn when a peak's radius reaches within about 60 m of the road."
+  },
+  {
+   "severity": "minor",
+   "title": "Content arrays are picked by position although content never declared them positional",
+   "detail": "index.ts: `const [driftLine, , , , , , altitudeLine] = TRACK_BILLBOARDS.mountain`. marks.ts: `const [, , pelican, , , curves, , , sharp] = ROAD_SIGNS`. Only TRACK_SIGNS is documented as positional in data/memes.ts. If content reorders or extends these lists, the banners show different jokes, the 'each joke once' exclusion stops working (duplicates appear on posters), and the curve and chicane signs show unrelated text, with no error.",
+   "fix": "Select the lines by content with a warn fallback (e.g. find(l => l.includes('漂移'))), or file a core/content request for named exports (MOUNTAIN_BANNER_PICKS, ROAD_SIGN.curves)."
+  },
+  {
+   "severity": "minor",
+   "title": "Duplicated helpers (global rule: extract logic that repeats)",
+   "detail": "The parabolic sag formula exists three times: scenery/props/mountain-deco.ts sagAt (exported), env/mountain-ropeway.ts (a local `const sagAt` with the same maths) and the clearance loop in dressing/mountain/life.ts cableCar. Identical part() box writers live in props/mountain-house.ts and props/mountain-pagoda.ts. There are two shared sim-time uniforms, each with its own onUpdate accumulator: mountain-anim.ts lifeTime ('mountain:life:time') and mountain-waterfall.ts timeUniform ('mountain:waterfall:time'). buildMist, which the hot spring also uses, lives inside the waterfall module.",
+   "fix": "Keep one exported sagAt and reuse it in the ropeway and life code. Move part() into kit/shapes or a props helper. Make the waterfall and mist use lifeTime(). Move buildMist to its own env/mountain-mist.ts."
+  },
+  {
+   "severity": "minor",
+   "title": "The look is applied by patching the track unit's meshes by name after they are built",
+   "detail": "mountain-sky.ts swaps the 'sky' material and recolours 'clouds'. mountain-lake.ts swaps the 'sea' ShaderMaterial and borrows its uniforms. mountain-grade.ts repaints the vertex colours of 'near*', 'far:*' and 'tunnelCap' (130k vertices). The coast-style sky and sea programs and materials are built only to be thrown away. If the track unit renames a mesh, the mountain silently falls back to a coast-coloured sky or sea, with only a console.warn. This is a patch beside the structure rather than a structural fix.",
+   "fix": "Put a core/track request in the status file for an additive per-track environment hook (for example LayoutDef.env { sky(ctx), water(ctx), groundColor(fn) }) that the builders call instead of the defaults, then delete the post-hoc swaps."
+  },
+  {
+   "severity": "minor",
+   "title": "Silent failure paths and a rope that can end in mid-air",
+   "detail": "landmarks.ts pagodaViewpoint and hotSpring return without any log when flatSpot finds nothing. flatSpot has no maximum slope, so it always returns the 'best' spot even on a steep face and relies on a 4.2 m plinth to hide floating. village.ts lanternStrings skips a pole whose claim() fails but still draws the lantern rope to it, which leaves a rope end hanging in the air.",
+   "fix": "Log console.warn('[mountain] ...') when a landmark is skipped. Reject spots whose slopeRange is above a threshold. Skip the string unless both poles were placed."
+  },
+  {
+   "severity": "minor",
+   "title": "Dead options and dead per-vertex data",
+   "detail": "HouseOpts.lantern is never set to false, AnimSpec.castShadow is never true, and houses(u0, u1, rows) is only ever called with its defaults. The balloon attribute aDrift.zw (centre x/z) is uploaded for every vertex but MOTION reads only .x and .y. The mist quadGeo uploads a 'uv' attribute that the mist shader never reads, and its corner(i) callback returns a triple of which only [2] is used.",
+   "fix": "Remove the unused options, attributes and parameters. Make aDrift a vec2 and give quadGeo a seed callback."
+  },
+  {
+   "severity": "minor",
+   "title": "cross-unit: AI riders hit the outer rail in every hairpin",
+   "detail": "Stepped autopilot race, seed 5, run twice (identical both times): 8 'wall' obstacleHit events plus 15 'wallScrape' events, all in the hairpins (s 656-708, 938-948, 1133-1169) at x = +/-8.35, the outer rail. The race unit's AI enters R 26-30 corners too fast. The races still finish, and the player autopilot never touches a wall.",
+   "fix": "Race unit: brake to sqrt(g_lat * R) before hairpins. Env side (optional): widen pinOut shoulder 2.2 -> 3.0 m for some margin."
+  }
+ ]
+}

@@ -1,0 +1,20 @@
+/* Player quip: jagged speech bubble from the cluster portrait (bottom-right corner box, 720×380 stage px).
+   Bottom-right anchored above the portrait card, clear of the skill diamonds and their deny labels; the tail
+   points down at the card. */
+.qp { position: absolute; right: 26px; bottom: 374px; transform-origin: 88% 100%; pointer-events: none; }
+.qp-box {
+  position: relative; max-width: 420px; padding: 12px 24px 11px 22px; background: var(--paper); color: var(--ink);
+  font: 400 30px/1.15 "ZCOOL KuaiLe", "Noto Sans SC", sans-serif; white-space: nowrap;
+  clip-path: polygon(0 10%, 8% 0, 42% 7%, 64% 0, 100% 8%, 97% 50%, 100% 94%, 62% 100%, 28% 93%, 3% 100%, 2% 52%);
+}
+.qp::before {
+  content: ""; position: absolute; inset: -6px -6px 0 -6px; background: var(--ink); translate: 6px 6px;
+  clip-path: polygon(0 10%, 8% 0, 42% 7%, 64% 0, 100% 8%, 97% 50%, 100% 94%, 62% 100%, 28% 93%, 3% 100%, 2% 52%);
+}
+.qp-tail {
+  position: absolute; right: 54px; bottom: -32px; width: 34px; height: 36px; background: var(--paper);
+  clip-path: polygon(0 0, 100% 0, 74% 100%);
+}
+.qp.is-ko .qp-box, .qp.is-ko .qp-tail { background: var(--red); color: var(--paper); }
+.qp.is-hurt .qp-box, .qp.is-hurt .qp-tail { background: var(--ink); color: var(--paper); }
+.qp.is-hurt::before { background: var(--red); }

@@ -1,0 +1,49 @@
+{
+ "pass": false,
+ "score": 7,
+ "summary": "env-city does not pass round 2: score 7/10, with 1 new major and 6 minor issues (2 of them cross-unit). Every round-1 blocker and major is fixed. (1) quality=low now compiles the wet overlay with USE_MIRROR 0, and 3 consecutive races run at low and at medium with 0 errors. (2) The mirror no longer leaks the street-level city into the tunnel: hiding the city batches changes the tunnel road brightness by 0-3.5 % (48.1 vs 48.1 at s=2330), against 79-85 % in round 1, and the underpass cut is down to about 3 %. (3) No sign stands inside the drivable road below 3.5 m. Tunnel pools no longer wash the floor. The engineering is solid: tsc reports 0 errors, there is no `any`, and the 39 files are each 173 lines or fewer with one job. track.test for the city has 0 fails and no leak, and the dressing builds in 0.5-0.63 s. In game at 1920x1080, dpr 1, the environment costs 155-210 draw calls and 516-719k triangles including shadows and the mirror (budget 250 / 800k); the whole scene is 198-286 calls and at most 1.12M triangles. The real-time autopilot race averages 116.7 fps (p95 10.3 ms, p99 16.7 ms, lowest snapshot 94 fps). The mirror renders exactly once per frame, also during the KO cinematic, and costs 0.2-0.7 ms of GPU time. After 3 consecutive races GPU memory returns to baseline (16 geometries, 10-11 textures) with no growth between races. The world is identical for seeds 3, 7 and 3, WebKit runs with 0 errors, and an autopilot race with seed 11 finishes (169 s); with combat stubbed there are 0 crashes, so the walls, crest and hairpin are fair. The new major: in the neon arcade, the right-side shophouse fronts (black piers that protrude 0.8 m and stand 0.5 m beyond the drivable edge) turn the right 30-40 % of the chase frame into a flat black wall whenever the rider is in the right lane or on the sidewalk. The 4 minor issues in this unit: the font-timeout fallback is still never redrawn (it happened in one of my runs), layout literals and copied constants remain, the mirror pass costs about 1.5 ms of main-thread time per frame, and crowd umbrellas reach 0.16 m into the scramble shoulder. Evidence is in shots/review/env-city/r2-tech/.",
+ "issues": [
+  {
+   "severity": "major",
+   "title": "Neon arcade: right-side shophouse fronts render as a flat black wall from the right lane (s≈850-1060)",
+   "detail": "When the rider is in the right half of the arcade (x ≥ about 5 m of the ±7.9 m drivable width), the right 30-40 % of the chase frame is a solid near-black slab: sheet_wall.jpg (w_1022_7.4, w_1022_5.5, w_950_7.4, w_880_7.4) and sheet_black.jpg (bk_880_1). Chase-camera raycasts (wall3.mjs) show the cause. The arcade shophouse lots start at track x≈8.4, only 0.5 m beyond the 0.9 m sidewalk (bound 7.9). Each lot front is two protruding piers from scenery/props/city-building.ts:71 (0.6 x GF x 0.8 m, CPAL.trim #15161c, aux 0, so no window shader) plus the trim strip under the 0.8 m overhang. The lit shop glass (aux 4) is recessed to x≈9.2. At the grazing angle of the right lane, the 0.8 m pier sides hide the glass, so the rays hit faces coloured (0.007, 0.008, 0.012) 3-5 m from the camera. blackscan.mjs: 54-94 % of the outer third of the frame has luma < 10 at s=880, 960 and 1000 with x=+6.5, and 52-70 % at s=880-1020 with x=+3.5. From the racing line (x=±1.8) the street reads correctly (sheet_black18.jpg). This breaks the brief's 'no empty black voids' bar on a flagship street that riders use to overtake.",
+   "fix": "In shophouse(), make the piers shallow (0.2 m or less) or flush with the glass, and give them a lit look (wall colour plus an HDR neon edge strip in the glow batch, or a window-shader aux) instead of CPAL.trim. Add a warm soffit glow under the overhang. Keep arcade lots at least 1.5-2 m behind field.bound (lots.ts / blocks.ts). Add a check: chase cam at x=±6.5 every 20 m along the arcade, with the near-black fraction of the outer third below 0.25."
+  },
+  {
+   "severity": "minor",
+   "title": "Atlas text and poster art are still drawn once, with whatever loaded within 2.5 s, and never redrawn (round-1 issue not fixed)",
+   "detail": "The status lists it as 'Not done: font-timeout redraw (T4)', and it happened: my first real-time run under machine load logged '[warning] [track] fonts still loading after 2500 ms; signs may use fallback glyphs' (perf_city_high_dpr1.json, logs). dressing/city/index.ts:85 awaits ensureFonts (386 glyphs across 3 CJK families) and loadBillboardArt once. finishCity() then uploads the 2048² neon and screen atlases and the faces atlas a single time. Every sign keeps its fallback glyphs, or misses its poster art, for the whole race, so the city's look depends on machine load.",
+   "fix": "On a timeout, keep the face draw closures (d.face already keys them), await document.fonts.ready and the art promises, redraw those cells and set needsUpdate on neonTex, screenTex and the faces texture. Alternatively, preload the city glyph set and BILLBOARDS.city during the loading screen (the track preload hook)."
+  },
+  {
+   "severity": "minor",
+   "title": "Layout-coupled literals and copied track constants remain (round-1 hygiene issue only partly fixed)",
+   "detail": "Fixed: ahead() and canvasTex() are shared, WALL_H/CROWN/LAMP_EVERY/WALL_TOE are imported, and roadPoint and the skyline mark are gone. Still open: (1) signs.ts:34-42 places nine signs at literal s values (175, 292, 380, 425, 1040, 1690, 2620, 2695, 2990), so they silently drift off their corners if any segment length changes. (2) layouts/city.ts:38 sums CREST by hand from 12 segment lengths (1566), and the drop's jumpCrest {at: -8, peak: CREST} depends on it. (3) bridge.ts:9 copies APEX/PYLON_AT/RIB_W/RIB_D from features/bridge.ts. (4) index.ts:7 and signs.ts:8 still import from dressing/coast/signage (core request pending). (5) `const C = (h) => new Color(h)` is repeated in city-people.ts:10, city-shops.ts:15 and city-street.ts:11.",
+   "fix": "Derive the warning-sign positions from zoneRuns (corner, chicane and hairpin s0 − 35), and compute CREST with a reduce over CITY.segments up to the 'drop' segment. Hoist C into city-kit.ts. Switch to the track unit's exported bridge constants and signage helpers once the open core request lands."
+  },
+  {
+   "severity": "minor",
+   "title": "The wet-mirror pass costs about 1.5 ms of main-thread time per frame",
+   "detail": "Measured with ab.mjs: interleaved 3 s windows in one real-time race at dpr 2, with the wet overlay switched off through material.visible. CPU time in game.frame is p50 5.7 ms with the mirror vs 4.2 ms without (p95 8.6 vs 7.1), and mean fps is 46.9 vs 52.7 under load. The nested renderer.render(scene, mirrorCam) in env/city-mirror.ts re-traverses, culls and sorts the whole scene graph (riders, fx, every track mesh) to draw only 26-35 REFLECT_LAYER meshes. GPU cost at dpr 1 is small, 0.2-0.7 ms (gpu.mjs, gpu_city_high_dpr1.json).",
+   "fix": "Render the mirror from a dedicated lightweight Scene of proxy Meshes that share geometry and material with the REFLECT_LAYER batches (built once in finishCity), or hide the non-city top-level groups during the nested pass. Optionally refresh the mirror every other frame at medium quality."
+  },
+  {
+   "severity": "minor",
+   "title": "Scramble crowd umbrellas reach into the drivable shoulder at head height",
+   "detail": "sandbox/city.intrude.mjs (default ymax 3.5, intrude.txt): crowd:1,-3 at s=780-785 has vertices 0.12-0.16 m inside the drivable bound (x=11.29-11.33 vs bound 11.45) at y=1.73-1.76 m, so riders on the 4.5 m scramble shoulder ride through umbrella rims. All round-1 sign intrusions are gone. The only other hits are lamp heads at 3.0-3.5 m, above the rider and the 2.2 m camera.",
+   "fix": "In life.ts crowds(), offset the kerb rows by the umbrella radius + 0.2 m from field.bound, or shrink the front-row umbrellas. Make city.intrude.mjs exit non-zero on any non-lamp hit below 2.5 m."
+  },
+  {
+   "severity": "minor",
+   "title": "cross-unit: the last raced track stays reachable after endSession (round-1 issue persists)",
+   "detail": "races.mjs ran 3 consecutive city races, then endSession, the menu and two CDP collectGarbage calls. WeakRefs to the 3 track groups give [false, false, true]: the first two are freed, the last stays pinned, and the heap is 133-136 MB at the menu. GPU memory returns to baseline (16 geometries, 10-11 textures, 32 programs at high and 19 at low, with no growth between races). env-city holds no module-level references (city-cam.ts uses a WeakMap).",
+   "fix": "(integrator) Take a heap snapshot after endSession and null the closure or listener that still references the last Session or track; an attach(null) path in ui/fx/audio that keeps the old session is the likely culprit."
+  },
+  {
+   "severity": "minor",
+   "title": "cross-unit: at dpr 2 (quality high on a Retina M1) both tracks drop to p95 25 ms",
+   "detail": "ab.mjs at a 1920x1080 viewport with dpr 2: the city averages 76.9 fps with p95 25.0 ms, and the coast, measured in the same period, 74.7 fps with p95 25.0 ms. With its track group hidden, the city still reaches only 107 fps (p95 16.7 ms). At dpr 1 the city holds vsync: mean 116.7 fps, p95 10.3 ms, p99 16.7 ms, lowest snapshot 94 fps (perf_city_high_dpr1_run2.json). The 4K post pipeline (4x MSAA HalfFloat scene target + 5-level bloom) dominates, not env-city.",
+   "fix": "(fx/core) Cap the high-quality dpr at about 1.5, or add a render scale for the scene target and bloom when dpr > 1.5."
+  }
+ ]
+}

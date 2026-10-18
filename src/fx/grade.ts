@@ -16,14 +16,18 @@ export function updateGrade(state: PostState, look: EnvLook | null, renderer: We
   s.saturation += (g.saturation - s.saturation) * k;
   s.contrast += (g.contrast - s.contrast) * k;
   s.bloom += (Math.max(0, g.bloom) - s.bloom) * k;
-  s.threshold += ((g.night ? 0.7 : 1.0) - s.threshold) * k;
+  s.threshold += ((g.night ? 0.85 : 1.0) - s.threshold) * k;
   tint.set(g.tint);
   s.tint.lerp(tint, k);
   const exposure = renderer.toneMapping === NoToneMapping ? 1 : renderer.toneMappingExposure;
   s.exposure += (exposure - s.exposure) * k;
 }
 
-/** Speed lines, edge blur and chromatic fringe that grow with speed, boost and slipstream. */
+/**
+ * Speed lines, edge blur and chromatic fringe. Plain top speed keeps the toon outlines crisp (sparse
+ * white edge lines + the camera FOV carry it); blur starts above top speed (downhill, slingshot) and
+ * blur + chroma fringe belong to boosts.
+ */
 export class SpeedFeel {
   private blur = 0;
   private chroma = 0;
@@ -36,22 +40,21 @@ export class SpeedFeel {
       const v = player.speed / top;
       const boost = player.boostTime > 0 ? clamp01(0.45 + player.boostPower * 1.6) : 0;
       const draft = player.draft > 0.35 ? player.draft : 0;
-      tBlur = 0.018 * smoothstep(0.55, 1.2, v) + 0.032 * boost;
-      tChroma = 0.0016 * smoothstep(0.6, 1.2, v) + 0.0042 * boost;
-      tLines = Math.max(boost * 0.8, draft * 0.42, 0.42 * smoothstep(1.02, 1.35, v));
+      tBlur = 0.018 * smoothstep(1.02, 1.3, v) + 0.032 * boost;
+      tChroma = 0.0042 * boost;
+      tLines = Math.max(boost * 0.8, draft * 0.42, 0.15 * smoothstep(0.9, 1.0, v), 0.42 * smoothstep(1.02, 1.35, v));
     }
     // Fast attack, slower release so boosts punch in and ease out.
     const rate = (cur: number, target: number): number => (target > cur ? 9 : 2.6);
     this.blur = damp(this.blur, tBlur, rate(this.blur, tBlur), dtReal);
     this.chroma = damp(this.chroma, tChroma, rate(this.chroma, tChroma), dtReal);
     this.lines = damp(this.lines, tLines, rate(this.lines, tLines), dtReal);
-    // The release whoosh rides on top (eased so it swells, then thins out).
+    // The release whoosh rides on top (eased so it swells, then thins out); the composite adds it unmasked.
     const w = state.pulse.whoosh;
-    const rush = w * w * (3 - 2 * w);
-    state.speed.edgeBlur = this.blur + 0.04 * rush;
-    state.speed.chroma = this.chroma + 0.003 * rush;
-    const lines = Math.max(this.lines, 0.9 * rush);
-    state.speed.lines = lines < 0.01 ? 0 : lines;
+    state.speed.rush = w * w * (3 - 2 * w);
+    state.speed.edgeBlur = this.blur;
+    state.speed.chroma = this.chroma + 0.003 * state.speed.rush;
+    state.speed.lines = this.lines < 0.01 ? 0 : this.lines;
   }
 
   reset(): void {

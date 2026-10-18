@@ -20,6 +20,15 @@ if (!canvas || !uiRoot || !hudRoot) throw new Error('[hud-sandbox] page is missi
 async function boot(): Promise<void> {
   const game = await Game.create(canvas as HTMLCanvasElement, uiRoot as HTMLElement, params);
   const debug = installDebug(game, errors);
+  // Spy on the HUD's UI sounds (sandbox/hud.shots.mjs asserts them via window.__hudSfx).
+  const audio = game.app.audio;
+  const baseSfx = audio.sfx.bind(audio);
+  const sfxLog: string[] = [];
+  window.__hudSfx = sfxLog;
+  audio.sfx = (id, opts) => {
+    sfxLog.push(id);
+    baseSfx(id, opts);
+  };
   const hud = createHud(game.app, hudRoot as HTMLElement);
   let attached: Session | null = null;
   const ui = game.app.ui;

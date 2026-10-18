@@ -1,0 +1,82 @@
+{
+  "unit": "species",
+  "round": 1,
+  "lens": "art",
+  "pass": false,
+  "score": 5,
+  "summary": "The cast reads well: species are easy to tell apart, colours and accessories match the portraits, and there are nice touches (sleepy capybara with yuzu, pixel-shades doge, fish passenger on the sloth's tandem, corgi cap + vest). It is still clearly below a polished commercial stylised game. Every rider has faceted, blotchy cel shading. Helmets look like lumpy berets with ragged black streaks. From the chase camera the hero pelican shows neither beak nor pouch, and its Big Gulp is invisible to the player. Several signature poses don't read (doge, flash, wing dash). The stork-like pelican and stilt-legged penguin are off-model. No runtime errors from this unit. Evidence: shots/review/species/r1-art/*.jpg.",
+  "issues": [
+    {
+      "severity": "major",
+      "title": "Faceted, blotchy toon shading on every rider",
+      "detail": "The 3-band ramp's light/shadow boundaries follow the decimated SDF triangles, so smooth masses break into jagged grey/brown 'camo' patches. Seen on the pelican neck, wing and helmet (fc-sheet.jpg fc-0/fc-1, cu-sheet.jpg cu-0), the capybara face and cheeks (cu-1), the sloth back (turn-b.jpg, cu-5), the penguin helmet (faces-b.jpg) and the beaks (fc-0, fc-2). It also shows in-game in the coast intro flyover (crops-coast.jpg intro2 crop). This breaks SPEC §5: no visible faceting on characters.",
+      "fix": "After decimation, recompute final normals from the analytic SDF gradient with a wider kernel (2-3 cells), or run 2-3 Laplacian normal-smoothing passes that respect colour borders (kit/mesher.ts / kit/builder.ts). Move triangle budget from limbs/feet to the large smooth body, head and helmet masses (+30-50 %). Give the actors' cloned toon material a narrow smoothstep between bands so the boundaries are clean curves, not stair-steps."
+    },
+    {
+      "severity": "major",
+      "title": "Hero pelican shows neither beak nor pouch from the chase cam; Big Gulp is invisible to the player",
+      "detail": "species/pelican.ts: the beak is ~0.116 m wide and the pouch ~0.108 m, inside a 0.26 m head and 0.44 m body. From behind, the view the player has all race, the pelican is just a white egg with a red cap, the same shape as the goose and seagull (g2-sheet.jpg hop crop, crops-coast.jpg pack crop). The gulp inflation in rig/ride.ts (scale 1+0.9p, 1+1.7p, 1+0.35p) grows mostly downward, so nothing shows from behind even at full gulp: skills.jpg 'pelican.gulp back', and crops-coast.jpg skill2 crop has the BIG GULP cut-in on screen with no pouch visible. From the front (look-back, g2-sheet.jpg top) the beak foreshortens to a small nub. The brief requires 'pelican beak + pouch' to read from behind at 6 m.",
+      "fix": "Widen the beak to ~0.17-0.20 m with a flatter, spoon-like upper mandible. Make the resting pouch >= 0.24 m wide so it bulges past both cheeks. Make the gulp inflate sideways first (x scale 3-3.5, a ~0.6 m balloon visible on both sides of the neck), pitch the head up ~0.3 so the balloon rises above the shoulders, and add a jiggle. An occasional idle head yaw would let the beak tip clear the head outline from behind."
+    },
+    {
+      "severity": "major",
+      "title": "Several signature skill poses don't read (brief deliverable 3)",
+      "detail": "In rig/cues.ts skill(): 'doge' only turns the head, squints and lowers the brow. There is no paw up and no shades glint, so from behind it looks like normal riding (skills.jpg shiba.doge 34/back). 'flash' only pitches the spine and widens the eyes; there is no lightning pose (sloth.flash). 'wingspread' sticks out two stiff, flat planks with no feather splay (pelican.wing back). The pigeon 'ghost' is a hard strobe, visible 1 frame in 7 at 30 Hz (view.ts visibleFor), not a fade. Capybara 'chill' looks in 3/4 like a schoolkid raising one hand (capybara.chill 34), and no steam is visible.",
+      "fix": "doge: raise the near paw palm-out by the shades, lift the chin, flash an emissive glint sprite on the lens, lean back smugly. flash: sprinter/lightning pose (one arm thrust forward, the other swept back, head low) plus a yellow zig-zag emissive flash. wingspread: fan 5-7 primary feather fingers per wing, swept back 20-30 degrees, with a slow flap. ghost: fade alpha 1 to 0.2 with a cyan tint using a cloned transparent material; keep the strobe for respawn only. chill: both paws behind the head symmetrically, eyes fully closed, steam puffs."
+    },
+    {
+      "severity": "major",
+      "title": "Off-model proportions vs the portraits (stork pelican, stilt-legged penguin, sleeve arms, pipe legs)",
+      "detail": "Pelican: long horizontal stork body with the tail ~0.4 m behind the saddle (pelvis ellipsoid rz 0.3, tail prims at z 0.22-0.33) and a straight diagonal neck. The portrait shows a chunky, upright, S-necked pelican with a big head (turn-a.jpg pelican side, crops-coast.jpg intro2 crop). Penguin: long yellow stilt legs break the egg silhouette (turn-b.jpg penguin side, faces-b.jpg). Cat/shiba: long, thin, nearly straight forearms reaching to the bars, the 'sleeve' look the brief wanted gone (turn-a.jpg side row). The fit stretch is only 1.00-1.09, so the long arms are modelled, not stretched. Goose/pelican legs are even-width orange pipes ending in slab feet with no webbing or toes (cu-3).",
+      "fix": "Pelican: shorten the body (rz 0.30 to ~0.22), tilt it more upright, pull the tail in, bend the neck into a real S (back, then forward) and enlarge the head ~15 %. Penguin: hide the thighs inside the egg (higher hip, shin <= 0.12 m) and use pedal blocks like the corgi so only the feet show. Cat/shiba: move the shoulders forward/down and hunch the chest so the elbows bend; taper the arms so they get thicker toward the paw. Taper legs (thicker thigh/calf) and give web feet 3 toe ridges and membrane notches."
+    },
+    {
+      "severity": "major",
+      "title": "Helmets look like lumpy berets with ragged black 'crack' streaks",
+      "detail": "kit/gear.ts addHelmet meshes the shell and four vent grooves at a 1.1 cm cell with a 360-tri budget. Each groove is a capsule of radius ~1 cm (0.07 x min(rx, rz)), about one cell, so the grooves alias into broken black scratches and the dome comes out faceted (fc-sheet.jpg pelican/seagull/pigeon helmets, faces-b.jpg penguin). The helmet tops every rider's silhouette in the chase view, and the portraits show sleek vented helmets with visors.",
+      "fix": "Build the helmet as its own smooth lathe or subdivided shell, outside the SDF budget. Draw vents as crisp dark inset patches (kit/crisp.ts paint), or cut real slots at least 3 cells wide. Add a small visor lip and a visible shell rim. Budget ~700-900 tris for the hero and ~500 for rivals, taken from limbs/feet."
+    },
+    {
+      "severity": "minor",
+      "title": "Hero face lacks the portrait's attitude: blank eye from 3/4, mouth line pokes out of the beak",
+      "detail": "Pelican eye: a pale iris (0xffe08a) and white lid on a white head read as a black dot with a beige ring. The highlight (pupil x 0.36, about 1 cm) disappears beyond ~1 m. The angry brow sits under the helmet rim and is hidden in 3/4. The mouth-corner capsule from addMouth sticks out of the beak like a toothpick (fc-sheet.jpg fc-0). The portrait has strong angry brows and a smug grin.",
+      "fix": "Put a thicker (~0.022), angled brow in front of the helmet rim. Add a darker iris ring or a thin black eye outline so the sclera shape reads. Double the highlight size. Seat the mouth line on the beak surface and curve it up into a smirk."
+    },
+    {
+      "severity": "minor",
+      "title": "Outline hull pokes through at concave joints (black wedges/scribbles)",
+      "detail": "The single merged outline hull (kit/outline.ts) crosses the surface at armpits, shoulders and other concave blends, leaving black wedges and scribbles on the body: capybara shoulders/chest (cu-1), sloth shoulder (cu-5), pelican chest/wing roots (fc-1).",
+      "fix": "Reduce the aOutline weight on vertices in concave blend zones (where smooth-min blending is active or mean curvature < 0), and push the hull out along smoothed normals so it cannot cross the surface."
+    },
+    {
+      "severity": "minor",
+      "title": "Pigeon neck iridescence is two hard-edged stripes (reads as a scarf); seagull's fry barely visible",
+      "detail": "faces-b.jpg / fc-3: the neck has flat green and purple bands with crisp borders, while the portrait shows a smooth green-to-purple sheen. The seagull's fry is a thin stick the same yellow as the beak, visible only from the front (turn-b.jpg seagull front) and not from the side or back.",
+      "fix": "Blend the neck paint over 2-3 cm and add a view-angle tint shift (fresnel lerp green/purple) on that region. Make the fry pale cream with a golden-brown tip, ~1.2 cm thick, sticking out ~10 cm sideways from the beak corner so it reads in the chase view."
+    },
+    {
+      "severity": "minor",
+      "title": "Sloth has no shag; the brown riders merge at night",
+      "detail": "The sloth's silhouette is smooth (turn-b.jpg sloth side/back), though the brief asks for 'sloth shag'. In the city night race, shiba, capybara and sloth read from behind as three similar mid-brown blobs (crops-city.jpg pack crop).",
+      "fix": "Add a shaggy fringe to the silhouette (SDF noise displacement, or 8-12 tuft capsules along the back, arms and crown). Shift the sloth to a greyer olive-brown with lighter tips, and push the shiba toward a brighter orange/cream contrast."
+    },
+    {
+      "severity": "minor",
+      "title": "Weapon smear trail is a flat translucent white cone that looks like a flashlight beam",
+      "detail": "During heavy swings, the local-fx.ts smear is a straight, evenly translucent white wedge from the hand upward (misc.jpg, all 8 heavy swings). It doesn't follow the weapon tip, and the saltfish/pan are hard to identify at the key frame.",
+      "fix": "Build the smear as a ribbon along the last N weapon-tip positions (a curved arc), fading toward the tail, with a white core and a thin black or red ink edge (P5). Keep it ~80-120 ms."
+    },
+    {
+      "severity": "minor",
+      "title": "cross-unit: no cool rim light on riders",
+      "detail": "render/toon.ts (core) has no rim term, and the actors use toon('#ffffff', {vertexColors}) (species/index.ts:62). At night the riders lose separation from the busy reflective background (crops-city.jpg). SPEC §5 asks for a cool rim light.",
+      "fix": "Core: add an optional fresnel rim (cool blue, tunable per scene) to toon(). Or the actors unit clones its material and adds the rim term via onBeforeCompile."
+    },
+    {
+      "severity": "minor",
+      "title": "Detail misses vs portraits: capybara nose reads as a hole, goose bandana has no knot, pelican wings are magpie zigzags",
+      "detail": "Capybara (cu-1): a flat black oval on the front of the snout reads as an open mouth. Goose: the bandana is a plain black band; the portrait has a knot and tails (faces-a.jpg). Pelican flank wings are painted in black/white/grey sawtooth rows (turn-a.jpg pelican side/back); SPEC §5 asks for grey-tinted wings with black primary tips.",
+      "fix": "Capybara: a dark-brown rounded nose pad with two nostril dots. Goose: a knot plus two flapping tails at the back of the bandana, visible from the chase cam. Pelican: light-grey coverts, with black kept only on the primary tips."
+    }
+  ]
+}

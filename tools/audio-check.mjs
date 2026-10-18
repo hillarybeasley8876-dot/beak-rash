@@ -2,10 +2,14 @@
 // Audio check, two parts (exit code 1 when anything fails the quality bar):
 //  offline — renders every song (20 s from the top, the loop seam, the adaptive final-stretch layer),
 //            every stinger and every sfx through the real mixing graph in an OfflineAudioContext
-//            (sandbox/audio.html): peak / RMS / clipping / clicks / dropouts / low-end share / render cost.
+//            (sandbox/audio.html): peak / RMS / clipping / clicks / dropouts / render cost; per song the
+//            bass stem, the hook over the race mix, and one full loop's tone (octaves vs 125 Hz, width,
+//            loudness range, breakdown / build).
 //  game    — runs a real race (audio-check-game.mjs): nothing before unlock, music per screen, event →
 //            sound mapping, KO cinematic, pause muffle, mix peaks in game, no errors when muted;
-//            race-start sync (audio-check-start.mjs), no-WebAudio / WebKit robustness (audio-check-robust.mjs),
+//            race-start sync (audio-check-start.mjs), adaptive layers / finish cues (audio-check-adaptive.mjs),
+//            held KO lines after short / cut cinematics (audio-check-barks.mjs),
+//            no-WebAudio / WebKit robustness (audio-check-robust.mjs),
 //            realtime audio-thread load (audio-check-cpu.mjs: renderCapacity p50 ≤ 5 %, p90 ≤ 8 %).
 //   node tools/audio-check.mjs [--offline | --game | --cpu] [--seconds 20] [--only race-coast] [--sfx] [--verbose]
 //                              [--stub camera,fx]   (isolate from other units' breakage)
@@ -15,6 +19,8 @@ import { gameCheck } from './audio-check-game.mjs';
 import { robustCheck } from './audio-check-robust.mjs';
 import { startCheck } from './audio-check-start.mjs';
 import { cpuCheck } from './audio-check-cpu.mjs';
+import { adaptiveCheck } from './audio-check-adaptive.mjs';
+import { barksCheck } from './audio-check-barks.mjs';
 
 const args = parseArgs(process.argv.slice(2));
 const SECONDS = Number(args.seconds ?? 20);
@@ -79,14 +85,30 @@ if (RUN_OFFLINE) await withPage(async (page, h) => {
       return { ...st, mask: songId.startsWith('race-') && a2 >= 0 ? await c.hookMask(songId, a2, 16, 20) : null };
     }, id);
     const bad = [];
-    const { lead, bass } = r.stems;
-    if (lead !== undefined && lead > -60 && (lead > -3.5 || lead < -7.5)) bad.push(`lead ${lead} LU (want -7.5…-3.5)`);
-    if (bass !== undefined && (bass > -6.5 || bass < -10.5)) bad.push(`bass ${bass} LU (want -10.5…-6.5)`);
-    if (r.low > 0.4) bad.push(`60-150 Hz ${(r.low * 100).toFixed(0)} % (max 40)`);
+    const { bass } = r.stems;
+    if (bass !== undefined && (bass > -5 || bass < -11)) bad.push(`bass ${bass} LU (want -11…-5)`);
     if (r.mask && Math.max(...Object.values(r.mask)) < 3) bad.push(`hook under the race mix ${JSON.stringify(r.mask)} dB`);
     if (bad.length) failures.push(`${id} mix: ${bad.join(', ')}`);
     const stems = Object.entries(r.stems).map(([k, v]) => `${k} ${v}`).join(' ');
     console.log(`${(id + ' mix').padEnd(26)} ${stems} | low ${(r.low * 100).toFixed(0)}% | hook ${r.mask ? JSON.stringify(r.mask) : '-'}  ${bad.length ? 'FAIL ' + bad.join(', ') : 'ok'}`);
+  }
+  // Loop-level tone (critic r3): octaves vs the 125 Hz one, width above 200 Hz (the low end is mono),
+  // loudness range, and the breakdown / build shape of section D.
+  for (const id of songs) {
+    if (only && !only.includes(id)) continue;
+    const t = await page.evaluate((songId) => window.__audioCheck.tone(songId), id);
+    const o = t.octaves;
+    const bad = [];
+    if (o['63'] < -1 || o['63'] > 3) bad.push(`63 Hz ${o['63']} dB (want -1…+3 vs 125 Hz)`);
+    if (o['31.5'] > -4) bad.push(`31.5 Hz ${o['31.5']} dB (max -4: no rumble)`);
+    if (o['1000'] > -6) bad.push(`1 kHz ${o['1000']} dB (max -6)`);
+    if (o['8000'] > -10) bad.push(`8 kHz ${o['8000']} dB (max -10)`);
+    if (t.sideMidHigh < -12) bad.push(`width ${t.sideMidHigh} dB S/M above 200 Hz (min -12)`);
+    if (t.lra < 4) bad.push(`LRA ${t.lra} LU (min 4)`);
+    if (t.breakdown && t.breakdown.dropDb > -6) bad.push(`breakdown only ${t.breakdown.dropDb} dB under B2 (want ≤ -6)`);
+    if (t.breakdown && t.breakdown.build.some((v, k, a) => k > 0 && v <= (a[k - 1] ?? -Infinity))) bad.push(`build not rising ${t.breakdown.build.join(' ')}`);
+    if (bad.length) failures.push(`${id} tone: ${bad.join(', ')}`);
+    console.log(`${(id + ' tone').padEnd(26)} 63 ${o['63']} 250 ${o['250']} 1k ${o['1000']} 4k ${o['4000']} 8k ${o['8000']} | S/M ${t.sideMid} (>200 Hz ${t.sideMidHigh}) corr ${t.corr} | LRA ${t.lra} | D ${t.breakdown?.dropDb ?? '-'}  ${bad.length ? 'FAIL ' + bad.join(', ') : 'ok'}`);
   }
   if (!only) {
     for (const id of stingers) {
@@ -127,7 +149,10 @@ if (RUN_OFFLINE) await withPage(async (page, h) => {
   }
 });
 
-if (RUN_GAME) failures.push(...await gameCheck(args), ...await startCheck(args), ...await robustCheck(args));
+if (RUN_GAME) {
+  failures.push(...await gameCheck(args), ...await startCheck(args), ...await adaptiveCheck(args), ...await barksCheck(args));
+  failures.push(...await robustCheck(args));
+}
 if (RUN_CPU) failures.push(...(await cpuCheck(args)).fails);
 
 if (failures.length) {

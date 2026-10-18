@@ -16,7 +16,7 @@ export class Barks {
 
   constructor(private h: Host, private voices: VoicePlayer) {}
 
-  say(riderId: RiderId, kind: BarkKind, text?: string): void {
+  say(riderId: RiderId, kind: BarkKind, text?: string, wait?: number): void {
     const s = this.h.session();
     const r = s?.rider(riderId);
     if (!s || !r) return;
@@ -31,7 +31,7 @@ export class Barks {
     const id = text !== undefined ? this.voices.idFor(text) : voiced.length ? this.rng.pick(voiced) : null;
     const follow = (): { gain: number; pan: number } | null => this.place(riderId);
     const at = follow();
-    if (id && at && this.voices.play(id, { channel: 'bark', pan: at.pan, gain: at.gain, follow }) !== 'none') return;
+    if (id && at && this.voices.play(id, { channel: 'bark', pan: at.pan, gain: at.gain, follow, wait }) !== 'none') return;
     if (this.h.cooldown(`call${riderId}`, 2)) this.h.play(`animal.${r.character}`, riderId, { volume: 0.85 });
   }
 

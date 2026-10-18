@@ -1,0 +1,61 @@
+{
+ "pass": false,
+ "score": 7,
+ "summary": "Race fails round 3 on gameplay: 7/10, with one new major issue. Fixed from r2: (1) the corgi now reaches the player in every chase (3.5-6.9 s), with no 'lost' before 16 s. (2) Bikes matter: the passive seed 4 player finishes 1st in 148.7 s on the fixie vs 8th in 165.3 s on the roadbike, with rival caps unchanged. (4) Rear-end rams are gone (stopped 6/6, brakecheck 5/5). (6) Race-owned chatter is 8-14 lines a minute with no bursts. (7) KO gaps hold at -63/-63/-73 m. (8) The results screen builds with 0 errors. Not fixed: (3) the unit's own suite is 47/50 on a fresh run, though status claims 50/50. (5) Payback hits are still rare (7/20). Edge cases are clean. Lifecycle events fire exactly once. placeChange chains are consistent, and finishLine places/times match the results in 10 recorded races. No rider is stuck more than 2 s. A KO during penguin slide, pigeon ghost or sloth flash leaves no residue (no ghost teleport after the KO, statuses cleared, AI resumes in 0.5 s). The ghost never jumps over the line. Fresh soak seeds 1-3 pass. Coast and city scenes, the corgi alongside, the escape toasts and the FINISH splash look commercial-grade. The new major: race winners are predetermined. In 34 full races the pigeon won 20 of the 30 it entered and the penguin 6 of 15 (5/5 on city and mountain). The cat, goose, seagull and capybara never won. The 'slow' sloth made the podium 19/31. Rank-based pace offsets and speed skills fired on cooldown decide every race. Minor issues: the corgi is in view only 35 % of a chase and busts 1 in 11 times; it rides through rivals; PERFECT START is now announced twice; finishers park in the lanes past the line; and two cross-unit leftovers. Evidence: shots/review/race/r3-gameplay/me/ (batch.mjs with batch-coastA.txt and batch-wave2.txt, scenarios-default.txt, soak.txt, police.mjs with pol-s1-*.png and pol-s11-*.png, launch.mjs with launch-*.png, edge3.mjs, draftbrake.mjs, chatter.mjs, bumps.mjs, winners.mjs, pack-city-s9-*.png). Also the earlier r3 logs in shots/review/race/r3-gameplay/ (race-*.txt, *.json, chase-stats.mjs, finish-s4-*.png, trail-*.png).",
+ "issues": [
+  {
+   "severity": "major",
+   "title": "Predictable podium: the pigeon or the penguin wins almost every race the player doesn't",
+   "detail": "The sample is 34 full races: 11 fresh ones across coast, city and mountain at L1-L4 (me/batch-coastA.txt, me/batch-wave2.txt), 3 fresh soak seeds, 17 earlier r3 runs and 3 close-race scenario runs. A rival won 30 of them: the pigeon 20 times, the penguin 6, the shiba 3 and the sloth once. The pigeon wins 67 % of the races it enters and podiums 87 %. The penguin wins every city and mountain race it enters (5/5). The cat has the second-best rating yet never wins (podium 7/32). The goose (2/32), seagull (5/34) and capybara (4/32) never win either. The sloth is the slowest joke character (speed 2, '慢……慢……来'), yet it podiums 19/31. Leaders often lead wire to wire: the pigeon led from 19 to 90 % in coast s12 and the whole of s15, and the penguin led from 29 to 98 % on mountain s24. Margins are only 0.2-6 s, so small structural edges decide the winner. All three causes are race-owned. (a) ai/index.ts paceOffsets() makes half of the ±2 % spread rank-based, so the top-rated rival (the pigeon) always starts with about +1 %. (b) ai/skills.ts fires pure speed skills on cooldown: penguin.slide whenever there is more than 90 m of straight road (10-11 casts per race), sloth.flash whenever the sloth is out of the top 3, and shiba.doge on long straights. brain.ts drive() multiplies the pace cap by mods.speedMul, so each cast is a gain on top of the rubber band (one slide = +25 % for 2.5 s, about +12 m; one race ≈ +125 m). (c) The pigeon drafts at 0.95. The races are close, but the result is known before GO.",
+   "fix": "Make pace offsets per-race form (dice), with at most 25 % rank weight. Fire speed skills only with a purpose: an overtake (a rider 3-25 m ahead in the lane), defence (threatened), or a comeback (behind the player or in the bottom half). Never fire them as the race leader or when more than 20 m ahead of the player. Change sloth.flash's 'out of the top 3' to 'bottom 3'. Add a regression over 24 seeds × 3 tracks: no species takes more than 35 % of rival wins, and every species makes a podium at least once."
+  },
+  {
+   "severity": "minor",
+   "title": "Police chases happen mostly off-screen and almost never end in BUSTED",
+   "detail": "chase-stats.mjs covers the 11 natural chases recorded after sim's 16:05 retune. The corgi was in view (beside the player or less than 4.5 m behind) for 110 of 312 chase seconds (35 %). It trailed 8-30 m behind the chase camera for 123 s (39 %); in brawler s3 L3, one 44 s chase had only 6.6 s in view. On fresh seed 11 the corgi rode alongside for about 3.5 s, then sat 7-18 m behind for 12 s. pol-s11-trail.png shows only the POLICE banner. Only 1 of the 11 chases ended in BUSTED (after a wall crash next to the corgi). 4 of 18 recorded chases ended through police.ts giveUp(false) (LET_GO_HEAT): no toast and no sound, the banner just disappears. For long stretches the 'funny chase' (brief bar) is only a HUD state.",
+   "fix": "Resolve the unseen tail. After the corgi has trailed by more than 8 m for 5 s, give it one visible re-sprint into whistle range with a line, or let it give up with the escape toast. Cap a chase at about 25 s. Give the let-go its own toast and sound (e.g. '柯基警官：算了，下不为例'). Add a scenario: the corgi is in view at least 50 % of chase time over 6 natural chases."
+  },
+  {
+   "severity": "minor",
+   "title": "The unit's own regression suite is red again: 47/50 fresh (status reports 50/50)",
+   "detail": "A fresh run of `node tools/race-scenarios.mjs` (me/scenarios-default.txt) fails 3 checks. Two are 'full-speed player loses the corgi within 45 s' and 'corgi rides alongside ≥ 4 s, and the escape takes ≥ 15 s': on seed 11 the chase now ends through the silent let-go at about 30 s with the corgi 7-17 m behind, never 'lost'. The third is 'grudge: hot-tempered rivals land a hit back in ≥ 40 %' at 7/20, matching earlier r3 runs at 15:54 (10/28) and 17:03 (7/20). The 'FINAL 16:05 … 50/50' line in status/race.md coincides with sim's 16:05 changes (contacts/physics/state), and its grudge result has not reproduced since. Soak is green (me/soak.txt).",
+   "fix": "Re-run the full suite on the current tree. Re-tune the outrun case, for example by counting a calm escape after the corgi reached the player as 'lost' (see the previous issue). Fix the grudge (next issue). Record only the counts from the final run in the status file."
+  },
+  {
+   "severity": "minor",
+   "title": "Hot-tempered rivals still rarely hit back (r2 issue 5 only partly fixed)",
+   "detail": "In the fresh grudge scenario (L1 brawler, seeds 1-6), a goose, seagull, cat or shiba that the player hits lands a hit back within 5 s in 7/20 fights, and swings back in only 8/20. In the r3 brawler races the player took 6 hits (49-76 damage) per race at L1 while landing 21. In fight.ts, RETALIATE_WINDOW (2 s) starts at the hit. The knockback and the 5-10 % speed loss put the victim out of melee range (|ds| > 1.5) while the player rides on, so the window runs out. After that, melee() uses the normal aggression roll, and a failed roll still costs a full reaction period.",
+   "fix": "Start the payback window when the victim is back in reach, or make it 4 s. While grudging, allow a short catch-up in view: pace ×1.06 for up to 3 s, only to close an 8 m gap. Count a signature-skill hit (honk, spin, steal) as payback. Keep the 6 s calm start and the hit budget."
+  },
+  {
+   "severity": "minor",
+   "title": "The corgi rides straight through rivals",
+   "detail": "In police-chase.ts, ride() → blocker() only avoids `solid` obstacles (traffic) and ignores riders. The corgi's own obstacle is `solid: false`, so riders also pass through it. Recorded races with a chase show 0.1-1.6 s of corgi/rival overlap (|ds| < 1.7, |dx| < 0.75): auto city s3 1.6 s, auto mountain s3 1.5 s, brawler s5 1.2 s. pol-s1-overlap-cat.png (23.9 s) shows the corgi and 哈基米 merged into one body. Fresh seed 11 overlapped the capybara.",
+   "fix": "Let blocker() also consider racing riders (0.45 × 0.9 m) so the corgi brakes or passes on the free side. When choosing the alongside side, require at least 1.2 m clearance from other riders."
+  },
+  {
+   "severity": "minor",
+   "title": "PERFECT START is announced twice",
+   "detail": "ui-hud now has the 'launch' callout: ui/hud/cutins/layer.ts:206-214 shows a ransom-note 'PERFECT START! 起步完美'. flow.ts:52-53 still shows the fallback toast with the same text. launch-c.png (1.1 s after GO) shows both at once, on top of the GO splash, SLIPSTREAM and an achievement chip.",
+   "fix": "Delete the toast and its comment in flow.ts launch(), and close core request 1 and the related known issue in status/race.md."
+  },
+  {
+   "severity": "minor",
+   "title": "Finishers stop dead in the racing lanes just past the line, and later finishers run into them",
+   "detail": "For mode 'finished', brain.ts drive() brakes on a fixed ramp (brake = clamp((v-5)/10, 0.1, 0.8)) and returns before any follow logic. Finishers park 3-27 m past the line across the lanes (finish-4.txt: 6 riders at v=0 between +8 and +27 m; finish-s4-2.png shows the cluster under the arch). In passive s4 L3, the player's own roll-out drove into a goose parked 18 m past the line at 9.3 m/s (rider:bump 6.5 at 174.13 s), while the FINISH splash was on screen.",
+   "fix": "After the line, steer finished riders to the road edge (alternate sides by place) and let them coast at 6 m/s or more for about 60 m. Use the normal stopping-distance following for any rider ahead during the roll-out."
+  },
+  {
+   "severity": "minor",
+   "title": "cross-unit: draft slingshot still fires on a braking player",
+   "detail": "sim/contacts.ts slipstream() still has no brake gate. In me/draftbrake.mjs, a player braking fully behind a rival (throttle 0, brake 1) got rider:boost 'draft' at 20.2 s and sped up from 0.7 to 3.0 m/s. The effect is small now, but it still works against the BUSTED 'slow' rule.",
+   "fix": "sim: no slingshot while brake > 0.5 or below 8 m/s; reset draft while braking."
+  },
+  {
+   "severity": "minor",
+   "title": "cross-unit: the seagull's 'MINE!' is the line that repeats",
+   "detail": "Race-owned roster chatter has no repeats within 60 s. Combat's seagull.steal shout, however, fires on every steal (every 10-15 s), so 'MINE!' repeats 4-12 times within 60 s per race (me/chatter.mjs over six race logs; passive coast s8 L2 has 8).",
+   "fix": "combat: draw steal shouts from a no-repeat bag (MINE! / 我的了！/ 薯条归我！ …), or let race's 60 % skill lines stand in for it."
+  }
+ ]
+}

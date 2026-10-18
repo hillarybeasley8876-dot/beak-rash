@@ -2,7 +2,7 @@
 // Race unit scenario checks (deterministic manual stepping). Prints PASS/FAIL per check.
 //   node tools/race-scenarios.mjs [--only police,launch,finish,…] [--shots] [--stub world,sim,…] [--seeds 1,2]
 // Groups: basic (police, launch, finish, restart, timeout), fair (close, bikes, mugging, opening, flicker, pulses),
-// chase (arrive, outrun, koNoBust, selfBust), contact (grudge, stopped, brakecheck), chatter, order (penalty, tie), traffic (popin). close, bikes, mugging and
+// chase (visible, arrive, outrun, koNoBust, selfBust), contact (grudge, stopped, brakecheck), chatter, order (penalty, tie), traffic (popin). close, bikes, mugging and
 // arrive (full races) run only when named.
 import { parseArgs, withPage } from './lib.mjs';
 import { basicScenarios } from './race-scenarios/basic.mjs';

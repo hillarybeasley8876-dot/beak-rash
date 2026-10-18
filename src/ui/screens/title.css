@@ -1,6 +1,8 @@
-.br-title-artbox { position: absolute; left: 36%; top: 0; width: 64%; height: 100%; clip-path: polygon(13% 0, 100% 0, 100% 100%, 0 100%); background: var(--ink); animation: br-in-right 0.36s var(--ease-out) both; }
+/* Stage px: 1229 wide = up to the stage's right edge; 60 px over the top/bottom fill a 16:10 letterbox. */
+.br-title-artbox { position: absolute; left: 691px; top: -60px; width: 1229px; height: 1200px; clip-path: polygon(13% 0, 100% 0, 100% 100%, 0 100%); background: var(--ink); animation: br-in-right 0.36s var(--ease-out) both; }
 .br-title-artbox::after { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 14%; background: linear-gradient(90deg, var(--white) 0 18%, transparent 18%); clip-path: polygon(92% 0, 100% 0, 8% 100%, 0 100%); }
-.br-title-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 42% 50%; }
+/* The re-rolled key art centres the hero (beak hook at ~29 % x): a centred crop keeps all of him. */
+.br-title-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 50%; }
 
 .br-title-hero { position: absolute; left: 1010px; top: 150px; width: 860px; height: 860px; }
 .br-title-burst { position: absolute; inset: 40px; width: 780px; height: 780px; animation: br-spin 50s linear infinite; }
@@ -27,9 +29,11 @@
   text-shadow: 4px 4px 0 var(--ink);
 }
 
-.br-title-logo { position: absolute; left: 96px; top: 120px; rotate: -7deg; transform-origin: left center; }
+/* The EN line ends left of / above the hero's beak (H box ≤ x 840; the beak hook tops out near 850,480),
+   at 16:9 and 16:10 alike (the art sits in the stage). */
+.br-title-logo { position: absolute; left: 96px; top: 100px; rotate: -7deg; transform-origin: left center; }
 .br-title-cn { display: flex; font-size: 196px; }
-.br-title-en { display: flex; margin: 26px 0 0 70px; font-size: 128px; --delay: 220ms; }
+.br-title-en { display: flex; margin: 22px 0 0 24px; font-size: 104px; --delay: 220ms; }
 
 .br-title-sub {
   position: absolute;
@@ -44,9 +48,10 @@
 .br-title-prompt { display: block; font-family: var(--f-bebas); font-weight: 400; font-size: 50px; letter-spacing: 0.04em; color: var(--white); }
 .br-title-joke { display: block; margin-top: 2px; font-family: var(--f-cn-play); font-weight: 400; font-size: 44px; color: var(--red-hot); }
 
+/* Ends before the art panel's white diagonal border (x ≈ 720 at this height), pulse included. */
 .br-title-press {
   position: absolute;
-  left: 150px;
+  left: 104px;
   top: 880px;
   display: flex;
   align-items: baseline;
@@ -56,9 +61,13 @@
   color: var(--ink);
   transform: skewX(var(--skew)) rotate(-3deg);
   box-shadow: 10px 10px 0 var(--ink);
-  animation: br-pulse 1.1s ease-in-out infinite;
+  animation: br-pulse 1.1s ease-in-out infinite, br-title-press-shadow 1.1s ease-in-out infinite;
+}
+@keyframes br-title-press-shadow {
+  0%, 100% { box-shadow: 10px 10px 0 var(--ink); }
+  50% { box-shadow: 16px 16px 0 var(--ink); }
 }
 .br-title-press-cn { font-family: var(--f-cn-block); font-weight: 400; font-size: 58px; }
-.br-title-press-en { font-family: var(--f-display); font-weight: 400; font-size: 46px; letter-spacing: 0.08em; color: var(--red); }
+.br-title-press-en { font-family: var(--f-display); font-weight: 400; font-size: 46px; letter-spacing: 0.03em; color: var(--red); }
 .br-title-ver { position: absolute; right: 50px; bottom: 30px; padding: 4px 16px 2px; background: var(--ink); font-family: var(--f-cn-heavy); font-size: 22px; color: rgba(255, 255, 255, 0.8); transform: skewX(var(--skew)); }
 .br-scr-title.is-leaving .br-title-press { animation: br-blink 0.08s steps(1) 4; }

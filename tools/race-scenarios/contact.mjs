@@ -10,9 +10,13 @@ const HOT = new Set(['goose', 'seagull', 'cat', 'shiba']);   // grudge ≥ 0.6 (
 const fmt = (bumps, chars) => bumps.map((b) => `${chars[b.other]}:${b.k}`).join(' ') || '-';
 
 export const contactScenarios = {
-  /** A brawling player (level 1, 100 s, seeds 1–6): hot-tempered rivals it hits hit back, nobody in the first 6 s. */
+  /**
+   * A brawling player (level 1, 100 s, seeds 1–6): hot-tempered rivals it hits hit back, nobody in the first 6 s.
+   * Fights = hits from within 6 m (a torpedo from 30 m or the SHOWTIME shockwave cannot be answered within 5 s;
+   * those are listed as `ranged`, not checked).
+   */
   async grudge(page, h, { check, stub, a }) {
-    let hotN = 0, hotA = 0, hotL = 0, early = 0;
+    let hotN = 0, hotA = 0, hotL = 0, early = 0, ranged = 0;
     for (const seed of String(a.seeds ?? '1,2,3,4,5,6').split(',').map(Number)) {
       await openRace(h, `race=coast&seed=${seed}&level=1&manual=1&intro=0${stub}`);
       for (let i = 0; i < 10 && !(await h.eval('!!window.__rl.end')); i++) await h.eval(`window.__runHuman(300, ${DT}, 1000, 'brawler')`);
@@ -23,8 +27,11 @@ export const contactScenarios = {
       // crashes within 2 s (KO, ult, wall) cannot answer, so it is left out.
       const crashes = await events(h, 'rider:crash');
       const swings = await events(h, 'combat:swing');
-      const episodes = given.filter((g, i) => !given.slice(0, i).some((q) => q.p.victim === g.p.victim && g.time - q.time < 5)
+      const first = given.filter((g, i) => !given.slice(0, i).some((q) => q.p.victim === g.p.victim && g.time - q.time < 5)
         && !crashes.some((c) => c.p.riderId === g.p.victim && c.time >= g.time && c.time - g.time < 2));
+      const fight = (g) => g.ds !== null && Math.abs(g.ds) < 6 && g.p.skillId !== 'pelican.ult';
+      const episodes = first.filter(fight);
+      ranged += first.length - episodes.length;
       const within = (g, e, id) => id === g.p.victim && e.time > g.time && e.time - g.time < 5;
       const answered = episodes.filter((g) => taken.some((t) => within(g, t, t.p.attacker)) || swings.some((w) => within(g, w, w.p.riderId)));
       const chars = await h.eval(CHARS);
@@ -37,9 +44,8 @@ export const contactScenarios = {
       early += taken.filter((e) => e.time < 6).length;
       console.log(`  grudge seed ${seed}: given ${given.length} taken ${taken.length} · answered ${tag(answered) || '-'} · unanswered ${tag(episodes.filter((g) => !answered.includes(g))) || '-'}`);
     }
-    // Without grudges (personality.grudge = 0) hot rivals land a hit back in 7/29 fights; with them 14/26.
     check('grudge: hot-tempered rivals land a hit back in ≥ 40 % of fights within 5 s (all seeds)', hotN > 0 && hotL >= hotN * 0.4,
-      { landedBack: `${hotL}/${hotN}`, swungBack: `${hotA}/${hotN}` });
+      { landedBack: `${hotL}/${hotN}`, swungBack: `${hotA}/${hotN}`, rangedHitsLeftOut: ranged });
     check('grudge: nobody hits the brawler in the first 6 s', early === 0, { early });
   },
 

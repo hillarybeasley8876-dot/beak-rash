@@ -27,16 +27,22 @@
   --s: 1;
   position: absolute;
   inset: 0;
-  overflow: hidden;
+  /* clip, not hidden: a hidden box can still be scrolled by scrollIntoView / find-in-page, which shifted
+     whole screens off the viewport (seen after an automated click into a sliding button). */
+  overflow: clip;
   pointer-events: none;
   color: var(--white);
   font-family: var(--f-cn-heavy);
-  font-weight: 900;
+  /* Every face ships one weight (Noto Sans SC 900, the display faces 400). Never synthesise bold: a
+     400 request still picks Noto's 900 face, while QingKe / Anton stay crisp. */
+  font-weight: 400;
+  font-synthesis: none;
   -webkit-font-smoothing: antialiased;
   user-select: none;
   -webkit-user-select: none;
 }
 .br-ui *, .br-ui *::before, .br-ui *::after { box-sizing: border-box; }
+.br-ui b, .br-ui strong { font-weight: inherit; }
 
 .br-layer { position: absolute; inset: 0; }
 .br-hud-layer { z-index: 1; }
@@ -45,9 +51,9 @@
 .br-toasts { z-index: 6; pointer-events: none; }
 
 /* One screen = full-bleed background + a 1920×1080 stage scaled to fit (letterboxed by the bg). */
-.br-screen { position: absolute; inset: 0; pointer-events: auto; overflow: hidden; }
+.br-screen { position: absolute; inset: 0; pointer-events: auto; overflow: clip; }
 .br-screen.is-passive { pointer-events: none; }
-.br-bg { position: absolute; inset: 0; overflow: hidden; }
+.br-bg { position: absolute; inset: 0; overflow: clip; }
 .br-stage {
   position: absolute;
   left: 50%;

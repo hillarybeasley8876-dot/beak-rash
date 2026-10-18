@@ -1,5 +1,6 @@
-// Police chase scenarios (critic r1): a full-speed player outruns the corgi; a KO by a rival next to the
-// corgi is no BUSTED (a self-inflicted crash still is); alert reasons spawn / lost / busted.
+// Police chase scenarios (critic r1–r3): natural chases stay on screen and end visibly; a full-speed player
+// outruns the corgi; a KO by a rival next to the corgi is no BUSTED (a self-inflicted crash still is); alert
+// reasons spawn / lost / busted.
 import { events, openRace } from '../race-lib.mjs';
 
 const DT = 1 / 30;
@@ -24,7 +25,10 @@ const TRACE = `window.__policeTrace = (frames, dt, mode) => {
   for (let i = 0; i < frames && !window.__rl.end; i++) {
     tick(dt); br.step(1, dt);
     const c = br.race.police();
-    if (i % 3 === 0 && c && c.mode !== 'off') out.push({ t: +br.session().time.toFixed(2), m: c.mode[0], gap: c.gap });
+    if (i % 3 !== 0 || !c || c.mode === 'off') continue;
+    // ov: the corgi overlaps a rival's body (track-space contact box |ds| < 1.7, |dx| < 0.75).
+    const ov = br.session().riders.some((r) => !r.isPlayer && r.mode === 'racing' && Math.abs(r.s - c.s) < 1.7 && Math.abs(r.x - c.x) < 0.75);
+    out.push({ t: +br.session().time.toFixed(2), m: c.mode[0], gap: c.gap, ov });
   }
   return out.length;
 };`;
@@ -42,7 +46,47 @@ function chases(trace, alerts) {
   });
 }
 
+/** Chase anatomy: seconds in 'chase', seconds in view (corgi beside or ahead: gap < 4.5 m), how it ended. */
+function anatomy(trace, alerts) {
+  const spawns = alerts.filter((e) => e.p.reason === 'spawn').map((e) => e.time);
+  return spawns.map((t0, i) => {
+    const t1 = spawns[i + 1] ?? Infinity;
+    const rows = trace.filter((r) => r.t >= t0 && r.t < t1 && r.m === 'c');
+    const end = alerts.find((e) => e.time > t0 && e.time < t1 && e.p.level === 0) ?? null;
+    // Sim seconds between samples (slow-mo KO cinematics advance less per frame).
+    let dur = 0, vis = 0, ov = 0;
+    rows.forEach((r, k) => {
+      const dt = Math.min(0.2, (rows[k + 1]?.t ?? r.t + 0.1) - r.t);
+      dur += dt;
+      if (r.gap < 4.5 && r.gap > -25) vis += dt;
+      if (r.ov) ov += dt;
+    });
+    return { t0: +t0.toFixed(0), dur: +dur.toFixed(1), vis: +vis.toFixed(1), ov: +ov.toFixed(1), end: end ? end.p.reason ?? 'letgo' : 'open' };
+  });
+}
+
 export const chaseScenarios = {
+  /** Critic r3: natural chases (brawler L1–3) stay on screen ≥ 50 % of the time and always end visibly within ~26 s. */
+  async visible(page, h, { check, stub, a }) {
+    const runs = String(a.vruns ?? 'coast:1:1,coast:2:2,city:3:3,coast:4:3,mountain:5:2,coast:6:1').split(',').map((x) => x.split(':'));
+    const list = [];
+    for (const [track, seed, level] of runs) {
+      if (list.filter((c) => c.end !== 'open').length >= 8) break;
+      await openRace(h, `race=${track}&seed=${seed}&level=${level}&manual=1&intro=0${stub}`);
+      await h.eval(TRACE);
+      for (let i = 0; i < 12 && !(await h.eval('!!window.__rl.end')); i++) await h.eval(`window.__policeTrace(300, ${DT}, 'brawler')`);
+      list.push(...anatomy(await h.eval('window.__ptrace'), await events(h, 'police:alert')).map((c) => ({ ...c, run: `${track}${seed}` })));
+    }
+    const done = list.filter((c) => c.end !== 'open');
+    const dur = done.reduce((n, c) => n + c.dur, 0), vis = done.reduce((n, c) => n + c.vis, 0);
+    const info = { share: +(vis / Math.max(1, dur)).toFixed(2), chases: done.map((c) => `${c.run}@${c.t0}:${c.vis}/${c.dur}s:${c.end}`).join(' ') };
+    check('police: ≥ 6 natural chases, the corgi in view ≥ 50 % of chase time', done.length >= 6 && vis >= dur * 0.5, info);
+    check('police: every chase ends (lost / busted / let-go) within 26 s', done.every((c) => c.dur <= 26), info);
+    const ov = done.reduce((n, c) => n + c.ov, 0);
+    check('police: the corgi rides around rivals (≤ 0.3 s overlapping a rival per chase)', ov <= 0.3 * done.length, { overlapS: +ov.toFixed(1), perChase: done.map((c) => c.ov) });
+  },
+
+
   /** Critic r2: natural chases on boosting players (brawler / autopilot) arrive before any 'lost'. */
   async arrive(page, h, { check, stub, a }) {
     const runs = String(a.runs ?? 'brawler:1,brawler:2,brawler:3,auto:2').split(',').map((x) => x.split(':'));

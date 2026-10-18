@@ -3,7 +3,8 @@
 import { CanvasTexture, ClampToEdgeWrapping, LinearMipmapLinearFilter, RepeatWrapping, SRGBColorSpace, type WebGLRenderer } from 'three';
 import { Rng } from '../../../core/rng';
 
-function tex(renderer: WebGLRenderer, w: number, h: number, draw: (g: CanvasRenderingContext2D) => void): CanvasTexture {
+/** Mipmapped sRGB canvas texture drawn by `draw` (shared by the city's texture modules). */
+export function canvasTex(renderer: WebGLRenderer, w: number, h: number, draw: (g: CanvasRenderingContext2D) => void): CanvasTexture {
   const c = document.createElement('canvas');
   c.width = w;
   c.height = h;
@@ -25,7 +26,7 @@ export const PAVE_L = 4;
 /** Sidewalk: light kerb stone at the asphalt edge, gutter line, yellow tactile strip, square slabs. */
 export function pavingTexture(renderer: WebGLRenderer): CanvasTexture {
   const PX = 64; // px per metre
-  const t = tex(renderer, PAVE_W * PX, PAVE_L * PX, (g) => {
+  const t = canvasTex(renderer, PAVE_W * PX, PAVE_L * PX, (g) => {
     const rng = new Rng(0x9a7e);
     g.fillStyle = '#8d8b96';
     g.fillRect(0, 0, PAVE_W * PX, PAVE_L * PX);
@@ -53,7 +54,7 @@ export function pavingTexture(renderer: WebGLRenderer): CanvasTexture {
 
 /** Zebra: white bars along the road, 0.5 m wide every 1 m across (u = metres / 14 across 14 m). */
 export function zebraTexture(renderer: WebGLRenderer): CanvasTexture {
-  return tex(renderer, 448, 64, (g) => {
+  return canvasTex(renderer, 448, 64, (g) => {
     g.clearRect(0, 0, 448, 64);
     g.fillStyle = 'rgba(244,244,240,0.95)';
     for (let x = 0.25; x < 14; x += 1) g.fillRect(x * 32, 3, 16, 58);
@@ -64,7 +65,7 @@ export function zebraTexture(renderer: WebGLRenderer): CanvasTexture {
 export function scrambleTexture(renderer: WebGLRenderer, half: number, len: number): CanvasTexture {
   const PX = 16;
   const W = Math.round(half * 2 * PX), H = Math.round(len * PX);
-  return tex(renderer, W, H, (g) => {
+  return canvasTex(renderer, W, H, (g) => {
     g.clearRect(0, 0, W, H);
     const bars = (x0: number, y0: number, x1: number, y1: number, width: number): void => {
       const dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy);
@@ -88,12 +89,13 @@ export function scrambleTexture(renderer: WebGLRenderer, half: number, len: numb
 
 /** Soft lamp pool: radial falloff with a brighter core (white; tinted by vertex colour). */
 export function poolTexture(renderer: WebGLRenderer): CanvasTexture {
-  return tex(renderer, 128, 128, (g) => {
+  return canvasTex(renderer, 128, 128, (g) => {
+    // Hot core with a steep falloff: alpha = (1 - d²)³.
     const grd = g.createRadialGradient(64, 64, 0, 64, 64, 64);
-    grd.addColorStop(0, 'rgba(255,255,255,1)');
-    grd.addColorStop(0.35, 'rgba(255,255,255,0.7)');
-    grd.addColorStop(0.7, 'rgba(255,255,255,0.24)');
-    grd.addColorStop(1, 'rgba(255,255,255,0)');
+    for (let i = 0; i <= 8; i++) {
+      const d = i / 8;
+      grd.addColorStop(d, `rgba(255,255,255,${((1 - d * d) ** 3).toFixed(3)})`);
+    }
     g.fillStyle = grd;
     g.fillRect(0, 0, 128, 128);
   });

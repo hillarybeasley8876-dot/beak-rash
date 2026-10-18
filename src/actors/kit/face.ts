@@ -35,6 +35,10 @@ export interface EyeOpts {
   pupil: number;           // pupil radius
   pupilColor?: number;
   iris?: { r: number; color: number };
+  /** Dark ring around the iris so a pale eye on a pale head still reads (width in metres). */
+  ring?: { w: number; color: number };
+  /** Highlight size as a fraction of the pupil radius (default 0.36). */
+  glint?: number;
   sclera?: number;
   lid: number;             // lid colour
   /** Squash the sclera vertically (<1) or widen it (>1). */
@@ -66,11 +70,12 @@ export function addEyes(b: CharacterBuilder, J: Joints, o: EyeOpts): void {
     const d = vec(L ? o.dir : mirror(o.dir)).normalize();
     const eyeBone = L ? B.eyeL : B.eyeR;
     b.part({ geometry: sphere, matrix: placed(eye, d, [o.r, o.r * a, o.r]), color: o.sclera ?? 0xffffff, bone: B.head, outline: 0.55 });
+    if (o.iris && o.ring) capOn(b, eye, d, o.r, a, Math.asin(Math.min(0.97, (o.iris.r + o.ring.w) / o.r)), o.ring.color, eyeBone, 10, 1.01);
     if (o.iris) capOn(b, eye, d, o.r, a, Math.asin(Math.min(0.95, o.iris.r / o.r)), o.iris.color, eyeBone, 10, 1.015);
     capOn(b, eye, d, o.r, a, Math.asin(Math.min(0.9, o.pupil / o.r)), o.pupilColor ?? 0x101014, eyeBone, 10, 1.03);
     const hd = d.clone().applyAxisAngle(new Vector3(0, 1, 0).cross(d).normalize(), -0.32)
       .applyAxisAngle(new Vector3(0, 1, 0), side * 0.18).normalize();
-    capOn(b, eye, hd, o.r, a, Math.asin(Math.min(0.5, (o.pupil * 0.36) / o.r)), 0xffffff, eyeBone, 6, 1.045);
+    capOn(b, eye, hd, o.r, a, Math.asin(Math.min(0.5, (o.pupil * (o.glint ?? 0.36)) / o.r)), 0xffffff, eyeBone, 6, 1.045);
     // Upper lid: a cap slightly larger than the sclera, pole up; the rig hinges it about lidAxis.
     b.part({ geometry: lidGeo, matrix: new Matrix4().compose(eye, new Quaternion(), new Vector3(o.r * 1.1, o.r * 1.1 * a, o.r * 1.1)), color: o.lid, bone: L ? B.lidL : B.lidR, outline: 0.35 });
     if (o.brow) {

@@ -149,7 +149,7 @@ const respawnCam = {
   },
 };
 
-/** SHOWTIME (ult) hand-back: the first chase frame after the cinematic is already settled (eye height vs 0.6 s on). */
+/** SHOWTIME (ult) hand-back: chasePose settled on the first frame after the cinematic, the blend lands on it smoothly. */
 const ultHandback = {
   name: 'ultHandback',
   stub: '',
@@ -167,18 +167,45 @@ const ultHandback = {
       p.sp = 100;
       br.setControls({ throttle: 1 });
       br.step(20, 1 / 60);
-      const eyeY = () => ses.track.project(app.camera.position, p.s).y;
-      let cine = false, back = -1, y0 = 0, y1 = 0;
-      for (let i = 0; i < 420; i++) {
+      // What the player sees: the live chase pose (rig.chasePose) must already be settled on the first frame after
+      // the override, and the rendered eye must reach it by the end of the blend without whipping (<= 2 deg/frame).
+      const V = app.camera.position.constructor;
+      const Qn = app.camera.quaternion.constructor;
+      const cp = new V();
+      const cq = new Qn();
+      const prevQ = new Qn();
+      const hOf = (v) => ses.track.project(v, p.s).y;
+      let cine = false, back = -1, chaseY = 0, endY = null, maxRot = 0, rest = 0, cuts0 = 0;
+      for (let i = 0; i < 480; i++) {
         br.setControls({ throttle: 1, ult: i === 2 });
         br.step(1, 1 / 60);
-        if (app.rig.mode === 'cinematic') cine = true;
-        else if (cine && back < 0) { back = i; y0 = eyeY(); }
-        if (back >= 0 && i === back + 36) { y1 = eyeY(); break; }
+        const cam = br.sim.cam;
+        if (app.rig.mode === 'cinematic') {
+          cine = true;
+          cuts0 = cam.cuts;
+        } else if (cine && back < 0) {
+          back = i;
+          app.rig.chasePose(cp, cq);
+          chaseY = hOf(cp);
+        } else if (back >= 0) {
+          maxRot = Math.max(maxRot, (prevQ.angleTo(app.camera.quaternion) * 180) / Math.PI);
+        }
+        if (back >= 0 && endY === null && !cam.blending) endY = hOf(app.camera.position);
+        prevQ.copy(app.camera.quaternion);
+        if (back >= 0 && i === back + 40) {
+          rest = hOf(app.camera.position);
+          break;
+        }
       }
-      return { cine, back, y0, y1 };
+      const cut = back >= 0 && br.sim.cam.cuts > cuts0;
+      return { cine, back, chaseY, endY: endY ?? 0, rest, maxRot, cut };
     });
-    return { metrics: { cinematic: r.cine && r.back > 0, handbackEyeY: r3(r.y0), settledEyeY: r3(r.y1), handbackDy: r3(Math.abs(r.y0 - r.y1)) } };
+    return {
+      metrics: {
+        cinematic: r.cine && r.back > 0, handbackCut: r.cut, restEyeY: r3(r.rest),
+        chaseDy: r3(Math.abs(r.chaseY - r.rest)), blendEndDy: r3(Math.abs(r.endY - r.rest)), blendMaxRotDeg: r3(r.maxRot),
+      },
+    };
   },
 };
 

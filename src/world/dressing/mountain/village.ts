@@ -8,11 +8,12 @@ import { faceQuad } from '../../scenery/signs/boards';
 import type { Dress } from '../dress';
 import { lanternGantryFace } from './faces';
 
-/** A row of houses beyond the edge on `side` (u = setback range); a second row higher up when `rows` = 2. */
-export function houses(d: Dress, side: -1 | 1, s0: number, s1: number, u0 = 2.5, u1 = 5.5, rows = 2): void {
+/** Two rows of houses beyond the edge on `side`: the front row 2.5-5.5 m back, a one-floor row higher up behind it. */
+export function houses(d: Dress, side: -1 | 1, s0: number, s1: number): void {
+  const u0 = 2.5, u1 = 5.5;
   const { place, rng, b } = d;
   let n = 0;
-  for (let row = 0; row < rows; row++) {
+  for (let row = 0; row < 2; row++) {
     for (let s = s0 + rng.range(4, 9); s < s1 - 5; s += rng.range(11, 15)) {
       const u = row === 0 ? rng.range(u0, u1) : rng.range(u1 + 9, u1 + 16);
       const sp = place.spot(s, side, u);
@@ -24,7 +25,7 @@ export function houses(d: Dress, side: -1 | 1, s0: number, s1: number, u0 = 2.5,
       n++;
     }
   }
-  console.info(`[mountain] houses ${Math.round(s0)}-${Math.round(s1)} side ${side}: ${n}`);
+  d.ctx.log(`houses ${Math.round(s0)}-${Math.round(s1)} side ${side}: ${n}`);
 }
 
 /** Lantern strings across the road every `every` m (tall timber poles on both sides). */
@@ -34,9 +35,10 @@ export function lanternStrings(d: Dress, s0: number, s1: number, every: number):
     if (d.ctx.q.edgeKindAt(s, -1) === 'tunnel') continue;
     const l = place.spot(s, -1, 0.7), r = place.spot(s, 1, 0.7);
     const top = Math.max(d.field.edgeY(s, -1), d.field.edgeY(s, 1)) + 6.6;
+    // Both poles or none: a string never ends in mid-air.
+    if (!place.claim(l.pos.x, l.pos.z, 0.4) || !place.claim(r.pos.x, r.pos.z, 0.4)) continue;
     for (const p of [l, r]) {
       const base = Math.min(p.pos.y, d.field.edgeY(s, p.side));
-      if (!place.claim(p.pos.x, p.pos.z, 0.4)) continue;
       lanternPost(b.props.at(p.pos.x, p.pos.z), b.glow.at(p.pos.x, p.pos.z), p.pos.x, base, p.pos.z, p.faceRoad, rng, top - base);
     }
     const a = new Vector3(l.pos.x, top - 0.25, l.pos.z), c = new Vector3(r.pos.x, top - 0.25, r.pos.z);

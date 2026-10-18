@@ -138,3 +138,31 @@ export function bandShares(x: Float32Array, fs: number, bands: Array<[number, nu
     return s / total;
   });
 }
+
+/**
+ * EBU R128 / Tech 3342 loudness range (LU) of a buffer: short-term loudness (3 s windows, 1 s hop,
+ * K-weighted), absolute gate −70 LUFS, relative gate −20 LU, then the 10th → 95th percentile spread.
+ */
+export function lra(buf: AudioBuffer, skip = 0): number {
+  const fs = buf.sampleRate;
+  const [shelf, hp] = kWeights(fs);
+  const from = Math.floor(skip * fs);
+  const chans = Array.from({ length: buf.numberOfChannels }, (_, c) => biquad(biquad(buf.getChannelData(c).subarray(from), shelf), hp));
+  const win = 3 * fs;
+  const loud: number[] = [];
+  for (let i = 0; i + win <= (chans[0]?.length ?? 0); i += fs) {
+    let z = 0;
+    for (const ch of chans) {
+      let s = 0;
+      for (let j = i; j < i + win; j++) s += (ch[j] ?? 0) * (ch[j] ?? 0);
+      z += s / win;
+    }
+    loud.push(-0.691 + 10 * Math.log10(z || 1e-12));
+  }
+  const abs = loud.filter((l) => l > -70);
+  if (abs.length < 2) return 0;
+  const mean = 10 * Math.log10(abs.reduce((a, l) => a + Math.pow(10, l / 10), 0) / abs.length);
+  const gated = abs.filter((l) => l > mean - 20).sort((a, b) => a - b);
+  const at = (p: number): number => gated[Math.min(gated.length - 1, Math.floor(p * (gated.length - 1)))] ?? 0;
+  return +(at(0.95) - at(0.1)).toFixed(2);
+}

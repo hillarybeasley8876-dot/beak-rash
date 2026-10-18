@@ -27,8 +27,23 @@ export function statBar(label: string, value: number, max = 5): HTMLDivElement {
 
 export interface Meter { el: HTMLDivElement; set(v: number): void }
 
-/** 0..1 value as 10 skewed ticks (volume, shake). */
-export function meter(steps = 10): Meter {
+/** Mouse picking for a row of parts: press (or drag across) a part picks it; the click never bubbles
+ * to the row (whose own click cycles the value). */
+function pickable(el: HTMLElement, parts: HTMLElement[], onPick: (i: number) => void, drag: boolean): void {
+  el.classList.add('is-pickable');
+  parts.forEach((p, i) => {
+    p.addEventListener('pointerdown', (e) => {
+      if (e.button === 0) onPick(i);
+    });
+    if (drag) p.addEventListener('pointerenter', (e) => {
+      if (e.buttons === 1) onPick(i);
+    });
+  });
+  el.addEventListener('click', (e) => e.stopPropagation());
+}
+
+/** 0..1 value as 10 skewed ticks (volume, shake). `onPick(i)` makes ticks clickable / draggable. */
+export function meter(steps = 10, onPick?: (i: number) => void): Meter {
   const el = h('div', { class: 'br-meter' });
   const ticks: HTMLElement[] = [];
   for (let i = 0; i < steps; i++) {
@@ -36,6 +51,7 @@ export function meter(steps = 10): Meter {
     ticks.push(t);
     el.append(t);
   }
+  if (onPick) pickable(el, ticks, onPick, true);
   const num = h('b', { class: 'br-meter-num' });
   el.append(num);
   return {
@@ -50,11 +66,12 @@ export function meter(steps = 10): Meter {
 
 export interface Choice { el: HTMLDivElement; set(i: number): void }
 
-/** Row of option pills; exactly one lit. */
-export function choice(options: string[]): Choice {
+/** Row of option pills; exactly one lit. `onPick(i)` makes each pill clickable. */
+export function choice(options: string[], onPick?: (i: number) => void): Choice {
   const el = h('div', { class: 'br-choice' });
   const pills = options.map((o) => h('span', { class: 'br-pill', text: o }));
   el.append(...pills);
+  if (onPick) pickable(el, pills, onPick, false);
   return { el, set: (i) => pills.forEach((p, j) => p.classList.toggle('is-on', i === j)) };
 }
 
@@ -74,14 +91,17 @@ export const HINT_LR: Hint = { kb: '←→', pad: '✚', label: '切换' };
 export const HINT_OK: Hint = { kb: 'ENTER', pad: 'A', label: '确定', action: 'confirm' };
 export const HINT_BACK: Hint = { kb: 'ESC', pad: 'B', label: '返回', action: 'back' };
 
-/** Bottom hint strip; the shell toggles .is-pad on the root to show gamepad glyphs. */
+/** Keyboard + gamepad glyph pair; the shell toggles .is-pad on the root to show the right one. */
+export function keyGlyph(kb: string, pad: string): HTMLElement[] {
+  return [h('kbd', { class: 'br-key is-kb', text: kb }), h('kbd', { class: 'br-key is-pad', text: pad })];
+}
+
+/** Bottom hint strip. */
 export function hintBar(hints: Hint[]): HTMLDivElement {
   const el = h('div', { class: 'br-hints' });
   for (const hint of hints) {
     el.append(h('span', { class: `br-hint${hint.action ? ' is-click' : ''}`, data: hint.action ? { action: hint.action } : undefined },
-      h('kbd', { class: 'br-key is-kb', text: hint.kb }),
-      h('kbd', { class: 'br-key is-pad', text: hint.pad }),
-      h('span', { text: hint.label })));
+      ...keyGlyph(hint.kb, hint.pad), h('span', { text: hint.label })));
   }
   return el;
 }

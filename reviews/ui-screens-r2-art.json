@@ -1,0 +1,64 @@
+{
+  "unit": "ui-screens",
+  "round": 2,
+  "lens": "art",
+  "pass": true,
+  "score": 8.2,
+  "summary": "Re-review of round 1. All 4 r1 art majors are fixed. (1) Track and career cards now use in-engine stills with halftone; unfocused cards keep white bodies; locked events get a red tint, one chain tape per cup row and bronze/silver/gold tier tabs. (2) The garage bike hangs in the drawn repair stand with a dark pool and contact shadow instead of floating over the bench. (3) The faux-bold audit is clean: font-synthesis-weight none and 0 offending elements on 11 screens, and the CJK type is crisp at 1080p and 720p. (4) The shard wipe overlaps, has an ink fill and a red/ink/white palette with slashes, and reads on red and black screens. Most r1 minors are fixed too: centred title art with the beak hook in frame, P5 credits name cards, loading card measured on screen for 2.3 s, a P5 confirm modal, a toast lane, the pause sheet on an ink plate, the boot brush hero and consistent smug-bust podium cards with an inked stamp. The r1 interaction fixes pass tools/ui-input.mjs --real (modal Space/pad A/B, results mash, double-click, pill clicks, reduced motion, parked pointer, locked click). I saw 0 console errors across 5 sessions (menus, quick race to results, city/mountain pause, 16:10 and 720p spots), and every screen keeps idle motion. Title, menu, track select, pause, loading and results would sit comfortably next to a commercial P5-style game. What is left is small polish: the garage bike renders at 1x so spokes alias; the title prompt fades to a translucent smear; the logo sits on the hero's beak; 'QUICK RAC' is clipped; boot reads 'BEAKRASH'; the cursor is weak on locked career cards; CN widows; settings pills look like web toggles. No blocker or major. Evidence: shots/review/ui-screens/r2-art/sheets/*.jpg, a-/b-/c-/d-/e-* folders.",
+  "issues": [
+    {
+      "severity": "minor",
+      "title": "Garage showcase renders at 1x, so spokes break into dotted pixels and tyre edges stair-step",
+      "detail": "garage-turntable.ts fitPixels() sets pixelRatio = DPR x shown/1180. At 1920x1080 and DPR 1 the hero bike renders at exactly 1x, and at 1280x720 at 0.67x. The thin spokes break up into dotted grey static inside the wheels, and the white tyre edges and outlines show stair-steps. These crawl as the bike swings (shots/review/ui-screens/r2-art/sheets/s14-garage-zoom.jpg, a-1920x1080/12-garage-0.png, c-1280x720/garage.png). Secondary: the drawn stand's clamp is hidden behind the rear wheel, so the bike reads as perched on the post top at the rear hub, not clamped by the seatpost (crops/c1-garage0.png, c2-garage3.png).",
+      "fix": "Supersample the showcase: ratio = min(3, max(1.5, 2 x DPR x shown/1180)), which is cheap for one bike in a 1180x920 box. Or render into a 2x WebGLRenderTarget with samples: 4 and downscale. Add a small toon clamp-jaw mesh (or a drawn clamp sprite above the canvas) in front of the seatpost at the CLAMP point so the hang reads."
+    },
+    {
+      "severity": "minor",
+      "title": "br-pulse fades key prompts to 55 % opacity: the title's PRESS ANY KEY turns into a translucent pink smear",
+      "detail": "motion.css @keyframes br-pulse goes down to opacity .55. Every 1.1 s the title's white prompt pill turns pink-grey, the key art (the panel's white border stripe and a feather) shows through 'KEY', and 按任意键 goes muddy maroon (shots/review/ui-screens/r2-art/crops/c3-title-pill.png, a-1920x1080/03-title.png). The pill also runs about 60 px across the art panel's white diagonal border and breaks that clean edge. The career 出发 CTA uses the same pulse and is pale pink half the time (d-1920x1080/04-career-locked-focus.png).",
+      "fix": "Pulse with scale and shadow at full opacity (e.g. scale 1 to 1.04 and a red offset shadow growing 10 to 16 px), or a hard steps(2) blink between ink-on-white and white-on-red. Move the pill left (left ~110px) or tighten its letter-spacing so it ends before the art border at about x 700."
+    },
+    {
+      "severity": "minor",
+      "title": "Title logo covers the hero's beak (worse at 16:10)",
+      "detail": "The ransom BEAK RASH line (title.css .br-title-en, 128px, margin-left 70px) lands on the key art. At 1920x1080 the S and H boxes sit on the pelican's upper beak. At 1440x900, R-A-S-H cover the upper beak and pouch and the red hook only peeks out under the S (shots/review/ui-screens/r2-art/a-1920x1080/03-title.png, crops/u5-title-1610.png). The beak is the hero's defining feature (SPEC §5) and the game's joke.",
+      "fix": "Keep the logo and the beak apart at both aspects. Either lift and tighten the logo (top ~90px, EN line margin-left ~30px, ~112px) or shift the art box ~90 px right (or object-position ~58% 50%). Verify with the 1920x1080 and 1440x900 spot shots."
+    },
+    {
+      "severity": "minor",
+      "title": "Quick Race header ghost word is clipped to 'QUICK RAC'",
+      "detail": "screens.css .br-header-en starts at 196 + cn-n x 118 px. For 快速比赛 (4 glyphs) that is 668 px. 'QUICK RACE' in 112px Anton is about 560 px wide, but the band's clip ends near 1040 px, so the word is cut mid-letter at 1920x1080 and 1440x900 (shots/review/ui-screens/r2-art/a-1920x1080/09-tracks-1.png, crops/c5-qr-header.png, c-1440x900/trackSelect.png). CAREER, GARAGE, CONFIG, HOW TO and CREDITS fit. This is the r1 ghost-word slip again, now on the right edge.",
+      "fix": "Fit the ghost word to the remaining band width: pass --en-n from frame() and use font-size: min(112px, calc((1000px - left) / (var(--en-n) * 0.5))). Or widen the band per title (width: calc(300px + var(--cn-n)*118px + var(--en-n)*58px)). For this screen alone, ~88px fits."
+    },
+    {
+      "severity": "minor",
+      "title": "Boot splash: BEAK RASH reads as one word, 'BEAKRASH'",
+      "detail": "boot.css .br-boot-en uses Black Ops One 120px, letter-spacing .06em, an 8px red text-shadow and -9deg rotation. With the narrow stencil space and the shadow, the K's leg touches the R, so the game's first frame spells BEAKRASH (shots/review/ui-screens/r2-art/crops/u1-boot.png, d-1920x1080/02-boot-900.png, a-1920x1080/01-boot-a.png).",
+      "fix": "Add word-spacing: 0.4em to .br-boot-en (or use two spans with a 40-50 px gap), and make sure the K's shadow does not bridge the gap."
+    },
+    {
+      "severity": "minor",
+      "title": "Career: the focus cursor nearly disappears on locked events",
+      "detail": "A focused card gets only scale 1.07 and a 14px red offset shadow (.br-car-ev.is-focus). On locked events the chain tape (z-index 3) covers the middle of the card, so moving onto 霓虹夜城 or 落日山道 shows only a red sliver at the card's bottom-right corner. The detail panel is the only clear cue (shots/review/ui-screens/r2-art/a-1920x1080/07-career-locked.png, crops/u2-career-locked.png). The brief requires that focus is always visible.",
+      "fix": "Give the focused card a cursor above the tape: z-index 4, a 6px white + red jagged outline, and the menu's red triangle pointer at its left edge. Or lift the focused card above its tape segment with a torn gap."
+    },
+    {
+      "severity": "minor",
+      "title": "Settings value pills look like small web toggles",
+      "detail": "kit.css .br-pill sets 28px glyphs at 55 % white inside a 3px border at 25 % white, and only the selected value is a white box. On the dark rows, 低/中/高, 关/开 and 完整/简短/关闭 read as small form controls, and the unselected values are faint (about 19 px at 1280x720; shots/review/ui-screens/r2-art/crops/t5-settings-720.png, a-1920x1080/16-settings.png). Every other control in the kit is bolder.",
+      "fix": "Show the current value as a big skewed slab between the arrow buttons (36px QingKe, ink on white, 5px red offset shadow, slam on change), with the other options as small ghost ticks. At minimum, use 32px pills with unselected text at 80 % and the selected pill red with a white rim."
+    },
+    {
+      "severity": "minor",
+      "title": "Orphaned glyphs in wrapped Chinese copy",
+      "detail": "The garage buy modal leaves '了。' alone on line 2 ('…童年回来 / 了。'; shots/review/ui-screens/r2-art/a-1920x1080/15-garage-modal.png, crops/u3-modal.png). The settings INFO card splits 开大点 as '开 / 大点。' (a-1920x1080/16-settings.png). In big, slammed P5 type these widows look careless.",
+      "fix": "Add text-wrap: pretty to .br-modal-text and the INFO body. Also join the last 3-4 CJK characters with a nowrap span in the copy helper, or tune max-width per box."
+    },
+    {
+      "severity": "minor",
+      "title": "cross-unit: race toasts share a corner with ui-hud's rival mini cut-ins",
+      "detail": "During a race, the toasts that police.ts and flow.ts raise through app.ui.toast land at x 1400-1862, y 136-200 at 1080p, right under the HUD's KO/coins cluster (shots/review/ui-screens/r2-art/e-1920x1080/01-race-toasts.png, crops/v1-toasts.png). ui-hud shows rival skill mini cut-ins in the same corner (e.g. 'DOGE SHIELD' at about x 1640-1880, y 146-230 in b-1920x1080/21-mountain-speed.png), so a police warning and a rival skill can stack on top of each other.",
+      "fix": "Agree on a lane with ui-hud. While a race runs, move the toast lane below y~250 or to the left of the KO cluster, or have ui-hud expose a reserved rect that the toast lane avoids."
+    }
+  ]
+}

@@ -62,7 +62,7 @@ export function subscribeRide(ctx: FxContext): Array<() => void> {
     }),
     bus.on('rider:nearMiss', (e) => {
       const t = ctx.tracker.get(e.riderId);
-      if (t && isPlayer(e.riderId)) ctx.burst('streaks', t.pos, { dir: t.fwd, count: 10 });
+      if (t && isPlayer(e.riderId)) ctx.burst('streaks', t.pos, { dir: t.fwd, count: 6, color: '#b3b3b3' });
     }),
     bus.on('rider:offroad', (e) => {
       const t = ctx.tracker.get(e.riderId);

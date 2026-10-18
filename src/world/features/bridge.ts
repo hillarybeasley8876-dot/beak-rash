@@ -8,11 +8,17 @@ import type { PropBatch } from '../kit/batch';
 import { box, cylinder, trs } from '../kit/shapes';
 import type { TerrainField } from '../terrain/field';
 
-const COL = { deck: new Color('#d3d0c8'), under: new Color('#9e9b94'), stripe: new Color('#e5191c'), pier: new Color('#c9c5bb'), arch: new Color('#e3242b'), hanger: new Color('#2b2b31') };
+const COL = {
+  deck: new Color('#d3d0c8'), under: new Color('#9e9b94'), stripe: new Color('#e5191c'), pier: new Color('#c9c5bb'),
+  arch: new Color('#e3242b'), hanger: new Color('#2b2b31'),
+};
 const DECK_T = 1.5;
-const APEX = 19;
+/** Arch rib crown height above the deck (m); shared with dressings that decorate the arch (city). */
+export const APEX = 19;
 /** End pylons sit this far inside the bridge ends (m along the road). */
-const PYLON_AT = 0.6;
+export const PYLON_AT = 0.6;
+/** Arch rib cross-section: lateral width and vertical depth (m). */
+export const RIB_W = 0.8, RIB_D = 1.3;
 
 const A = new Vector3(), B = new Vector3(), C = new Vector3(), D = new Vector3(), N = new Vector3(), E = new Vector3();
 
@@ -92,7 +98,7 @@ function buildArches(ctx: WorldCtx, batch: PropBatch, field: TerrainField, f: Tr
   const q = ctx.q;
   // The ribs spring from the end pylons (see endPylons).
   const sA = f.s0 + PYLON_AT, sB = f.s1 - PYLON_AT, span = sB - sA;
-  const W = 0.8, Dp = 1.3, SEG = 28;
+  const W = RIB_W, Dp = RIB_D, SEG = 28;
   const xOf = (s: number, side: -1 | 1): number => side * (field.bound(s, side) + 1.0);
   const h = (t: number): number => 4 * APEX * t * (1 - t) + 1.2;
   const m = new Matrix4();

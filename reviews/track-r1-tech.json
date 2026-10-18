@@ -1,0 +1,79 @@
+{
+ "pass": false,
+ "score": 7,
+ "summary": "Track does not pass this round: score 7/10, with one major issue. The runtime engineering is strong. tsc reports 0 errors, there is no `any`, and the largest file is 231 lines. The Track contract is honoured: frameAt/bounds/surfaceAt clamp NaN, ±∞ and out-of-range s; project() round-trips exactly over 3000 drivable points even with hints off by 10–1000 m (0.74 µs per call); runoff is 250 m; frames are continuous across the finish. The rendered road sits exactly at toWorld(s,x,0): 0 mm error and 0 misses over 12k raycasts, including the banked shoulders. Visible walls match bounds() on 3184 of 3188 wall samples. Curbs match surfaceAt except at run ends (14 of 4400 samples). Water edges really drop: the beach runs straight into the sea and the quay falls 5 m to the harbour. The build is fully deterministic: geometry hash, features and API samples are identical for seeds 1/2/1 and in a fresh page, and only the billboard atlas follows the seed (by design). Disposal is clean across 4 back-to-back races and coast→city→mountain→coast: after quitting to the menu, track geometries/textures drop to 0/1, fog and __br.track are restored, and the JS heap stays flat. In a full autopilot race at 1920×1080 the environment costs ≤169 draw calls and ≤581k triangles including the shadow pass (the whole game peaks at 248/849k), the game runs at a steady 120 fps (p95 9.2 ms), track.update costs 0.035 ms per frame, and there are 0 console errors. The major issue: every race start or restart blocks the main thread for about 2 s in one long task, and 75 % of that time is a single O(r²) nearest-sample search, so the loading screen freezes. There are also eleven minor issues: tunnel lighting that depends on the shadow map (acne at high quality, fully sunlit at low), a missing visible wall at the tunnel cutting, posts and signs on or over the drivable edge, no cleanup when a build fails, static shadows under animated batches, quality=low barely lowering cost, duplicated algorithms, stale or dead code, log noise, and NaN handling. Evidence and scripts are in shots/review/track/r1-tech/.",
+ "issues": [
+  {
+   "severity": "major",
+   "title": "Track build freezes the main thread for ~2 s on every race start/restart (one O(r²) search is 75 % of it)",
+   "detail": "Measured with shots/review/track/r1-tech/loadstall.mjs: during __br.start() the longest task is 1946–2006 ms and the rAF gap is 1942–2000 ms, both with all units real and with the other units stubbed. A CPU profile of one build (profile.mjs, 2.2–2.7 s build) shows 1738 ms of self time in TerrainField.nearestSample (src/world/terrain/field.ts:125-144). far.ts:73-76 calls it once per far-grid vertex: 48,865 vertices on the 144×336-cell 16 m grid, including chunks that are later skipped as underwater. Each call is an expanding ring search over 32 m cells: 0.006 ms near the road, 0.040 ms at 1 km (fargrid.mjs). createTrack's few awaits resolve as microtasks when fonts and images are cached, so the whole build until buildFeatures runs as one task. Effects: the JS-driven loading bar and running-pelican icon (src/ui/screens/loading.ts update()) stand still for 2 s and then jump. The audio unit already had to add a 3 s 'loading' lookahead (src/audio/music/pump.ts) to survive the stall. This is ~120 dropped frames on every '再来一局' restart.",
+   "fix": "1) Replace the ring search with a kd-tree over the road samples (or a nearest-sample index grid at far-grid resolution built once with a two-pass chamfer/jump-flood distance transform). Share it with TrackQuery.project (see the duplication issue). Target: far-grid sampling under 80 ms. 2) Skip sampling vertices whose whole chunk ends up underwater, or sample with a cheap world-space test first. 3) Yield to the event loop between build stages (sky/road/near/far/sea/edges/features and each dressing pass) with `await new Promise((r) => setTimeout(r, 0))` so no task exceeds ~100 ms. 4) Optionally cache the seed-independent CPU results (far-grid heights, TerrainField) per track id for restarts; the geometry hash is identical across seeds."
+  },
+  {
+   "severity": "minor",
+   "title": "Tunnel interior lighting depends only on the sun shadow map: waffle acne on the vault (high), fully sunlit tunnel (low)",
+   "detail": "shots/review/track/r1-tech/tunnel-sheet.jpg (camera at s 1975 looking into the tunnel). At quality=high the right vault shows a regular checker/waffle shadow-acne pattern (tunnel-high-vault.jpg crop). It crawls as the camera moves (sun bias −0.0004 / normalBias 0.03 in env/lights.ts:28-29; the vault is a grazing receiver in the 'structures' batch). At quality=low there is no shadow map, and nothing else darkens the tunnel, so the asphalt, lines and cream walls inside are as bright as outdoors and the tunnel reads as an open underpass. The darkening is also limited to the ±46 m shadow frustum around the camera.",
+   "fix": "Bake the tunnel darkness so it doesn't depend on shadows. In road.ts/shoulders multiply vertex colours by ~0.45 where L.roof > 0 (ramped over the portal), and give the tube its own darker colours/material that does not receive shadows (receiveShadow=false on the tube cells, or a tunnel-only MeshToon with lower base colours and emissive lamp strips). That removes the acne and fixes quality=low."
+  },
+  {
+   "severity": "minor",
+   "title": "Invisible wall at the tunnel cutting, s ≈ 1898–1910 L: bounds say rock wall, the drawn rock face is 0.4–2 m farther out",
+   "detail": "Sideways raycasts from 0.5 m inside bounds() every 2 m at heights 0.1–1.1 m (edges.mjs, edges-out.json) find a visible wall at the bound on 3184 of 3188 wall samples. The exceptions are s 1900/1902 L (no geometry within 1.5 m beyond the bound) and 1904/1906 L (gaps of 0.69/0.42 m); the 6 m scan also gave a 1.25 m gap at 1904. Screenshot edge-1900L.png: the guard rail ends, then grass rises to a rock face set back from the edge, so riders bounce off nothing for ~8–10 m. Cause: layouts/coast.ts:142-147 ('cutting', sideEase 36). sides.ts switches the edge kind rail→rock at the blend midpoint, while the blended ground step/stepW is still about halfway (stepW ~4 m) and only becomes a vertical face later.",
+   "fix": "Make the visual and physics switch coincide. Either switch the edge kind to 'rock' only where the blended ground actually forms a wall at the bound (stepW ≤ 0.5 m; e.g. snap discrete fields at t = 1 when the late kind is 'rock'/'tunnel'), extend the rail run up to that point, or shorten sideEase on the cutting segment to ≤ 8 m. Then rerun edges.mjs."
+  },
+  {
+   "severity": "minor",
+   "title": "Solid-looking quay furniture sits on the 'water' drop line, and sign panels overhang the drivable shoulder",
+   "detail": "Quay (s 2700–3019 L, leftKind 'water'): mooring bollards (road/edges.ts 'quay', u = 0.22, r 0.16) start 0.06–0.07 m beyond the bound every 11 m. The promenade lamps placed with onRoad at u = 0.12 (dressing/coast/index.ts:76 → town.ts lamps) reach 1 cm inside the drivable area. A rider who leaves the quay falls into the harbour straight through these posts, which have no collision. Vertex scan of all scenery against bounds() (intrude2.mjs): the billboard panel at s 355 R overhangs the shoulder by 0.92 m at 2.5 m height, s 1603 R by 0.86 m at 2.4 m, the curves sign at s 930 R by 0.54 m at 2.2 m, and the 躺平车道 sign at s 2640 L by 0.38 m at 1.55 m (rider/chase-camera height), so riders and the camera clip through them when hugging the edge. All other intrusions are ≤ 8 cm.",
+   "fix": "Place quay furniture ≥ 0.5 m beyond the bound (on a widened coping) or leave gaps in the 'water' edge where posts stand. In signage.ts (mountY/billboards/roadSign) clamp each panel so its inner edge stays ≥ bounds + 0.3 m, or raise its lower edge to ≥ 3.0 m when it must overhang. Add the vertex scan to sandbox/track.test.mjs."
+  },
+  {
+   "severity": "minor",
+   "title": "No cleanup when a build stage throws: partial track leaks GPU resources and leaves scene fog/background replaced",
+   "detail": "createTrack (src/world/track.ts:28-51) has no try/catch. buildLights has already replaced app.scene.fog/background, and ctx.own() already holds GPU resources (the 1024² half-float heightmap render target, canvas textures, geometries) when buildFeatures, ensureFonts or the dressing throws. core/guard.ts then falls back to the world stub, but dispose() is never reachable for the half-built track, so those resources and the replaced fog/background stay alive for the rest of the session.",
+   "fix": "Wrap the build after createCtx in try/catch. On error run the same teardown as dispose() (restoreEnv, unpublish, dispose every owned resource, clear updaters), log `[track] build failed` with the cause, and rethrow so the guard can fall back to the stub."
+  },
+  {
+   "severity": "minor",
+   "title": "Animated crowd and boats cast static shadows (sway displacement missing from the shadow pass)",
+   "detail": "The 'crowd' (bob) and 'boats' (float) PropBatches cast shadows (dressing/dress.ts:44,46, castShadow defaults to true). Their motion is injected only into the colour material's vertex shader (scenery/sway.ts:29-37, onBeforeCompile). No customDepthMaterial is set, so three renders the shadow map with the default depth material: the crowd hops 16 cm while its shadow on the stands stays frozen.",
+   "fix": "Give sway meshes a patched MeshDepthMaterial as customDepthMaterial (reuse patch() with the same uSwayTime), or set castShadow: false for the crowd and boats batches."
+  },
+  {
+   "severity": "minor",
+   "title": "quality=low only turns shadows off: world cost barely drops",
+   "detail": "Quality is read only in env/lights.ts:16. perf.mjs at 1920×1080: env cost is 154 calls / 532k triangles at high and 117 / 387k at low, and the difference is just the shadow pass. Prop density, outline hulls, far-grid resolution, far forests and villages, and the fog-cull distance are identical. Low-end machines get the same 387k-triangle world plus all hull draws.",
+   "fix": "On 'low': no hulls for 'thin'/'far'/'boats' batches, a 32 m far-grid cell, skip farForest/hillVillages/islands detail, cull at fog.far × 0.7, and halve the sign-atlas size. Read ctx.quality in dress.ts/far.ts and document the scaling in status/track.md."
+  },
+  {
+   "severity": "minor",
+   "title": "Duplicated core algorithms (nearest-sample search, chord refinement, fog culling)",
+   "detail": "The spatial-hash ring search exists twice with different tuning: layout/query.ts:122-139 (24 m cells, 64 rings) and terrain/field.ts:125-144 (32 m cells, 200 rings). The chord refinement is copy-pasted (query.ts:142-152 vs field.ts:150-160). Fog-distance culling is implemented twice: lod.ts:17-24 (margin 40) and far.ts:162-169 (margin 60). This conflicts with the project rule to extract repeated logic, and the slow copy is the one behind the major issue.",
+   "fix": "Add one layout/sample-index.ts (kd-tree nearest sample + chord refine) used by TrackQuery.project and TerrainField.sampleWorld. Let far.ts register its chunks with installFogCull and a per-mesh margin (e.g. userData.cullMargin) instead of running its own loop."
+  },
+  {
+   "severity": "minor",
+   "title": "Stale comments and dead code from the wave-1 placeholder era",
+   "detail": "layouts/index.ts:1-2 and dressing/index.ts:1-2 say city/mountain 'reuse the coast layout/dressing until their own modules exist', and looks.ts:2 calls them placeholders. All three now have real layouts, dressings and looks. layouts/index.ts:12 `id === 'coast' ? COAST : { ...COAST, id }` has an unreachable fallback because every TrackId is handled above it. layout/build.ts exports sampleIndex(), which nothing uses. Several lines are 180–214 characters long (dressing/coast/town.ts, index.ts, layouts/coast.ts), which hurts review and diffs.",
+   "fix": "Return COAST directly (or use an exhaustive Record<TrackId, LayoutDef>), update the three header comments, delete sampleIndex, and wrap lines at ~140 characters."
+  },
+  {
+   "severity": "minor",
+   "title": "Every race build prints 4 console.info lines in production",
+   "detail": "Each build logs '[track] billboards: …', 'hill villages: …', 'coast dressing: N batched meshes' and 'coast built in N ms' (track.ts:52, dressing/coast/index.ts:97, signage.ts:73, hamlets.ts:53). That is debug output on every restart in the player's console.",
+   "fix": "Gate these behind a debug flag (app.params.has('debug') or a __br.track.stats object) and keep console.warn for real problems only."
+  },
+  {
+   "severity": "minor",
+   "title": "project() propagates NaN instead of validating its input",
+   "detail": "api.mjs: project({x: NaN, y: 0, z: 0}) returns {s: 0, x: NaN, y: NaN}. frameAt, bounds and surfaceAt clamp non-finite s correctly, but project() is the one boundary that hands NaN back to the caller (sim/camera/AI), where it spreads silently.",
+   "fix": "In TrackQuery.project, if p.x/p.z is not finite, warn once ('[track] project: non-finite point') and return {s: clampS(hintS ?? 0), x: 0, y: 0}. Cover it in sandbox/track.test.mjs."
+  },
+  {
+   "severity": "minor",
+   "title": "cross-unit: nobody emits flow:loading, so the loading bar is faked (and then frozen by the build)",
+   "detail": "src/ui/screens/loading.ts:89 listens for 'flow:loading' {progress, label}, but neither core/game.ts nor the track emits it. The bar creeps towards 92 % on a timer, freezes during the 2 s build task and then jumps.",
+   "fix": "Core request: pass an optional progress callback into createTrack (or let game.ts emit flow:loading). The track would report each stage (layout, terrain, edges, features, dressing) after it yields."
+  }
+ ]
+}

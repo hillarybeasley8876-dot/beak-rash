@@ -45,7 +45,10 @@ export interface Reward {
   coins: number;
   breakdown: Array<{ label: string; value: number }>;
   grade: Grade;
+  /** Beat an existing career best. */
   newBest: boolean;
+  /** First finish of this career event (no best yet). */
+  firstFinish: boolean;
   unlocked: CareerEvent | null;
   balanceBefore: number;
   balanceAfter: number;
@@ -73,12 +76,13 @@ export function applyRewards(save: SaveStore, config: RaceConfig | undefined, re
   const ev = careerEvent(config);
   const reward: Reward = {
     coins: me?.coins ?? 0, breakdown: me ? breakdown(me) : [], grade: me ? gradeFor(me, results.length) : { grade: 'D', title: '咸鱼' },
-    newBest: false, unlocked: null, balanceBefore: before, balanceAfter: before,
+    newBest: false, firstFinish: false, unlocked: null, balanceBefore: before, balanceAfter: before,
   };
   if (!me) return reward;
   const prevBest = ev ? bestPlace(save, ev) : null;
   const finished = me.time !== null;
-  reward.newBest = Boolean(ev && finished && (prevBest === null || me.place < prevBest));
+  reward.firstFinish = Boolean(ev && finished && prevBest === null);
+  reward.newBest = Boolean(ev && finished && prevBest !== null && me.place < prevBest);
   const next = ev && finished && me.place <= UNLOCK_PLACE ? CAREER[ev.index] ?? null : null;
   reward.unlocked = next && !isUnlocked(save, next) ? next : null;
   reward.balanceAfter = Math.max(0, before + reward.coins);
@@ -86,7 +90,7 @@ export function applyRewards(save: SaveStore, config: RaceConfig | undefined, re
   credited.set(results, reward);
   save.update((d) => {
     d.coins = reward.balanceAfter;
-    if (ev && reward.newBest) d.career.best[ev.key] = me.place;
+    if (ev && (reward.newBest || reward.firstFinish)) d.career.best[ev.key] = me.place;
     if (reward.unlocked) d.career.unlocked = Math.max(d.career.unlocked, reward.unlocked.index);
   });
   return reward;

@@ -125,3 +125,19 @@ export function mixWave(ctx: BaseAudioContext, mix: { saw?: number; square?: num
     return ctx.createPeriodicWave(real, imag, { disableNormalization: true });
   });
 }
+
+/**
+ * One wave with the long-term spectrum of a saw and a square played slightly detuned (each
+ * harmonic at the power sum of the two layers): one oscillator does the work of two.
+ */
+export function layerWave(ctx: BaseAudioContext, saw: number, square: number, harmonics = 256): PeriodicWave {
+  return cachedWave(ctx, `layer${saw}/${square}/${harmonics}`, () => {
+    const g = 1 / 1.179;
+    const real = new Float32Array(harmonics + 1);
+    const imag = new Float32Array(harmonics + 1);
+    for (let k = 1; k <= harmonics; k++) {
+      imag[k] = g * Math.hypot((saw * 2) / (Math.PI * k), k % 2 ? (square * 4) / (Math.PI * k) : 0);
+    }
+    return ctx.createPeriodicWave(real, imag, { disableNormalization: true });
+  });
+}

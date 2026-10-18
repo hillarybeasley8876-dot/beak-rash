@@ -17,11 +17,12 @@ const spec: BirdSpec = {
   beak: { base: [0, 0.905, -0.43], tip: [0, 0.88, -0.6], w: 0.044, h: 0.042, color: ORANGE, lower: 0xf07a00, nail: 0x1d1d22 },
   eye: {
     at: [-0.066, 0.94, -0.395], r: 0.043, dir: [-0.5, 0.08, -0.86], pupil: 0.02,
-    brow: { color: 0x1d1d22, len: 0.056, thick: 0.014, tilt: 0.65, lift: 0 },
+    brow: { color: 0x1d1d22, len: 0.062, thick: 0.017, tilt: 0.72, lift: 0 },
   },
   wing: {
     kind: 'fold', arm: [0.062, 0.055, 0.046], color: WHITE, feather: SHADE, edge: EDGE, chord: [0.05, 0.11, 0.07],
     trail: [-0.8, -0.5, 0.3], primaries: { n: 0, len: 0, w: 0, color: WHITE, tip: EDGE, tipFrac: 0 },
+    fan: { n: 5, len: 0.24, w: 0.05, color: WHITE, tip: SHADE, tipFrac: 0.45, droop: 0.2, spread: 0.32, seg: 2 },
     fist: { r: [0.048, 0.038, 0.054], color: WHITE, toes: 3, curl: true, toeR: 0.018, budget: 170 },
   },
   flank: {
@@ -38,7 +39,7 @@ const spec: BirdSpec = {
 };
 
 const J = birdJoints(spec, {
-  neck: [[0, 0.5, -0.25], [0, 0.66, -0.25], [0, 0.8, -0.27]], head: [0, 0.86, -0.29],
+  neck: [[0, 0.5, -0.25], [0, 0.66, -0.25], [0, 0.8, -0.27]], head: [0, 0.86, -0.29], brow: [-0.064, 0.974, -0.418],
   clav: [-0.08, 0.36, -0.19], shoulder: [-0.16, 0.36, -0.22], elbow: [-0.25, 0.27, -0.27], wrist: [-0.23, 0.15, -0.37],
   tail: [[0, 0.24, 0.2], [0, 0.28, 0.3]],
 });
@@ -53,6 +54,6 @@ export const goose: SpeciesDef = {
   },
   build(b) {
     buildBird(b, J, spec);
-    addBandana(b, [0, 0.985, -0.33], [0.088, 0.1, 0.104], 0x1d1d22, 0.3);
+    addBandana(b, [0, 1.0, -0.325], [0.076, 0.1, 0.09], 0x1d1d22, 0.12);
   },
 };

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // In-game contact sheet: start a race, teleport the player along the track, grab the real game
 // view (all units, HUD included) at each s, and tile the frames into one PNG.
-//   node sandbox/track.game.mjs --out shots/track/game-sheet.png [--s 60,400,…] [--q "&stub=fx"]
+//   node sandbox/track.game.mjs --out shots/track/game-sheet.png [--s 60,400,…] [--q "&stub=fx"] [--cols 4]
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseArgs, withPage } from '../tools/lib.mjs';
@@ -20,7 +20,7 @@ await withPage(async (page, h) => {
     shots.push((await page.screenshot()).toString('base64'));
   }
   const errors = await h.errors();
-  const cols = 4;
+  const cols = Number(a.cols ?? 4);
   const html = `<body style="margin:0;background:#111;display:grid;grid-template-columns:repeat(${cols},1fr);gap:2px">${shots
     .map((b64, i) => `<div style="position:relative"><img style="width:100%;display:block" src="data:image/png;base64,${b64}"><span style="position:absolute;left:4px;top:4px;background:#000;color:#fff;font:12px monospace;padding:1px 4px">s=${list[i]}</span></div>`)
     .join('')}</body>`;

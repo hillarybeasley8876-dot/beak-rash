@@ -21,7 +21,8 @@ void main() {
   // Azimuthal factor: 1 toward the sun, 0 opposite it.
   vec2 sa = normalize(uSunDir.xz + 1e-5), da = normalize(d.xz + 1e-5);
   float toward = dot(sa, da) * 0.5 + 0.5;
-  vec3 horizon = mix(uAnti, uGold, smoothstep(0.1, 0.9, toward));
+  // Wide gold band: the horizon glows across the sun's half of the sky.
+  vec3 horizon = mix(uAnti, uGold, smoothstep(0.05, 0.6, toward));
   vec3 col = mix(horizon, uPink, smoothstep(0.015, 0.16, h));
   col = mix(col, uHigh, smoothstep(0.12, 0.42, h));
   col = mix(col, uTop, smoothstep(0.38, 0.95, h));

@@ -1,5 +1,4 @@
-// Dressing registry: one module per environment. city / mountain (wave 2) reuse the coast dressing
-// on their placeholder look until their own modules exist.
+// Dressing registry: one module per environment (coast = track unit, city / mountain = env units).
 import type { TrackId } from '../../core/types';
 import type { WorldCtx } from '../ctx';
 import type { TerrainField } from '../terrain/field';

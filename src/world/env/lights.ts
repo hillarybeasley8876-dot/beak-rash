@@ -1,9 +1,30 @@
 // Sun (directional, shadow map following the camera with a small texel-snapped frustum), hemisphere
 // ambient, fog and background from the look. Restores the scene's fog/background on dispose.
+// While the camera is inside a tunnel both lights dim and sun shadows fade out (no sunlit rider
+// shadows on the tunnel road; riders darken, lamp pools flash over them).
 import { Color, DirectionalLight, Fog, HemisphereLight, PCFShadowMap, Vector3, type PerspectiveCamera } from 'three';
 import type { WorldCtx } from '../ctx';
 
 const SHADOW = { high: { size: 2048, half: 46 }, medium: { size: 1024, half: 36 } } as const;
+/** Receiver normal offset in shadow texels (acne on faces near-parallel to the sun) and depth bias. */
+const NORMAL_BIAS_TEXELS = 1.5;
+const DEPTH_BIAS = -0.0004;
+/** Light kept inside tunnels (day / night looks) and the dimming time constant (s). */
+const TUNNEL_KEEP = { day: 0.4, night: 0.7 } as const;
+const TUNNEL_TAU = 0.1;
+const LOW_FOG = 0.8;
+
+/** Fraction of light to keep for a camera at p: `keep` under a tunnel roof, else 1. */
+function tunnelLight(ctx: WorldCtx, keep: number): (p: Vector3) => number {
+  if (!ctx.L.roof.some((r) => r > 0)) return () => 1;
+  let hint = 0;
+  return (p) => {
+    const t = ctx.q.project(p, hint);
+    hint = t.s;
+    const roof = ctx.L.roof[ctx.q.sampleAt(t.s)] ?? 0;
+    return roof > 0 && t.y < roof - 1 && Math.abs(t.x) < ctx.L.halfWidth + 3 ? keep : 1;
+  };
+}
 
 export function buildLights(ctx: WorldCtx): () => void {
   const { look, app, quality } = ctx;
@@ -24,8 +45,8 @@ export function buildLights(ctx: WorldCtx): () => void {
     cam.right = cam.top = cfg.half;
     cam.near = 1;
     cam.far = 400;
-    sun.shadow.bias = -0.0004;
-    sun.shadow.normalBias = 0.03;
+    sun.shadow.bias = DEPTH_BIAS;
+    sun.shadow.normalBias = NORMAL_BIAS_TEXELS * (cfg.half * 2) / cfg.size;
     cam.updateProjectionMatrix();
   }
   // Light-space basis for texel snapping (shadow edges do not crawl as the camera moves).
@@ -34,7 +55,14 @@ export function buildLights(ctx: WorldCtx): () => void {
   ly.crossVectors(lz, lx).normalize();
   const focus = new Vector3(), fwd = new Vector3();
   const texel = cfg ? (cfg.half * 2) / cfg.size : 1;
-  ctx.onUpdate((_dtSim, _dtReal, camera: PerspectiveCamera) => {
+  const keep = look.grade.night ? TUNNEL_KEEP.night : TUNNEL_KEEP.day;
+  const lightAt = tunnelLight(ctx, keep);
+  let light = 1;
+  ctx.onUpdate((_dtSim, dtReal, camera: PerspectiveCamera) => {
+    light += (lightAt(camera.position) - light) * (1 - Math.exp(-Math.max(0, dtReal) / TUNNEL_TAU));
+    sun.intensity = look.sun.intensity * light;
+    hemi.intensity = look.ambient.intensity * (0.35 + 0.65 * light);
+    sun.shadow.intensity = Math.min(1, Math.max(0, (light - keep) / (1 - keep)));
     camera.getWorldDirection(fwd);
     fwd.y = 0;
     if (fwd.lengthSq() < 1e-6) fwd.set(0, 0, -1);
@@ -49,7 +77,9 @@ export function buildLights(ctx: WorldCtx): () => void {
   });
   // Fog + background.
   const prevFog = app.scene.fog, prevBg = app.scene.background;
-  const fog = new Fog(look.fog.color, look.fog.near, look.fog.far);
+  // quality=low pulls the fog in, and with it the fog-distance culling (world/lod.ts).
+  const fogK = quality === 'low' ? LOW_FOG : 1;
+  const fog = new Fog(look.fog.color, look.fog.near * fogK, look.fog.far * fogK);
   const bg = new Color(look.sky.horizon);
   app.scene.fog = fog;
   app.scene.background = bg;

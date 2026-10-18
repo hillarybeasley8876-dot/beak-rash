@@ -4,25 +4,28 @@
   position: absolute;
   left: -80px;
   top: 40px;
-  width: 1000px;
+  width: 1120px;
   height: 128px;
+  overflow: hidden;
   background: var(--ink);
   clip-path: polygon(0 10%, 100% 0, 95% 100%, 0 90%);
   rotate: -4deg;
   box-shadow: 0 0 0 4px var(--white);
 }
+/* Ghost English word: solid 13 % white, inside the band, after the ~118 px-wide Chinese ransom glyphs.
+   Long words shrink to the band width left after the glyphs (Anton ≈ 0.5 em per glyph; clip ≈ 1060 px). */
 .br-header-en {
+  --en-left: calc(196px + var(--cn-n, 2) * 118px);
   position: absolute;
-  left: 60px;
-  top: 6px;
+  left: var(--en-left);
+  top: 50%;
+  translate: 0 -46%;
   font-family: var(--f-display);
   font-weight: 400;
-  font-size: 168px;
+  font-size: min(112px, calc((1060px - var(--en-left)) / (var(--en-n, 6) * 0.5)));
   line-height: 1;
-  letter-spacing: 0.01em;
-  color: transparent;
-  -webkit-text-stroke: 3px rgba(255, 255, 255, 0.28);
-  rotate: -4deg;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.13);
   white-space: nowrap;
 }
 .br-header-cn { position: absolute; left: 86px; top: 58px; font-size: 92px; rotate: -4deg; }

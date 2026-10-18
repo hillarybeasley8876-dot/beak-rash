@@ -10,6 +10,7 @@ import type { Preset } from './kit';
 export const PRESETS: Readonly<Record<string, Preset>> = {
   hit: impacts.hit,
   hitHeavy: impacts.hitHeavy,
+  hitKo: impacts.hitKo,
   crit: impacts.crit,
   block: impacts.block,
   sparks: impacts.metalSparks,

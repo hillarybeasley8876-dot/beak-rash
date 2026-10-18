@@ -20,8 +20,10 @@ async function noAudio(mode, expect) {
     await h.sleep(300);
     const race = await page.evaluate(() => window.__br?.app.ui.screen ?? null);
     const errs = h.logs.filter((l) => l.startsWith('[error]') || l.startsWith('[pageerror]'));
-    expect(ready && menu === 'menu' && (race === 'race' || race === 'intro') && errs.length === 0,
-      `no WebAudio (${mode}): boots, key → ${menu}, race → ${race}, ${errs.length} page errors`);
+    // Without a constructor there is no rate to fall back from: only the real warning may appear.
+    const misleading = mode === 'undefined' ? h.logs.filter((l) => l.includes('32 kHz')).length : 0;
+    expect(ready && menu === 'menu' && (race === 'race' || race === 'intro') && errs.length === 0 && misleading === 0,
+      `no WebAudio (${mode}): boots, key → ${menu}, race → ${race}, ${errs.length} page errors, ${misleading} rate-fallback warnings`);
     if (errs.length) console.log(errs.slice(0, 4).join('\n'));
   });
 }

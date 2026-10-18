@@ -5,7 +5,7 @@
 //        [--stub world,actors,combat,race,fx,ui,audio] [--seed 1] [--browser webkit]
 // Scenarios: accel coastBrake steer keyboard slalom curveHold drift air wall bump press slipstream crash
 //            driftWall knock snake wallEvents slope wallPin driftTiming jitter camera handoff trafficCam
-//            respawnCam ultHandback pauseCam
+//            respawnCam ultHandback pauseCam driftRelease pressYaw lineHold draftBrake poses tightCam occlusion
 import path from 'node:path';
 import { parseArgs, withPage } from './lib.mjs';
 import { installFeel, installPatches, saveDataUrl, writeCsv, writeJson } from './feel-lib.mjs';
@@ -16,8 +16,9 @@ import { HANDOFF } from './feel-scenarios-blend.mjs';
 import { ABUSE } from './feel-scenarios-abuse.mjs';
 import { REVIEW2 } from './feel-scenarios-r2.mjs';
 import { CAMERA2 } from './feel-scenarios-cam2.mjs';
+import { REVIEW3 } from './feel-scenarios-r3.mjs';
 
-const SCENARIOS = [...HANDLING, ...WORLD, ...ABUSE, ...REVIEW2, ...CAMERA, ...HANDOFF, ...CAMERA2];
+const SCENARIOS = [...HANDLING, ...WORLD, ...ABUSE, ...REVIEW2, ...REVIEW3, ...CAMERA, ...HANDOFF, ...CAMERA2];
 
 const a = parseArgs(process.argv.slice(2));
 const OUT = a.out ?? 'shots/sim/telemetry';
@@ -64,7 +65,8 @@ const CHECKS = [
   ['handoff', 'back_cuts', 1, 1], ['handoff', 'back_maxRotDeg', 0, 8],
   ['handoff', 'side_cuts', 0, 0], ['handoff', 'side_maxRotDeg', 0, 8], ['handoff', 'side_rotPopRatio', 0, 3],
   ['handoff', 'side_minBlendDist', 1, 99], ['handoff', 'side_blendFrames', 12, 24],
-  ['handoff', 'ko_maxRotDeg', 0, 8], ['handoff', 'ko_rotPopRatio', 0, 3], ['handoff', 'wrecked_maxRotDeg', 0, 8],
+  ['handoff', 'side70_cuts', 1, 1], // camera review r3: blends never whip > 300 deg/s (5 deg/frame at 60 fps)
+  ['handoff', 'ko_maxRotDeg', 0, 5.2], ['handoff', 'ko_rotPopRatio', 0, 3], ['handoff', 'wrecked_maxRotDeg', 0, 8],
   ['handoff', 'wrecked_rotPopRatio', 0, 3], ['handoff', 'respawn_maxRotDeg', 0, 8], ['handoff', 'respawn_rotPopRatio', 0, 3],
   ['handoff', 'intro_maxRotDeg', 0, 8], ['handoff', 'intro_rotPopRatio', 0, 3],
   // camera review r2: a traffic crash never puts the eye inside the vehicle, the body is never hidden by it
@@ -77,9 +79,30 @@ const CHECKS = [
   ['respawnCam', 'traffic_respawned', true, true], ['respawnCam', 'water_respawned', true, true],
   ['respawnCam', 'traffic_onScreen', 0.9, 1], ['respawnCam', 'water_onScreen', 0.9, 1], ['respawnCam', 'slow_onScreen', 0.9, 1],
   ['respawnCam', 'traffic_maxRotDeg', 0, 8], ['respawnCam', 'water_maxRotDeg', 0, 8], ['respawnCam', 'slow_maxRotDeg', 0, 8],
-  ['ultHandback', 'cinematic', true, true], ['ultHandback', 'handbackDy', 0, 0.3],
+  ['ultHandback', 'cinematic', true, true], ['ultHandback', 'chaseDy', 0, 0.3], ['ultHandback', 'blendEndDy', 0, 0.1],
+  ['ultHandback', 'blendMaxRotDeg', 0, 2],
   ['pauseCam', 'buzz_rotDeg', 0, 0.01], ['pauseCam', 'shake_rotDeg', 0, 0.01], ['pauseCam', 'shake_move', 0, 0.001],
   ['pauseCam', 'kick_fov', 0, 0.01], ['pauseCam', 'kick_move', 0, 0.001], ['pauseCam', 'chasePoseErr', 0, 0.02],
+  // feel review r3: an L3 release mid-corner never wrecks; full lock holds the line (<= 2 m wide), full / half never
+  // point > 10 deg out of the bend; pressing into a rival = one bump per approach, headings ease (<= 300 deg/s)
+  ...[46, 60, 90].flatMap((R) => [
+    ['driftRelease', `R${R}_full_crashed`, false, false], ['driftRelease', `R${R}_half_crashed`, false, false],
+    ['driftRelease', `R${R}_neutral_crashed`, false, false], ['driftRelease', `R${R}_full_runWide`, 0, 2],
+    ['driftRelease', `R${R}_full_yawOutDeg`, 0, 10], ['driftRelease', `R${R}_half_yawOutDeg`, 0, 10],
+  ]),
+  ['press', 'sideBumps', 1, 1], ['pressYaw', 'bumps_60', 1, 1], ['pressYaw', 'bumps_144', 1, 1],
+  ['pressYaw', 'playerYawStepDeg_60', 0, 5.2], ['pressYaw', 'rivalYawStepDeg_60', 0, 5.2],
+  // (144 fps: <= 2.6 deg = 375 deg/s, the heading rate of a full-lock steering onset; the stub race AI steers the rival
+  // back to its lane in one frame after the bounce)
+  ['pressYaw', 'playerYawStepDeg_144', 0, 2.2], ['pressYaw', 'rivalYawStepDeg_144', 0, 2.6], ['pressYaw', 'hpLost_60', 0, 12],
+  ['draftBrake', 'draftBeforeBrake', 0.5, 1], ['draftBrake', 'draftWhileBraking', 0, 0],
+  ['draftBrake', 'slingshotWhileBraking', 0, 0], ['draftBrake', 'draftSlow', 0, 0],
+  ['poses', 'brakePitchDeg', -4, -2.5], ['poses', 'scrapeYawDeg', 3, 7], ['poses', 'scrapeLeanDeg', 6, 12],
+  ['poses', 'respawnMaxDv', 0, 0.5],
+  // camera review r3: chase distance is world metres (tight bends never zoom the hero), boosts never shrink it > 5 %
+  ['occlusion', 'gap18_fullHiddenRun', 0, 6], ['occlusion', 'gap18_minVisible', 2, 9], ['occlusion', 'gap25_minVisible', 5, 9],
+  ['occlusion', 'gap35_minVisible', 7, 9], ['occlusion', 'gap25_fullHiddenRun', 0, 0], ['occlusion', 'gap35_fullHiddenRun', 0, 0],
+  ['tightCam', 'L46in_distRatio', 0.92, 1.08], ['tightCam', 'L46out_distRatio', 0.92, 1.08], ['tightCam', 'releaseShrink', -1, 0.05],
 ];
 
 function report(results) {

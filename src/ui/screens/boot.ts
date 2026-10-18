@@ -1,6 +1,7 @@
-// boot: ~1 s P5 splash (red slash slams across black, stencil logo, brush 暴力鹈鹕) → title.
+// boot: ~1 s P5 splash. A red slash slams across black, a white star bursts behind the brush ransom
+// 暴力鹈鹕 (the hero, centred on the band), stencil BEAK RASH above, a halftone sweep → title.
 import './boot.css';
-import { backdrop, h, ransom, wait } from '../p5';
+import { backdrop, h, ransom, starSvg, svg, wait } from '../p5';
 import { frame, type ScreenFactory } from '../screen';
 
 const HOLD_MS = 1050;
@@ -13,9 +14,11 @@ export const bootScreen: ScreenFactory = () => {
   f.stage.append(
     h('div', { class: 'br-boot-slash' }),
     h('div', { class: 'br-boot-slash is-thin' }),
-    h('div', { class: 'br-boot-logo' },
-      h('div', { class: 'br-boot-en', text: 'BEAK RASH' }),
-      ransom('暴力鹈鹕', { seed: 'boot', slam: true, fonts: 'brush', styles: ['wb', 'wr', 'bw'], className: 'br-boot-cn' })),
+    h('div', { class: 'br-boot-sweep' }),
+    h('div', { class: 'br-boot-en', text: 'BEAK RASH' }),
+    h('div', { class: 'br-boot-cnwrap' },
+      svg(starSvg({ points: 16, inner: 0.72, wobble: 0.16, fill: '#ffffff', stroke: '#0b0b0f', strokeWidth: 5, seed: 'boot-burst' }), 'br-boot-burst'),
+      ransom('暴力鹈鹕', { seed: 'boot', slam: true, fonts: 'brush', styles: ['wb', 'wr', 'wb', 'wr'], className: 'br-boot-cn' })),
     h('div', { class: 'br-boot-credit', text: 'A PELICAN-POWERED PRODUCTION · 鹈鹕出品' }),
   );
   return { root: f.root, ready: wait(HOLD_MS) };

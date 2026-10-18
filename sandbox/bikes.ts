@@ -77,7 +77,7 @@ const ballMats: Record<string, MeshBasicMaterial> = {
 };
 
 function addBalls(b: BikeModel): void {
-  const m = b.markers as BikeModel['markers'] & { bell?: Object3D };
+  const m = b.markers;
   const list: Array<[Object3D | undefined, string]> = [
     [m.saddle, 'saddle'], [m.gripL, 'grip'], [m.gripR, 'grip'], [m.pedalL, 'pedal'], [m.pedalR, 'pedal'],
     [m.basket, 'extra'], [m.rack, 'extra'], [m.stoker, 'extra'], [m.bell, 'extra'],

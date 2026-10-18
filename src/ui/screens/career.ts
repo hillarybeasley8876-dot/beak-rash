@@ -4,12 +4,19 @@ import './career.css';
 import { TRACKS } from '../../data/tracks';
 import { CUPS } from '../copy';
 import { Nav } from '../nav';
-import { HINT_BACK, HINT_NAV, HINT_OK, backdrop, h, jagged, ransom, svg, torn, trackArtSvg } from '../p5';
+import { HINT_BACK, HINT_NAV, HINT_OK, backdrop, h, jagged, keyGlyph, ransom, torn } from '../p5';
 import { CAREER, UNLOCK_PLACE, bestPlace, isUnlocked, ordinal, type CareerEvent } from '../progress';
 import { frame, type ScreenFactory } from '../screen';
+import { trackArt } from '../track-stills';
 import { recall, remember } from './memory';
 
-const LOCK = '<svg viewBox="0 0 64 64"><rect x="12" y="28" width="40" height="30" rx="4" fill="#fff" stroke="#0b0b0f" stroke-width="5"/><path d="M20 28v-8a12 12 0 0 1 24 0v8" fill="none" stroke="#fff" stroke-width="7"/><circle cx="32" cy="42" r="5" fill="#0b0b0f"/></svg>';
+const TIER_STARS = ['★', '★★', '★★★'];
+
+/** One chain-tape sticker over the locked events of a cup row (grid columns 2–4 hold the events). */
+function chainTape(tier: number, firstLockedCol: number, allLocked: boolean): HTMLDivElement {
+  return h('div', { class: 'br-car-chain', style: `grid-row:${tier};grid-column:${firstLockedCol + 2} / 5` },
+    h('b', { text: '???' }), h('span', { text: allLocked ? '上一杯通关后开放' : `上一站前 ${UNLOCK_PLACE} 名解锁` }));
+}
 
 export const careerScreen: ScreenFactory = (ctx) => {
   const { save } = ctx.app;
@@ -25,24 +32,30 @@ export const careerScreen: ScreenFactory = (ctx) => {
     grid.append(h('div', { class: 'br-car-cup', vars: { '--t': cup.tier } },
       ransom(cup.cn, { seed: `cup${cup.tier}`, fonts: 'block', first: cup.tier === 3 ? 'wr' : 'bw' }),
       h('b', { text: cup.en }), h('p', { class: 'br-car-motto', text: cup.motto })));
-    for (const ev of CAREER.filter((e) => e.tier === cup.tier)) {
+    const events = CAREER.filter((e) => e.tier === cup.tier);
+    events.forEach((ev) => {
       const open = isUnlocked(save, ev);
       const best = bestPlace(save, ev);
-      const cell = h('div', { class: `br-car-ev${open ? '' : ' is-locked'}`, vars: { '--clip': jagged(`ev${ev.key}`, { jx: 2, jy: 4, notches: 1 }) } },
-        h('div', { class: 'br-car-art', vars: { '--clip': torn(`ea${ev.key}`, 'bottom', 8, 16) } }, svg(trackArtSvg(ev.trackId))),
+      const cell = h('div', { class: `br-car-ev is-t${ev.tier}${open ? '' : ' is-locked'}`, vars: { '--clip': jagged(`ev${ev.key}`, { jx: 2, jy: 4, notches: 1 }) } },
+        h('div', { class: 'br-car-art', vars: { '--clip': torn(`ea${ev.key}`, 'bottom', 8, 16) } }, trackArt(ev.trackId)),
+        h('span', { class: 'br-car-tier', text: TIER_STARS[ev.tier - 1] ?? '★' }),
         h('div', { class: 'br-car-name', text: TRACKS[ev.trackId].name }),
         best !== null ? h('span', { class: `br-car-best${best === 1 ? ' is-gold' : ''}`, text: `BEST ${ordinal(best)}` }) : h('span', { class: 'br-car-new', text: open ? 'NEW' : '' }),
-        open ? null : h('div', { class: 'br-car-lock' }, svg(LOCK), h('b', { text: 'LOCKED' })));
+        h('i', { class: 'br-car-cur' }),
+        h('b', { class: 'br-car-sticker', text: open ? 'GO!' : 'LOCKED' }));
       cells.push(cell);
       grid.append(cell);
-    }
+    });
+    const firstLocked = events.findIndex((ev) => !isUnlocked(save, ev));
+    if (firstLocked >= 0) grid.append(chainTape(cup.tier, firstLocked, firstLocked === 0));
   }
 
   const dName = h('div', { class: 'br-car-dname' });
   const dEn = h('div', { class: 'br-car-den' });
   const dRows = h('div', { class: 'br-car-drows' });
+  const go = h('div', { class: 'br-car-dgo', attrs: { role: 'button' } }, ...keyGlyph('ENTER', 'A'), h('span', { text: '出发！' }));
   const detail = h('div', { class: 'br-car-detail br-panel is-white', vars: { '--clip': jagged('cardetail', { jx: 2, jy: 3, notches: 2 }) } },
-    h('span', { class: 'br-tag is-red br-car-dtag', text: 'NEXT RACE' }), dName, dEn, dRows, h('div', { class: 'br-car-dgo', text: 'ENTER 出发！' }));
+    h('span', { class: 'br-tag is-red br-car-dtag', text: 'NEXT RACE' }), dName, dEn, dRows, go);
   f.stage.append(grid, detail);
 
   const show = (ev: CareerEvent): void => {
@@ -61,12 +74,14 @@ export const careerScreen: ScreenFactory = (ctx) => {
   const nav = ctx.nav(new Nav(CAREER.map((ev, i) => ({
     el: cells[i]!,
     disabled: () => !isUnlocked(save, ev),
+    onDenied: () => ctx.toast('先在上一站拿到前三名', 'warn'),
     confirm: () => ctx.app.bus.emit('flow:startRace', { config: { trackId: ev.trackId, mode: 'career', level: ev.tier } }),
     onFocus: () => {
       remember('career', i);
       show(ev);
     },
   })), { layout: 'grid', columns: 3, start: recall('career', Math.max(0, save.data.career.unlocked - 1)), sfx: ctx.sfx }));
+  go.addEventListener('click', () => nav.pointerActivate());
   return {
     root: f.root,
     onAction: (a) => {
@@ -75,7 +90,6 @@ export const careerScreen: ScreenFactory = (ctx) => {
         ctx.go('menu');
         return true;
       }
-      if (a === 'confirm' && nav.current?.disabled?.()) ctx.toast('先在上一站拿到前三名', 'warn');
       return nav.handle(a);
     },
   };

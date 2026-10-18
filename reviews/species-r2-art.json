@@ -1,0 +1,80 @@
+{
+  "unit": "species",
+  "round": 2,
+  "lens": "art",
+  "pass": false,
+  "score": 7,
+  "summary": "Big step up from r1 (5/10). Riders now shade smoothly, with soft band edges and a visible cool rim. Helmets are clean domes with rim, visor and vents. Signature poses read: honk, OIIA spin, doge paw + glint, sloth sprint, corgi stop-paw + whistle, penguin belly slide, ghost fade, and a pelican gulp that balloons pink lobes visible from the chase cam. Held weapons show from behind. Penguin and corgi have toy pedal extenders, cat and shiba arms bend, and capybara (nose pad, zen lids, yuzu helmet) and corgi are genuinely charming. Tris: 5.9-9.0k per rider. No console errors in the sandbox or in coast/city/mountain races. tsc is clean. One r1 major is still only half fixed: from the chase camera the hero pelican is a white egg with a red cap. Beak and pouch only show when a rival is within 7 m and triggers a glance, or during Big Gulp. The hero is also the roughest asset in close-up (blotchy faceted beak, straight neck, stork side silhouette). Several details are off-portrait or misread: the seagull's fry looks like a cigarette, the shiba's shades look like a moustache, the sloth's shag looks like camo plus a feather wing. Carried over from r1: the flat white swing smear and the pigeon's two-stripe neck. Evidence: shots/review/species/r2-art/*.jpg (lineA, lineB, faces, pel, cu, skills, detail, detail2, coast-crops, coast-c, coast-native, citymtn, introko, cine, portraits-s).",
+  "r1_followup": {
+    "fixed": ["faceted shading on rivals (soft bands + rim)", "gulp invisible from the chase cam", "doge/flash/chill/ghost/wing poses", "lumpy beret helmets (except the pelican's flat shell)", "penguin stilt legs, cat/shiba sleeve arms, corgi paddling feet", "capybara nose, goose bandana knot, pelican wing paint and brows", "cross-unit rim light (riderMaterial)", "held weapons visible from the chase cam", "outline wedges at concave joints (not seen in r2 close-ups)"],
+    "not_fixed": ["hero beak/pouch invisible from the chase cam at rest (major)", "residual faceting on the pelican beak/neck/pouch", "pelican S-neck / stork side silhouette", "swing smear still a flat white wedge", "pigeon neck two hard bands", "sloth shag (changed, now reads as camo + feather wing)", "seagull fry (thicker and moved, now reads as a cigarette)"]
+  },
+  "issues": [
+    {
+      "severity": "major",
+      "title": "Hero pelican still shows neither beak nor pouch from the chase cam at rest (r1 major only half fixed)",
+      "detail": "Only Big Gulp now reads from behind (coast-native.jpg 'gulp hero'). The rest of the time the hero is a white egg with a red cap, black wing tips and orange legs: coast-native.jpg 'b hero', cine.jpg top, all four citymtn.jpg crops, lineA.jpg 'pelican-back', pel.jpg 'ride chase'. Cause, species/pelican.ts: the resting pouch ellipsoid (c [0, 0.648, -0.742], r [0.12, 0.066, 0.185]) sits entirely in front of the ~0.29 m head (headScale 1.12), so the head hides it from behind. view.ts chooseLook() only glances when a rival is within 7 m, so when the field spreads out (most of the race after the start) the head never turns. The beak showed only once, in coast-c.jpg, while glancing at the shiba in a pack. The brief's chase-view silhouette list starts with 'pelican beak + pouch', and the title character's signature feature should read from the camera the player sees 100 % of the race.",
+      "fix": "Make the resting pouch a sagging sack that hangs from the jaw to the upper chest just ahead of the neck (z about -0.45 to -0.6), at least 0.32 m wide at the bottom, so pink-orange crescents show on both sides of the neck/head from behind. Add solo glances when nobody is within 7 m (every 4-7 s, 0.5-0.8 s, 30-40 deg yaw, toward billboards/sea) and a small cadence-synced head sway, so the beak tip regularly clears the head outline. Verify in-game from the chase cam (4.3-5.1 m back, 1.9-2.2 m up) on a straight with no rivals near."
+    },
+    {
+      "severity": "minor",
+      "title": "Residual faceting and blotchy paint concentrated on the hero's beak, neck and gulp pouch",
+      "detail": "Rivals now look smooth (capybara, cat, shiba, corgi in cu.jpg/faces.jpg), but the pelican, the asset seen most, does not. Front view: irregular dark-orange polygon patches across the whole beak, like crumpled clay (pel.jpg 'ride front', cu.jpg 'pelican front'). The neck silhouette and shadow terminator are stair-stepped at 1.3-2 m (cu.jpg 'pelican 34b', detail2.jpg 'pelican head side'). The inflated gulp balloon carries a large irregular orange stain where the lower-mandible paint bleeds over POUCH (pel.jpg 'gulp 34', skills.jpg 'pelican.gulp 34'). Status: the beak was trimmed to a 300-tri budget to keep the pelican at 8998 tris. This is visible in the intro flyover, the wrecked side cam and every gulp seen from the side; SPEC section 5 says no visible faceting on characters.",
+      "fix": "Give the beak/pouch at least 900 tris, taken from the tuft, fan blades and feet. Build the upper mandible as a parametric smooth spoon outside the SDF budget (like kit/helmet.ts). Run 3-4 smoothing iterations of smooth-normals on the head/neck chunk. Assign the lower-mandible paint by region/bone so it can never spill onto the pouch balloon."
+    },
+    {
+      "severity": "minor",
+      "title": "Pelican side silhouette still reads as a stork/heron, not the portrait's S-necked pelican",
+      "detail": "J.neck z goes -0.38 -> -0.355 -> -0.38, a 2.5 cm wiggle over a 20 cm neck, and the chest capsule leans forward, so the neck reads as one straight diagonal. Body and head stay low and long. Compare lineA.jpg 'pelican-side'/'pelican-34' and pel.jpg 'ride side' with portraits-s.jpg: the portrait pelican is upright and compact, with a pronounced S-neck and a big pink sack.",
+      "fix": "Move neck[1] back 6-8 cm and neck[2]/head forward about 5 cm so the S is real, and raise the head 4-5 cm. Tilt the pelvis/spine ellipsoids another ~10 deg upright and pull the rear body/tail in about 5 cm. Re-check grips and IK."
+    },
+    {
+      "severity": "minor",
+      "title": "Seagull's fry reads as a cigarette",
+      "detail": "kit/props.ts addFry: a thin 1.4 cm box in near-white 0xfff1cf with a tan 0xc98a2e band on the last 20 %, sticking out of the beak corner at an angle. Paper-white with a tan tip is exactly the cigarette look (lineB.jpg seagull front/34/back, detail2.jpg 'seagull front'). That association is unwanted in a family-friendly meme game. The portrait shows golden fries, plus a fistful in the wing.",
+      "fix": "Make it golden-yellow (about #F2C14E), chunky and square (1.8-2 cm), slightly bent, with soft darker-gold ends rather than one tan band. Optionally fan 2-3 fries and add a small red fry carton tucked under the wing, matching seagull_main.png."
+    },
+    {
+      "severity": "minor",
+      "title": "Shiba off-portrait: shades read as a black moustache, coat is cat-orange",
+      "detail": "The 'slid-down' pixel shades sit on the muzzle below the eyes, and the nose pokes through the bridge, so from the front they read as a moustache (detail2.jpg 'shiba front'). In 3/4 they float in front of the snout (lineA.jpg shiba-34). shiba_main.png has the shades over the eyes and a pale tan/cream doge coat. The 3D coat is saturated orange, close to the cat and the corgi (three orange riders in coast-c.jpg).",
+      "fix": "Seat the shades on the eye line with a slight tilt, with the side-eye peeking over the top edge. If they stay slid-down, put the bridge above the nose. Shift the coat toward tan (about #D9A35F) with cream cheeks/chest so it matches the portrait and separates from the cat's orange."
+    },
+    {
+      "severity": "minor",
+      "title": "Sloth shag reads as camouflage blotches plus a feather wing on the shoulder",
+      "detail": "species/sloth.ts shag(): SHAG 0xa89b7c bumps are lighter discs on FUR 0x8c8068, which read as camo spots. The pointed lock capsules bunch at the shoulder into a shape like a folded bird wing (cu.jpg 'sloth r34b', detail.jpg 'sloth back', lineB.jpg sloth-34). The portrait has long, evenly shaggy strands.",
+      "fix": "Paint the bumps in FUR and lighten only the lock tips. Spread 12-16 longer, thinner locks evenly over back, arms and crown, pointing down-back with a ragged silhouette edge, and keep them off the shoulder line."
+    },
+    {
+      "severity": "minor",
+      "title": "Weapon swing smear is still a flat translucent white wedge (unchanged since r1)",
+      "detail": "local-fx.ts SwingSmear is a 2-row white MeshBasic ribbon (alpha 0.15 -> 0.8) with no core, edge or taper. At the heavy-swing apex it reads as a grey flashlight beam beside the pan (detail.jpg 'pan heavy strike'). It still lacks the P5 ink look asked for in r1.",
+      "fix": "Use 3 rows (outer ink edge, white core, inner fade), with a thin black or red border on the leading edge and a tapered tail. Sample the tip every substep so the arc curves. Lifetime 80-120 ms."
+    },
+    {
+      "severity": "minor",
+      "title": "Extended wings are flat stiff planks (wing dash, seagull steal)",
+      "detail": "Seen from behind, the outstretched wings are straight horizontal boards with small fans only at the tips: skills.jpg 'pelican.wing back', 'seagull.steal back'; pel.jpg 'wing chase'. They read as airplane wings or a surfboard, not feathered wings.",
+      "fix": "Droop the wing 10-20 deg at the wrist, add slight dihedral, splay primaries and secondaries along the whole trailing edge (not just the tip), and keep a slow flap. For seagull steal, curl the grabbing wing-hand forward."
+    },
+    {
+      "severity": "minor",
+      "title": "Pigeon neck iridescence is still two hard stripes (reads as a scarf)",
+      "detail": "species/pigeon.ts paints the neck with crisp green (0x3fbf8f) and purple ellipsoid bands (detail.jpg 'pigeon neck', lineB.jpg pigeon front/34). Status lists it as known and not done.",
+      "fix": "Blend the bands over 2-3 cm and add a fresnel hue shift from green to purple on that region in riderMaterial (driven by a vertex weight)."
+    },
+    {
+      "severity": "minor",
+      "title": "Helmet decals read as tiger/claw stripes; pelican shell looks like a beret and its tuft pierces it",
+      "detail": "Vent decals are tapered black spikes, so every helmet looks tiger-striped. The capybara's yuzu helmet reads as a tiger-striped beanie, which kills the yuzu idea (faces.jpg, detail2.jpg seagull/shiba/sloth front, cu.jpg capybara). The pelican's flat aero shell sits like a red beret from the side, and the white tuft spikes straight through its top (pel.jpg 'ride side', 'ride front').",
+      "fix": "Draw the vents as constant-width rounded-end slots in the liner colour, 4-6 per helmet. Give the capybara a dimpled yuzu-peel shell with the leaf and no vents. Raise and dome the pelican shell 1.5-2 cm, and route the tuft out through a vent slot."
+    },
+    {
+      "severity": "minor",
+      "title": "Capybara chill has no steam; pigeon ghost shows its insides",
+      "detail": "The brief asks for chill as eyes closed plus steam. The paws-behind-head pose reads, but no steam is emitted (skills.jpg 'capybara.chill'; no steam in rig/ or local-fx.ts). The pigeon ghost's transparent clones (fade.ts: transparent, depthWrite=false) show every overlapping limb and bike tube through the body, an x-ray tangle rather than a clean wisp (skills.jpg 'pigeon.ghost 34').",
+      "fix": "Chill: 3-5 soft steam-puff sprites rising from the head over the 4 s (local-fx). Ghost: render a depth pre-pass (colorWrite false, depthWrite true) before the transparent pass so only the front surface blends, and add a cyan fresnel edge."
+    }
+  ]
+}

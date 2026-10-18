@@ -147,7 +147,9 @@ export class Conductor {
     return t;
   }
 
+  /** The stinger / count-in band (stingers and count steps last ≤ 4 s: the reverb stays on that long). */
   private band(): Band {
+    this.engine.keepReverb(this.engine.now + 4);
     if (!this.stingBand) {
       this.stingBand = new Band(this.engine, 120, { lead: 1.1, brass: 1.3 }, this.engine.stingIn);
       this.stingBand.fade(1, 0.01, this.engine.now);
@@ -158,8 +160,10 @@ export class Conductor {
   /** Schedule music up to `until` (audio clock) and drop finished crossfades. */
   schedule(until: number): void {
     this.stingBand?.tick(this.engine.now);
+    if (this.current || this.fading.length) this.engine.keepReverb(until);
     this.current?.schedule(until);
     for (const p of this.fading) p.schedule(until);
     if (this.fading.length) this.fading = this.fading.filter((p) => !p.stopped);
+    this.engine.tick();
   }
 }

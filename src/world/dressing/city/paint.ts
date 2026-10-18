@@ -1,6 +1,6 @@
 // City road paint: paved sidewalks with kerb stones and tactile strips over the drivable shoulders,
 // zebra crossings, the scramble-crossing plaza and additive lamp pools on the wet asphalt.
-import { AdditiveBlending, Color, DoubleSide, Mesh, MeshBasicMaterial, MeshToonMaterial, Vector3 } from 'three';
+import { AdditiveBlending, Color, DoubleSide, Mesh, MeshBasicMaterial, MeshToonMaterial, Vector3, type MeshBasicMaterialParameters } from 'three';
 import { toonRamp } from '../../../render/toon';
 import type { TrackFrame } from '../../../core/types';
 import type { WorldCtx } from '../../ctx';
@@ -37,9 +37,11 @@ export function sidewalks(ctx: WorldCtx): void {
   }
 }
 
+/** Road paint: toon-lit plus a faint self-glow (retro-reflective) so stripes read near-white at night. */
 function paintMat(ctx: WorldCtx, map: ReturnType<typeof zebraTexture>): MeshToonMaterial {
   return ctx.own(new MeshToonMaterial({
-    map, gradientMap: toonRamp(), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, side: DoubleSide,
+    map, gradientMap: toonRamp(), emissive: 0xffffff, emissiveMap: map, emissiveIntensity: 0.45,
+    transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, side: DoubleSide,
   }));
 }
 
@@ -55,6 +57,16 @@ export function scramble(ctx: WorldCtx, s: number, len: number): void {
   const half = Math.max(ctx.q.bounds(s).left, ctx.q.bounds(s).right);
   const mat = paintMat(ctx, ctx.own(scrambleTexture(ctx.app.renderer, half, len)));
   decal(ctx, s - len / 2, s + len / 2, -half, half, mat);
+}
+
+/** Additive vertex-coloured material whose light fades out with fog distance instead of turning fog-coloured. */
+function additiveFade(ctx: WorldCtx, opts: MeshBasicMaterialParameters = {}): MeshBasicMaterial {
+  const mat = ctx.own(new MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: AdditiveBlending, ...opts }));
+  mat.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace('#include <fog_fragment>', '#ifdef USE_FOG\n  gl_FragColor.rgb *= 1.0 - smoothstep(fogNear, fogFar, vFogDepth);\n#endif');
+  };
+  mat.customProgramCacheKey = () => 'city-additive-fade';
+  return mat;
 }
 
 /** Additive light pools on the road (one mesh); call add() per lamp, then build(). */
@@ -79,15 +91,9 @@ export class Pools {
   build(): void {
     const { ctx } = this;
     if (!this.buf.idx.length) return;
-    const mat = ctx.own(new MeshBasicMaterial({
-      map: ctx.own(poolTexture(ctx.app.renderer)), vertexColors: true, transparent: true, depthWrite: false, blending: AdditiveBlending,
-      polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, side: DoubleSide,
-    }));
-    // Additive light fades out with distance instead of turning fog-coloured.
-    mat.onBeforeCompile = (shader) => {
-      shader.fragmentShader = shader.fragmentShader.replace('#include <fog_fragment>', '#ifdef USE_FOG\n  gl_FragColor.rgb *= 1.0 - smoothstep(fogNear, fogFar, vFogDepth);\n#endif');
-    };
-    mat.customProgramCacheKey = () => 'city-pool';
+    const mat = additiveFade(ctx, {
+      map: ctx.own(poolTexture(ctx.app.renderer)), polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, side: DoubleSide,
+    });
     const mesh = new Mesh(ctx.own(this.buf.build()), mat);
     mesh.name = 'city:pools';
     mesh.renderOrder = 3;

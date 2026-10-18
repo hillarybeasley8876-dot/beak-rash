@@ -6,6 +6,7 @@
 import { TUNING as T } from './tuning';
 import { giveBoost } from './drift';
 import { crashRider } from './crash';
+import { landCompression } from './attitude';
 import { verticalCurvature, type AirKind, type SimCtx, type SimRider } from './state';
 import type { Controls } from '../core/types';
 
@@ -66,6 +67,7 @@ function land(ctx: SimCtx, sr: SimRider): void {
     crashRider(ctx, sr, 'obstacle', null);
     return;
   }
+  if (air >= T.landEventMinAir) landCompression(sr, air);
   const minAir = sr.airKind === 'hop' ? T.perfectMinAirHop : T.perfectMinAir;
   const calm = sr.airCalm >= T.perfectCalmTime && yawAbs < T.perfectCalmYaw;
   const timed = sr.hopPressAt >= 0 && air - sr.hopPressAt <= T.perfectHopWindow && yawAbs < T.perfectMaxYaw;

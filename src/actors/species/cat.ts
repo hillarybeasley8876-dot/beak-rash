@@ -29,13 +29,13 @@ function stripes(): Prim[] {
 const spec: MammalSpec = {
   fur: FUR, belly: CREAM, muzzle: CREAM, nose: 0xff8fa0,
   body: { c: [0, 0.17, -0.06], r: [0.21, 0.19, 0.24], rot: 0.35 },
-  chest: { c: [0, 0.31, -0.18], r: [0.17, 0.16, 0.16] },
+  chest: { c: [0, 0.29, -0.22], r: [0.17, 0.16, 0.16] },
   head: { c: [0, 0.6, -0.33], r: [0.185, 0.165, 0.165] },
   snout: { c: [0, 0.55, -0.47], r: [0.08, 0.055, 0.056] },
   cheeks: { c: [-0.07, 0.545, -0.445], r: [0.075, 0.055, 0.06], color: CREAM },
   noseAt: [0, 0.58, -0.522], noseR: [0.021, 0.014, 0.012],
   chin: { c: [0, 0.505, -0.455], r: [0.055, 0.03, 0.045] },
-  arm: [0.07, 0.062, 0.058], leg: [0.095, 0.075, 0.062, 0.056],
+  arm: [0.064, 0.06, 0.068], leg: [0.095, 0.075, 0.062, 0.056],
   hand: { r: [0.062, 0.046, 0.066], color: CREAM, toes: 3 },
   foot: { r: [0.062, 0.045, 0.085], color: CREAM, toes: 3, pad: PINK, drop: 0.012 },
   eye: { at: [-0.076, 0.625, -0.462], r: 0.053, dir: [-0.32, 0.05, -0.95], pupil: 0.025, iris: { r: 0.043, color: 0x8ccf3a } },
@@ -45,6 +45,8 @@ const spec: MammalSpec = {
 
 const J = mammalJoints(spec, {
   hat: [0, 0.69, -0.31], ear: [-0.13, 0.7, -0.29],
+  // Shoulders forward/down on a hunched chest: the paws reach the bars with bent elbows (no sleeve arms).
+  clav: [-0.07, 0.3, -0.26], shoulder: [-0.15, 0.29, -0.32], elbow: [-0.24, 0.17, -0.45], wrist: [-0.18, 0.02, -0.59],
   tail: [[0, 0.17, 0.2], [0, 0.22, 0.3]],
 });
 
@@ -53,7 +55,7 @@ export const cat: SpeciesDef = {
   joints: J,
   meta: {
     wings: false, hat: 'helmet', eyeDir: spec.eye.dir, lid: { open: -0.85, closed: 1.45 }, sleepy: 0.2, lidTilt: 0.22,
-    neckReach: 0.05, tail: 'long', armUp: ARM_UP, gripDrop: 0.03, ankleLift: [0, 0.05, 0.05],
+    neckReach: 0.05, tail: 'long', earFlop: 0.05, armUp: ARM_UP, gripDrop: 0.03, ankleLift: [0, 0.05, 0.05],
     beak: [0, 0.53, -0.52], skin: FUR, skillPose: 'spin',
   },
   build(b) {

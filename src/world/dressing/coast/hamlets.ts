@@ -50,5 +50,5 @@ export function hillVillages(d: Dress, sites: number[], side: -1 | 1 = 1): void 
     }
     placed.push(`${s}:${houses}`);
   }
-  console.info(`[track] hill villages: ${placed.join(' ')}`);
+  d.ctx.log(`hill villages: ${placed.join(' ')}`);
 }

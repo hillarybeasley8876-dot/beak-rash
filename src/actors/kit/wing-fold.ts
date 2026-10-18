@@ -1,6 +1,7 @@
 // Folded bird wings for riders: a chunky feathered arm (leading-edge tube shoulder → elbow → wrist), a
 // scalloped secondaries panel hanging down-back from it, a fan of primaries trailing back along the
-// forearm (dark tips read from the chase cam) and a feather fist (kit/paws mitten) wrapped on the grip.
+// forearm (dark tips read from the chase cam), an optional spread-only fan on the primaries bone, and a
+// feather fist (kit/paws mitten) wrapped on the grip.
 import { Shape, Vector3 } from 'three';
 import type { CharacterBuilder, Influences } from './builder';
 import { addHandMitten, type MittenOpts } from './paws';
@@ -9,7 +10,13 @@ import { addTube } from './tube';
 import type { V3 } from './sdf';
 import { B, mirror, type Joints } from '../rig/skeleton';
 
-export interface PrimaryOpts { n: number; len: number; w: number; color: number; tip: number; tipFrac: number; droop?: number }
+export interface PrimaryOpts {
+  n: number; len: number; w: number; color: number; tip: number; tipFrac: number; droop?: number;
+  /** Angle step between blades (rad, default 0.2). */
+  spread?: number;
+  /** Outline curve segments per blade edge (default 3). */
+  seg?: number;
+}
 
 export interface FoldWingOpts {
   arm: readonly [number, number, number];   // leading-edge radii at shoulder / elbow / wrist
@@ -18,6 +25,8 @@ export interface FoldWingOpts {
   edge: number;                             // trailing-edge tips of the secondaries
   chord: readonly [number, number, number]; // secondaries depth at shoulder / elbow / wrist
   primaries: PrimaryOpts;
+  /** Primaries that only show on a spread wing (B.primL/R, scaled from 0 and fanned out by rig/ride.ts). */
+  fan?: PrimaryOpts;
   fist: MittenOpts;
   armUp: V3;                                // species meta.armUp (palm side of the fist)
   /** Direction the secondaries hang from the arm (left side, bind); default armUp. */
@@ -70,7 +79,7 @@ export function addFoldedWing(b: CharacterBuilder, J: Joints, side: -1 | 1, o: F
   });
   const l0 = S.distanceTo(E), span = l0 + E.distanceTo(W);
   // Secondaries panel warped along the two arm segments (frames blend across the elbow).
-  const geo = extrudeSmooth(secondaries(span, l0, o.chord), { depth: o.thick ?? 0.022, bevel: 0.45, curveSegments: 3, bevelSegments: 1 });
+  const geo = extrudeSmooth(secondaries(span, l0, o.chord), { depth: o.thick ?? 0.022, bevel: 0.45, curveSegments: 2, bevelSegments: 1 });
   const src = positionsOf(geo), out = new Float32Array(src.length);
   const weights: Influences[] = [], colors: number[] = [];
   const p = new Vector3(), t = new Vector3(), n = new Vector3(), win = 0.06;
@@ -98,6 +107,7 @@ export function addFoldedWing(b: CharacterBuilder, J: Joints, side: -1 | 1, o: F
   b.part({ geometry: geo, color: (_x, _y, _z, _a, _b, _c, i) => colors[i] ?? o.color, bone: (_x, _y, _z, i) => weights[i] ?? [[bArm, 1]], outline: 0.8 });
   geo.dispose();
   addPrimaries(b, W, E, frames[1] as Frame, side, bFore, o.primaries);
+  if (o.fan) addPrimaries(b, W, E, frames[1] as Frame, side, side === -1 ? B.primL : B.primR, o.fan);
   // Leading edge: the feathered "arm".
   const at = (v: Vector3): V3 => [v.x, v.y, v.z];
   addTube(b, [
@@ -116,11 +126,11 @@ function addPrimaries(b: CharacterBuilder, W: Vector3, E: Vector3, f: Frame, sid
   const down = f.t.clone().addScaledVector(back, -f.t.dot(back)).normalize();
   for (let i = 0; i < o.n; i++) {
     const len = o.len * (1 - i * 0.09), w = o.w * (1 - i * 0.06);
-    const dir = back.clone().addScaledVector(down, (o.droop ?? 0.25) + i * 0.2).normalize();
+    const dir = back.clone().addScaledVector(down, (o.droop ?? 0.25) + i * (o.spread ?? 0.2)).normalize();
     const across = down.clone().addScaledVector(dir, -down.dot(dir)).normalize();
     const nrm = new Vector3().crossVectors(dir, across).multiplyScalar(-side);
     const base = W.clone().addScaledVector(down, 0.02 + i * 0.012).addScaledVector(nrm, 0.012 + i * 0.006).addScaledVector(dir, -0.02);
-    const geo = extrudeSmooth(blade(len, w), { depth: 0.014, bevel: 0.45, curveSegments: 3, bevelSegments: 1 });
+    const geo = extrudeSmooth(blade(len, w), { depth: 0.014, bevel: 0.45, curveSegments: o.seg ?? 3, bevelSegments: 1 });
     const src = positionsOf(geo), out = new Float32Array(src.length), cols: number[] = [];
     for (let k = 0; k < src.length / 3; k++) {
       const x = src[k * 3] ?? 0, y = src[k * 3 + 1] ?? 0, z = src[k * 3 + 2] ?? 0;

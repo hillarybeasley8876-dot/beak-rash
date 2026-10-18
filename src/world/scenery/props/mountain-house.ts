@@ -6,6 +6,7 @@ import { Color, Matrix4, Vector3 } from 'three';
 import type { Rng } from '../../../core/rng';
 import type { MeshBuf } from '../../geom';
 import { box, trs } from '../../kit/shapes';
+import { part } from './mountain-kit';
 import { poly } from './building';
 import { lantern } from './mountain-deco';
 
@@ -18,11 +19,6 @@ const HPAL = {
 };
 const lm = new Matrix4(), wm = new Matrix4();
 const V = new Vector3();
-
-function part(buf: MeshBuf, base: Matrix4, cx: number, cy: number, cz: number, sx: number, sy: number, sz: number, col: Color, ry = 0): void {
-  wm.multiplyMatrices(base, trs(cx, cy, cz, ry, sx, sy, sz, lm));
-  box(buf, wm, col);
-}
 
 /** Gable roof over a w × d box (centred at the origin) whose walls end at height h. */
 function gableRoof(buf: MeshBuf, m: Matrix4, w: number, d: number, h: number, rise: number, col: Color, wall: Color): void {
@@ -46,7 +42,7 @@ function gableRoof(buf: MeshBuf, m: Matrix4, w: number, d: number, h: number, ri
   }
 }
 
-export interface HouseOpts { floors?: 1 | 2; w?: number; d?: number; sink?: number; lantern?: boolean }
+export interface HouseOpts { floors?: 1 | 2; w?: number; d?: number; sink?: number }
 
 /** Mountain house. (x, y, z) = ground at the front centre; ry turns local −Z toward the road. */
 export function mountainHouse(props: MeshBuf, glow: MeshBuf, x: number, y: number, z: number, ry: number, rng: Rng, o: HouseOpts = {}): void {
@@ -89,8 +85,6 @@ export function mountainHouse(props: MeshBuf, glow: MeshBuf, x: number, y: numbe
     for (let k = 0; k <= 6; k++) part(props, base, -w * 0.4 + (k * w * 0.8) / 6, fh + 0.5, front - 1.0, 0.08, 0.9, 0.08, timber);
   }
   if (rng.chance(0.7)) part(props, base, w * 0.28, h + 1.6, d * 0.7, 0.7, 2.4, 0.7, HPAL.chimney);
-  if (o.lantern !== false) {
-    V.set(-0.95, 2.55, -0.25).applyMatrix4(base);
-    lantern(props, glow, V.x, V.y, V.z, rng, 0.8);
-  }
+  V.set(-0.95, 2.55, -0.25).applyMatrix4(base);
+  lantern(props, glow, V.x, V.y, V.z, rng, 0.8);
 }

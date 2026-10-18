@@ -14,6 +14,7 @@
 }
 
 .ic { position: absolute; left: 1180px; top: 610px; width: 660px; height: 340px; transform-origin: 50% 50%; }
+.ic.is-left { left: 80px; }
 .ic-sh, .ic-card { position: absolute; inset: 0; clip-path: polygon(0 4%, 3% 0, 26% 3%, 52% 0, 78% 4%, 100% 0, 98% 30%, 100% 62%, 97% 100%, 70% 96%, 44% 100%, 18% 96%, 0 100%, 2% 66%, 0 34%); }
 .ic-sh { background: var(--ink); translate: 16px 16px; }
 .ic-card {

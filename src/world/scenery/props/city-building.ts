@@ -5,7 +5,7 @@
 import { Color, Matrix4, Vector3 } from 'three';
 import type { Rng } from '../../../core/rng';
 import type { AuxBuf } from '../../dressing/city/batch';
-import { box, cylinder, trs } from '../../kit/shapes';
+import { box, cone, cylinder, trs } from '../../kit/shapes';
 import { CPAL, fbox, winSpec } from './city-kit';
 
 export interface BuildBufs { body: AuxBuf; lights: AuxBuf }
@@ -16,6 +16,9 @@ export interface SignSlot { kind: SlotKind; pos: Vector3; yaw: number; w: number
 const GF = 4.4, FH = 3.2;
 const lm = new Matrix4(), wm = new Matrix4();
 const RED = new Color(1, 0.12, 0.1);
+// Steady lamps (light-cycle role 6 = ×2.4): shop pier edge strips and the warm soffit line under the overhang.
+const EDGE = [new Color(0.9, 0.2, 0.6), new Color(0.2, 0.75, 0.9), new Color(0.95, 0.55, 0.2), new Color(0.9, 0.15, 0.15)];
+const SOFFIT = new Color(0.85, 0.6, 0.35);
 
 function at(base: Matrix4, x: number, y: number, z: number): Vector3 {
   return new Vector3(x, y, z).applyMatrix4(base);
@@ -65,10 +68,19 @@ export function shophouse(b: BuildBufs, x: number, y: number, z: number, yaw: nu
   const wall = rng.pick(CPAL.walls);
   const seed = rng.range(0, 100);
   const H = GF + floors * FH;
-  // Ground floor: recessed glass front between two piers, back block behind it.
-  fbox(b.body, base, 0, GF / 2, d / 2 + 0.4, w, GF, d - 0.8, wall, null, CPAL.roof, 0b11110);
-  fbox(b.body, base, 0, 1.7, 0.75, w - 1.2, 3.0, 0.1, wall, winSpec(4, seed, 1, 0, rng.range(1.6, 2.6), 3.0, 0.2), undefined, 0b00001);
-  for (const sx of [-1, 1]) part(b.body, base, sx * (w / 2 - 0.3), GF / 2, 0.4, 0.6, GF, 0.8, CPAL.trim);
+  // Ground floor: glass front recessed only 0.3 m between two shallow wall-coloured piers with neon edge
+  // strips (deep dark piers hid the glass from the outer lanes), back block behind it, warm soffit strip.
+  fbox(b.body, base, 0, GF / 2, d / 2 + 0.15, w, GF, d - 0.3, wall, null, CPAL.roof, 0b11110);
+  fbox(b.body, base, 0, 1.7, 0.28, w - 0.7, 3.0, 0.04, wall, winSpec(4, seed, 1, 0, rng.range(1.6, 2.6), 3.0, 0.2), undefined, 0b00001);
+  const edge = rng.pick(EDGE);
+  for (const sx of [-1, 1]) {
+    part(b.body, base, sx * (w / 2 - 0.17), GF / 2, 0.15, 0.34, GF, 0.3, wall);
+    b.lights.setAux(0, 6);
+    box(b.lights, wm.multiplyMatrices(base, trs(sx * (w / 2 - 0.36), 1.95, -0.01, 0, 0.06, 3.3, 0.04, lm)), edge);
+  }
+  b.lights.setAux(0, 6);
+  box(b.lights, wm.multiplyMatrices(base, trs(0, GF - 0.15, 0.2, 0, w - 1.0, 0.03, 0.1, lm)), SOFFIT);
+  b.lights.setAux(0);
   // Upper floors (front overhangs the storefront by 0.8 m) + cornice.
   const style = rng.chance(0.7) ? 1 : 3;
   fbox(b.body, base, 0, GF + (floors * FH) / 2, d / 2, w, floors * FH, d, wall, winSpec(style, seed, rng.range(0.35, 0.75), 0, 2.0, FH, GF), CPAL.roof);
@@ -112,9 +124,50 @@ export function tower(b: BuildBufs, x: number, y: number, z: number, yaw: number
   return slots;
 }
 
-/** Far skyline block: one shaft with windows and a lit crown (no outline, no slots). */
-export function skylineBlock(buf: AuxBuf, x: number, y: number, z: number, yaw: number, w: number, d: number, h: number, rng: Rng): void {
+/** Red aviation blinker (light-cycle role 5) at world point p. */
+function blinker(lights: AuxBuf, p: Vector3, rng: Rng): void {
+  lights.setAux(rng.range(0, 3), 5);
+  cylinder(lights, trs(p.x, p.y - 0.2, p.z, 0, 0.3, 0.4, 0.3, lm), RED, 6);
+  lights.setAux(0);
+}
+
+/**
+ * Far skyline block (no outline, no slots): a windowed shaft with a rooftop kit so the skyline is not a
+ * bar chart: stepped setback crowns, pyramid caps, antenna masts and spires with red blinkers (`lights`).
+ */
+export function skylineBlock(buf: AuxBuf, x: number, y: number, z: number, yaw: number, w: number, d: number, h: number, rng: Rng, lights?: AuxBuf): void {
   const base = trs(x, y, z, yaw, 1, 1, 1, new Matrix4());
   const style = rng.chance(0.6) ? 2 : 3, led = rng.chance(0.35) ? rng.int(1, 4) : 0;
-  fbox(buf, base, 0, h / 2, d / 2, w, h, d, rng.pick(CPAL.towers), winSpec(style, rng.range(0, 100), rng.range(0.35, 0.7), led, 3.2, 3.6, 0), CPAL.roof);
+  const wall = rng.pick(CPAL.towers), seed = rng.range(0, 100), lit = rng.range(0.35, 0.7);
+  fbox(buf, base, 0, h / 2, d / 2, w, h, d, wall, winSpec(style, seed, lit, led, 3.2, 3.6, 0), CPAL.roof);
+  let top = h, tw = w, td = d;
+  const roll = rng.next();
+  if (h > 45 && roll < 0.4) {
+    // Stepped setbacks: one or two smaller windowed boxes.
+    for (let k = 0; k < (rng.chance(0.5) ? 2 : 1); k++) {
+      tw *= rng.range(0.55, 0.75); td *= rng.range(0.55, 0.75);
+      const sh = rng.range(5, 13);
+      fbox(buf, base, 0, top + sh / 2, d / 2, tw, sh, td, wall, winSpec(style, seed + 7 + k, lit, 0, 3.2, 3.6, top), CPAL.roof);
+      top += sh;
+    }
+  } else if (h > 45 && roll < 0.58) {
+    // Pyramid cap (four-sided cone turned 45° so its faces line up with the walls).
+    buf.setAux(0);
+    cone(buf, wm.multiplyMatrices(base, trs(0, top, d / 2, Math.PI / 4, w * 0.62, rng.range(6, 12), d * 0.62, lm)), CPAL.roof, 4);
+    top += 3;
+  } else if (roll < 0.8) {
+    part(buf, base, rng.range(-w * 0.2, w * 0.2), top + 1.2, d * rng.range(0.35, 0.65), rng.range(3, 6), 2.4, rng.range(3, 6), CPAL.ac);
+  }
+  if (!lights) return;
+  if (h > 110) {
+    // Landmark spire.
+    const sh = rng.range(18, 30);
+    buf.setAux(0);
+    cone(buf, wm.multiplyMatrices(base, trs(0, top, d / 2, 0, 0.9, sh, 0.9, lm)), CPAL.steel, 8);
+    blinker(lights, at(base, 0, top + sh + 0.2, d / 2), rng);
+  } else if (rng.chance(0.45)) {
+    const ax = rng.range(-tw * 0.3, tw * 0.3), az = d / 2 + rng.range(-td * 0.25, td * 0.25), ah = rng.range(6, 16);
+    part(buf, base, ax, top + ah / 2, az, 0.25, ah, 0.25, CPAL.steel);
+    blinker(lights, at(base, ax, top + ah + 0.2, az), rng);
+  }
 }

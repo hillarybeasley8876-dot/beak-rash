@@ -1,13 +1,12 @@
-// Layout registry. city / mountain are wave 2: until their layout files exist they reuse the coast
-// layout under their own id (their look and dressing already differ, see looks.ts / dressing/).
+// Layout registry: one layout file per track (coast = track unit, city / mountain = env units).
 import type { TrackId } from '../../core/types';
 import type { LayoutDef } from '../layout/types';
 import { COAST } from './coast';
 import { CITY } from './city';
 import { MOUNTAIN } from './mountain';
 
+const LAYOUTS: Record<TrackId, LayoutDef> = { coast: COAST, city: CITY, mountain: MOUNTAIN };
+
 export function layoutFor(id: TrackId): LayoutDef {
-  if (id === 'mountain') return MOUNTAIN;
-  if (id === 'city') return CITY;
-  return id === 'coast' ? COAST : { ...COAST, id };
+  return LAYOUTS[id];
 }

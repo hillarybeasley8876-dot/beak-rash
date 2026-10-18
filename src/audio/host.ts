@@ -25,8 +25,9 @@ export interface Host {
   /** A sub-heavy impact: only one owns the low end at a time (a second within 0.4 s is high-passed). */
   boom(id: string, where?: Where, opts?: PlayOpts): void;
   announce(id: string, priority?: number): void;
-  /** A rival's voice line (or its animal call when no clip exists), only near the player. */
-  bark(riderId: RiderId, kind: BarkKind, text?: string): void;
+  /** A rival's voice line (or its animal call when no clip exists), only near the player.
+   *  `wait` = s the line may wait for the bark channel (held KO lines) instead of being dropped. */
+  bark(riderId: RiderId, kind: BarkKind, text?: string, wait?: number): void;
   stinger(id: StingerId): void;
   song(id: string | null, fade?: number): void;
   /** Race countdown n = 3, 2, 1 (count-in; the song waits), 0 = GO (bar 1 of section A). */

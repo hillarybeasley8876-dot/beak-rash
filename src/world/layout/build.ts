@@ -150,12 +150,6 @@ function collect(L: BuiltLayout, segs: SegmentDef[], starts: number[]): void {
   L.marks.sort((a, b) => a.s - b.s);
 }
 
-/** Sample index (float) for s, clamped to the sampled range. */
-export function sampleIndex(L: BuiltLayout, s: number): number {
-  const f = s - L.sMin;
-  return f < 0 ? 0 : f > L.n - 1 ? L.n - 1 : f;
-}
-
 /** Zones containing s (names), e.g. 'tunnel', 'market'. */
 export function zoneAt(L: BuiltLayout, s: number): string | null {
   for (const z of L.zones) if (s >= z.s0 && s < z.s1) return z.name;

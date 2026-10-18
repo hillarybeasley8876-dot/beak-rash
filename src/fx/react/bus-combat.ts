@@ -27,7 +27,9 @@ export function subscribeCombat(ctx: FxContext): Array<() => void> {
     bus.on('combat:hit', (e) => {
       const v = ctx.tracker.get(e.victim);
       const scale = clamp(0.8 + e.damage / 30, 0.8, 1.5);
-      const preset = e.blocked ? 'block' : e.crit ? 'crit' : e.heavy ? 'hitHeavy' : 'hit';
+      // A lethal blow skips its impact lines: the KO punctuation (koPow) brings its own.
+      const lethal = !e.blocked && (ctx.session()?.rider(e.victim)?.hp ?? 1) <= 0;
+      const preset = e.blocked ? 'block' : lethal ? 'hitKo' : e.crit ? 'crit' : e.heavy ? 'hitHeavy' : 'hit';
       const opts = { vel: v?.vel, ground: v?.ground, dir: hitDir(e.attacker, e.side), scale };
       ctx.burst(preset, e.pos, opts);
       const bits = WEAPON_BITS[e.weapon];

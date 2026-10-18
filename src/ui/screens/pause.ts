@@ -9,10 +9,11 @@ import { ordinal } from '../progress';
 import { frame, type ScreenCtx, type ScreenFactory } from '../screen';
 import { fmtTime } from './results-parts';
 
-const CONTROLS: Array<[string, string]> = [
-  ['W / ↑', '踩踏'], ['S / ↓', '刹车'], ['A D / ← →', '转向'], ['SHIFT', '漂移'],
-  ['SPACE', '跳跃'], ['J / L', '左挥 / 右挥'], ['K', '重击'], ['U I O', '技能'],
-  ['P', 'SHOWTIME'], ['B', '打铃嘲讽'], ['C', '回头看'], ['ESC', '暂停'],
+/** [keyboard, gamepad, action]: the sheet shows the glyphs of the device in use (.is-pad on the root). */
+const CONTROLS: Array<[string, string, string]> = [
+  ['W / ↑', 'RT', '踩踏'], ['S / ↓', 'LT', '刹车'], ['A D / ← →', '左摇杆', '转向'], ['SHIFT', 'RB', '漂移'],
+  ['SPACE', 'A', '跳跃'], ['J / L', 'X / B', '左挥 / 右挥'], ['K', 'Y', '重击'], ['U I O', 'LB ✚↑ ✚↓', '技能'],
+  ['P', 'R3', 'SHOWTIME'], ['B', 'BACK', '打铃嘲讽'], ['C', 'L3', '回头看'], ['ESC', 'START', '暂停'],
 ];
 
 function standings(session: Session | null): HTMLDivElement {
@@ -36,9 +37,13 @@ function standings(session: Session | null): HTMLDivElement {
 }
 
 function controlsSheet(): HTMLDivElement {
-  const el = h('div', { class: 'br-pz-keys' });
-  for (const [k, label] of CONTROLS) el.append(h('div', { class: 'br-pz-key' }, h('kbd', { text: k }), h('span', { text: label })));
-  return el;
+  const grid = h('div', { class: 'br-pz-keys-grid' });
+  for (const [kb, pad, label] of CONTROLS) {
+    grid.append(h('div', { class: 'br-pz-key' },
+      h('kbd', { class: 'br-kb-only', text: kb }), h('kbd', { class: 'br-pad-only', text: pad }), h('span', { text: label })));
+  }
+  return h('div', { class: 'br-pz-keys br-panel is-black', vars: { '--clip': jagged('pzkeys', { jx: 1.5, jy: 4, notches: 2 }) } },
+    h('div', { class: 'br-pz-keys-title' }, h('b', { text: 'CONTROLS' }), h('span', { text: '操作' })), grid);
 }
 
 function resume(ctx: ScreenCtx): void {
@@ -83,8 +88,9 @@ export const pauseScreen: ScreenFactory = (ctx) => {
       h('span', { class: 'br-pz-time', text: session ? fmtTime(session.time) : '0:00.00' })),
     controlsSheet(),
   );
-  const nav = ctx.nav(new Nav(items, { layout: 'vertical', sfx: ctx.sfx }));
-  if (ctx.from !== 'settings') ctx.sfx('ui.cutin'); // PAUSE slam (not when backing out of settings)
+  // Backing out of settings lands on 设置 again.
+  const nav = ctx.nav(new Nav(items, { layout: 'vertical', start: ctx.from === 'settings' ? 2 : 0, sfx: ctx.sfx }));
+  if (ctx.from !== 'settings') ctx.sfx('ui.pause'); // PAUSE slam, tape-stop (not when backing out of settings)
   return {
     root: f.root,
     onAction: (a) => {

@@ -73,31 +73,69 @@ export const dirt: Preset = (k, pos, o) => {
   bits(k, pos, o, k.n(3, o), FRAME.puff, '#7a5530', '#5a3b1e', 0.09);
 };
 
-function groundRing(k: Kit, pos: Vec3Like, o: BurstOpts, from: number, to: number, life: number, color: string, carry = 0.6): void {
-  const s = k.at(pos);
-  s.y = o.ground ?? pos.y;
-  k.p.colors(s, color);
-  s.frame = FRAME.ring; s.mode = 2; s.erode = true;
-  s.life = life; s.size0 = from; s.size1 = to; s.rot = k.range(0, 6.28);
-  inherit(s, o, carry, 3);
-  k.p.emit(s);
+/**
+ * Flat comic shock ring on the road (o.ground), carried along with the source: 7 fat inked dashes that fly
+ * outward from the `from` to the `to` ring (sprite sizes, as before) and shorten to nothing, over a soft
+ * dust haze; nothing reaches past ~1.6 m.
+ */
+export function groundRing(k: Kit, pos: Vec3Like, o: BurstOpts, from: number, to: number, life: number, color: string, carry = 0.6): void {
+  const y = (o.ground ?? pos.y) + 0.02;
+  const r0 = Math.max(0.45, 0.4 * from);
+  const r1 = Math.min(1.6, Math.max(r0 + 0.45, 0.5 * to));
+  const n = 7;
+  const spin = k.range(0, Math.PI * 2);
+  for (let i = 0; i < n; i++) {
+    const a = spin + (i / n) * Math.PI * 2 + k.range(-0.12, 0.12);
+    const s = k.at({ x: pos.x + Math.cos(a) * r0, y, z: pos.z + Math.sin(a) * r0 });
+    k.p.colors(s, color);
+    s.frame = FRAME.dash; s.mode = 2;
+    const v = ((r1 - r0) / life) * k.range(0.85, 1.15);
+    s.vx = Math.cos(a) * v; s.vz = Math.sin(a) * v;
+    s.life = life * k.range(0.85, 1.1); s.size0 = ((Math.PI * 2 * r0) / n) * 1.1; s.size1 = 0;
+    s.rot = a + Math.PI / 2; // long axis along the tangent, convex side outward
+    inherit(s, o, carry, 3);
+    k.p.emit(s);
+  }
+  const g = k.at({ x: pos.x, y: y - 0.01, z: pos.z });
+  k.p.colors(g, '#6b6152', '#211d17');
+  g.frame = FRAME.glow; g.additive = true; g.mode = 2;
+  g.life = life * 1.2; g.size0 = 2 * r0; g.size1 = 2.3 * r1;
+  inherit(g, o, carry, 3);
+  k.p.emit(g);
 }
 
-/** Landing: dust ring on the road + puffs swooshing out along the ground. They keep most of the rider's speed
- *  so the dust stays round the wheel long enough to read from the chase camera. */
+/** Landing: a tapering shock ring on the road + a crescent of dust kicked out behind and to the sides of
+ *  travel (big two-tone lead puffs of mixed sizes, then grit). The dust keeps most of the rider's speed so
+ *  it stays round the wheel long enough to read from the chase camera; size and count grow with air time. */
 export const landing: Preset = (k, pos, o) => {
   const sc = o.scale ?? 1;
-  groundRing(k, pos, o, 0.4 * sc, 2.4 * sc, 0.32, '#f6efe2', 0.85);
-  const count = k.n(14, o);
-  for (let i = 0; i < count; i++) {
-    const a = (i / count) * Math.PI * 2 + k.range(-0.2, 0.2);
-    const s = k.at({ x: pos.x + Math.cos(a) * 0.4, y: (o.ground ?? pos.y) + 0.12, z: pos.z + Math.sin(a) * 0.4 });
-    k.p.colors(s, LOOKS.dust.a, LOOKS.dust.b);
+  const ground = o.ground ?? pos.y;
+  groundRing(k, pos, o, 0.4 * sc, 2.0 * sc, 0.28, '#f6efe2', 0.85);
+  const back = o.vel && Math.hypot(o.vel.x, o.vel.z) > 1 ? Math.atan2(-o.vel.z, -o.vel.x) : null;
+  const angle = (): number => (back === null ? k.range(0, Math.PI * 2) : back + k.range(-1.92, 1.92));
+  const lead = k.n(7, o);
+  for (let i = 0; i < lead; i++) {
+    const a = angle();
+    const s = k.at({ x: pos.x + Math.cos(a) * 0.4, y: ground + 0.12, z: pos.z + Math.sin(a) * 0.4 });
+    if (i % 3 === 0) k.p.colors(s, '#d9c9ad', '#a8977c');
+    else k.p.colors(s, LOOKS.dust.a, LOOKS.dust.b);
     s.frame = FRAME.puff;
-    const v = k.range(2.6, 4.2) * sc;
-    s.vx = Math.cos(a) * v; s.vy = k.range(0.3, 0.9); s.vz = Math.sin(a) * v;
-    s.life = k.range(0.4, 0.55); s.size0 = 0.24 * sc; s.size1 = 0.55 * sc;
+    const v = k.range(2, 4.6) * sc;
+    s.vx = Math.cos(a) * v; s.vy = k.range(0.3, 1); s.vz = Math.sin(a) * v;
+    const size = k.range(0.6, 1.4) * sc;
+    s.life = k.range(0.4, 0.6); s.size0 = 0.3 * size; s.size1 = 0.7 * size;
     s.rot = k.range(0, 6.28); s.spin = k.range(-2, 2); s.drag = 3.5;
+    inherit(s, o, 0.85, 1.5);
+    k.p.emit(s);
+  }
+  for (let i = 0; i < k.n(6, o); i++) {
+    const a = angle();
+    const s = k.at({ x: pos.x + Math.cos(a) * 0.3, y: ground + 0.1, z: pos.z + Math.sin(a) * 0.3 });
+    k.p.colors(s, '#cdbb9c', '#8f7f66');
+    s.frame = i % 2 ? FRAME.stick : FRAME.drop; s.mode = 1; s.k = 0.03;
+    const v = k.range(3, 6) * sc;
+    s.vx = Math.cos(a) * v; s.vy = k.range(1.5, 3); s.vz = Math.sin(a) * v;
+    s.life = k.range(0.3, 0.45); s.size0 = 0.07; s.size1 = 0.05; s.gravity = 14; s.drag = 1; s.ground = ground;
     inherit(s, o, 0.85, 1.5);
     k.p.emit(s);
   }

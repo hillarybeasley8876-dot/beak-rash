@@ -4,7 +4,7 @@
 import { Group, PerspectiveCamera, Quaternion, Vector3 } from 'three';
 import { Clock } from '../src/core/clock';
 import { EventBus } from '../src/core/events';
-import { shotFor } from '../src/fx/ko/camera';
+import { shotFor } from '../src/fx/ko/framing';
 import { KoCine, type CineHost } from '../src/fx/ko/cine';
 import { FULL, LITE, shortVariant, ULT_IMPACT, WRECKED, type CineKind, type Timeline } from '../src/fx/ko/look';
 import type { CameraOverride } from '../src/core/contracts';

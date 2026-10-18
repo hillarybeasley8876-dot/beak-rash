@@ -1,0 +1,73 @@
+{
+  "pass": false,
+  "score": 7,
+  "summary": "Round 2 is a large step up. From the chase cam at 70 km/h the city is now unmistakably a neon night city: dark navy facades with amber and cyan windows, dense meme neon, red P5 fascias, readable white zebras, lantern-lit arcade, an excellent calling-card mural, a far-bank skyline across the river and a billboard sprint toward the moon and the FINISH screen. The white pelican reads clearly everywhere. Verified as fixed from r1: the sawtooth comb in the reflections (streaks are smooth on flat road), the lamp-pool haze on the streets, the pastel lightbox shopfronts, the empty riverside, the missing sprint canyon (built, though sparse), cube lanterns, scramble stripes and the gate text. Partly fixed: P5 accents, the trees, the statue, the tunnel pools and the clouds. No runtime errors in any run (high and low quality, traffic on and off) and tsc is clean. Two majors remain. (1) The wet-road overlay is hidden by the road mesh at grade changes. Razor-sharp horizontal seams sweep down the screen and the neon reflection switches off for about 2 s at the underpass entry and again at its exit. Verified at runtime: setting the overlay's depthTest to false removes them. (2) The tree canopies and the statue were moved into the unlit, outline-less glow batch, so they read as flat, faceted pink and yellow blobs. 2 major, 7 minor and 2 cross-unit. Shots are in shots/review/env-city/r2-art/ (sheetA-G, cropsA/B, seam.jpg, exitseam.jpg).",
+  "issues": [
+    {
+      "severity": "major",
+      "title": "Wet-road overlay is depth-occluded at grade changes: hard horizontal seams, reflection pops off about 2 s at the underpass",
+      "detail": "Captured in the chase cam with autopilot at 1920x1080. Rider at s~2176: the reflection stops at a perfectly straight line across the whole road at y~649, a row-luminance step of 6-18 per pixel row (p_2160_base.png, seam.jpg top). Rider at s~2181-2215: the reflection is gone completely. Mean road luminance is 21.5-24, against 43-55 on flat road (q_2165..q_2195_b.png, seam.jpg bottom). Underpass exit, rider at s~2566-2576: the same razor edge, with dark near road and the reflection only beyond the ramp top (q_2550_b.png, k_2560_b.png, exitseam.jpg). While driving, these lines sweep down the screen and the neon pops off and back on. Root cause, verified at runtime (levelfix.mjs): with depthTest=false on the city:wet material every seam disappears and the reflection returns (s2190: L 21.5 -> 34.2; s2545: 27.3 -> 43.4; seam step 18.4 -> 2.2). Forcing `level = 1.0` or `damp = 1.0` in WET_FRAG changes nothing, and uOn stays 1. overlayGeometry() in env/city-wet.ts builds a 2-column strip at 2 m rows, lifted only 0.02 m along frameVis. Where the track's road surface or sampling differs from it, at the ends of the underpass vertical curves, the strip sinks under the road mesh. Secondary problem: on the crest/drop (s 1545-1620) the single mirror plane, taken from the frame at the camera's s, tilts about 9 degrees, so tower reflections lean 20-30 degrees and look sheared (a_1545.png lower left, cropsA.jpg bottom-left).",
+      "fix": "Build the overlay to match the real road: rows at the road mesh's own s spacing (<= 1 m) with 6-8 lateral columns placed by q.toWorld(s, x, 0.03), or reuse the road geometry's vertices offset along their normals. Use a real depth bias (polygonOffsetUnits around -40, or depthFunc LessEqual on a copy of the road geometry). Add a row-luminance seam scan, like rowstep.py, over s 1500-1650, 2150-2230 and 2530-2590 to sandbox/city.perf.mjs. At crests, take the mirror plane from the road frame ~12 m ahead of the camera, or blend its normal toward world up when vertical curvature is high."
+    },
+    {
+      "severity": "major",
+      "title": "Trees and the roundabout statue now sit in the unlit, outline-less glow batch: flat faceted blobs ('pink blobs with eyes', yellow sponges, a yellow-chick statue)",
+      "detail": "r1 A6 was only half fixed. planterTree (scenery/props/city-street.ts:108-117) draws each canopy as 3 spheres of 12x8 segments into the `glow` buffer, and landmarks.ts:94 draws the statue into b.glow. That batch is 'unlit ... no outline' (dressing/dress.ts:17,46). The pink and gold now read, but the canopies have no cel ramp, no 0.04 m prop outline (art bible section 5) and visibly faceted silhouettes. Close up, the two white fairy-light cubes on each canopy read as eyes, so every tree looks like a pink jelly creature (cropsB.jpg bottom-left, c_shopsL.png). In the chase view they float like pink cotton-candy balloons on the start grid and at the finish (a_30.png, c_finish.png, l_300.png), and yellow sponges/lemons line the avenue and hairpin (a_2650.png, exitseam.jpg, a_2770.png). The 'gilded pelican' statue is a flat yellow chick: no shading, no gold sheen, no recognisable S-neck or pouch (cropsB.jpg bottom-right, c_statue.png). Its 'flower beds' are rings of glowing white, yellow and pink boxes that read as dance-floor confetti.",
+      "fix": "Put canopies and the statue back in the toon props batch so they get the cel ramp and the outline hull. Get the lit-at-night look from emissive instead: an aux emissive of ~0.35-0.5, or a MeshToonMaterial clone with emissive. Build each canopy from 5-7 overlapping blobs with smoothed normals (>= 16x12 segments) plus a darker underside band and a scalloped or petal silhouette. Scatter the fairy lights over many blobs, never as a symmetric pair. Statue: toon gold (warm yellow base, orange shadow band, white spec/rim), the pelican's oversized beak/pouch and S-neck, 2-4 warm uplights. Flower beds: low toon mounds with small flower dots, not glowing tiles."
+    },
+    {
+      "severity": "minor",
+      "title": "Tunnel: a bland mid-grey vault fills half the frame and the floor pool reads as a milky smudge",
+      "detail": "c_tunnel.png and a_2360.png (sheetC). underpass.ts skins the tunnel walls (tiles, LED strips, red dado) but not the vault (the track's tunnel mesh). The vault is flat mid-grey with concentric banding and much brighter than the night streets, so it reads as daytime concrete with all the colour squeezed into one band. The remaining TUNNEL_POOL (0.35,0.32,0.28, every 18 m) shows as a big soft whitish ellipse on the floor ahead of the rider, like fog on the lens.",
+      "fix": "Skin the vault in underpass.ts the same way as the walls: dark navy panels or tiles, cable trays, lamp housings with emissive strips, maybe a red P5 stripe at the crown. Drop the floor pools (the strips and lamps already reflect), or shrink them to r~1.5 m hot spots directly under the lamps."
+    },
+    {
+      "severity": "minor",
+      "title": "Street lamp pools become horizontal glowing bars at the chase-cam grazing angle",
+      "detail": "a_250.png (left kerb), a_600.png, a_1250.png (cropsB.jpg top-right). At 15-30 m ahead the additive discs from paint.ts Pools (r 3.8-4.5 m) flatten into soft orange or white bars lying across the lane. They read like lens streaks. On wet asphalt, lamp light stretches toward the viewer as vertical streaks.",
+      "fix": "Stretch the pool along the view direction in its shader, scaled by the grazing angle, or make it a small 1.5 m hot spot under the lamp and let the mirror's lamp-head reflections supply the vertical streaks."
+    },
+    {
+      "severity": "minor",
+      "title": "P5 identity is still small-scale: no 'huge red/black P5 accent' on the chase line",
+      "detail": "Red and black now show up on 1 in 5 fascias, 1 in 6 blades, 9 street boards, the canyon boards and the mural (c_mural.png is excellent). The street boards are small, 3.4 x 1.06 m on legs (c_p5board.png). In the chase frames red is still a minor accent among purple, cyan and yellow (sheetA-C). The planned viaduct and tunnel-portal chevrons were skipped, and no tower-scale P5 piece frames any straight.",
+      "fix": "Add 3-4 big set pieces: 20-30 m red/black diagonal banners on tower corners at the boulevard, scramble and sprint, plus hazard chevrons on the viaduct fascia and both tunnel portals. Scale the street boards to >= 6 x 2 m and put them on corner outsides, where the camera looks."
+    },
+    {
+      "severity": "minor",
+      "title": "Billboard canyon is sparse: one scaffold every ~26 m per side and plain facades in between",
+      "detail": "a_2990.png, a_3100.png, c_canyon.png. Only 2-3 screens are visible at once, and the screens at 6-13 m sit mostly above the chase frame's centre. The low shophouse facades between the scaffolds are unchanged, so the climax reads as an avenue with some billboards rather than a canyon.",
+      "fix": "Double the density (canyon.ts: every ~13 m per side). Add screens and vertical blade signs at 3-8 m on the facades themselves and light strips running along the sprint, and flank the FINISH screen with taller screens."
+    },
+    {
+      "severity": "minor",
+      "title": "Far bank: each tower stands on its own little quay island; the river shows no reflections, only white foam flecks",
+      "detail": "farbank.ts gives every tower its own quay box (w+30 x d+12), which makes a dotted string of floating platforms (aerial.png, top). From the riverside and the bridge (c_farbank.png) the water is flat navy with white flecks that read as snow. The riverGlow light columns fade with fog at 265-420 m, so the skyline casts no visible reflection.",
+      "fix": "Run one continuous embankment strip, with a lamp-lit promenade, under all the far-bank towers. Fade the riverGlow streaks by distance from the camera instead of fog, and break them up with ripples. Ask the track unit to hide sea foam on night looks (cross-unit)."
+    },
+    {
+      "severity": "minor",
+      "title": "Skyline silhouettes are uniform flat-topped boxes",
+      "detail": "Every tower is an extruded box with a flat roof (sheetA-C, e.g. a_1250.png, a_2650.png). Apart from a few neon crowns there are no antennas, water tanks, stepped crowns, rooftop billboard frames or red aviation blinkers, so against the purple sky the skyline reads like a bar chart.",
+      "fix": "Add a rooftop kit in city-building.ts / blocks.ts: setbacks or stepped tops on ~30 % of tall towers, antenna masts with blinking red lights (glow batch), water tanks and AC units on low blocks, and 1-2 landmark spires visible down the boulevard and the sprint."
+    },
+    {
+      "severity": "minor",
+      "title": "Shop interiors repeat one keyhole silhouette for every shopper",
+      "detail": "c_shopsL.png, a_30.png, c_finish.png: each lit bay shows the same black circle-plus-bar figure, like a toilet sign, at the same height. Repeated along every street it reads as wallpaper, not life.",
+      "fix": "In glsl.ts shopInterior(), use 3-4 animal-head silhouette variants (ears, beak, round) at varied heights and widths, give a few a slow horizontal drift, and skip shoppers in about half the bays."
+    },
+    {
+      "severity": "minor",
+      "title": "cross-unit: the oil slick reads as a black hole in the wet night road",
+      "detail": "a_600.png and cropsA.jpg top-right: the oil feature (features/decals.ts, track unit) at s~615 and ~2868 is a near-black ellipse with thin blue swirls. Against the neon-reflecting road it looks like a pit.",
+      "fix": "(track unit) On night looks, give the oil decal an iridescent rainbow sheen and let it pass the wet reflection at reduced strength."
+    },
+    {
+      "severity": "minor",
+      "title": "cross-unit: night clouds still hang as flat cut-outs among the towers",
+      "detail": "env/sky.ts (track unit; env-city made the night tint darker indigo). The clouds float at rooftop height in front of towers on the expressway and riverside (a_1420.png, a_1545.png, a_1720.png, c_farbank.png). They read as dark cardboard shapes.",
+      "fix": "For the city look, raise them above the tallest towers with a faint magenta/orange underglow, or hide them (it is overcast and raining)."
+    }
+  ]
+}

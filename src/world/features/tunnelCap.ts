@@ -8,7 +8,9 @@ import type { TerrainField } from '../terrain/field';
 import { terrainMat } from '../terrain/material';
 import { groundColor } from '../terrain/profile';
 
-export function buildTunnelCap(ctx: WorldCtx, field: TerrainField, f: TrackFeature, W: number, capY: (s: number, x: number, W: number) => number): void {
+export function buildTunnelCap(
+  ctx: WorldCtx, field: TerrainField, f: TrackFeature, W: number, capY: (s: number, x: number, W: number) => number,
+): void {
   const COLS = 15;
   const rows = rowsBetween(f.s0, f.s1, 3);
   const g = new GridGeo(rows.length, COLS);

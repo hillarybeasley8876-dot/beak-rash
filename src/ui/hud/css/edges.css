@@ -1,10 +1,22 @@
 /* Edge warnings: rear-threat chevrons and the police siren glow. */
 .brh-edges { position: absolute; inset: 0; }
+/* Police siren: jagged hazard-tape light bars on the left (red) and right (blue) edges, flashing in turn at
+   4 Hz. Drawn under the static HUD (world layer), between the place block and the corner modules. */
 .eg-police { position: absolute; inset: 0; opacity: 0; }
-.eg-police::before, .eg-police::after { content: ""; position: absolute; inset: 0; }
-.eg-police::before { box-shadow: inset 0 0 calc(var(--k) * 120px) calc(var(--k) * 30px) rgba(255, 30, 60, 0.85); animation: brh-siren 0.5s steps(1, end) infinite; }
-.eg-police::after { box-shadow: inset 0 0 calc(var(--k) * 120px) calc(var(--k) * 30px) rgba(40, 110, 255, 0.85); animation: brh-siren 0.5s steps(1, end) -0.25s infinite; }
-@keyframes brh-siren { 0% { opacity: 1; } 50% { opacity: 0; } }
+.eg-police::before, .eg-police::after {
+  content: ""; position: absolute; top: 22%; bottom: 36%; width: calc(var(--k) * 54px);
+  background: repeating-linear-gradient(-52deg, var(--lamp) 0 calc(var(--k) * 20px), var(--ink) 0 calc(var(--k) * 34px));
+  animation: brh-siren 0.5s steps(1, end) infinite;
+}
+.eg-police::before {
+  left: 0; --lamp: var(--hot);
+  clip-path: polygon(0 0, 100% 3%, 58% 16%, 100% 29%, 64% 44%, 100% 58%, 60% 73%, 100% 88%, 0 100%);
+}
+.eg-police::after {
+  right: 0; --lamp: #2A6BFF; animation-delay: -0.25s;
+  clip-path: polygon(100% 0, 0 3%, 42% 16%, 0 29%, 36% 44%, 0 58%, 40% 73%, 0 88%, 100% 100%);
+}
+@keyframes brh-siren { 0% { opacity: 1; } 50% { opacity: 0.12; } }
 .eg-chip {
   position: absolute; left: 50%; top: calc(var(--k) * 146px); display: flex; align-items: center; gap: 10px;
   padding: 6px 14px 4px; background: var(--ink); color: var(--paper); opacity: 0;

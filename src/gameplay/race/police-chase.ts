@@ -1,8 +1,8 @@
 // The corgi officer's riding (track space): sprint in from behind (always faster than the player, boosts
 // included) and hold station alongside for a few seconds, then cruise just under the player's own top
-// speed, so a player at full pedal slowly pulls away. Short
-// legs tire after chasing close for a while (腿短), traffic blocks it (brakes behind vehicles, changes
-// lanes slowly), and a swing or a Wing Dash from the player knocks it back for a few seconds.
+// speed, so a player at full pedal slowly pulls away (police.ts sends it on one more sprint before it gives
+// up). Short legs tire after chasing close for a while (腿短), traffic and other riders block it (brakes
+// behind them, changes lanes slowly), and a swing or a Wing Dash from the player knocks it back.
 import { approach, clamp, damp } from '../../core/math';
 import type { Track } from '../../core/contracts';
 import type { Obstacle, RiderState } from '../../core/types';
@@ -10,6 +10,7 @@ import type { Obstacle, RiderState } from '../../core/types';
 const SPRINT_MUL = 1.28, SPRINT_MAX = 15;   // × player top, while arriving (at most SPRINT_MAX s)…
 const SPRINT_CLOSE = 4;                      // …and never less than the player's current speed + this
 const ALONG_HOLD = 4;                        // …and for this long alongside
+const RESPRINT_MAX = 8, RESPRINT_HOLD = 3;   // one more sprint (s at most) and hold (s alongside) when trailing
 const CRUISE = 0.97;                         // × the player's flat-road top speed
 const TIRE_AFTER = 15, TIRED_TIME = 6, TIRED_MUL = 0.85;
 const KNOCK_TIME = 3, KNOCK_MUL = 0.7;
@@ -19,6 +20,7 @@ const LOOK = 22;                             // m ahead the corgi watches for tr
 export interface Corgi {
   readonly st: RiderState;
   chaseT: number;     // s since the chase started
+  sprintT: number;    // s of sprint left (arrival, or the one re-sprint)
   alongT: number;     // s alongside the player this chase (sprint over after ALONG_HOLD)
   closeT: number;     // s chased within CLOSE m since the last rest
   tiredT: number;     // s left out of breath
@@ -27,15 +29,26 @@ export interface Corgi {
 
 const CLOSE = 12;                            // m: chasing this close wears the short legs out
 
-export const createCorgi = (st: RiderState): Corgi => ({ st, chaseT: 0, alongT: 0, closeT: 0, tiredT: 0, knockT: 0 });
+export const createCorgi = (st: RiderState): Corgi => ({ st, chaseT: 0, sprintT: SPRINT_MAX, alongT: 0, closeT: 0, tiredT: 0, knockT: 0 });
 
 export function resetCorgi(c: Corgi): void {
   c.chaseT = c.alongT = c.closeT = c.tiredT = c.knockT = 0;
+  c.sprintT = SPRINT_MAX;
 }
+
+/** Trailing the player: one more sprint back into whistle range, then a shorter hold alongside. */
+export function resprint(c: Corgi): void {
+  c.sprintT = RESPRINT_MAX;
+  c.alongT = ALONG_HOLD - RESPRINT_HOLD;
+}
+
+/** Still sprinting in (arrival or re-sprint), not yet holding station alongside. */
+export const sprinting = (c: Corgi): boolean => c.alongT < ALONG_HOLD && c.sprintT > 0;
 
 /** Advance stamina (`gap` = player.s − corgi.s); returns true on the step the corgi runs out of breath. */
 export function tire(c: Corgi, dt: number, gap: number): boolean {
   c.chaseT += dt;
+  if (sprinting(c)) c.sprintT -= dt;
   if (Math.abs(gap) < 4) c.alongT += dt;
   c.knockT = Math.max(0, c.knockT - dt);
   if (c.tiredT > 0) {
@@ -59,28 +72,42 @@ export function knock(c: Corgi, awayX: number): void {
 export const tired = (c: Corgi): boolean => c.tiredT > 0;
 
 function topSpeed(c: Corgi, w: RideWorld): number {
-  const sprint = c.alongT < ALONG_HOLD && c.chaseT < SPRINT_MAX;
-  const base = sprint ? Math.max(w.playerTop * SPRINT_MUL, w.playerSpeed + SPRINT_CLOSE) : w.playerTop * CRUISE;
+  const base = sprinting(c) ? Math.max(w.playerTop * SPRINT_MUL, w.playerSpeed + SPRINT_CLOSE) : w.playerTop * CRUISE;
   return base * (c.tiredT > 0 ? TIRED_MUL : 1) * (c.knockT > 0 ? KNOCK_MUL : 1);
 }
 
-/** Nearest solid obstacle within LOOK m ahead in the corgi's lane or across its path to `tx`. */
-function blocker(obstacles: readonly Obstacle[], st: RiderState, tx: number): Obstacle | null {
-  let best: Obstacle | null = null;
+/** Something the corgi rides around: a solid obstacle (traffic) or another rider. */
+interface Box { s: number; x: number; speed: number; halfWidth: number; halfLength: number }
+const RIDER_HW = 0.45, RIDER_HL = 0.9;
+
+/** Gap ahead (m) of a box within LOOK m and across the corgi's path between lo..hi, else Infinity. */
+function inPath(b: Box, st: RiderState, lo: number, hi: number): number {
+  const ds = b.s - st.s;
+  if (ds < -b.halfLength || ds > LOOK + b.halfLength) return Infinity;
+  const m = b.halfWidth + 0.9;
+  return b.x + m < lo || b.x - m > hi ? Infinity : ds;
+}
+
+/** Nearest solid obstacle or rival within LOOK m ahead in the corgi's lane or across its path to `tx`. */
+function blocker(w: RideWorld, st: RiderState, tx: number): Box | null {
   const lo = Math.min(st.x, tx), hi = Math.max(st.x, tx);
-  for (const o of obstacles) {
+  let best: Box | null = null, bestDs = Infinity;
+  for (const o of w.obstacles) {
     if (!o.active || !o.solid) continue;
-    const ds = o.s - st.s;
-    if (ds < -o.halfLength || ds > LOOK + o.halfLength) continue;
-    const m = o.halfWidth + 0.9;
-    if (o.x + m < lo || o.x - m > hi) continue;
-    if (!best || ds < best.s - st.s) best = o;
+    const ds = inPath(o, st, lo, hi);
+    if (ds < bestDs) { best = o; bestDs = ds; }
+  }
+  for (const r of w.riders) {
+    if (r.isPlayer || (r.mode !== 'racing' && r.mode !== 'finished') || r.mods.intangible) continue;
+    const box = { s: r.s, x: r.x, speed: r.speed, halfWidth: RIDER_HW, halfLength: RIDER_HL };
+    const ds = inPath(box, st, lo, hi);
+    if (ds < bestDs) { best = box; bestDs = ds; }
   }
   return best;
 }
 
 /** Pass on the side the corgi is already on when there is room, else on the roomier side. */
-function passSide(b: Obstacle, x: number, hw: number): 1 | -1 {
+function passSide(b: Box, x: number, hw: number): 1 | -1 {
   const room = (side: number): number => hw - side * b.x - b.halfWidth;
   const mine = x >= b.x ? 1 : -1;
   if (room(mine) > 1.6) return mine;
@@ -90,22 +117,24 @@ function passSide(b: Obstacle, x: number, hw: number): 1 | -1 {
 export interface RideWorld {
   track: Track;
   obstacles: readonly Obstacle[];
+  /** Everyone in the race (the corgi rides around rivals; the player is its target, not a blocker). */
+  riders: readonly RiderState[];
   playerTop: number;
   /** The player's current speed (boosts included): the arrival sprint always closes in. */
   playerSpeed: number;
 }
 
-/** Ride toward `wantSpeed` and lateral target `tx`; brakes behind traffic and squeezes past slowly. */
+/** Ride toward `wantSpeed` and lateral target `tx`; brakes behind traffic or a rival and squeezes past. */
 export function ride(c: Corgi, w: RideWorld, dt: number, wantSpeed: number, tx: number, accel: number): void {
   const st = c.st;
   let want = clamp(wantSpeed, -WALK_BACK, topSpeed(c, w));
   let lat = 4;
   const hw = w.track.bounds(st.s).halfWidth;
-  const b = blocker(w.obstacles, st, tx);
+  const b = blocker(w, st, tx);
   if (b) {
-    // Steer around it slowly; brake only while still in its lane (beside it the corgi rides on).
+    // Steer around it (slowly around traffic); brake only while still in its lane (beside it the corgi rides on).
     tx = b.x + passSide(b, st.x, hw) * (b.halfWidth + 1.3);
-    lat = b.speed < 0 ? 3.5 : 1.6;               // oncoming traffic: dodge smartly
+    lat = b.speed < 0 ? 3.5 : b.halfWidth === RIDER_HW ? 2.5 : 1.6;   // oncoming traffic: dodge smartly
     if (Math.abs(b.x - st.x) < b.halfWidth + 0.9) {
       const gap = b.s - st.s - b.halfLength - 1;
       want = Math.min(want, Math.max(0, b.speed + (gap - 2) * 0.8));

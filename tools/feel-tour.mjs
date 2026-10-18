@@ -22,7 +22,8 @@ const STOPS = [
     { time: 1.2, controls: T, steerHold: { x: -1.5 }, grabEvery: 14 }] },
   { name: 'crest', s: 1600, x: 0, v: 20, segs: [{ time: 3.6, controls: T, grabEvery: 13 }] },
   { name: 'ramp', s: 1785, x: 3.1, v: 20, segs: [{ time: 3.0, controls: T, grabEvery: 11 }] },
-  { name: 'cliffwall', s: 1200, x: 3, v: 20, segs: [{ time: 3.5, controls: { ...T, steer: 0.45 }, grabEvery: 13 }] },
+  // tunnel rock walls 1945–2095 (the old cliff stop at s 1200 is now the calanque's R90 entry turn)
+  { name: 'tunnelwall', s: 1960, x: 5, v: 20, segs: [{ time: 3.5, controls: { ...T, steer: 0.45 }, grabEvery: 13 }] },
   { name: 'lookback', s: 700, x: 0, v: 20, rival: { s: 690, x: 1.5, v: 19 }, segs: [
     { time: 0.5, controls: T, grabEvery: 10 }, { time: 1.4, controls: { ...T, lookBack: true }, grabEvery: 10 },
     { time: 0.6, controls: T, grabEvery: 10 }] },

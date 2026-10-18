@@ -1,10 +1,12 @@
 // Planar mirror for the wet city road: reflects the camera about the road plane under it, renders only
-// the REFLECT_LAYER (neon, screens, lit windows, lamps) into a small HDR target with an oblique
-// near plane (nothing below the road leaks in), and exposes the projective texture matrix.
+// the REFLECT_LAYER (neon, screens, lit windows, lamps) of the track's branch into a small HDR target
+// with an oblique near plane (nothing below the road leaks in), and exposes the projective texture matrix.
 import {
   Color, HalfFloatType, LinearFilter, Matrix4, PerspectiveCamera, Plane, Vector2, Vector3, Vector4, WebGLRenderTarget,
-  type Camera, type Scene, type WebGLRenderer,
+  type Camera, type Light, type Object3D, type Scene, type WebGLRenderer,
 } from 'three';
+
+const MAX_H = 720;
 
 export class RoadMirror {
   readonly target: WebGLRenderTarget;
@@ -14,10 +16,13 @@ export class RoadMirror {
   readonly planeNormal = new Vector3(0, 1, 0);
   private readonly cam = new PerspectiveCamera();
   private readonly size = new Vector2();
-  private readonly v = { view: new Vector3(), target: new Vector3(), look: new Vector3(), rot: new Matrix4(), plane: new Plane(), clip: new Vector4(), q: new Vector4() };
+  private readonly v = { cam: new Vector3(), view: new Vector3(), target: new Vector3(), look: new Vector3(), rot: new Matrix4(), plane: new Plane(), clip: new Vector4(), q: new Vector4() };
   private readonly clear = new Color();
 
-  constructor(layer: number, private readonly scale: number) {
+  private readonly hidden: Object3D[] = [];
+
+  /** `keep` = the track group (the only branch with reflected meshes). */
+  constructor(layer: number, private readonly scale: number, private readonly keep: Object3D) {
     this.target = new WebGLRenderTarget(1, 1, { type: HalfFloatType, minFilter: LinearFilter, magFilter: LinearFilter, depthBuffer: true });
     this.target.texture.name = 'city.wetMirror';
     this.target.texture.generateMipmaps = false;
@@ -26,7 +31,9 @@ export class RoadMirror {
 
   private fit(renderer: WebGLRenderer): void {
     renderer.getDrawingBufferSize(this.size);
-    const w = Math.max(64, Math.round(this.size.x * this.scale)), h = Math.max(36, Math.round(this.size.y * this.scale));
+    // Scale of the drawing buffer, capped at MAX_H rows (dpr 2 would otherwise quadruple the cost).
+    const k = Math.min(this.scale, MAX_H / Math.max(1, this.size.y));
+    const w = Math.max(64, Math.round(this.size.x * k)), h = Math.max(36, Math.round(this.size.y * k));
     if (this.target.width !== w || this.target.height !== h) this.target.setSize(w, h);
   }
 
@@ -35,7 +42,7 @@ export class RoadMirror {
     if (!(camera instanceof PerspectiveCamera)) return false;
     const { view, target, look, rot, plane, clip, q } = this.v;
     camera.updateMatrixWorld();
-    const camPos = new Vector3().setFromMatrixPosition(camera.matrixWorld);
+    const camPos = this.v.cam.setFromMatrixPosition(camera.matrixWorld);
     view.subVectors(point, camPos);
     if (view.dot(normal) > 0) return false;            // camera under the road
     this.planePoint.copy(point);
@@ -74,13 +81,32 @@ export class RoadMirror {
     // Accumulate stats into the outer frame instead of resetting them mid-frame.
     const prevReset = renderer.info.autoReset;
     renderer.info.autoReset = false;
+    const hidden = this.prune(scene);
     renderer.render(scene, cam);
+    for (const o of hidden) o.visible = true;
     renderer.info.autoReset = prevReset;
     scene.background = prevBg;
     renderer.shadowMap.autoUpdate = prevShadow;
     renderer.setClearColor(this.clear, prevAlpha);
     renderer.setRenderTarget(prevTarget);
     return true;
+  }
+
+  /**
+   * Hide every top-level branch except the track's (and the lights, so the materials keep their lit
+   * program): only track meshes carry REFLECT_LAYER, and riders / fx / UI need not be traversed,
+   * culled and sorted again for the nested pass. Returns what to unhide.
+   */
+  private prune(scene: Scene): Object3D[] {
+    let keep: Object3D | null = this.keep;
+    while (keep && keep.parent && keep.parent !== scene) keep = keep.parent;
+    this.hidden.length = 0;
+    for (const o of scene.children) {
+      if (o === keep || !o.visible || (o as Light).isLight) continue;
+      o.visible = false;
+      this.hidden.push(o);
+    }
+    return this.hidden;
   }
 
   dispose(): void {

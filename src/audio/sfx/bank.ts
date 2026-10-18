@@ -37,9 +37,11 @@ export const PREWARM_RACE = [
   'pickup.coin', 'pickup.fish', 'obstacle.hit', 'traffic.horn.car', 'traffic.horn.van', 'skill.cast', 'skill.hit',
 ];
 
-/** Concurrent one-shots (a busy pack is capped here: the quietest sound gives way). */
-const MAX_ACTIVE = 24;
-const PER_ID: Record<string, number> = { 'ui.count': 2, 'ui.move': 2, 'bike.bump': 2, 'swing.light': 3, 'ko.boom': 2 };
+/** Concurrent one-shots (a busy pack is capped here: the quietest sound gives way; every voice is
+ *  two nodes the realtime thread renders, and a dozen overlapping hits already mask each other). */
+const MAX_ACTIVE = 16;
+const PER_ID_DEFAULT = 3;
+const PER_ID: Record<string, number> = { 'ui.count': 2, 'ui.move': 2, 'bike.bump': 2, 'swing.light': 2, 'ko.boom': 2 };
 
 interface Active {
   id: string;
@@ -88,7 +90,7 @@ export class SfxPlayer {
     const prev = this.last.get(id);
     if (prev !== undefined && Math.abs(t - prev) < 0.025) return 0;
     const same = this.active.filter((a) => a.id === id);
-    if (same.length >= (PER_ID[id] ?? 4) && !this.steal(same, vol, t)) return 0;
+    if (same.length >= (PER_ID[id] ?? PER_ID_DEFAULT) && !this.steal(same, vol, t)) return 0;
     if (this.active.length >= MAX_ACTIVE && !this.steal(this.active, vol, t)) return 0;
     const ctx = this.engine.ctx;
     const take = this.cache?.get(id) ?? null;
@@ -97,8 +99,9 @@ export class SfxPlayer {
     if (opts.lowpass !== undefined && opts.lowpass < 14000) head = head.connect(filter(ctx, { type: 'lowpass', frequency: opts.lowpass, Q: 0.7 }));
     if (opts.highpass !== undefined && opts.highpass > 30) head = head.connect(filter(ctx, { type: 'highpass', frequency: opts.highpass, Q: 0.7 }));
     this.route(head, opts);
-    // UI sounds stay exact; world sounds vary ±3 % so repeats never machine-gun.
-    const vary = id.startsWith('ui.') ? 1 : 1 + (this.rng.next() - 0.5) * 0.06;
+    // Live world sounds vary ±3 % so repeats never machine-gun (cached takes bake that variation in
+    // and play at rate 1 unless a pitch is asked for); UI sounds stay exact.
+    const vary = take || id.startsWith('ui.') ? 1 : 1 + (this.rng.next() - 0.5) * 0.06;
     const pitch = Math.max(0.25, (opts.pitch ?? 1) * vary);
     let dur: number;
     if (take) {

@@ -71,3 +71,14 @@
 - env-city / env-mountain: use content's TRACK_BILLBOARDS / TRACK_SIGNS (src/data/strings.ts or memes.ts)
   for neon signs / billboards / road signs.
 - audio: regenerate barks for content's new roster lines with tools/gen-tts.mjs when convenient.
+
+## Open for the whole-game acceptance pass (integrator, 10-19)
+- race (r3 limit reached, critic 7/10): predictable podium: when the player doesn't win, the pigeon or the penguin wins almost every race. Needs per-rival pace variety / rubber-banding spread across the field.
+- sim (r3 limit reached; feel 7/10, camera 8/10 pass): fix r3 addressed but unverified: releasing an L3 drift mid-corner flings the bike outward (nose ~60° past the tangent, runs 4–12 m wide); rider-rider side bumps snap the heading 20–25° in one frame and repeat every 0.4 s while pressing.
+- ui-hud (r2 limit reached; art 7, correctness 7): fix r2 addressed but unverified: name tags + taunt bubbles stack into a column over the road in packs; the progress strip shows all 7 rivals as one badge; the player quip bubble covers rival taunts docked on the right edge.
+- fx (r2 limit reached; art 7, timing 7): fix r2 addressed but unverified: KO hold renders orange/tan victims (cat, shiba, corgi) as flat red-orange silhouettes on the red rays; KO framing crops the victim's head at the top letterbox; SHOWTIME impact victims are small specks in a cluttered clump, and the letterbox pops off at impact; a KO credited during the SHOWTIME rise aborts the rise and plays an unrelated KO cinematic.
+- ui-screens (r2 limit reached; art 8.2 pass, interaction 7.5): fix r2 addressed but unverified: results still get dismissed by finish-line input (hop rhythm on Space/A fires 下一站; mashing pad B bails to the menu).
+- track (r2 limit; art 7, tech 8 pass): fix r2 addressed but unverified: shadow acne shimmers on the limestone cutting/cliff faces at default quality (s 1260-1320, 1890-1930, 2088-2120).
+- env-city (r2 limit; art 7, tech 7): fix r2 addressed but unverified: the wet-road overlay is depth-occluded at grade changes (hard seams, the reflection pops off ~2 s at the underpass); trees and the roundabout statue sit in the unlit, outline-less glow batch (flat faceted blobs); neon arcade right-side shophouse fronts render as a flat black wall from the right lane (s≈850-1060).
+- env-mountain (r2 limit; art 6, tech 8 pass): fix r2 addressed but unverified: rock faces read as flat plywood (planar walls, plank strata, pinstriped slopes); the waterfall looks like a flat blue camouflage card from the bridge; the three hairpins look identical at speed and the roadside is sparse.
+- species (r2 limit; art 7, anim 6.5): fix r2 addressed but unverified: the hero pelican shows neither beak nor pouch from the chase cam at rest; signature skill poses last ~0.3 s in the real game (8 of 12 crushed).

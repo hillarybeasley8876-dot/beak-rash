@@ -24,6 +24,8 @@ export interface VoiceOpts {
   priority?: number;
   /** Barks: re-placed every frame while the line plays. */
   follow?: Follow;
+  /** Barks: how long (s) the line may wait for the channel instead of being dropped (one waits at a time). */
+  wait?: number;
 }
 
 interface Playing {
@@ -37,14 +39,19 @@ interface Playing {
 const STALE = 1.4;        // s: queued announcer lines older than this are dropped
 const BARK_GAP = 1.3;     // s between character barks
 const LOUD = 3;           // announcer priority that silences barks while it speaks
+const FADE = 0.07;        // s: a cut line's fade-out
 
 export class VoicePlayer {
   private clips = new Map<string, Clip>();
   private loading = new Map<string, Promise<Clip>>();
   private byText = new Map<string, string>();
+  /** When each channel's line ends (or ended, when it was cut). */
   private busy: Record<VoiceChannel, number> = { announcer: 0, bark: 0 };
+  /** Earliest start of the next bark: the gap after a bark, or the end of a loud announcer line. */
+  private barkGate = 0;
   private current: Record<VoiceChannel, Playing | null> = { announcer: null, bark: null };
   private pending: { id: string; opts: VoiceOpts; at: number } | null = null;
+  private pendingBark: { id: string; opts: VoiceOpts; at: number } | null = null;
   private warned = false;
   private paused = false;
 
@@ -101,7 +108,7 @@ export class VoicePlayer {
     if (!(id in VOICE)) return 'none';
     const now = this.engine.now;
     const channel = opts.channel ?? 'announcer';
-    if (channel === 'bark' && (this.paused || now < this.busy.bark + BARK_GAP)) return 'dropped';
+    if (channel === 'bark' && (this.paused || now < this.barkGate)) return this.waitForBark(id, opts);
     const clip = this.clips.get(id);
     if (clip === 'missing') return 'none';
     if (!clip) {
@@ -126,38 +133,53 @@ export class VoicePlayer {
     return 'started';
   }
 
-  /** Game paused: barks fade out, the queued announcer line is dropped, nothing new starts until resumed. */
+  /** A bark that may wait (a KO line held for the cinematic's end) takes the one waiting slot. */
+  private waitForBark(id: string, opts: VoiceOpts): VoiceResult {
+    const wait = opts.wait ?? 0;
+    if (this.paused || wait <= 0 || this.pendingBark) return 'dropped';
+    this.pendingBark = { id, opts, at: this.engine.now };
+    void this.load(id);
+    return 'queued';
+  }
+
+  /** Game paused: barks fade out, queued lines are dropped, nothing new starts until resumed. */
   setPaused(paused: boolean): void {
     if (paused === this.paused) return;
     this.paused = paused;
     if (!paused) return;
     this.pending = null;
+    this.pendingBark = null;
     this.cut('bark');
   }
 
   private start(id: string, clip: AudioBuffer, opts: VoiceOpts, channel: VoiceChannel): void {
     const ctx = this.engine.ctx;
     const now = this.engine.now;
+    // A bark that waited: placed where its speaker is now (gone = silent).
+    const where = channel === 'bark' && opts.follow ? opts.follow() : undefined;
+    if (where === null) return;
+    const level = where?.gain ?? opts.gain ?? 1;
     const src = new AudioBufferSourceNode(ctx, { buffer: clip });
-    const gain = new GainNode(ctx, { gain: opts.gain ?? 1 });
+    const gain = new GainNode(ctx, { gain: level });
     let head: AudioNode = src.connect(gain);
     let pan: StereoPannerNode | null = null;
     if (channel === 'bark') {
-      pan = new StereoPannerNode(ctx, { pan: Math.max(-1, Math.min(1, opts.pan ?? 0)) });
+      pan = new StereoPannerNode(ctx, { pan: Math.max(-1, Math.min(1, where?.pan ?? opts.pan ?? 0)) });
       head = head.connect(pan);
+      this.barkGate = now + clip.duration + BARK_GAP;
     }
     head.connect(this.engine.voiceIn);
     src.start(now);
     const priority = opts.priority ?? 1;
     this.busy[channel] = now + clip.duration;
     this.current[channel] = { src, gain, pan, follow: opts.follow, priority };
-    this.onStart(id, channel, opts.gain ?? 1);
+    this.onStart(id, channel, level);
     if (channel === 'announcer') {
       this.engine.setVoiceDuck(1);
       if (priority >= LOUD) {
-        // A big call (countdown, KO, SHOWTIME, finish): character lines step aside.
+        // A big call (countdown, KO, SHOWTIME, finish): character lines step aside until it ends.
         this.cut('bark');
-        this.busy.bark = Math.max(this.busy.bark, now + clip.duration + 0.25 - BARK_GAP);
+        this.barkGate = Math.max(this.barkGate, now + clip.duration + 0.25);
       }
     }
   }
@@ -168,9 +190,12 @@ export class VoicePlayer {
     if (!cur) return;
     const now = this.engine.now;
     holdAt(cur.gain.gain, now);
-    cur.gain.gain.linearRampToValueAtTime(0, now + 0.06);
-    cur.src.stop(now + 0.07);
+    cur.gain.gain.linearRampToValueAtTime(0, now + FADE - 0.01);
+    cur.src.stop(now + FADE);
     this.current[channel] = null;
+    // The line stopped now: its remaining length (and a bark's gap after it) no longer blocks anything.
+    this.busy[channel] = Math.min(this.busy[channel], now + FADE);
+    if (channel === 'bark') this.barkGate = Math.min(this.barkGate, now + FADE);
   }
 
   /** Per frame: play the queued announcer line when free, move barks with their speaker, release the duck. */
@@ -181,6 +206,13 @@ export class VoicePlayer {
       this.pending = null;
       const clip = this.clips.get(id);
       if (clip && clip !== 'missing' && now - at < STALE) this.start(id, clip, opts, 'announcer');
+    }
+    const waiting = this.pendingBark;
+    if (waiting && now - waiting.at > (waiting.opts.wait ?? 0)) this.pendingBark = null;
+    else if (waiting && !this.paused && now >= this.barkGate) {
+      this.pendingBark = null;
+      const clip = this.clips.get(waiting.id);
+      if (clip && clip !== 'missing') this.start(waiting.id, clip, waiting.opts, 'bark');
     }
     const bark = this.current.bark;
     if (bark && now >= this.busy.bark) this.current.bark = null;

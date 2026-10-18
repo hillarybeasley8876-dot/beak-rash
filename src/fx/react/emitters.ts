@@ -74,10 +74,10 @@ export class RiderEmitters implements FxPart {
     const boosting = r.boostTime > 0;
     const drafting = r.isPlayer && r.draft > 0.5;
     if (!boosting && !drafting) return;
-    const rate = boosting ? (r.isPlayer ? 46 : 12) : 14 * r.draft;
+    const rate = boosting ? (r.isPlayer ? 40 : 10) : 14 * r.draft;
     fx.streak += rate * dt;
     for (; fx.streak >= 1; fx.streak--) {
-      this.ctx.burst('streaks', t.pos, { count: 1, dir: t.fwd, color: boosting ? '#ffffff' : '#cfe8ff', scale: r.isPlayer ? 1 : 0.7 });
+      this.ctx.burst('streaks', t.pos, { count: 1, dir: t.fwd, color: boosting ? '#b3b3b3' : '#8c8c8c', scale: r.isPlayer ? 1 : 0.7 });
     }
   }
 }

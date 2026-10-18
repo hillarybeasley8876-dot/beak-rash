@@ -84,3 +84,16 @@ export function smooth(g: BufferGeometry, tolerance = 1e-4): BufferGeometry {
   merged.computeVertexNormals();
   return merged;
 }
+
+/** Ring (collar, headset cup, seat clamp) around `axis` through c: rIn..rOut, height h, rounded outer edges. */
+export function roundRing(c: V3, axis: V3, rIn: number, rOut: number, h: number, seg: number): BufferGeometry {
+  const e = Math.min(h / 3, (rOut - rIn) / 2);
+  return lathe([[rIn, -h / 2], [rOut - e, -h / 2], [rOut, -h / 2 + e], [rOut, h / 2 - e], [rOut - e, h / 2], [rIn, h / 2]], seg, c, axis);
+}
+
+/** Pill a → b (radius r) with domed ends: rounded clamps, bar ends, lever blades. */
+export function pill(a: V3, b: V3, r: number, seg: number): BufferGeometry {
+  const dir = b.clone().sub(a), len = dir.length(), k = Math.min(r, len / 2);
+  const prof: Array<[number, number]> = [[0, 0], [r * 0.7, k * 0.3], [r, k], [r, len - k], [r * 0.7, len - k * 0.3], [0, len]];
+  return lathe(prof, seg, a, dir.normalize());
+}

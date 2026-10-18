@@ -41,7 +41,7 @@
 - tools/race-soak.mjs: seeds 1,2,3 OK (races end ~165–181 s, nobody stuck > 1 s, sane positions, no traffic
   spawned inside riders, police busts the braking autopilot, 0 console errors); per race ≈ 60 AI
   overtakes, 50–70 hits, 4–8 KOs, 1–7 traffic crashes, 6–12 AI drifts with L1–L2 mini-turbos, 30–45 taunts.
-- tools/race-scenarios.mjs 15/15 (police spawn/catch/BUSTED once/alerts/resume, countdown + launch
+- tools/race-scenarios.mjs (see Fix round 3 for the latest counts; police spawn/catch/BUSTED once/alerts/resume, countdown + launch
   boost, finish + results + single race:end, 60 s DNF timeout, restart mid-intro, quit cleanup).
 - Perf: race logic ≈ 0.16 ms/frame; traffic 20 draw calls / ~40k tris with 7 vehicles (instance counts
   trimmed to slots in use; was 460k tris before the trim).
@@ -57,17 +57,22 @@
   bike is the only real top-speed edge (by design: garage upgrades matter).
 - Police speech uses `app.ui.toast` (the corgi is not a session rider, so no `taunt` bubble; core request 6).
 - Police whistle pushes a `slow` status (1 s, 15 %) onto the player directly (combat owns statuses).
-- PERFECT START is still a race toast (flow.ts) until ui-hud ships its 'launch' callout (ui-hud fix item 13).
+- Finished riders stop where the sim's finish auto-brake puts them (sim forces.ts finishBrake 2.5 m/s², throttle
+  ignored: ~60–70 m past the line); race only steers them to the road edge and brakes for riders stopped ahead.
+- The passive test player (lane keeping, no draft/drift/skills) finishes 6th–8th more often since rivals use the
+  slipstream (fix r3); a fixie or a player who drafts/drifts still wins (`--only bikes`).
 
 ## Core requests
 1–5 applied by core (rider:boost 'launch', race:intro.duration, outlineMaterial export (traffic uses it since fix r2),
 police:alert.reason, RiderState.rubber; sim multiplies rubber in).
 6. (open) a world-anchored speech line for non-session riders (the corgi), or let `taunt` take a world position.
-Cross-unit (critic r2, not race-owned):
+Cross-unit (critics r2/r3, not race-owned; sim is wrapped up, so these stay open):
 - sim: no draft slingshot while braking (brake > 0.5) or below ~8 m/s, and reset `draft` while braking
-  (sim/contacts.ts slipstream(): a fully braking player was pushed 13.3 → 15.8 m/s by kind 'draft' boosts).
-- ui-hud: 'launch' callout (PERFECT START! 起步完美) → then race drops its toast in flow.ts (2 lines); the BUSTED
-  '+4S' timer chip should be a 4-3-2-1 ticket-hold countdown while the player's mode is 'busted' (no time is added).
+  (sim/contacts.ts slipstream(): critic r3 saw a fully braking player get rider:boost 'draft' and go 0.7 → 3.0 m/s).
+- combat: seagull.steal shouts 'MINE!' on every steal (4–12 repeats a minute): draw from a no-repeat bag
+  (MINE! / 我的了！/ 薯条归我！…) or drop it (race already shouts the seagull's roster skillLines on 60 % of casts).
+- ui-hud: the 'launch' callout shipped (race's PERFECT START toast removed, fix r3); the BUSTED '+4S' timer chip
+  should be a 4-3-2-1 ticket-hold countdown while the player's mode is 'busted' (no time is added).
 
 ## How to test
 - Play: `/?race=coast&seed=3` (Enter skips the intro). Autopilot: `&autopilot=1`. Aerial debug cam:
@@ -76,6 +81,8 @@ Cross-unit (critic r2, not race-owned):
   checks run only when named: `--only close,bikes,mugging,arrive`; groups listed in the file header)
 - `node tools/race-soak.mjs --seeds 1,2,3` (full autopilot races, any console error fails; isolate with
   `--stub world,fx,ui,audio --lenient`)
+- `node tools/race-podium.mjs --seeds 1-24 [--par 3]` (72 passive full races over coast/city/mountain: who wins; PASS = no
+  species > 35 % of rival wins, every species podiums; ~12 min at --par 3)
 - `node tools/race-gallery.mjs --views row,front,side` → shots/race/gallery-*.png
 - `node tools/race-check.mjs --url "/?race=coast&seed=3&manual=1" --frames 1800 --every 300 --ai`
 
@@ -213,3 +220,64 @@ brake, 10 launch/ticket HUD) → re-run scenarios + soak. Status per issue (appe
   `race-soak --seeds 1,2,3` SOAK OK (winners shiba/pigeon/sloth, busted 1/1/1, stuck ≤ 2.0 s, 0 errors); tsc: 0 errors in
   race files. Fix round 2 complete; open items are cross-unit only (sim draft-while-braking, ui-hud launch callout + ticket
   countdown → then drop flow.ts PERFECT START toast).
+
+## Fix round 3
+Plan (critic reviews/race-r3-gameplay.json, 9 issues; 2 cross-unit; + env-city note, content req 10). Order: 6 PERFECT START
+toast → 1 predictable podium (form dice, purposeful speed skills, podium regression) → 4 grudge payback → 5 corgi vs riders →
+2 police tail (re-sprint / cap / let-go toast, content req 10) → 7 finisher roll-out (+ env-city note) → 3 suite re-run →
+8/9 cross-unit notes. Status per issue (append DONE lines as each lands):
+- [6 PERFECT START twice] DONE: flow.ts launch() no longer toasts (ui-hud's 'launch' callout shows PERFECT START / GOOD START);
+  core request 1 and the known issue are closed.
+- [1 podium] code in: ai/index.ts offsets = 25 % strength rank + 75 % per-race form dice; ai/skills.ts speed skills (slide,
+  flash, doge, ghost) only with a purpose (overtake: rider 3–25 m ahead in lane; defence: threatened; comeback: behind the
+  player or bottom half), holstered as race leader or > 20 m ahead of the player; sloth.flash only from the bottom 3 or
+  trailing the player; brain cap × slipstream (+10 % × draft, as the sim) so drafters catch and pass a pack leader; pigeon
+  drafter 0.95 → 0.8. New tools/race-podium.mjs (passive player, seeds × tracks, own seed block per track, form % + speed
+  casts + leader per race; PASS = no species > 35 % of rival wins, every species podiums). Baseline 12 races: pigeon 9/12
+  (75 %), goose no podium. After: 24 races (seeds 5-12) PASS max 33 % (cat 8, shiba 6, penguin 5, pigeon 2, capybara/goose/
+  seagull 1), all podium. Full 72-race run after the other AI fixes.
+- [4 grudge] DONE: fight.ts payback owed for 5 s (was a 2 s window that ran out while the knocked victim was out of
+  reach), taken as soon as the player is in reach (a failed roll retries after 0.25 s, not a full reaction period); a
+  grudge only fires hitting/robbing skills (honk/spin/steal: shields and slides block its own swing) and brakes to let a
+  player behind come alongside (Fighter.owes); catch-up in view while owed and the player 0.5–8 m ahead, 3 s per grudge:
+  pace.ts paybackPace = max(pace ×1.06, player speed + 1.5) (a boosted player outran ×1.06), rubber rate 0.4/s; hot
+  species' grudge chance up (goose 1, seagull .95, cat .9, shiba .8; × (0.9 + 0.05·lv)). Scenario: fights = hits from
+  within 6 m (torpedo/ult hits from 8–45 m listed as ranged, not checked; race-lib logs ds at each combat:hit).
+  `--only grudge` PASS 10/21 landed back, 12/21 swung back (39 ranged hits left out); 0 early hits. Brain summary now
+  exposes fight timers (`__br.race.ai()[i].fight`).
+- [7 finishers] code in: brain.ts rollOut(): past the line riders pull over to the road edge (sides alternate by place)
+  and roll out ≥ 6 m/s for 60 m (3 m/s² from the finish speed), then stop at 2 m/s²; followLimit (stopping distance)
+  now also runs for finished riders. drive() split into raceSpeed / rollOut / followLimit / huntLimit. env-city note:
+  standings.rollOutLate() marks riders crossing after race:end as finished (they rolled on to s≈5400).
+- [2 police tail + content req 10] DONE: police.ts: spawn 20 m back (arrives in ~3 s); behind the chase camera
+  (> 4.5 m) for 2 s → one re-sprint (police-chase.ts resprint(): sprint ≤ 8 s, hold 3 s) with a POLICE_LINES.chase
+  line, the next time (or when tired) it gives up with the escape toast; chases end by 25 s (escape when the player
+  rides ahead of it, else a let-go: own toast 算了，下不为例 + police toot); the heat let-go also toasts; first time
+  alongside → a POLICE_LINES.chase toast (content request 10). New `--only visible` (6 brawler races, coast/city/
+  mountain L1–3): 8 chases, in view 60 % (critic 35 %), 12–25 s each, 7 lost + 1 busted; arrive brawler 1-2/auto 2 PASS
+  (reach 2.7–3.8 s, lost 19–23 s); outrun PASS (alongside 11 s, lost at 20.2 s).
+- [5 corgi through riders] DONE: police-chase.ts blocker() also treats racing rivals (0.45 × 0.9 m) as blockers (brake
+  behind / pass on the free side, 2.5 m/s lateral), police.ts picks the alongside side with 1.2 m clearance from
+  rivals. `--only visible` overlap check: 0.0 s corgi/rival overlap in 8 chases.
+- [1 podium] DONE: full regression `node tools/race-podium.mjs --seeds 1-24` (72 races, coast/city/mountain, L1–4 cycling,
+  passive player) PASS: rival wins pigeon 17 (24 %), cat 16, penguin 14, shiba 12, capybara 6, goose 3, seagull 3, sloth 1;
+  podiums goose 12, seagull 15, sloth 15 … all species ≥ 12; 0 console errors. Races are closer: median field spread L1
+  5.7 s (baseline 8.9), player−winner gap unchanged at L1–2 (3.3 / 7.2 s), smaller at L3–4 (10 / 15.6 s, was 20.6 / 20.8).
+- [7 finishers] DONE: the sim's finish auto-brake (sim-owned, throttle ignored) decides where finishers stop (~60–70 m past
+  the line, was 3–27 m when the brain braked hard), so race's roll-out only coasts (never pedals/brakes hard), pulls
+  over to the road edge by place and brakes for anyone stopped ahead (followLimit). Probe shots/race/r3fix/finish-probe.mjs
+  (passive s4 L3, critic's case): all 8 stopped 62–69 m past the line, 0 bumps involving finished riders (the player's
+  roll-out no longer hits a parked goose); finish-sheet.jpg.
+- [3 suite] DONE, final runs on the current tree (full game, real units): `race-scenarios` default 53/53 (new: visible ×3,
+  grudge melee-range fights, koGap keeps the passive player's HP topped up: its own KO at 56.5 s by rival 6 had handed the
+  field the gap back → gaps −98/−58/−29 m at +15/+30/+45 s, playerDown 0); named `close,bikes,mugging,arrive` 20/20 (leader
+  gap 59/18/113 m; roadbike 7th 169.1 s → fixie 1st 144.2 s); `race-soak --seeds 1,2,3` SOAK OK (winners pigeon/cat/goose,
+  stuck ≤ 2.5 s, busted 1 each, 0 errors); `race-podium --seeds 1-24` PASS (above); tsc 0 errors.
+- Visual (shots/race/r3fix/, 5 images read): launch.jpg (one ransom PERFECT START from the HUD, no toast), pol-sheet.jpg
+  (corgi + beacon riding beside the player around the goose; escape toast 甩掉了柯基警官), finish-sheet.jpg (finishers
+  rolled out 60 m+ past the line, results).
+- [8 sim draft while braking] not race-owned, sim is wrapped up: kept under Core requests / cross-unit.
+- [9 seagull MINE! repeats] not race-owned (combat's steal shout): note under Core requests / cross-unit for combat.
+- Other units' requests: env-city late finishers (done above), content req 10 chase line (done above); ui-hud's optional
+  race:introFocus / police:busted.hold need core event changes (not requested by core; HUD works without them).
+Fix round 3 complete.

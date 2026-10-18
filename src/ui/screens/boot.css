@@ -11,17 +11,41 @@
   animation: br-slash 0.16s var(--ease-snap) both;
 }
 .br-boot-slash.is-thin { top: 690px; height: 26px; background: var(--white); animation-delay: 0.08s; }
-.br-boot-logo { position: absolute; left: 0; right: 0; top: 330px; text-align: center; rotate: -9deg; }
 .br-boot-en {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 236px;
+  z-index: 1;
+  text-align: center;
   font-family: var(--f-stencil);
   font-weight: 400;
-  font-size: 210px;
+  font-size: 120px;
   line-height: 1;
+  letter-spacing: 0.06em;
+  word-spacing: 0.45em; /* Black Ops One's space is narrow: without this the splash reads BEAKRASH */
   color: var(--white);
-  text-shadow: 10px 10px 0 var(--ink);
-  animation: br-slam 0.4s var(--ease-slam) 0.06s both;
+  text-shadow: 8px 8px 0 var(--red);
+  rotate: -9deg;
+  animation: br-slam 0.36s var(--ease-slam) 0.05s both;
 }
-.br-boot-cn { margin-top: 10px; font-size: 110px; --delay: 260ms; }
+/* Centred on the red band (band centre: 960, 525; same -9° tilt), so the thin slash stays clear. */
+.br-boot-cnwrap { position: absolute; left: 0; right: 0; top: 525px; display: flex; justify-content: center; translate: 0 -50%; rotate: -9deg; }
+.br-boot-cn { position: relative; font-size: 200px; --delay: 180ms; }
+.br-boot-burst { position: absolute; left: 50%; top: 50%; width: 600px; height: 600px; margin: -300px 0 0 -300px; animation: br-pop 0.32s var(--ease-slam) 0.12s both, br-spin 24s linear 0.44s infinite; }
+.br-boot-sweep {
+  position: absolute;
+  left: -40%;
+  top: 0;
+  width: 60%;
+  height: 100%;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.22) 0 30%, transparent 33%);
+  background-size: 22px 22px;
+  -webkit-mask-image: linear-gradient(100deg, transparent 0%, #000 45%, #000 55%, transparent 100%);
+  mask-image: linear-gradient(100deg, transparent 0%, #000 45%, #000 55%, transparent 100%);
+  animation: br-boot-sweep 0.9s var(--ease-out) 0.1s both;
+}
+@keyframes br-boot-sweep { from { translate: 0 0; } to { translate: 260% 0; } }
 .br-boot-credit {
   position: absolute;
   left: 0;

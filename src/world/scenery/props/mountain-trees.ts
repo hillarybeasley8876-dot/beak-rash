@@ -4,7 +4,7 @@
 import { Color, Matrix4 } from 'three';
 import type { Rng } from '../../../core/rng';
 import type { MeshBuf } from '../../geom';
-import { cone, cylinder, sphere, trs } from '../../kit/shapes';
+import { box, cone, cylinder, sphere, trs } from '../../kit/shapes';
 
 const C = (h: string): Color => new Color(h);
 const PAL = {
@@ -27,7 +27,7 @@ export function pine(buf: MeshBuf, x: number, y: number, z: number, rng: Rng, sc
     const r = R * (1 - t * 0.62), h = (H * 0.5) * (1 - t * 0.25);
     const y0 = y + H * 0.2 + t * H * 0.62;
     const ox = rng.range(-0.12, 0.12) * scale, oz = rng.range(-0.12, 0.12) * scale;
-    cone(buf, trs(x + ox, y0, z + oz, rng.range(0, 6.28), r, h, r, m), i === tiers - 1 ? PAL.pineTop : col, 8);
+    cone(buf, trs(x + ox, y0, z + oz, rng.range(0, 6.28), r, h, r, m), i === tiers - 1 ? PAL.pineTop : col, 10);
   }
 }
 
@@ -39,24 +39,28 @@ export function fir(buf: MeshBuf, x: number, y: number, z: number, rng: Rng, sca
   for (let i = 0; i < 5; i++) {
     const t = i / 5;
     const r = R * (1 - t * 0.7), h = H * 0.34 * (1 - t * 0.3);
-    cone(buf, trs(x, y + H * 0.14 + t * H * 0.66, z, rng.range(0, 6.28), r, h, r, m), i === 4 ? PAL.firTop : col, 7);
+    cone(buf, trs(x, y + H * 0.14 + t * H * 0.66, z, rng.range(0, 6.28), r, h, r, m), i === 4 ? PAL.firTop : col, 9);
   }
 }
 
-/** Birch: white trunk with dark marks, a few golden autumn blobs. Height ≈ 7–9 m × scale. */
+/** Birch: white trunk (two leaning pieces) with a few short dark dashes, a crown of 3–4 merged golden blobs
+ * with a darker underside. Height ≈ 7–9 m × scale. */
 export function birch(buf: MeshBuf, x: number, y: number, z: number, rng: Rng, scale = 1): void {
-  const H = rng.range(6.5, 8.5) * scale;
-  const lean = rng.range(-0.25, 0.25);
-  const K = 5;
-  for (let i = 0; i < K; i++) {
-    const t0 = i / K;
-    cylinder(buf, trs(x + lean * t0 * 0.5, y - 0.3 + t0 * H * 0.75, z, 0, 0.16 * scale, (H * 0.75) / K, 0.16 * scale, m), i % 2 ? PAL.birchMark : PAL.birch, 6, 1, 0.92, false);
+  const H = rng.range(6.5, 8.5) * scale, r = 0.16 * scale, th = H * 0.75;
+  const lx = rng.range(-0.25, 0.25), lz = rng.range(-0.25, 0.25);
+  cylinder(buf, trs(x, y - 0.3, z, 0, r, th * 0.5 + 0.3, r, m), PAL.birch, 6, 1, 0.92, false);
+  cylinder(buf, trs(x + lx * 0.5, y + th * 0.5 - 0.05, z + lz * 0.5, 0, r * 0.92, th * 0.5, r * 0.92, m), PAL.birch, 6, 1, 0.85, false);
+  for (let k = rng.int(3, 5); k > 0; k--) {
+    const t = rng.range(0.1, 0.9), a = rng.range(0, Math.PI * 2), rr = r * (1 - t * 0.15), off = t < 0.5 ? 0 : 0.5;
+    const cx = x + lx * off + Math.cos(a) * (rr + 0.01), cz = z + lz * off + Math.sin(a) * (rr + 0.01);
+    box(buf, trs(cx, y - 0.3 + t * th, cz, -a, 0.07, 0.05, rr * 1.1, m), PAL.birchMark);
   }
-  const leaf = rng.pick(PAL.birchLeaf);
+  const leaf = rng.pick(PAL.birchLeaf), dark = leaf.clone().multiplyScalar(0.72);
   const top = y + H * 0.72;
-  for (let k = 0; k < 3; k++) {
-    const r = rng.range(1.2, 1.7) * scale;
-    sphere(buf, trs(x + lean * 0.4 + rng.range(-0.8, 0.8) * scale, top + k * 0.9 * scale, z + rng.range(-0.8, 0.8) * scale, 0, r, r * 0.85, r, m), leaf, 8, 5);
+  for (let k = rng.int(3, 4); k > 0; k--) {
+    const rb = rng.range(1.0, 1.5) * scale;
+    sphere(buf, trs(x + lx + rng.range(-0.9, 0.9) * scale, top + rng.range(-0.2, 1.4) * scale, z + lz + rng.range(-0.9, 0.9) * scale, 0, rb, rb * 0.85, rb, m),
+      leaf, 7, 5, dark);
   }
 }
 
@@ -69,6 +73,6 @@ export function farPine(buf: MeshBuf, x: number, y: number, z: number, rng: Rng,
 /** Round tea bush (terraces): a squashed blob with a lighter top. */
 export function teaBush(buf: MeshBuf, x: number, y: number, z: number, rng: Rng, len: number, yaw: number): void {
   const r = rng.range(0.55, 0.7);
-  sphere(buf, trs(x, y + r * 0.3, z, yaw, len * 0.5, r * 0.9, r, m), PAL.tea, 7, 4, PAL.tea.clone().multiplyScalar(0.75));
-  sphere(buf, trs(x, y + r * 0.85, z, yaw, len * 0.42, r * 0.35, r * 0.75, m), PAL.teaTop, 6, 3);
+  sphere(buf, trs(x, y + r * 0.3, z, yaw, len * 0.5, r * 0.9, r, m), PAL.tea, 7, 3, PAL.tea.clone().multiplyScalar(0.75));
+  sphere(buf, trs(x, y + r * 0.85, z, yaw, len * 0.42, r * 0.35, r * 0.75, m), PAL.teaTop, 6, 2);
 }

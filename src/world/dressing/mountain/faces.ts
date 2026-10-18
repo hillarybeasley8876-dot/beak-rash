@@ -93,3 +93,18 @@ export function lanternGantryFace(atlas: SignAtlas, word: string, sub: string): 
     label(g, sub, w / 2, h * 0.87, 20, P5.yellow, FONT.cn, 400);
   });
 }
+
+/** Carved stone plaque over the tunnel portal: gilt title, English caption, length line. */
+export function tunnelPlaqueFace(atlas: SignAtlas, title: string, en: string): AtlasRect | null {
+  return cell(atlas, 512, 128, (g, w, h) => {
+    g.fillStyle = '#3a3036';
+    g.fillRect(0, 0, w, h);
+    g.lineWidth = 6;
+    g.strokeStyle = '#e8b85a';
+    g.strokeRect(10, 10, w - 20, h - 20);
+    emblem(g, 30, 34, 56, '#e8b85a', '#ff8a4a');
+    emblem(g, w - 86, 34, 56, '#e8b85a', '#ff8a4a');
+    label(g, title, w / 2, h * 0.42, 64, '#ffd27a', FONT.cn, 400);
+    label(g, en, w / 2, h * 0.8, 20, '#f3e6cf', FONT.en, 400);
+  });
+}

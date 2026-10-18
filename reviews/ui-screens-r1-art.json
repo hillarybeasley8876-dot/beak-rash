@@ -1,0 +1,82 @@
+{
+  "unit": "ui-screens",
+  "round": 1,
+  "lens": "art",
+  "pass": false,
+  "score": 6.5,
+  "summary": "The title, main menu, pause and results screens have a strong P5 identity: bold red/black/white diagonals, ransom-note titles, generated comic art integrated with sticker frames, clear hierarchy and constant subtle motion. There were 0 console errors at 1920x1080, 1280x720 and 1440x900. It is not yet at the bar of a polished commercial stylised game. (1) Race selection relies on placeholder-grade flat SVG track art, greys out unfocused cards and shows a grid of eight identical LOCKED tiles. (2) The garage bike floats in front of the workbench art instead of standing in the scene. (3) Single-weight display fonts get synthesised bold, which smears the small CJK labels on howto, pause, garage and results. (4) The signature shard wipe leaks the old screen through gaps on every navigation. Smaller polish gaps: the title crop cuts off the hero's beak, header ghost words are clipped, the credits half is an empty black slab, the loading card flashes by half-built, and the confirm modal and toasts look generic. 4 majors, so not a pass. Evidence: shots/review/ui-screens/r1-art/final/.",
+  "issues": [
+    {
+      "severity": "major",
+      "title": "Track cards use placeholder-grade flat SVG art; unfocused cards are grey-washed and career is 8 identical grey LOCKED tiles",
+      "detail": "src/ui/p5/track-art.ts draws each track from about 10 flat shapes: lighthouse, sea and sun; blocky towers with coloured windows; three purple triangles and a pagoda. Next to the rich AI comic key art on title, menu, garage and results these read as clip-art placeholders, yet they are the hero element of trackSelect and career. track-select.css .br-tc { filter: brightness(0.62) saturate(0.8) } turns the white bodies of unfocused cards mid-grey with dark text, so 02 and 03 look disabled rather than unselected (final/menus-1920x1080/21-tracks-1.png, 23-tracks-3.png). On a fresh save, career shows one coloured card and eight identical grey padlock + LOCKED tiles (16-career.png, 19-career-tier2.png). It is the most template-looking screen in the game.",
+      "fix": "Give each track a real illustration. Option A: an in-engine still of the actual track (render one frame per track offscreen with createTrack + the toon pipeline at preload and cache it as an ImageBitmap). Option B: request 16:9 track key art from the assets unit. Then layer halftone shading and a racer silhouette over it. Unfocused track cards should keep the white body and dim only the art, or invert to a black body with white text. Show a locked event as its track art in a dark red-tinted silhouette with one torn '???' or chain sticker per cup row, not a padlock repeated 8 times. Vary the frame per tier (bronze/silver/gold)."
+    },
+    {
+      "severity": "major",
+      "title": "Garage: the 3D bike is pasted over the workshop art instead of standing in it",
+      "detail": "The turntable box (.br-gar-show left 60, top 190, 1000x620) puts the bike's contact line at about y=740 of 1080. In art/garage.webp that is the middle of the workbench drawers; the drawn floor starts around y=900. So the bike hovers in front of the bench, with the turntable's flat black disc (CircleGeometry 0.95, opacity .32) smeared across the bench face. The art's bike repair stand right beside it stays empty (final/menus-1920x1080/24-garage-0.png, crops/garage-bike0.png; crops/garage-bike2.png shows the pink balance bike floating at bench-top height). The camera (eye 0.92 m, about 10 degrees down) does not match the art's higher horizon, so the perspectives disagree. Red and pink bikes sit red-on-red with nothing to separate them from the backdrop.",
+      "fix": "Mount the bike in the drawn stand (clamped at the seatpost, wheels free, slow spin), or move .br-gar-show down and right so the wheels land on the drawn floor in front of the stand. Match the camera height and pitch to the art's horizon. Replace the hard disc with a soft radial contact-shadow sprite. Add a thin white/ink rim pass or a dark radial vignette behind the bike so red frames separate from the red art."
+    },
+    {
+      "severity": "major",
+      "title": "Synthesised faux-bold on single-weight display fonts smears small CJK labels",
+      "detail": ".br-ui sets font-weight: 900 globally, but ZCOOL QingKe HuangYou, ZCOOL KuaiLe and Anton are bundled at 400 only, so every rule that does not reset the weight gets browser-synthesised bold. A computed-style audit (final/probe/faux-bold.txt) finds QingKe at 900 in: howto legend lines (.br-ht-line span 25px; 踩踏/刹车/漂移 turn into blobs, see crops/howto-legend.png); gamepad callouts (.br-ht-call span); skill cooldown chips (.br-ht-scd); the pause controls sheet (.br-pz-key span 27px) and standings subtitle; the garage 装备中 and 鱼 tags; settings 按确定清空; career stat chips (.br-car-stats i); results podium names (700) and the 余额 label. It finds Anton at 900 on every keycap/kbd, .br-ht-skey, .br-pz-time, .br-cc-bal, RANK and MORE. The brief's bar asks for crisp type.",
+      "fix": "Add font-synthesis-weight: none (or font-synthesis: none) to .br-ui in src/ui/p5/tokens.css. Then set font-weight: 400 explicitly on the selectors listed above, and keep 900 only for Noto Sans SC text. Re-run the audit; it should come back empty."
+    },
+    {
+      "severity": "major",
+      "title": "Shard wipe never fully covers: the old screen shows through about 1/3 of the frame and the new one pops in under the stripes",
+      "detail": "transition.ts gives each of its 6 shards height calc(100%/6 + 3px) but clips them with jagged(jy: 14), so neighbouring shards leave wedge gaps. At the covered moment (final/probe/wipe-in-150.png, wipe-in-215.png) the menu items and pelican art are still visible between the stripes. The career screen then appears in those same gaps (wipe-out-20.png), a visible hard cut on every navigation. The ink shards are the same colour as the dark screens, so most wipes read as 2-3 red stripes. On the red title the red shards blend into the red art (menus-1920x1080/07-wipe-title-menu.png).",
+      "fix": "Overlap the shards (height calc(100%/6 + 7%), top offset -3.5%, jy <= 5) and fill the wipe box with ink while state === 'covered' so nothing leaks through. Use a red / white / ink palette with a 12-16 px white leading slash on each shard so the wipe reads on both red and black screens. Keep the total at or under 450 ms."
+    },
+    {
+      "severity": "minor",
+      "title": "Title key art crops the hero's beak; at 16:10 the logo sits on the wing",
+      "detail": "title.css .br-title-art { object-fit: cover; object-position: 42% 50% } inside a 64%-wide box crops about 380 px off the right of art/title.webp. That pushes the red hooked beak tip (the pelican's defining feature, SPEC §5) and the sloth out of frame (final/menus-1920x1080/05-title.png). The box lives in the full-bleed bg, so at 1440x900 even more of the beak is lost while the stage-scaled logo overlaps the wing (spot-1440x900/1-title.png).",
+      "fix": "Anchor the crop on the hero (object-position about 85% 40%, or 100% height with object-fit: contain against the ink box) so the whole beak, red hook included, stays in frame at 16:9 and 16:10. Put the art box in the stage, or clamp its left edge to the logo's right edge, so the logo and pelican never collide."
+    },
+    {
+      "severity": "minor",
+      "title": "Header ghost word is clipped by the top edge and hidden behind the Chinese title on six screens",
+      "detail": "screens.css .br-header-en (Anton 168px, top 6px, rotate -4deg, 3px stroke at 28% white) rises above y=0 for long words, and two thirds of it sit behind the ransom title. Career, quick race, garage, config, how-to and credits therefore show fragments like 'AGE', 'FIG' and 'RACE' with sliced-off tops (final/menus-1920x1080/16-career.png, 21-tracks-1.png, 24-garage-0.png). It reads as a layout slip rather than a deliberate bleed.",
+      "fix": "Move the English word fully on-screen (top >= 34px) and offset it to the right of or below the CN title (e.g. left 300px, top 120px, behind the band's right end). Use a solid 10-14% white fill or a 5px red stroke, and clip it to the header band."
+    },
+    {
+      "severity": "minor",
+      "title": "Credits: the right half is a flat black void with a plain centred roll",
+      "detail": "credits.css .br-cr-slab is solid ink with no halftone, stars or bands. The roll is plain QingKe lines with a red shadow fading in and out (final/menus-1920x1080/39-credits-a.png, 40-credits-b.png). The Latin prompt line 'Generate an SVG of a pelican riding a bicycle' is set in QingKe's odd Latin glyphs. This is the least P5 screen in the game.",
+      "fix": "Put the backdrop() halftone and star on the slab. Render each credit as a skewed white/black name card that slams in, with the matching character's portrait sticker per role. Set Latin text in Bebas or Anton."
+    },
+    {
+      "severity": "minor",
+      "title": "Loading screen flashes by half-built, so the meme tip is unreadable",
+      "detail": "loading.ts MIN_SHOW_MS = 900 includes the roughly 210 ms cover wipe, and real loads are faster. In play the card is on screen for about 0.6 s and leaves while the TIPS box (120 ms delay + rise) and the vignette are still animating in (final/race-1920x1080-t0/02-loading-a.png, race-1920x1080-t1/02-loading-a.png: tip box translucent over the red band, title glyphs mid-slam). Held still (probe/loading-hold.png) the composition is good, but the vignette sits on the road strip and the rider icon runs through it.",
+      "fix": "Raise the minimum to about 2.0 s, or 1.6 s after the tip has fully landed. Start the tip and vignette animations with no delay. Raise the vignette about 80 px so it clears the road strip and the flag."
+    },
+    {
+      "severity": "minor",
+      "title": "Confirm modal and toasts are the generic parts of the kit",
+      "detail": "confirm.ts draws a plain black panel with a thin white rim, 28px grey body text and two small buttons. It looks like a web dialog next to everything else (final/menus-1920x1080/31-garage-modal.png, race-1920x1080-t0/12-pause-restart-modal.png). Toasts (toast.ts, 14% from the top, right edge) are small strips that land on the menu pelican's face and on the garage list (probe/menu-toasts.png).",
+      "fix": "Give the modal the P5 treatment: a jagged red/ink burst panel, ransom title, halftone, big slanted yes/no buttons with the menu's red-band cursor, and a pelican hurt/smug sticker. Move toasts to a dedicated lane under the coin badge or above the hint bar, at 32px+, with a per-kind icon in a star."
+    },
+    {
+      "severity": "minor",
+      "title": "Pause controls sheet floats on the live 3D scene",
+      "detail": ".br-pz-keys sits directly over the race, behind only a 58% veil, with no backing plate. Its 27px faux-bold labels are hard to read over bright coast sand and sky or wet city reflections (final/race-1920x1080-t0/10-pause.png, crops/pause-right.png).",
+      "fix": "Put the sheet on a skewed ink panel that matches the standings box (white rim, jagged clip), or collapse it into a single keycap strip under the standings."
+    },
+    {
+      "severity": "minor",
+      "title": "Boot splash under-sells the Chinese title",
+      "detail": "boot.css .br-boot-cn is 110px against a 210px English stencil, and it lands on the band's lower edge, touching the white slash line. The only motion is one slash and a slam over a still black star (final/probe/boot-500.png, boot-1000.png).",
+      "fix": "Make 暴力鹈鹕 the hero: a brush ransom of at least 180px centred on the red band, with BEAK RASH smaller above it. Add a white star-burst pop behind it and a halftone sweep, and keep the white slash clear of the glyphs."
+    },
+    {
+      "severity": "minor",
+      "title": "Results: podium mixes portrait types and the grade stamp is a clean sticker",
+      "detail": "The winner card uses the smug bust while 2nd and 3rd use full riding poses at a different scale, so the three cards look unmatched (final/race-1920x1080-t0/21-results-3.png, crops/results-right.jpg). The grade 'A' is a clean Anton letter in a white scalloped disc tucked under the podium. It lacks the inked rubber-stamp texture that a 'grade stamp' implies, so the grade reveal has little punch.",
+      "fix": "Use the same portrait type for all three cards (all smug busts or all main poses) and scale 1st place up about 15%. Give the stamp a rough ink mask (SVG turbulence/displacement or a grunge alpha), a red double ring, and a one-frame screen shake when it lands."
+    }
+  ]
+}

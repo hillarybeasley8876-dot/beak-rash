@@ -9,6 +9,8 @@ export interface NavItem {
   left?(): void;
   right?(): void;
   disabled?: () => boolean;
+  /** Activation of a disabled item (key or click): explain why (toast). */
+  onDenied?(): void;
   /** Called whenever this item gains focus (previews). */
   onFocus?(): void;
 }
@@ -22,26 +24,49 @@ export interface NavOpts {
   onMove?(index: number, item: NavItem): void;
 }
 
+// Hover focus follows REAL pointer movement only: a cursor parked where a new screen draws its items
+// must not steal the keyboard focus (browsers fire synthetic moves when content changes under it).
+let lastX = Number.NaN;
+let lastY = Number.NaN;
+let lastMoveAt = -Infinity;
+let tracking = false;
+
+function trackPointer(): void {
+  if (tracking) return;
+  tracking = true;
+  window.addEventListener('pointermove', (e) => {
+    if (e.clientX === lastX && e.clientY === lastY) return;
+    const first = Number.isNaN(lastX);
+    lastX = e.clientX;
+    lastY = e.clientY;
+    if (!first) lastMoveAt = performance.now();
+  }, { capture: true, passive: true });
+}
+
 export class Nav {
   index = 0;
   enabled = true;
+  /** Pointer gate set by the shell (no clicks while a screen is leaving / under the wipe / a modal). */
+  gate: () => boolean = () => true;
+  private readonly born = performance.now();
   private readonly cleanups: Array<() => void> = [];
 
   constructor(readonly items: NavItem[], private readonly o: NavOpts) {
+    trackPointer();
     items.forEach((item, i) => {
       item.el.dataset.nav = '1';
-      const enter = (): void => {
-        if (this.enabled && this.index !== i) this.focus(i);
+      const hover = (): void => {
+        if (this.enabled && lastMoveAt > this.born && this.index !== i && this.gate()) this.focus(i);
       };
       const click = (e: MouseEvent): void => {
-        if (!this.enabled || e.button !== 0) return;
+        if (!this.enabled || e.button !== 0 || !this.gate()) return;
         this.focus(i, true);
         this.activate();
       };
-      item.el.addEventListener('pointerenter', enter);
+      item.el.addEventListener('pointermove', hover);
       item.el.addEventListener('click', click);
       this.cleanups.push(() => {
-        item.el.removeEventListener('pointerenter', enter);
+        item.el.removeEventListener('pointermove', hover);
         item.el.removeEventListener('click', click);
       });
     });
@@ -96,10 +121,11 @@ export class Nav {
     const item = this.current;
     if (!item) return;
     if (item.disabled?.()) {
-      this.o.sfx('ui.back');
+      this.o.sfx('ui.deny');
       item.el.classList.remove('br-anim-shake');
       void item.el.offsetWidth;
       item.el.classList.add('br-anim-shake');
+      item.onDenied?.();
       return;
     }
     item.el.classList.remove('is-press');
@@ -107,6 +133,11 @@ export class Nav {
     item.el.classList.add('is-press');
     this.o.sfx('ui.confirm');
     item.confirm?.();
+  }
+
+  /** Mouse activation of the focused item from a separate CTA element (honours the pointer gate). */
+  pointerActivate(): void {
+    if (this.enabled && this.gate()) this.activate();
   }
 
   private move(step: number): void {

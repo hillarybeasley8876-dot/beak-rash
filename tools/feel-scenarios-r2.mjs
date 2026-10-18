@@ -4,11 +4,29 @@
 // that followed hairpins on rails.
 import { DEG, events, prep, r3, run } from './feel-steps.mjs';
 
-/** Yaw direction reversals per second in rows with t > t0 (oscillation detector). */
-function reversals(rows, t0) {
+/**
+ * Yaw direction reversals per second in rows with t > t0 (pinball detector). Swings under 3° between extremes
+ * are ignored, so the deliberate wall-scrape shimmy (±1.2°, review r3) does not count as oscillation.
+ */
+function reversals(rows, t0, minSwing = 3 / DEG) {
   const ys = rows.filter((r) => r.t > t0).map((r) => r.yaw);
   let n = 0;
-  for (let i = 2; i < ys.length; i++) if ((ys[i] - ys[i - 1]) * (ys[i - 1] - ys[i - 2]) < -1e-12) n++;
+  let dir = 0;
+  let ext = ys[0] ?? 0; // the last extreme (or the start until the first swing)
+  for (const y of ys) {
+    if (dir === 0) {
+      if (Math.abs(y - ext) >= minSwing) {
+        dir = Math.sign(y - ext);
+        ext = y;
+      }
+    } else if ((y - ext) * dir > 0) {
+      ext = y;
+    } else if (Math.abs(y - ext) >= minSwing) {
+      n++;
+      dir = -dir;
+      ext = y;
+    }
+  }
   const span = rows.length ? rows[rows.length - 1].t - t0 : 1;
   return n / Math.max(0.1, span);
 }

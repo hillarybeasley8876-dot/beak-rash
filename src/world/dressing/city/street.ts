@@ -8,13 +8,13 @@ import { postSign } from '../../scenery/signs/boards';
 import { roadSignFace } from '../../scenery/signs/faces';
 import type { City } from './city';
 import type { Pools } from './paint';
-import { hdr, mount, towardRiders, zoneAt, zoneRuns } from './util';
+import { hdr, mount, signInset, towardRiders, zoneAt, zoneRuns } from './util';
 
 /** Lamp kinds: glow colour (HDR) + pool colour on the road. */
 const LAMPS = {
-  sodium: { glow: hdr('#ffb661', 2.6), pool: new Color(1.0, 0.6, 0.28).multiplyScalar(1.2) },
-  led: { glow: hdr('#d8e8ff', 2.6), pool: new Color(0.55, 0.72, 1.0).multiplyScalar(1.05) },
-  pink: { glow: hdr('#ff5fc8', 2.6), pool: new Color(1.0, 0.3, 0.75).multiplyScalar(1.0) },
+  sodium: { glow: hdr('#ffb661', 2.6), pool: new Color(1.0, 0.6, 0.28).multiplyScalar(0.75) },
+  led: { glow: hdr('#d8e8ff', 2.6), pool: new Color(0.55, 0.72, 1.0).multiplyScalar(0.65) },
+  pink: { glow: hdr('#ff5fc8', 2.6), pool: new Color(1.0, 0.3, 0.75).multiplyScalar(0.62) },
 };
 type LampKind = keyof typeof LAMPS;
 
@@ -27,7 +27,16 @@ function lampKind(zone: string, rng: Rng): LampKind {
   return rng.chance(0.75) ? 'sodium' : 'led';
 }
 
-/** Lamps every ~26 m per side (sides staggered), each with a pool on the road under its head. */
+/** Plazas get slightly wider hot spots. */
+const WIDE = ['start', 'scramble', 'finish'];
+
+/** No flat decal pools where the road bends vertically (crest, drop): they would float or clip. */
+function flatEnough(c: City, s: number): boolean {
+  const q = c.d.ctx.q;
+  return Math.abs(q.frameVis(s + 4).tangent.y - q.frameVis(s - 4).tangent.y) < 0.03;
+}
+
+/** Lamps every ~26 m per side (sides staggered), each with a hot spot on the road under its head. */
 export function streetLamps(c: City, pools: Pools): number {
   const { ctx, b } = c.d;
   const rng = c.d.rng.fork(0x1a3b);
@@ -42,7 +51,9 @@ export function streetLamps(c: City, pools: Pools): number {
         const kind = LAMPS[lampKind(zoneAt(ctx, s), rng)];
         const reach = mt.onDeck ? 1.8 : 2.6;
         streetLamp(b.props.at(sp.pos.x, sp.pos.z), b.glow.at(sp.pos.x, sp.pos.z), sp.pos.x, y, sp.pos.z, sp.faceRoad, kind.glow, reach, mt.onDeck ? 7 : 8);
-        pools.add(s, sp.x - side * reach, 7, kind.pool);
+        // A small hot spot under the head (wide discs flattened into glowing bars at the chase-cam angle;
+        // the mirror's lamp-head reflections draw the long wet streaks).
+        if (flatEnough(c, s)) pools.add(s, sp.x - side * reach, WIDE.includes(zoneAt(ctx, s)) ? 2.0 : 1.7, kind.pool);
         n++;
       }
     }
@@ -75,7 +86,7 @@ export function busStop(c: City, s: number, side: -1 | 1, k: number): void {
   const ads = [hdr('#ff3d8b', 1.8), hdr('#3de0ff', 1.8), hdr('#ffd23d', 1.8)];
   busShelter(b.props.at(sp.pos.x, sp.pos.z), b.glow.at(sp.pos.x, sp.pos.z), sp.pos.x, y, sp.pos.z, sp.faceRoad, ads[k % ads.length] ?? (ads[0] as Color));
   const rect = c.d.face('sign:bus', () => roadSignFace(atlas, '公交站 鹈鹕大道'));
-  const ps = place.spot(s - 3.4, side, 0.35);
+  const ps = place.spot(s - 3.4, side, signInset(1.5, 0.5));
   if (rect && place.claim(ps.pos.x, ps.pos.z, 0.3)) {
     postSign(b.props.at(ps.pos.x, ps.pos.z), b.faces.at(ps.pos.x, ps.pos.z), ps.pos.x, y, ps.pos.z, towardRiders(c.d.ctx, s, side, 0.5), 1.5, 0.95, 1.7, rect);
   }
@@ -83,7 +94,7 @@ export function busStop(c: City, s: number, side: -1 | 1, k: number): void {
 
 /** Planter trees: cherry blossom along the boulevard / plazas / river, ginkgo on the avenues. */
 const TREES: Record<string, 'cherry' | 'ginkgo'> = {
-  start: 'cherry', boulevard: 'cherry', riverside: 'cherry', finish: 'cherry', scramble: 'ginkgo', avenue: 'ginkgo', hairpin: 'ginkgo', sprint: 'ginkgo',
+  start: 'cherry', boulevard: 'cherry', riverside: 'cherry', finish: 'cherry', scramble: 'ginkgo', avenue: 'ginkgo', hairpin: 'ginkgo',
 };
 const PROP_ZONES = ['start', 'boulevard', 'street', 'scramble', 'chicane', 'riverside', 'avenue', 'sprint', 'finish'];
 const VENDING = [new Color('#d8262c'), new Color('#eeeef2'), new Color('#2a6fdb'), new Color('#1fae8c')];
@@ -99,18 +110,23 @@ function kerbSpot(c: City, s: number, side: -1 | 1, us: number[], r: number): Re
   return null;
 }
 
-function trees(c: City, rng: Rng): void {
+function trees(c: City, rng: Rng): number {
   const { ctx, b } = c.d;
+  let count = 0;
   for (const z of ctx.L.zones) {
     const kind = TREES[z.name];
     if (!kind) continue;
     for (const side of [-1, 1] as const) {
       for (let s = z.s0 + 10 + rng.range(0, 5); s < z.s1 - 6; s += rng.range(15, 21)) {
         const mt = kerbSpot(c, s, side, [1.3, 1.0], 1.0);
-        if (mt) planterTree(b.props.at(mt.sp.pos.x, mt.sp.pos.z), b.glow.at(mt.sp.pos.x, mt.sp.pos.z), mt.sp.pos.x, mt.y, mt.sp.pos.z, rng, kind);
+        if (!mt) continue;
+        const { x, z: wz } = mt.sp.pos;
+        planterTree(b.props.at(x, wz), c.cb.lit.at(x, wz), b.glow.at(x, wz), x, mt.y, wz, mt.sp.faceRoad, rng, kind);
+        count++;
       }
     }
   }
+  return count;
 }
 
 function vendingPair(c: City, s: number, side: -1 | 1, rng: Rng): void {
@@ -135,10 +151,10 @@ function scooterRow(c: City, s: number, side: -1 | 1, rng: Rng): void {
   }
 }
 
-/** Trees, vending machines and scooter rows along the street-level zones. */
-export function kerbProps(c: City): void {
+/** Trees, vending machines and scooter rows along the street-level zones. Returns the tree count. */
+export function kerbProps(c: City): number {
   const rng = c.d.rng.fork(0x4e7b);
-  trees(c, rng);
+  const n = trees(c, rng);
   for (const z of c.d.ctx.L.zones) {
     if (!PROP_ZONES.includes(z.name)) continue;
     for (const side of [-1, 1] as const) {
@@ -148,4 +164,5 @@ export function kerbProps(c: City): void {
       }
     }
   }
+  return n;
 }

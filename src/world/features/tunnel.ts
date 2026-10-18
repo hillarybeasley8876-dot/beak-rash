@@ -1,5 +1,7 @@
 // Tunnel through the headland: arched tube (red P5 dado band, cream tiles, sooty vault, light
 // strips), portal headwalls with a red-ringed concrete arch, and the hill cap that closes the top.
+// The tube is unlit with baked lamp lighting (same darkness at every quality, no shadow acne);
+// per-track fit-outs (dressing/*) add fixtures on top of this shared shell.
 import { Color, Vector3 } from 'three';
 import type { TrackFeature } from '../../core/types';
 import type { WorldCtx } from '../ctx';
@@ -9,15 +11,17 @@ import type { TerrainField } from '../terrain/field';
 import { WALL_TOE } from '../terrain/profile';
 import { buildTunnelCap } from './tunnelCap';
 
-const WALL_H = 3.6;
-const CROWN = 7.4;
+export const WALL_H = 3.6;
+export const CROWN = 7.4;
+/** The hill cap spans the tube plus this much on each side (m). */
+const CAP_MARGIN = 3.5;
 const COL = {
   dado: new Color('#c8102e'), line: new Color('#f4f2ec'), tile: new Color('#e9dfc8'), vault: new Color('#575862'),
-  concrete: new Color('#cfccc4'), ring: new Color('#e5191c'), lamp: new Color('#fff3c4'), rock: new Color('#9c7d62'),
+  concrete: new Color('#cfccc4'), ring: new Color('#e5191c'), lamp: new Color('#fff3c4'), rock: new Color('#cdbb98'),
 };
 
 /** Inner outline (x, y) from the right wall foot, over the crown, to the left wall foot. */
-export function tunnelOutline(halfW: number, n = 14): Array<[number, number]> {
+function tunnelOutline(halfW: number, n = 14): Array<[number, number]> {
   const pts: Array<[number, number]> = [[halfW, 0], [halfW, 1.15], [halfW, 1.25], [halfW, WALL_H]];
   for (let i = 1; i < n; i++) {
     const a = (i / n) * Math.PI;
@@ -33,6 +37,18 @@ function colorFor(y: number, x: number, halfW: number): Color {
   return y <= WALL_H + 0.01 ? COL.tile : COL.vault;
 }
 
+/** Light strips start every LAMP_EVERY m from s0 + 5 (2.4 m long, x = ±2.2): fit-outs align to them. */
+export const LAMP_EVERY = 9;
+const shaded = new Color();
+
+/** Baked interior light: dim overall, brighter rows under each light strip, 4 m tile panels. */
+function bake(base: Color, s: number, f: TrackFeature, night: boolean): Color {
+  const k = (s - f.s0 - 5) / LAMP_EVERY;
+  const under = k - Math.floor(k) < 2.6 / LAMP_EVERY && s < f.s1 - 3;
+  const panel = Math.floor((s - f.s0) / 4) % 2 === 0 ? 1 : 0.93;
+  return shaded.copy(base).multiplyScalar((night ? 0.55 : 0.66) * (under ? 1.22 : 1) * panel);
+}
+
 const A = new Vector3(), B = new Vector3(), C = new Vector3(), D = new Vector3(), N = new Vector3(), E = new Vector3();
 const DOWN = new Vector3(0, -1, 0);
 
@@ -44,10 +60,23 @@ function quad(buf: MeshBuf, a: Vector3, b: Vector3, c: Vector3, d: Vector3, col:
   if (flip) buf.quad(i, l, k, j); else buf.quad(i, j, k, l);
 }
 
-export function buildTunnel(ctx: WorldCtx, tube: PropBatch, lamps: PropBatch, field: TerrainField, f: TrackFeature): void {
-  // Walls a toe beyond the drivable bound, like the cutting's rock faces (riders scrape, never sink in).
+/** Inner half-width of the tube: walls a toe beyond the drivable bound (riders scrape, never sink in). */
+export function tunnelHalfW(field: TerrainField, f: TrackFeature): number {
   const mid = (f.s0 + f.s1) / 2;
-  const halfW = Math.max(field.bound(mid, -1), field.bound(mid, 1)) + WALL_TOE;
+  return Math.max(field.bound(mid, -1), field.bound(mid, 1)) + WALL_TOE;
+}
+
+/** Vault height above the road at lateral x (|x| ≤ halfW). */
+export const vaultY = (x: number, halfW: number): number => WALL_H + Math.sqrt(Math.max(0, 1 - (x / halfW) ** 2)) * (CROWN - WALL_H);
+
+/** Height of the hill cap over tunnel f at (s, x), |x| ≤ capHalfW(); for props on the headland. */
+export function capHeight(ctx: WorldCtx, field: TerrainField, f: TrackFeature, s: number, x: number): number {
+  return capY(ctx, field, f, s, x, tunnelHalfW(field, f) + CAP_MARGIN);
+}
+export const capHalfW = (field: TerrainField, f: TrackFeature): number => tunnelHalfW(field, f) + CAP_MARGIN;
+
+export function buildTunnel(ctx: WorldCtx, structure: PropBatch, tube: PropBatch, lamps: PropBatch, field: TerrainField, f: TrackFeature): void {
+  const halfW = tunnelHalfW(field, f);
   const outline = tunnelOutline(halfW);
   const fr = ctx.q.frameVis(f.s0);
   const centre = new Vector3();
@@ -64,20 +93,20 @@ export function buildTunnel(ctx: WorldCtx, tube: PropBatch, lamps: PropBatch, fi
       ctx.q.toWorld(sb, x1, y1, C); ctx.q.toWorld(sb, x0, y0, D);
       // Faces point into the tube.
       const facing = E.copy(centre).sub(A);
-      quad(buf, A, B, C, D, colorFor((y0 + y1) / 2, (x0 + x1) / 2, halfW), facing.clone());
+      quad(buf, A, B, C, D, bake(colorFor((y0 + y1) / 2, (x0 + x1) / 2, halfW), sa, f, ctx.look.grade.night), facing.clone());
     }
   }
-  // Light strips on the vault every 9 m (unlit, glowing).
-  for (let s = f.s0 + 5; s < f.s1 - 3; s += 9) {
+  // Light strips on the vault every LAMP_EVERY m (unlit, glowing).
+  for (let s = f.s0 + 5; s < f.s1 - 3; s += LAMP_EVERY) {
     for (const x of [-2.2, 2.2]) {
-      const y = WALL_H + Math.sqrt(Math.max(0, 1 - (x / halfW) ** 2)) * (CROWN - WALL_H) - 0.06;
+      const y = vaultY(x, halfW) - 0.06;
       ctx.q.toWorld(s, x - 0.18, y, A); ctx.q.toWorld(s, x + 0.18, y, B);
       ctx.q.toWorld(s + 2.4, x + 0.18, y, C); ctx.q.toWorld(s + 2.4, x - 0.18, y, D);
       quad(lamps.at(A.x, A.z), A, B, C, D, COL.lamp, DOWN);
     }
   }
-  for (const [s, dir] of [[f.s0, -1], [f.s1, 1]] as Array<[number, number]>) buildPortal(ctx, tube, field, s, dir, outline, halfW, f);
-  buildTunnelCap(ctx, field, f, halfW + 3.5, (s, x, W) => capY(ctx, field, f, s, x, W));
+  for (const [s, dir] of [[f.s0, -1], [f.s1, 1]] as Array<[number, number]>) buildPortal(ctx, structure, field, s, dir, outline, halfW, f);
+  buildTunnelCap(ctx, field, f, halfW + CAP_MARGIN, (s, x, W) => capY(ctx, field, f, s, x, W));
 }
 
 /** Hill-cap height over the tunnel at (s, x): a hump between the terrain on both sides. */
@@ -116,7 +145,8 @@ function resample(pts: Array<[number, number]>, n: number): Array<[number, numbe
   return out;
 }
 
-function buildPortal(ctx: WorldCtx, batch: PropBatch, field: TerrainField, s: number, dir: number, outline: Array<[number, number]>, halfW: number, f: TrackFeature): void {
+function buildPortal(ctx: WorldCtx, batch: PropBatch, field: TerrainField, s: number, dir: number, outline: Array<[number, number]>, halfW: number,
+  f: TrackFeature): void {
   // Just wide enough to close the gap to the cutting's rock faces (which start at the bound).
   const W = halfW + 1.6, K = 44;
   const fr = ctx.q.frameVis(s);

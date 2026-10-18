@@ -1,0 +1,90 @@
+{
+  "unit": "track",
+  "round": 1,
+  "lens": "art",
+  "pass": false,
+  "score": 6,
+  "summary": "Coast reads clearly at speed and has a coherent sunny palette. Landmarks are good: lighthouse islet, red arch bridge, market/pier straight with bunting, START stands. I found no popping, z-fighting or floating props. Measured against a polished stylised racer, the big surfaces let it down. Cliff, calanque and cutting walls are smooth mud-brown planes with a cardboard-like scallop strata texture. They fill 22-35 % of the frame for ~0.5 km, with a visible seam and a smeared projection. The tunnel is a bland, evenly sunlit tube under a blob headland. Inland terrain and the beach are flat and empty. Billboards, villas, asphalt, fog and the FINISH gantry are serviceable but generic. Evidence: shots/review/track/r1-art/ (n/f-*.png in-game 1920x1080 all units, n/nofx-*.png with stub=fx, n/cu-*.png and n/v-*.png sandbox close-ups/aerials, sheet-*.jpg contact sheets, pops.mjs pop sweep, pick.mjs raycasts).",
+  "issues": [
+    {
+      "severity": "major",
+      "title": "Rock walls and cuttings read as brown corrugated cardboard, not rock (terrain/material.ts strata on near-ribbon walls, s 1160-1580 and 1880-1940)",
+      "detail": "The cliff, calanque and tunnel-cutting faces are smooth extruded ribbons. A 7 m world-projected scallop strata texture is multiplied onto a mud-brown vertex colour, with thin black crack strokes. There are no ledges, overhangs, boulders or vegetation, the top silhouette is a ruler-smooth line, and there is no highlight band or outline. On this stretch they fill 22-35 % of the frame (colour mask: f-s1180 22 %, f-s1270 28 %, f-s1370 32 %, nofx-s1880 35 %) and read like wooden siding or a cardboard set piece (f-s1270, f-s1370, cu-signs, cu-portal). There are also two defects. A hard vertical texture/shading seam runs down the hairpin's outer wall (cu-chev; f-s1270 around x 1180, y 180-480). Strata are smeared and stretched on the sloped left face of the tunnel cutting (nofx-s1880). Mud brown also fights the cream/white/turquoise Mediterranean palette; real calanques are pale limestone.",
+      "fix": "Give the faces geometry. Displace wall vertices with 2-3 octaves of low-frequency noise for 1-3 m ledges and overhangs and a jagged top edge. Scatter instanced faceted boulders (3-4 shapes in one hulled batch) along the foot and crest, with bush/grass clumps on ledges and the top lip. Recolour to pale limestone (base ~#e9dcc3, ochre bands ~#c9b48f, cool shadow ~#8f93a8) with 3-band toon shading per facet. Use large, low-contrast 2-4 m strata bands; keep crack strokes for the near 30 m only. Remove the seam by keeping the strata projection axis continuous: blend 'th' over >= 20 m, or use a world-fixed triplanar axis. Clamp the steepness blend so sloped cut faces get the planar grain, not stretched strata."
+    },
+    {
+      "severity": "major",
+      "title": "Inland terrain and beach are large, flat and empty (terrain/near.ts, terrain/far.ts, terrain/farmland.ts, dressing/coast/nature.ts)",
+      "detail": "In most chase frames the inland half of the screen is a plain one-tone green plane. It has a faint grain, a few lollipop umbrella pines and isolated villas (f-s250, f-s1005, f-s1640, f-s2300, cu-villas). Up to 10 % of a frame is perfectly flat green (24-px blocks with sigma < 5: f-s1640 10.6 %, f-s1005 6.6 %). The farmland patchwork reads as a flat colour quilt pasted onto the slopes (f-s60, v-high60, v-high3280). The promenade beach is a wide bare sand strip with sparse umbrellas, mostly far from the road (cu-umbr, v-high60). A commercial stylised coast fills this mid-ground with olive terraces, dry-stone walls, flowering bushes, fences, paths, rocks and beach life. The brief bar is 'rich and characterful (not empty)'.",
+      "fix": "Within 0-80 m of the road, scatter instanced ground cover (grass tufts, magenta/yellow flower clumps, bush clusters, small rocks) at ~1 per 3 m2. Use 2-3 batches and fog-cull them. Add dry-stone terrace walls with olive-tree rows on gentle slopes, and fences/footpaths up to the hill villages. Tint the grass with low-frequency noise (3 greens + a sun-bleached ochre) and add darker AO blobs under trees and props. Give the farmland soft hedgerow edges and toon furrow stripes instead of flat fills. On the beach, bring umbrella/towel clusters to 6-20 m from the seawall. Add lifeguard towers, beach huts, sunbathing crowd figures (reuse the crowd batch), sandcastles and a volleyball net."
+    },
+    {
+      "severity": "major",
+      "title": "Tunnel is a bland, evenly sunlit tube under a blob headland (features/tunnel.ts, env/lights.ts; s 1940-2100)",
+      "detail": "Inside: a flat cream wall with a dark-red dado, a dark vault and tiny yellow lamp dashes. There are no light pools on the road and no readable fixtures, tiles, jet fans, signage or exit beacons. 160 m (~8 s at speed) look like an untextured box (f-s1922, f-s1990, cu-tun). Sun and hemisphere lights stay at full strength, so the pelican is lit like noon daylight inside the tunnel (f-s1990). There is none of the dark/bright rhythm that sells speed in tunnels. Outside, the cap over the portal is a smooth brown dome resting on the red ring (cu-portal, nofx-s1880, f-s1880). It reads as a mud mound, not the rocky headland the layout describes, and the portal has no facade or name plate.",
+      "fix": "Lamp fixtures every 8 m on both upper walls, with emissive housings and matching light pools on road and walls (additive decal strip, or vertex-colour bands baked into the tube). Tiled wall texture (canvas: cream tiles, a red P5 stripe with a black jagged edge). Jet-fan pairs every 40 m and meme exit signs (e.g. '出口 → 海鲜大排档'). While the camera is inside [s0+10, s1-10], ramp sun and hemi intensity down ~60 % over 0.3 s so riders darken and the lamp pools flash over them. Rebuild the cap as the sculpted rock mass from issue 1 with pines on top, and put a concrete portal facade with a name plate (鹈鹕岬隧道) in front of the ring."
+    },
+    {
+      "severity": "minor",
+      "title": "Meme billboards are too small and sparse to read at speed (dressing/coast/signage.ts billboards())",
+      "detail": "There are 8 boards on 3.3 km (every ~230 m). Faces are 4.5 x 2.6 m, set 3-7 m off the edge and yawed only 0.42 rad toward riders. The 2-line meme band gives ~0.8 m glyphs, i.e. <= 15 px until ~40 m at 1080p. That is ~1.5 s of sideways reading time at 72 km/h (f-s250, f-s800, cu-bbface, cu-bbface168). On the track, billboards carry Pillar 5 (memes everywhere), yet here they read as small dark rectangles.",
+      "fix": "Double the face (~9 x 4.5 m) and give the text >= 50 % of the face in heavy CN type. Halve the spacing to ~120 m. Turn faces 0.7-0.9 rad toward the approach and put some on the outside of curves, where the camera looks straight at them. Add a few road-spanning P5 red/black meme banners."
+    },
+    {
+      "severity": "minor",
+      "title": "Villas are one boxy template repeated (scenery/props/building.ts villa(), dressing/coast/town.ts)",
+      "detail": "Every house is a cream/white box with flat painted window quads, a hip roof and occasional shutters. There are no balconies, pergolas, chimneys, stepped doors, plants or garden walls, and the same template repeats in rows (f-s250, f-s2400, f-s2520, cu-villas, cu-market). At chase distance they read as generic low-poly boxes and do little for the 'white villas with terracotta roofs' postcard.",
+      "fix": "4-5 variants: L-shapes and stacked volumes, balconies with railings, roof terraces with pergolas, chimneys, arched doors, magenta bougainvillea cascades. Pastel walls (pink, ochre, white) with blue/green shutters, plus garden walls and cypresses. Jitter roof pitch and storey count; keep everything in the same batch."
+    },
+    {
+      "severity": "minor",
+      "title": "Asphalt is a featureless grey field (road/textures.ts)",
+      "detail": "Across 9 chase frames the road covers 26-32 % of the screen, and 19-25 % of the whole frame is perfectly flat grey (24-px blocks with sigma < 5). There are no wheel-path wear lanes, patches, cracks, manholes or tone variation. The road reads clean but CG-plain next to the textured props (f-s60, f-s250, f-s2960).",
+      "fix": "Keep the canvas texture low-contrast so readability is unchanged, and add darker wheel-path bands per lane, rectangular patch repairs, tar-sealed crack lines, a 2-tone large-scale tint noise and the odd manhole. Add occasional painted road text near features ('慢', '注意落鱼', '前方大鹅') through the existing decal path."
+    },
+    {
+      "severity": "minor",
+      "title": "Distance fog is milky and paler than the sky, turning far hills into white ghosts (world/looks.ts coast fog #c6e6fb near 200 / far 980; env/sky.ts gradient)",
+      "detail": "The fog colour is lighter than the sky just above the horizon, where the dome goes from #bfe7ff toward #2f86e6 quickly. Hills 500-1000 m away become pale translucent silhouettes in front of a bluer sky, and the vanishing point looks washed out. This also happens with fx stubbed (nofx-s60, nofx-s250; f-s60 centre). Noon coast light should be crisp, with blue-tinted distance.",
+      "fix": "Use FogExp2 or a height-attenuated fog with a bluer colour that matches the dome at h ~0.03-0.08 (e.g. ~#a9d4f5). Push 'near' to ~320 m so the mid-ground keeps full saturation."
+    },
+    {
+      "severity": "minor",
+      "title": "FINISH gantry is a thin plank, not a climax (scenery/props/event.ts gantry(), dressing/coast/event.ts gantryAt)",
+      "detail": "The finish is a black board with a white 'FINISH' and red stripes on two thin truss legs (f-s3220, f-s3265, cu-finish). It is the same light structure as START and reads small in the last seconds. There are no chequered flags, balloons, confetti, crowd walkway or P5 star bursts. The brief asks for a big FINISH gantry.",
+      "fix": "Build a chunky arch: thick black/red pillars with jagged star-burst plates and an oversized ransom-note 'FINISH 终点' header (each glyph its own tilted box). Add a chequered band, inflatable pelican heads or balloons on the pillars, flag-waving crowd on a walkway, and cloth-batch pennants spilling down."
+    },
+    {
+      "severity": "minor",
+      "title": "Bridge cove ends in ruler-straight terrain cuts (features/bridge.ts, terrain/near.ts ribbon ends)",
+      "detail": "Beside the bridge, the green near ribbon stops in a straight diagonal edge into the water. The brown cutting wall ends in a flat vertical slab at the abutment (v-high2150, cu-bridgeL). This is hidden from the chase camera, but the intro flyover, KO orbit and aerial expose a cardboard-diorama edge at the most photogenic landmark.",
+      "fix": "Close each ribbon end with a rounded rocky shore skirt: a noise-displaced rock lip, boulder instances at the waterline and a foam ring. Wrap the cutting end into a rounded buttress that meets the abutment."
+    },
+    {
+      "severity": "minor",
+      "title": "Grandstands and crowd are generic peg figures in beige boxes (scenery/props/event.ts stand())",
+      "detail": "The crowd is rows of near-identical capsule bodies with round heads, and no animal features read (status says 'animal crowd'). The stands are flat beige boxes with one red stripe (cu-start, cu-stands, intro-2). The start grid is a showcase shot during the intro flyover.",
+      "fix": "Add 4-6 head variants with species silhouettes (beak, ears, pouch, long goose neck) tinted from the roster colours, with some figures holding flags or signs (cloth batch). Give the stands a striped red/black P5 awning, meme banners on the fascia ('V我50小鱼干') and an announcer booth or jumbotron on one stand."
+    },
+    {
+      "severity": "minor",
+      "title": "Shallow-sea foam reads as white paint blotches from above (env/sea.ts)",
+      "detail": "In high and intro views, the shallow band is covered with large, irregular, solid-white patches instead of surf lines (v-high60, v-high3280). From the chase camera the sea is good: bands, foam line and glints all read well (f-s520).",
+      "fix": "Restrict foam to 2-3 thin animated shore-parallel bands driven by depth contours, plus sparse small crest dashes. Cap the patch size and fade foam out beyond ~0.6 m depth."
+    },
+    {
+      "severity": "minor",
+      "title": "cross-unit: flat translucent fx/combat ground overlays lie across the road (near-miss octagon rings, CHILL ZONE aura)",
+      "detail": "The near-miss rings (f-s60, n/g-s1600) and the capybara chill aura (f-s1180, f-s1270) read as flat CG geometry over the toon road. The aura is an orange-outlined translucent rectangle spanning road and curbs. Not track-owned; listed for the integrator.",
+      "fix": "fx/combat: draw auras as toon ground rings projected into track space and clipped to the drivable width with a soft additive edge, or as vertical screen-facing effects."
+    }
+  ],
+  "verified_ok": [
+    "No popping: fog-distance culling checked with a horizon-band frame-diff sweep over s 0-3300 at 1 m steps (pops.mjs). Only periodic lane-dash aliasing was flagged, and a 0.25 m re-check at the tunnel exit was clean.",
+    "No z-fighting seen on decals (lift 0.012 + polygonOffset), curbs or shoulders in any shot. No props on the asphalt. Raycast picks (pick.mjs) show the billboard at s 834 L stands on the near-ribbon shore, not in the sea.",
+    "Road reads clearly at 70-84 km/h: double yellow centre, white edges, lane dashes, red/white curbs on curves, readable chevrons and warning signs (f-s1005, f-s1270, cu-signs, cu-chev).",
+    "Strong landmarks: lighthouse islet (cu-lh), red through-arch bridge (f-s2112, f-s2190, cu-bridgeL), fish-market straight with bunting, stalls, pier and moored boats (f-s2720-2870, cu-market, cu-pier), START grandstands (intro-2), lane meme signs 躺平车道/内卷车道 (f-s2620).",
+    "Coherent sunny palette and toon sky: teal/turquoise sea bands with foam line, cream sand, terracotta roofs, outlined cartoon clouds, P5 red accents in barriers, curbs and gantries.",
+    "Aerial view reads as a believable coastal road (v-aerial, v-high60/1330/2150/2800/3280). window.__br.errors stayed empty in every in-game run (all units and stub=fx)."
+  ]
+}

@@ -11,18 +11,19 @@
   height: 640px;
   color: var(--ink);
   transform: skewX(-6deg);
-  transition: transform 0.16s var(--ease-out), filter 0.16s;
-  filter: brightness(0.62) saturate(0.8);
+  transition: transform 0.16s var(--ease-out);
   isolation: isolate;
   animation: br-rise 0.34s var(--ease-out) both;
   animation-delay: calc(var(--i) * 60ms);
 }
 .br-tc::before { content: ''; position: absolute; inset: 0; background: var(--white); clip-path: var(--clip); z-index: -1; }
 .br-tc::after { content: ''; position: absolute; inset: 0; background: var(--ink); clip-path: var(--clip); z-index: -2; transform: translate(14px, 14px); transition: background 0.12s, transform 0.16s var(--ease-out); }
-.br-tc.is-focus { transform: skewX(-6deg) translateY(-26px) scale(1.06); filter: none; z-index: 2; }
+.br-tc.is-focus { transform: skewX(-6deg) translateY(-26px) scale(1.06); z-index: 2; }
+/* Unselected cards keep their white body; only the art dims. */
+.br-tc:not(.is-focus) .br-still-img { filter: brightness(0.55) saturate(0.7); }
+.br-tc:not(.is-focus) .br-tc-num { -webkit-text-stroke-color: #2a2a32; color: #d6d6dc; }
 .br-tc.is-focus::after { background: var(--red); transform: translate(20px, 22px); }
 .br-tc-art { position: absolute; left: 14px; right: 14px; top: 14px; height: 320px; clip-path: var(--clip); background: var(--ink); overflow: hidden; }
-.br-tc-art svg { width: 100%; height: 100%; display: block; }
 .br-tc-num { position: absolute; left: 30px; top: 18px; font-family: var(--f-display); font-weight: 400; font-size: 110px; line-height: 1; color: var(--white); -webkit-text-stroke: 4px var(--ink); paint-order: stroke fill; }
 .br-tc-body { position: absolute; left: 36px; right: 30px; top: 344px; }
 .br-tc-name { font-family: var(--f-cn-block); font-weight: 400; font-size: 58px; line-height: 1.05; }
@@ -36,5 +37,3 @@
 .br-tc-go svg { position: absolute; inset: 0; width: 100%; height: 100%; animation: br-spin 10s linear infinite; }
 .br-tc-go b { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--f-comic); font-weight: 400; font-size: 62px; color: var(--red); text-shadow: 3px 3px 0 var(--ink); transform: skewX(6deg); }
 .br-tc.is-focus .br-tc-go { opacity: 1; transform: scale(1) rotate(10deg); }
-.br-tc.is-locked { filter: brightness(0.5) grayscale(1); }
-.br-tc.is-locked.is-focus { filter: grayscale(0.85) brightness(0.85); }

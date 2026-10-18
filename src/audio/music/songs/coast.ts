@@ -10,7 +10,7 @@ const K2 = 'X...X...X..xX...';
 const K_HALF = 'X.........x.....';
 const S1 = '....X..g.g..X...';
 const S2 = '..g.X..g.g..X.gg';
-const H1 = 'xxOxxxOxxxOxxxOx';
+const H1 = 'XoOoxoOoXoOoxoOo';
 const H2 = 'x.O.x.O.x.O.x.O.';
 const FILLS: Lanes[] = [
   { snare: '....X..g.xxXxXXX', hat: 'xxOxxxOx........', tom: '........1.2.3...' },
@@ -130,7 +130,7 @@ export const COAST: Song = {
       cym: REST + 'W...............',
       fill: { snare: '....X...X.X.XXXX', bass: '1> . . . . . . . 5 . 8^ . 7 . 8^ .', brass: '............r---' },
     },
-    A,
+    A: { ...A, gainDb: -3 },
     A2: { ...A, lead: HOOK, fill: [FILLS[1], FILLS[3]], layers: { 1: { brass: BRASS_TOP, lead2: transpose(HOOK, -12) } } },
     B,
     A3,
@@ -140,6 +140,7 @@ export const COAST: Song = {
       brass: bars(REST, REST, REST, '........X-.x.X--', REST, REST, REST, 'X.....x.x.X.r---'),
     },
     D: {
+      shape: 'breakdown',
       bars: 8, chords: 'F#m9 | Dmaj9 | Bm9 | E13 | F#m9 | Dmaj9 | Bm9 | E13',
       kick: bars(rep(K_HALF, 4), rep(K1, 3), 'X...X...X.X.XXXX'),
       snare: bars(rep('........X.......', 4), '....X.......X...', '....X...X...X...', 'X.X.X.X.X.X.X.X.', 'oooooooxxxxxxxXX'),
@@ -148,7 +149,7 @@ export const COAST: Song = {
       brass: bars(rep(REST, 4), 'r-------........', REST, 'r-------........', 'x.x.x.x.X.X.X.X.'),
       layers: { 1: { clav: rep(REST, 8), perc: REST } },
     },
-    B2: { ...B, kick: K2, snare: S2, hat: H1, brass: BRASS_B2, lead2: transpose(CHORUS, -12) },
+    B2: { ...B, gainDb: 2, kick: K2, snare: S2, hat: H1, brass: BRASS_B2, lead2: transpose(CHORUS, -12) },
     A4: { ...A3, lead: HOOK_A4, lead2: undefined, brass: BRASS_A, layers: { 1: { brass: BRASS_TOP, lead2: transpose(HOOK_A4, -12) } } },
   },
   form: ['intro', 'A', 'A2', 'B', 'A3', 'S', 'D', 'B2', 'A4'],

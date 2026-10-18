@@ -1,6 +1,7 @@
 // Canvas drawing for every decal in the atlas (origin = the decal's top-left corner).
 // Original artwork only: no real brands, no real QR payload.
 import type { DecalId } from './atlas';
+import { blur, chain, spider, spokes } from './decals-wheel';
 
 type Ctx = CanvasRenderingContext2D;
 type Draw = (ctx: Ctx, w: number, h: number) => void;
@@ -241,39 +242,22 @@ const grid: Draw = (ctx, w, h) => {
   ctx.fillRect(0, h - 8, w, 8);
 };
 
-/** Grumpy salted-fish face (mouth on the right = forward): salt crust, gill, half-lidded eye, angry brow. */
-const fishface: Draw = (ctx, w, h) => {
-  const rnd = lcg(0xf15);
-  for (let i = 0; i < 26; i++) {
-    ctx.fillStyle = `rgba(250,248,236,${0.35 + rnd() * 0.4})`;
-    ctx.beginPath();
-    ctx.arc(6 + rnd() * w * 0.55, 8 + rnd() * (h - 16), 1.5 + rnd() * 3, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.strokeStyle = '#3c4650';
-  ctx.lineWidth = 3;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.arc(w * 0.92, h * 0.5, h * 0.42, Math.PI * 0.72, Math.PI * 1.28);
-  ctx.stroke();
-  const ex = w * 0.74, ey = h * 0.5, r = 17;
-  ctx.fillStyle = '#ffffff';
-  ctx.beginPath(); ctx.arc(ex, ey, r, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#121216';
-  ctx.beginPath(); ctx.arc(ex + 5, ey + 4, 7, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#ffffff';
-  ctx.beginPath(); ctx.arc(ex + 7, ey + 1, 2.2, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#7b8a96';
-  ctx.beginPath(); ctx.arc(ex, ey, r + 0.5, Math.PI * 1.08, Math.PI * 1.98); ctx.closePath(); ctx.fill();
-  ctx.lineWidth = 3;
+/** Rear tail light lens: red capsule with bright LED bars and a glint (seen by the chase camera). */
+const taillight: Draw = (ctx, w, h) => {
+  rrect(ctx, 3, 3, w - 6, h - 6, (h - 6) / 2);
+  ctx.fillStyle = '#b8101a';
+  ctx.fill();
+  ctx.lineWidth = 5;
   ctx.strokeStyle = '#121216';
-  ctx.beginPath(); ctx.arc(ex, ey, r, 0, Math.PI * 2); ctx.stroke();
-  ctx.lineWidth = 7;
-  ctx.beginPath(); ctx.moveTo(ex - 19, ey - 23); ctx.lineTo(ex + 17, ey - 11); ctx.stroke();
-  ctx.lineWidth = 4;
-  ctx.beginPath(); ctx.moveTo(w - 2, h * 0.7); ctx.quadraticCurveTo(w - 9, h * 0.6, w - 17, h * 0.8); ctx.stroke();
+  ctx.stroke();
+  ctx.fillStyle = '#ff5a4e';
+  for (let i = 0; i < 4; i++) { rrect(ctx, w * 0.2 + i * w * 0.155, h * 0.3, w * 0.1, h * 0.4, 4); ctx.fill(); }
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  rrect(ctx, w * 0.16, h * 0.16, w * 0.3, h * 0.1, 3);
+  ctx.fill();
 };
 
 export const DECAL_DRAW: Record<DecalId, Draw> = {
-  qr, badge, scan, plate, guard, nobrakes, offroad, fishsign, wind, star: pastelStar, heart, tandem, grid, fishface,
+  qr, badge, scan, plate, guard, nobrakes, offroad, fishsign, wind, star: pastelStar, heart, tandem, grid,
+  spokes, blur, chain, taillight, spider,
 };

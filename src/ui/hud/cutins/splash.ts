@@ -27,6 +27,8 @@ export interface SplashSpec {
   stamp?: boolean;
   flash?: boolean;
   tint?: boolean;
+  /** Band tilt in degrees (default −9; cinematic splashes sit flatter in the lower part of the frame). */
+  tilt?: number;
 }
 
 /** Portrait card with a jagged frame, offset shadow and optional name plate / red cross. */
@@ -78,6 +80,7 @@ export function splashCut(spec: SplashSpec): CutIn {
   const cn = spec.cn ? el('div', 'sx-cn', root, spec.cn) : null;
   const sub = spec.sub ? el('div', 'sx-sub', root, spec.sub) : null;
   const { dur } = spec;
+  const tilt = spec.tilt ?? -9;
   return {
     root,
     dur,
@@ -87,7 +90,7 @@ export function splashCut(spec: SplashSpec): CutIn {
       const fade = fadeOut(t, dur, 0.18);
       if (flash) flash.style.opacity = reducedMotion() ? '0' : Math.max(0, 0.85 - t / 0.1).toFixed(3);
       if (tint) tint.style.opacity = envelope(t, 0, 0.1, dur - 0.2, dur).toFixed(3);
-      band.style.transform = `rotate(-9deg) translateX(${((1 - inT) * 2600 - outT * 2600).toFixed(0)}px)`;
+      band.style.transform = `rotate(${tilt}deg) translateX(${((1 - inT) * 2600 - outT * 2600).toFixed(0)}px)`;
       const in2 = enter(t, 0.13, 0.04);
       band2.style.transform = `rotate(5deg) translateX(${((in2 - 1) * 2600 + outT * 2600).toFixed(0)}px)`;
       const spin = reducedMotion() ? 0 : t * 14;

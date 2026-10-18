@@ -36,7 +36,19 @@ export const TUNING = {
   yawMax: 50 * DEG,       // heading cap (velocity angle + drift slip): full-lock drifts stay readable, yet a
                           // slow full-lock drift into a jump can still exceed crashLandYaw
   leanCarve: 0.035,       // lean demand from lateral motion: a = v²·κ + leanCarve·v·vx
-  pitchLambda: 9,         // 1/s smoothing of the visual pitch (air / ramps)
+  pitchLambda: 9,         // 1/s smoothing of the visual pitch (air / ramps / weight)
+  pitchBrake: 0.25 * DEG, // nose-down pitch per m/s² of deceleration (full brake ≈ −3°) …
+  pitchSquat: 0.1 * DEG,  // … nose-up per m/s² of acceleration (boost squat) …
+  pitchWeightMax: 4 * DEG, // … capped at this
+  landPitchBase: 5 * DEG, // landing compression: nose-down target offset base + per s of air (peak ≈ 0.37× after ≈ 0.1 s) …
+  landPitchAir: 8 * DEG,
+  landPitchMax: 12 * DEG,
+  landPitchLambda: 9,     // … decaying at this rate (1/s)
+  scrapeYaw: 5 * DEG,     // scraping a wall at full pressure: nose into the wall …
+  scrapeLean: 8 * DEG,    // … leaning on it …
+  scrapeShimmy: 1.2 * DEG, // … with a grinding shimmy of this amplitude …
+  scrapeShimmyK: 4.1,     // … at this many rad per metre ridden (≈ 13 Hz at 20 m/s)
+  scrapeLambda: 12,       // 1/s smoothing of the scrape pose
   // ---- drift
   driftMinSpeed: 8,
   driftEndSpeed: 6,
@@ -51,12 +63,15 @@ export const TUNING = {
   driftMaxAngle: 20 * DEG, // |vx| ≤ v·tan(this) while drifting: below wallCrashAngle, so a drift bounces off walls
   driftCurveCancel: 1.35, // a drift cancels the curve push only up to this × steerAuthHigh × handling × v/top
                           // (turn authority ×1.35): beyond ≈ R32 at top speed a drift runs wide
-  driftExitTime: 0.2,     // s after a release over which grip steering takes over from the drift's lateral speed
+  driftExitTime: 0.35,    // s after a release over which grip steering takes over from the drift's lateral speed …
+  driftExitGuard: 0.5,    // … and |vx| ≤ v·tan(driftMaxAngle) for this long (a release mistake bounces, never wrecks)
   driftBleed: 0.04,       // 1/s speed bleed while drifting
   // Charge by commitment: rate lerp(low, high, u) × (straight … 1 as the bend into the drift tightens to
-  // 1/250 m⁻¹). Full commitment: R ≤ 250 → L3 in 1.74 s, R319 2.07 s, R380 2.34 s; snaking on a straight
-  // nets ≤ +3 % (measured over 20 s), counter-steered wiggles lose speed.
-  driftChargeLow: 0.35,   // full counter-steer
+  // 1/250 m⁻¹), where `low` rises to lowBend on that bend. Full commitment: R ≤ 250 → L3 in 1.74 s, R319
+  // 2.07 s, R380 2.34 s; a drift holding its line on R ≤ 250 (≈ −0.64 counter-steer) → L3 in ≈ 2.3 s;
+  // snaking on a straight nets ≤ +3 % (measured over 20 s), counter-steered wiggles lose speed.
+  driftChargeLow: 0.35,   // full counter-steer on a straight …
+  driftChargeLowBend: 0.8, // … and on a bend into the drift (R ≤ 250)
   driftChargeHigh: 1.15,  // full steer into the drift
   driftChargeStraight: 0.25,
   driftChargeKappa: 250,
@@ -102,6 +117,8 @@ export const TUNING = {
   slingshotMin: 0.8,
   slingshotPower: 0.15,
   slingshotTime: 0.8,
+  draftMinSpeed: 8,       // no slipstream / slingshot below this speed …
+  draftBrakeMax: 0.5,     // … or while braking harder than this (braking resets the draft)
   // ---- surfaces
   grassTopBase: 0.55,
   grassTopOffroad: 0.45,
@@ -146,7 +163,11 @@ export const TUNING = {
   contactDx: 0.75,
   contactRestitution: 0.8, // side impacts above bumpBounceMin (1 = full lateral velocity swap)
   bumpBounceMin: 1.5,     // m/s closing; gentler side contact is an inelastic shove (no jitter)
+  bumpEaseMin: 0.5,       // m/s closing above which a side contact eases both headings (yawEaseRate)
   bumpSteer: 0.3,         // side bounce carry: steering back toward the other rider ×this (knocks use knockSteer)
+  pairLatchGap: 0.4,      // side-contact latch: after a bounce, re-contacts of the pair are silent inelastic shoves
+  pairLatchFar: 1.0,      // until they are > gap m apart with neither pressing in, > far m apart whatever the steering …
+  pairLatchTime: 0.6,     // … or apart for this many s
   rearRestitution: 0.3,
   contactMaxFix: 0.04,    // m positional correction per substep (≈ 4.8 m/s): push, never teleport
   bumpMin: 1.0,           // m/s strength before rider:bump fires (gentle shoulder pressing stays quiet)
@@ -183,7 +204,9 @@ export const TUNING = {
   respawnTime: 0.6,
   invulnTime: 2,
   respawnHp: 0.7,
-  respawnSpeed: 6,
+  respawnSpeed: 6,        // m/s the push-off eases up to after the respawn blink …
+  respawnPush: 20,        // … at this acceleration (m/s², ≈ 0.3 s) …
+  respawnPushTime: 0.4,   // … for at most this long
 };
 
 export type Tuning = typeof TUNING;

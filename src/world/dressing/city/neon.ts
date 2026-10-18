@@ -10,10 +10,10 @@ import { billboardFace } from '../../scenery/signs/faces';
 import type { AuxBuf } from './batch';
 import type { City } from './city';
 import { BLADES, P5_LINES, ROOF_LINES, SHOPS } from './lines';
-import { bladeFace, fasciaFace, p5Face, roofFace } from './neon-faces';
+import { ahead } from './util';
+import { bladeFace, fasciaFace, p5BladeFace, p5FasciaFace, p5Face, roofFace } from './neon-faces';
 
 const m = new Matrix4();
-const ahead = (p: Vector3, yaw: number, d: number): Vector3 => new Vector3(p.x - Math.sin(yaw) * d, p.y, p.z - Math.cos(yaw) * d);
 
 /** Sign quad with HDR intensity and optional flicker. */
 export function sign(buf: AuxBuf, c: Vector3, yaw: number, w: number, h: number, rect: AtlasRect, glow: number, flicker = 0, phase = 0): void {
@@ -29,25 +29,31 @@ export function board(c: City, p: Vector3, yaw: number, w: number, h: number, t:
   box(buf, trs(p.x, p.y, p.z, yaw, w, h, t, m), CPAL.trim);
 }
 
+type Style = 'tube' | 'lightbox' | 'p5';
+const GLOW: Record<Style, number> = { tube: 2.3, lightbox: 1.25, p5: 1.3 };
+
 function fascia(c: City, sl: SignSlot, k: number): void {
   const { d } = c;
   const i = k % SHOPS.length, name = SHOPS[i] ?? '';
-  const lightbox = i % 5 === 1 || i % 5 === 3;
-  const rect = d.face(`fascia:${name}:${lightbox}`, () => fasciaFace(c.neonAtlas, d.rng.fork(k), name, lightbox));
+  // One shop in five gets the red/black P5 treatment, two in five a lightbox.
+  const style: Style = i % 5 === 4 ? 'p5' : i % 5 === 1 || i % 5 === 3 ? 'lightbox' : 'tube';
+  const rect = d.face(`fascia:${name}:${style}`, () => (style === 'p5'
+    ? p5FasciaFace(c.neonAtlas, d.rng.fork(k), name) : fasciaFace(c.neonAtlas, d.rng.fork(k), name, style === 'lightbox')));
   if (!rect) return;
   board(c, ahead(sl.pos, sl.yaw, -0.04), sl.yaw, sl.w + 0.2, sl.h + 0.16, 0.16);
-  sign(c.cb.neon.at(sl.pos.x, sl.pos.z), ahead(sl.pos, sl.yaw, 0.05), sl.yaw, sl.w, sl.h, rect, lightbox ? 1.25 : 2.3, k % 9 === 4 ? 1 : 0, k * 0.37);
+  sign(c.cb.neon.at(sl.pos.x, sl.pos.z), ahead(sl.pos, sl.yaw, 0.05), sl.yaw, sl.w, sl.h, rect, GLOW[style], k % 9 === 4 ? 1 : 0, k * 0.37);
 }
 
 function blade(c: City, sl: SignSlot, k: number): void {
   const { d } = c;
   const i = k % BLADES.length, text = BLADES[i] ?? '';
-  const lightbox = i % 3 === 2;
-  const rect = d.face(`blade:${text}:${lightbox}`, () => bladeFace(c.neonAtlas, d.rng.fork(k + 500), text, lightbox));
+  const style: Style = i % 6 === 0 ? 'p5' : i % 3 === 2 ? 'lightbox' : 'tube';
+  const rect = d.face(`blade:${text}:${style}`, () => (style === 'p5'
+    ? p5BladeFace(c.neonAtlas, d.rng.fork(k + 500), text) : bladeFace(c.neonAtlas, d.rng.fork(k + 500), text, style === 'lightbox')));
   if (!rect) return;
   board(c, sl.pos, sl.yaw, sl.w + 0.16, sl.h + 0.16, 0.12);
   const buf = c.cb.neon.at(sl.pos.x, sl.pos.z);
-  for (const flip of [0, Math.PI]) sign(buf, ahead(sl.pos, sl.yaw + flip, 0.075), sl.yaw + flip, sl.w, sl.h, rect, lightbox ? 1.25 : 2.3, k % 7 === 3 ? 1 : 0, k * 0.61);
+  for (const flip of [0, Math.PI]) sign(buf, ahead(sl.pos, sl.yaw + flip, 0.075), sl.yaw + flip, sl.w, sl.h, rect, GLOW[style], k % 7 === 3 ? 1 : 0, k * 0.61);
 }
 
 function roof(c: City, sl: SignSlot, k: number): void {
@@ -68,13 +74,16 @@ function roof(c: City, sl: SignSlot, k: number): void {
   sign(c.cb.neon.at(sl.pos.x, sl.pos.z), ahead(centre, sl.yaw, 0.02), sl.yaw, sl.w, h, rect, p5 ? 1.3 : 2.4, k % 6 === 5 ? 0.6 : 0, k * 0.29);
 }
 
-function screen(c: City, sl: SignSlot, k: number, art: HTMLImageElement[]): void {
-  const { d } = c;
-  // 12 screen designs cycle (art × line), so the 2048² screen atlas never overflows.
+/** Atlas cell of screen design k: 12 designs cycle (art × line), so the 2048² screen atlas never overflows. */
+export function screenRect(c: City, k: number, art: HTMLImageElement[]): AtlasRect | null {
   const j = k % 12;
   const img = art.length ? art[j % art.length] ?? null : null;
   const text = ROOF_LINES[(j * 7 + 3) % ROOF_LINES.length] ?? '';
-  const rect = d.face(`screen:${text}:${img?.src ?? ''}`, () => billboardFace(c.screenAtlas, d.rng.fork(k + 1300), text, img));
+  return c.d.face(`screen:${text}:${img?.src ?? ''}`, () => billboardFace(c.screenAtlas, c.d.rng.fork(j + 1300), text, img));
+}
+
+function screen(c: City, sl: SignSlot, k: number, art: HTMLImageElement[]): void {
+  const rect = screenRect(c, k, art);
   if (!rect) return;
   board(c, ahead(sl.pos, sl.yaw, -0.12), sl.yaw, sl.w + 0.6, sl.h + 0.6, 0.3);
   sign(c.cb.screens.at(sl.pos.x, sl.pos.z), ahead(sl.pos, sl.yaw, 0.06), sl.yaw, sl.w, sl.h, rect, 1.15);

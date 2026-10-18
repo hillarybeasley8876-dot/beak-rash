@@ -20,7 +20,7 @@ src/camera/
 tools/feel-telemetry.mjs  scripted scenarios → JSON/CSV + PNG strips + metrics
 
 ## Design notes
-- Curve push is applied as a lateral-velocity bias (kappa*v^2*0.8 m/s) through the grip lag, so fast
+- Curve push is applied as a lateral-velocity bias (kappa*min(v, bike top)^2*0.8 m/s) through the grip lag, so fast
   corners need ~60-80 % steer (a pure acceleration would be cancelled by the 0.07 s grip lag).
 - Drift is road-relative (no curve push; steering sets the speed across the road) and charges by commitment;
   knocks / hard bumps / wall bounces / side swipes open a short carry window (weak steering, slow grip).
@@ -82,6 +82,20 @@ screen jitter same at 30/60/144 fps, camera jerk (track space) 22.5/23.3/23.8 m/
   the tightest radius grip can hold flat out (needs ~93 % steer at 20 m/s; R < 43 would force braking or a drift).
 - everyone: CameraRig.chasePose(outPos, outQuat) returns the live chase pose + FOV (also during an override).
 
+## Notes for other units (fix round 3)
+- everyone: rider:bump now fires once per approach: a pair that touched stays latched (side re-contacts are silent inelastic
+  shoves, no damage) until it is > 0.4 m apart with nobody pressing in, > 1 m apart, or apart 0.6 s.
+- race/ui: respawn now ends the blink at 0 m/s and pushes off to 6 m/s in ~0.3 s (was 6 m/s in one frame).
+- race (your request): no slipstream / slingshot below 8 m/s or while brake > 0.5; braking resets rider.draft to 0.
+- race AI: the curve push uses min(speed, bike top x rubber): boosts and descents no longer shrink the radius full lock holds
+  (your speed planner assumes v^2, which is now conservative while boosted). Drift ends (forced too) lock drifting 0.3 s.
+- actors: physics.pose() pitch now has weight cues (braking nose dive ~-3 deg, boost squat, landing compression dip) and a
+  wall-scrape pose (nose ~5 deg into the wall + 1.2 deg 13 Hz shimmy, lean ~8 deg onto it).
+- fx/race (camera): blends whose peak turn rate would exceed 300 deg/s now cut on the release (was > 90 deg), so most KO
+  hand-backs between ~56 and 90 deg cut under the whoosh; the crash cam may hover up to 10 m over the sea past a water edge;
+  the chase eye slides (<= 1.4 m) / lifts (<= 0.8 m) when a rider blocks the view of the player (__br.sim.cam.occSide /
+  occLift); chase distance is world metres on bends. chasePose() unchanged (it includes these offsets).
+
 ## Notes for other units (events/data sim emits)
 - rider:obstacleHit kind 'wall' (impact, speed = lateral impact m/s) and 'wallScrape' (~6/s while
   leaning on a wall, speed = v·pressure); obstacleId −1 for walls. Traffic: speed = closing speed.
@@ -89,11 +103,20 @@ screen jitter same at 30/60/144 fps, camera jerk (track space) 22.5/23.3/23.8 m/
   'wobble' (bumps/obstacles). Physics applies their grip itself via min(), so combat mapping oiled →
   gripMul too is harmless (never multiplied twice).
 - rider:land fires for hops and airs ≥ 0.12 s; PERFECT needs ≥ 0.35 s air (plain hops need ≥ 0.55 s
-  so hop-spam cannot farm boosts). Respawn: mode 'respawning' 0.6 s, speed 0, then 'racing' at 6 m/s.
+  so hop-spam cannot farm boosts). Respawn: mode 'respawning' 0.6 s, speed 0, then 'racing' from 0 m/s with a ~0.3 s
+  push-off to 6 m/s.
 - Camera listens to cam:shake/cam:kick/hitstop + rider:crash/land/boost/bump/obstacleHit + combat:hit
   (player involved). Duplicate shakes from fx are harmless (max-combined).
 
 ## Core requests
+- (fix round 3) SPEC section 6 wording to match deliberate, tested choices (critics keep measuring against the old text):
+  L1 mini-turbo boost 0.3 s (not 0.45; anti snake-farming); PERFECT after a plain flat hop needs >= 0.55 s air (ramps,
+  crests, drops >= 0.35 s); a wall crash needs > 24 deg impact angle above 18 m/s; the curve push is
+  curvature x min(v, bike top)^2 x 0.8 (boosts never shrink the holdable radius); drift charge on a bend into the drift
+  rewards a line-holding drift too (L3 ~2.3 s on R <= 250); side contacts bump once per approach (pair latch).
+- (fix round 3, cross-unit, feel critic r3) rider meshes overlap at the SPEC contact distance |dx| < 0.75 m: either SPEC
+  raises it to ~0.9 m (then combat's wing.ts CONTACT.dx 0.85 -> ~1.0 and sim's T.contactDx / nearPassGap follow), or
+  actors keep each rider's shoulders / wings within 0.37 m of its centre line. sim waits for the decision.
 - (applied by core, implemented) CameraRig.chasePose; rider.rubber; Track.runoff (sim reads frames to length + runoff).
 - combat's RiderMods.pushImmune (status/combat.md core request): once core adds the field, sim's rider contacts will
   skip the speed loss for a pushImmune rider (contacts.ts sideBySide/rearEnd); nothing to do until then.
@@ -107,7 +130,11 @@ screen jitter same at 30/60/144 fps, camera jerk (track space) 22.5/23.3/23.8 m/
 - fix round 2 probes: node shots/sim/fix2/cam/{t7-traffic,t17b-grab,t4-crash,t5u-ult,t8-pause,t9n-swerve,t1-fps}.mjs
   (camera critic's scripts, real game), shots/sim/fix2/scripts/{framing,framing-k,wallpin,walldead,hairpin,driftexit,
   knockreal,rubber,runoff,profile,tightcorners,soak}.mjs
-- node tools/feel-tour.mjs [--only drift,crest]  → shots/sim/tour/*.png (real coast track)
+- fix round 3: feel-telemetry scenarios driftRelease pressYaw lineHold draftBrake poses tightCam occlusion (tools/
+  feel-scenarios-r3.mjs); probes shots/sim/fix3/scripts/{minors,yawsnap,bounds}.mjs, shots/sim/fix3/feel/{soak,dtcompare,
+  knockreal}.mjs (critic copies), shots/sim/fix3/cam/{release-size,t30-lap,t34-tight,t32-corners,t4-crash,t3-blend}.mjs
+  (critic copies; t30-lap adds occlusion details + maxFullRun; run from that folder, TRACK=city|mountain|coast).
+- node tools/feel-tour.mjs [--main] [--only drift,crest,tunnelwall]  → shots/sim/tour/*.png (real coast track)
 - /sandbox/sim.html?race=coast&seed=1&traffic=0&realtrack=1  (feel bench: drive with keyboard)
 - /?race=coast&seed=1&stub=world,actors,combat,fx&traffic=0 ; live tuning: __br.sim.tuning, __br.sim.riders(), __br.sim.cam
 
@@ -250,3 +277,98 @@ Plan (issue -> fix; [x] = done + verified). Critic scripts: shots/review/sim/r2-
       approach straight); full-commitment drifts reach the inside wall and scrape (bounce, no crash).
 - Fix round 2 complete: the camera major + both feel majors (wall pinball, drift charge) fixed and verified, all minors done;
   feel-telemetry 106/106; tsc clean for src/sim + src/camera (remaining tsc errors are in src/world, track/env units).
+
+## Fix round 3
+Plan (issue -> fix; [x] = done + verified). Critic evidence: shots/review/sim/r3-feel, r3-camera. Probes: shots/sim/fix3/.
+- [x] F1 major L3 release flings outward -> steering.ts curvePush() uses min(v, bikeTop) (forces.ts bikeTop = bike top x
+      rubber), so boosts / skills / descents never shrink the radius full lock holds (R43); release ramp 0.2 -> 0.35 s
+      (driftExitTime) and |vx| <= v tan 20 deg for 0.5 s after a release (driftExitGuard). Critic driftexit.mjs (real coast):
+      L46 full/half/neutral yaw 37 -> 1 / -7 / -15 deg (was -10/-18/-25), run-wide 0 / 3.2 / 8.0 m (was 3.9/9.0/12.2), no
+      crash (was a wall crash); L60 0 / 0.2 / 3.7 m; R90 0 / 0 / 3.6 m; <= 2.9 deg/frame. driftexit2.mjs bothKeys L46 at
+      1/30, 1/60, 1/144: 1 wall bounce, no crash (was a crash at +1.39 s). (shiftOnly L60 still crashes at +1.6 s: full LEFT
+      held into the chicane's R60 at 26 m/s = 26 deg into the wall, a player error, also before.)
+- [x] F2 major rider bump yaw snap + press loop -> contacts.ts: side contacts latch the pair (like walls): after the first
+      bounce, re-contacts are inelastic shoves with no rider:bump and no damage until the pair is > 0.4 m apart with neither
+      pressing in (pairLatchGap), > 1 m apart (pairLatchFar), apart 0.6 s (pairLatchTime), or moved farther than it could
+      ride (respawn / teleport = new approach). Any side contact closing > 1.5 m/s sets yawEase on both riders (300 deg/s).
+      Critic bump.mjs (combat stubbed) at 1/30, 1/60, 1/144 x steer 0.3/0.6/1: 1 bump per 3 s press (was 7-8), HP lost
+      P 0/3/5 G 0/2/2 (was up to 43/22), yaw reversals 0.7-1.3/s (was 2.0-5.0); shoulder fight 1 bump (was 7, -36 HP);
+      rear-ends unchanged (1 bump). bumpyaw.mjs: player/rival yaw step 5.0 / 4.7-5.0 deg/frame at 60 fps (was 25 / 16).
+- [x] F3 minor wall-scrape pose dead straight -> surfaces.ts stores the signed scrape pressure (sr.scrape), attitude.ts
+      smooths it (lambda 12) into nose-into-wall yaw 5 deg x pressure + a 1.2 deg grinding shimmy (4.1 rad/m = 13 Hz at
+      20 m/s) and lean 8 deg into the wall; vx stays 0 (physics unchanged). fix3/scripts/minors.mjs tunnel wall, full
+      lock 3 s at 1/30, 1/60, 1/144: late yaw 3.8..6.2 deg, lean 9.3..9.5 deg (was 0 / 0), 1 wall event.
+- [x] F4 minor respawn 0 -> 6 m/s pop -> respawningUpdate starts 'racing' at 0 m/s with a push-off (forces.ts: >= 20 m/s^2
+      while below 6 m/s, at most 0.4 s): 6 m/s after 0.30 s, max 0.33 m/s per frame at 60 fps (was 6.2 in one frame).
+- [x] F5 minor no brake/landing pitch -> attitude.ts pitchTarget(): -0.25 deg per m/s^2 braking / +0.1 deg per m/s^2
+      squat (cap 4 deg) + landing compression (air.ts landCompression: target offset -(5 + 8 x air) deg, cap 12, decays
+      lambda 9: peak ~0.37x after ~0.1 s). Full brake 20 -> 0: pitch -3.2 deg (was 0); pedalling +0.5; hop / ramp
+      landings dip -4.6 / -8.8 deg (incl. the descending air pitch) and settle within 0.5 s.
+- [x] F6 minor drift restarts on a wall -> drift.ts: every end (forced too) locks drifting out 0.3 s, and no drift starts
+      toward a latched wall (sr.wallSide). minors.mjs Shift + full lock into the tunnel wall 2.5 s: start@0.00, end + wall
+      @0.53, no restart (was a restart 10 ms after the wall killed it).
+- [x] F7 minor telemetry blind spots + SPEC deviations -> new tools/feel-scenarios-r3.mjs (REVIEW3): driftRelease (L3 release
+      in R46/R60/R90 x full/half/neutral: no crash, full <= 2 m wide, full/half <= 10 deg out), pressYaw (1 bump per 3 s
+      press, yaw steps <= 300 deg/s at 60 & 144 fps, HP), lineHold (report: line-holding drift charge), draftBrake, poses
+      (brake pitch, scrape pose, respawn push-off), tightCam (real coast: world-distance chase, release-boost size),
+      occlusion (rival closing in the camera gap); press.sideBumps is now checked (1). SPEC deviations filed under core
+      requests below.
+- [x] F8 cross-unit fx load -> fx loads again; ultHandback re-run (see C5): SHOWTIME hand-back settled, 0.69 deg/frame.
+- [ ] F9 cross-unit meshes overlap at the 0.75 m contact distance -> not changed in sim: SPEC section 6 fixes |dx| < 0.75 and
+      combat's wing.ts mirrors it (CONTACT.dx 0.85), so widening it alone would desync combat's ram test. Filed as a core
+      request below (SPEC 0.9 m + combat mirror 1.0, or actors keep shoulders <= 0.37 m); sim only needs T.contactDx.
+- [x] C1 minor rival hides hero in camera gap -> new camera/occlude.ts RiderOcclude (chase.ts applies it): riders are boxes
+      (|ds| < 0.85, |dx| < 0.35, 1.9 m + 0.12 m clearance); judged from the natural eye, a blocked sight line to the hero's
+      chest / head slides the eye toward the open side (<= 1.4 m, within the edge clamp) and lifts it when sliding cannot
+      clear (<= 0.8 m), omega-8 springs, held 0.5 s, side sticks until the blocker is > 0.3 m on it (no swinging while a
+      drafter weaves); eases out on the crash cam. Critic t30-lap.mjs (copied + fullRun counter): city s4 >= 5/9 blocked
+      72 frames (0.7 %), never 9/9 (was 134 frames, 3 full hides up to 0.83 s); mountain s4 175 frames (1.6 %), longest
+      full hide 4 frames (rivals tailgating 1.7 m behind in line); coast s3 0 frames (was 14). inObs 0, blendOff 0, no
+      rotation spikes, size p5 179-184 px on all three. Telemetry occlusion (rival closing to 1.8 / 2.5 / 3.5 m in line):
+      min visible 2 / 7 / 9 of 9, no full-hidden run.
+- [x] C2 minor chase dist along centre line -> chase.ts alongS(): the eye sits dist world metres back (and the look point
+      `ahead` metres forward) on the line at its lateral offset, delta-s = d / clamp(1 - kappa x, 0.7, 1.3) (the physics'
+      metric) with kappa sampled mid-span + one refinement. Plus the boost shrink: while the FOV is kicked beyond the speed
+      FOV, the counter-dolly also takes out the acceleration surge (finish(): ramps in over 2 deg of kick). Critic
+      t34-tight.mjs (copied, mountain): R27 inside dRider 4.92-5.04 m / 212-220 px (was 4.01 m / 269 px), outside
+      4.95-4.97 m / 214-216 px (was 5.92 / 181), straight 5.0 m / 212 px; R26 drift 188-216 px (was 188-278). Coast
+      fix3/cam/release-size.mjs (clean L3 release on L46/L60/R90, stick full/half): boost min -2.3..-2.5 % (was -7.2..-8.7 %
+      before the surge dolly; critic saw 254 -> 170 px), >= 178 px = 24.7 %. t32-corners: chicane/hairpin 185-187 px.
+      Telemetry tightCam (real coast, world live): L46 inside/outside distance ratio 0.996 / 0.998, releaseShrink 0.2 %.
+- [x] C3 minor KO exits whip just under 90 deg -> blend.ts: BLEND.cutAngle 90 deg replaced by cutRate 300 deg/s: after
+      the duration stretch, a blend whose peak turn rate (1.875 x angle / duration) would exceed 300 deg/s (~56 deg in
+      0.35 s = 5 deg/frame at 60 fps, 10 at 30 fps) cuts on the release instead (distance rule 12 m unchanged).
+      Critic t3-blend.mjs (copied to fix3/cam): az30 still blends (2.76 deg/frame); az60 / az85 / az60 at 30 & 144 fps /
+      orbit60 / az60_steer now cut in one frame (were 5.4-7.6 deg/frame, 10.7 at 30 fps). Telemetry handoff: side
+      override at az 45 blends 20 frames at <= 4.1 deg/frame, new side70 case cuts, ko_maxRotDeg check 8 -> 5.2: 16/16.
+- [x] C4 minor water crash horizon-less -> chase.ts: the crash cam may hover up to 10 m past a WATER edge (crashOverWater,
+      weighted by crashBlend; walls/other edges keep the 1 m inside margin), the crash orbit swings out over the sea when
+      the nearer edge is water (body seen against the beach), zoom floor 30 -> 40 deg, and keepHorizon() limits the crash
+      cam pitch to -(fov/2 - 6 deg) by raising the look point. Critic t4-crash.mjs (copied): water body distance 4.4-5.2 m
+      (was 5.2-14.5), FOV >= 52 (was 30.8), horizon inside the frame in 157/157 crashed frames, >= 6 deg below the top;
+      fix3/cam/t4-water-strip3.jpg: beach, road and villas behind the floating pelican until ~2.4 s, horizon + shore after.
+      Traffic crash unchanged (4.4-5.5 m).
+- [x] C5 minor ultHandback check measures the blend start -> feel-scenarios-cam2.mjs ultHandback now checks what the player
+      sees: rig.chasePose() eye height on the first frame after the override vs rest (chaseDy <= 0.3), rendered eye at the
+      end of the blend vs rest (blendEndDy <= 0.1) and the blend's rotation (<= 2 deg/frame). Real fx SHOWTIME (fx loads
+      again): chaseDy 0.007 m, blendEndDy 0.029 m, 0.69 deg/frame, no cut: 4/4 (was FAIL handbackDy 0.396 on correct
+      behaviour). This also re-verifies the r2 SHOWTIME settle fix (cross-unit item F8 below).
+- [x] X1 race request: no slingshot/draft while braking or < 8 m/s -> contacts.ts slipstream(): no leader search and no
+      slingshot while brake > 0.5 (draftBrakeMax) or v < 8 m/s (draftMinSpeed); braking resets r.draft to 0. Telemetry
+      draftBrake: draft 1.0 before braking, 0 while braking, 0 'draft' boosts while braking, 0 at 7 m/s.
+- [x] extra: line-holding drift charge (critic context for F1: a drift holding its line on a bend charged at ~45 %, so L3
+      only came from cutting inside): drift.ts chargeRate() raises the counter-steer floor on a bend into the drift
+      (driftChargeLowBend 0.8, straights unchanged 0.35 x 0.25): lineHold R150 L1/L2/L3 0.63 / 1.38 / 2.32 s (was 1.1 / 2.43
+      / none in 3.5 s); full commitment unchanged (driftTiming), snake/driftWall checks unchanged.
+- [x] X2 track note: feel-tour cliffwall stop moved -> tools/feel-tour.mjs stop renamed 'tunnelwall' at s 1960, x 5 (tunnel
+      rock walls 1945-2095): node tools/feel-tour.mjs --main --only tunnelwall -> 1 'wall' impact at 0.97 s then scrapes
+      every 0.16 s, x 4.9..7.7, v 20 -> 16.2; strip fix3/tour/tunnelwall.jpg shows the bike leaning on the wall.
+- [x] regression pass: feel-telemetry 152/152 (shots/sim/fix3/tele/metrics.json; wallPin's reversal detector now ignores
+      swings < 3 deg so the deliberate scrape shimmy is not counted as pinball); critic soak s3 90 s all units: 0 NaN /
+      out-of-bounds / tunnelling, player bump loops 0 (was 3), bumps 18 (player 2, was 8); dtcompare 30/60/144/jitter
+      events within 1-3 frames; knockreal light shove 1.12 m; laps coast s3 / mountain s4 / city s4: inObs 0, blendOff 0,
+      no rotation spikes, no page errors; npx tsc --noEmit: 0 errors (whole project).
+- Fix round 3 complete: both feel majors (L3 release fling, bump snap/loop) and every camera minor fixed and verified, feel
+  minors done (scrape pose, respawn push-off, weight pitch, drift lock), race's draft request done, feel-tour retargeted;
+  F9 (contact width vs meshes) and the SPEC wording are filed as core requests. Note: critic wall.mjs counts every yaw
+  wiggle as a reversal, so it will report the 13 Hz scrape shimmy (~26/s) that its own F3 fix asked for.

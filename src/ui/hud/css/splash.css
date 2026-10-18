@@ -48,6 +48,20 @@
   border: 14px solid var(--hot); background: rgba(255, 255, 255, 0.92); box-shadow: 0 0 0 8px var(--ink), 16px 16px 0 8px var(--ink);
 }
 
+/* KNOCK OUT! fits between the attacker and victim cards. */
+.ci-ko .sx-title { top: 340px; font-size: 140px; }
+/* KNOCK OUT / WRECKED play over the KO cinematic: a flatter band in the lower 40 % of the frame keeps the
+   tumbling victim (frame centre) in view; the title fits between the two portrait cards. */
+.ci-cine .sx-band { top: 712px; height: 220px; }
+.ci-cine .sx-band2 { top: 948px; height: 48px; }
+.ci-cine .sx-burst { left: 600px; top: 660px; width: 720px; height: 320px; }
+.ci-cine .sx-pre { top: 650px; font-size: 72px; }
+.ci-cine .sx-title { top: 730px; font-size: 132px; }
+.ci-cine .sx-cn { top: 878px; font-size: 90px; -webkit-text-stroke-width: 11px; text-shadow: 8px 8px 0 var(--red); }
+.ci-cine .sx-sub { top: 990px; font-size: 34px; }
+.ci-cine .sx-left { left: 70px; top: 660px; width: 250px; height: 300px; }
+.ci-cine .sx-right { right: 80px; top: 680px; width: 236px; height: 284px; }
+.ci-cine .sx-name { font-size: 32px; bottom: -20px; }
 .ci-wrecked .sx-band { background: var(--ink); box-shadow: 0 -16px 0 0 var(--red), 0 16px 0 0 var(--red); }
 .ci-busted .sx-band { background: #1F4FD1; box-shadow: 0 -16px 0 0 var(--hot), 0 16px 0 0 var(--hot); }
 .ci-busted .sx-burst { background: var(--sp); }

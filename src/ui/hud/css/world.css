@@ -29,6 +29,23 @@
 .nt-chip.cast { background: var(--sp); color: var(--ink); font-size: 24px; box-shadow: 0 0 0 3px var(--ink); }
 .nt.is-cast .nt-plate { box-shadow: 3px 3px 0 var(--sp), 0 0 0 3px var(--hot); }
 .nt-tip { width: 14px; height: 9px; margin-top: 2px; background: var(--paper); clip-path: polygon(0 0, 100% 0, 50% 100%); }
+/* Compact place pip (rivals that are not relevant right now): species dot + place, bottom-centre on the anchor. */
+.nt-pip {
+  position: absolute; left: 0; bottom: 0; translate: -50% 0; display: flex; align-items: center; gap: 3px; width: max-content;
+  padding: 2px 3px 2px 2px; background: var(--ink); transform-origin: 50% 100%;
+  box-shadow: 0 0 0 2px var(--paper), 3px 3px 0 2px var(--c3, var(--red));
+}
+.nt-pip .nt-dot { width: 22px; height: 22px; font-size: 14px; box-shadow: none; }
+.nt-pip .nt-pl { font-size: 19px; padding: 2px 4px 0; }
+/* Leader line from under a slid plate to the rider's anchor (scaled to length in JS), and the anchor dot. */
+.nt-lead {
+  position: absolute; left: 0; top: -3px; width: 1px; height: 6px; transform-origin: 0 50%; visibility: hidden;
+  background: linear-gradient(180deg, var(--ink) 0 1.5px, var(--paper) 1.5px 4.5px, var(--ink) 4.5px 6px);
+}
+.nt-end {
+  position: absolute; left: -7px; top: -7px; width: 14px; height: 14px; border-radius: 50%; visibility: hidden;
+  background: var(--c1, var(--paper)); box-shadow: 0 0 0 3px var(--ink), 0 0 0 5px var(--paper);
+}
 
 /* Taunt bubble: jagged white speech shape with a tail pointing at the speaker. */
 .tb-in { position: absolute; left: 0; bottom: 0; width: max-content; max-width: 340px; translate: -50% 0; transform-origin: 50% 100%; }

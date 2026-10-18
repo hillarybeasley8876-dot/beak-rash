@@ -2,7 +2,7 @@
 """Cut out and export BEAK RASH art (assets unit).
 
 usage: cutout.py RAW.png OUT_BASE [--cut] [--max-h N] [--max-w N] [--png] [--webp] [--colors N] [--flip]
-                 [--hole X,Y,R[,RY] ...] [--frame CX,CY,S] [--tint X,Y,RX,RY ...]
+                 [--hole X,Y,R[,RY] ...] [--frame CX,CY,S] [--tint X,Y,RX,RY ...] [--canvas S[,DY]]
 
 --cut   flood-fills the near-white background (plus neutral light greys: sticker edges, soft
         shadows) from the image border to transparency. Dark ink
@@ -15,6 +15,10 @@ usage: cutout.py RAW.png OUT_BASE [--cut] [--max-h N] [--max-w N] [--png] [--web
         eyes strip, which the HUD shows as a thin centred band).
 --tint  repaints warm orange/yellow pixels inside an ellipse (raw px, after --flip) crimson, keeping
         their shading: puts the pelican's red hooked beak tip back when a roll painted it orange.
+--canvas builds an outpainting canvas instead of export art: the image shrunk by S, bottom-centred on a
+        same-size white canvas (DY = extra downward shift as a fraction of the height; the overflow is
+        cropped). gen-image.mjs --edit uploads it so the model extends the scene around a poster whose
+        subject must sit in the lower part of the frame (billboard text band on top).
 Outputs OUT_BASE.png / OUT_BASE.webp, never taller than --max-h (default 900).
 Prints one summary line: size, file sizes, opaque coverage, removed specks.
 """
@@ -183,6 +187,17 @@ def frame(rgb, cx, cy, s):
     return np.ascontiguousarray(rgb[y0:y0 + fh, x0:x0 + fw])
 
 
+def make_canvas(rgb, s, dy=0.0):
+    """Shrink HxWx3 by s and paste it bottom-centred (shifted down by dy*H) on a white canvas of the same size."""
+    if not (0.2 <= s <= 1.0 and -0.5 <= dy <= 0.5):
+        raise ValueError('--canvas wants S in 0.2..1 and DY in -0.5..0.5')
+    h, w = rgb.shape[:2]
+    small = Image.fromarray(rgb).resize((round(w * s), round(h * s)), Image.LANCZOS)
+    out = Image.new('RGB', (w, h), (255, 255, 255))
+    out.paste(small, ((w - small.width) // 2, h - small.height + round(dy * h)))
+    return np.asarray(out)
+
+
 def trim(im, pad=6):
     a = np.asarray(im)[:, :, 3]
     ys, xs = np.nonzero(a > 8)
@@ -217,6 +232,7 @@ def main():
     ap.add_argument('--tint', action='append', default=[], metavar='X,Y,RX,RY',
                     help='repaint warm orange pixels inside this ellipse crimson (raw px, after --flip); repeatable')
     ap.add_argument('--frame', metavar='CX,CY,S', help='re-frame: crop to S of the size around (CX, CY) fractions')
+    ap.add_argument('--canvas', metavar='S[,DY]', help='outpainting canvas: shrink by S, bottom-centred on white')
     ap.add_argument('--hole', action='append', default=[], metavar='X,Y,R[,RY]',
                     help='clear enclosed light regions inside this circle/ellipse (raw px, after --flip); repeatable')
     args = ap.parse_args()
@@ -237,6 +253,11 @@ def main():
         if len(parts) != 3:
             raise ValueError('--frame wants CX,CY,S')
         rgb = frame(rgb, *parts)
+    if args.canvas:
+        parts = [float(v) for v in args.canvas.split(',')]
+        if len(parts) not in (1, 2):
+            raise ValueError('--canvas wants S or S,DY')
+        rgb = make_canvas(rgb, *parts)
     specks, holes, coverage = 0, 0, 100.0
     if args.cut:
         ellipses = [tuple(int(v) for v in h.split(',')) for h in args.hole]

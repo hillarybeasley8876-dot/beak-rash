@@ -64,12 +64,12 @@ const BRASS_TOP = bars(
 
 // Leads: flute hook (A2 / A3 / A4) and bridge melody (B / B2), wah solo over a C dorian vamp (S).
 const HOOK = bars(
-  'G5 - Bb5 - C6 - Eb6 - D6 - - C6 Bb5 - G5 -',
+  'G5 - Bb5 - C6 - . Eb6 - D6 - C6 Bb5 - G5 -',
   'Ab5 - - - G5 F5 - Eb5 - - F5 - G5 - - -',
-  'G5 - Bb5 - C6 - Eb6 - F6 - - Eb6 D6 - C6 -',
+  'G5 - Bb5 - C6 - . Eb6 - F6 - Eb6 D6 - C6 -',
   'D6 - C6 - Bb5 - Ab5 - B5 - - - Bb5 - G5 -',
   'C6 - - - - - Eb6 D6 C6 - Bb5 - G5 - - -',
-  'Ab5 - - - Bb5 - C6 - Eb6 - - - D6 - C6 -',
+  'Ab5 - - - Bb5 - C6 Eb6 - - - - D6 - C6 -',
   'F5 - Ab5 - C6 - Ab5 - B5 - - - Ab5 - F5 -',
   'Eb5 - - - D5 - C5 - F5 - - - G5 - Ab5 -',
 );
@@ -129,7 +129,7 @@ export const CITY: Song = {
       cym: REST + 'W...............',
       fill: { kick: 'X.....x.X..x....', snare: '....X.......XxXX', bass: '1> . 8^ . . 1 b7 8^ . . . . 5 . b7 8^' },
     },
-    A,
+    A: { ...A, gainDb: -3 },
     A2: { ...A, lead: HOOK, clav: CLAV_A2, fill: [FILLS[1], FILLS[3]], layers: { 1: { brass: BRASS_TOP, lead2: transpose(HOOK, -12) } } },
     B,
     A3,
@@ -139,6 +139,7 @@ export const CITY: Song = {
       brass: bars(REST, REST, REST, 'X-..x.X-........', REST, REST, REST, '........x.x.X-f-'),
     },
     D: {
+      shape: 'breakdown',
       bars: 8, chords: 'Abmaj9 | Gm7 | Fm9 | G7#9 | Abmaj9 | Gm7 | Fm9 | G7alt',
       kick: bars(rep(K_HALF, 4), rep(K1, 3), 'X.....x.X.X.XXXX'),
       snare: bars(rep('........X.......', 4), '....X.......X...', '....X...X...X...', 'X.X.X.X.X.X.X.X.', 'oooooooxxxxxxxXX'),
@@ -147,7 +148,7 @@ export const CITY: Song = {
       brass: bars(rep(REST, 4), 'r-------........', REST, 'r-------........', 'x.x.x.x.X.X.X.X.'),
       layers: { 1: { clav: rep(REST, 8), perc: REST } },
     },
-    B2: { ...B, kick: K4, snare: S2, hat: H1, cym: CRASH, brass: BRASS_B2, lead2: transpose(BRIDGE, -12) },
+    B2: { ...B, gainDb: 2, kick: K4, snare: S2, hat: H1, cym: CRASH, brass: BRASS_B2, lead2: transpose(BRIDGE, -12) },
     A4: { ...A3, lead: HOOK_A4, lead2: undefined, brass: BRASS_A, layers: { 1: { brass: BRASS_TOP, lead2: transpose(HOOK_A4, -12) } } },
   },
   form: ['intro', 'A', 'A2', 'B', 'A3', 'S', 'D', 'B2', 'A4'],

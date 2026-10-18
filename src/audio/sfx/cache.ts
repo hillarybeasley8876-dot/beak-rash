@@ -1,15 +1,18 @@
 // Rendered one-shots. A synthesized sfx builds 5–20 nodes per play, and the realtime audio thread
 // pays for every one of them, so after its first (live) play each sound is rendered once into a
-// couple of takes (OfflineAudioContext: off the audio thread) and replayed as a buffer: one source
-// node instead of a graph. `pitch` maps to playbackRate (the kit's pitch is tape speed: frequencies
-// × p, times ÷ p), `vol` to a gain (the kit's levels are linear in vol), so takes sound identical.
+// few takes (OfflineAudioContext: off the audio thread) and replayed as a buffer: one source node
+// instead of a graph. Short sounds get three takes, each with its own noise and a baked ±3 % pitch
+// (repeats never machine-gun), so they play at playbackRate 1: a resampling buffer source costs the
+// audio thread ≈ 3× a unity-rate one. An explicit `pitch` still maps to playbackRate (the kit's
+// pitch is tape speed: frequencies × p, times ÷ p), `vol` to a gain, so takes sound identical.
 import { Rng } from '../../core/rng';
 import type { SfxFn } from './kit';
 
 /** Total cached audio (s, all takes): bounds memory (≈ 128 kB per mono second at 32 kHz). */
-const BUDGET_S = 90;
-/** Sounds shorter than this get two takes (noise offsets differ), longer ones one. */
+const BUDGET_S = 110;
+/** Sounds shorter than this get the TAKE_PITCHES takes (noise offsets differ), longer ones one. */
 const SHORT_S = 0.9;
+const TAKE_PITCHES = [1, 0.97, 1.03];
 const TAIL_S = 0.03;
 /** Render length for a sound whose length is not known yet (prewarm); trimmed afterwards. */
 const MAX_S = 3.2;
@@ -44,11 +47,13 @@ export class SfxCache {
     this.running = true;
     for (let job = this.queue.shift(); job; job = this.queue.shift()) {
       try {
-        const first = await this.render(job.fn, job.dur);
+        const first = await this.render(job.fn, job.dur, 1);
         const list = [first];
-        if (first.duration < SHORT_S) list.push(await this.render(job.fn, first.duration));
+        if (first.duration < SHORT_S) {
+          for (const pitch of TAKE_PITCHES.slice(1)) list.push(await this.render(job.fn, first.duration, pitch));
+        }
         this.takes.set(job.id, list);
-        this.seconds += first.duration * list.length;
+        this.seconds += list.reduce((s, b) => s + b.duration, 0);
       } catch (err) {
         // Rendering is an optimisation: on failure the sound keeps being synthesized live.
         console.warn(`[audio] could not pre-render sfx "${job.id}"`, err);
@@ -57,10 +62,10 @@ export class SfxCache {
     this.running = false;
   }
 
-  private async render(fn: SfxFn, dur: number | null): Promise<AudioBuffer> {
-    const len = Math.ceil((dur === null ? MAX_S : dur + TAIL_S) * this.sampleRate);
+  private async render(fn: SfxFn, dur: number | null, pitch: number): Promise<AudioBuffer> {
+    const len = Math.ceil((dur === null ? MAX_S : dur / pitch + TAIL_S) * this.sampleRate);
     const ctx = new OfflineAudioContext(2, len, this.sampleRate);
-    fn({ ctx, out: ctx.destination, t: 0, vol: 1, pitch: 1, rng: this.rng.fork(Math.floor(this.rng.next() * 1e9)) });
+    fn({ ctx, out: ctx.destination, t: 0, vol: 1, pitch, rng: this.rng.fork(Math.floor(this.rng.next() * 1e9)) });
     return compact(await ctx.startRendering());
   }
 }

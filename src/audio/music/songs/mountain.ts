@@ -65,12 +65,12 @@ const BRASS_TOP = bars(
 
 // Leads: wah hook (A2 / A3 / A4), bridge melody (B / B2), square-synth solo over an A dorian vamp (S), tag riff (T).
 const HOOK = bars(
-  'A5 - - - G5 - E5 - G5 - A5 - - - C6 -',
+  'A5 - - G5 - - E5 - G5 - A5 - - C6 - -',
   'B5 - - - A5 - G5 - E5 - - - - - . .',
-  'D5 - E5 - G5 - - - A5 - B5 - D6 - - -',
+  'D5 - E5 - G5 - - A5 - - B5 - D6 - - -',
   'B5 - - - - - G5 - E5 - - - . . . .',
-  'A5 - - - G5 - E5 - G5 - A5 - - - C6 -',
-  'E6 - - - D6 - C6 - A5 - - - G5 - - -',
+  'A5 - - G5 - - E5 - G5 - A5 - - C6 - -',
+  'E6 - - D6 - - C6 - A5 - - G5 - - - -',
   'F5 - - - A5 - C6 - B5 - - - D6 - - -',
   'E6 - - - D6 - B5 - G#5 - - - G5 - E5 -',
 );
@@ -127,14 +127,14 @@ export const MOUNTAIN: Song = {
   key: 'A Dorian',
   lead: 'wah',
   // Half-note Rhodes, pad and brass hits sit in the hook's band (and warm the low end): all back a little.
-  mix: { lead: 0.68, keys: 0.55, bass: 0.66, brass: 0.8, drums: 1.0, pad: 0.6 },
+  mix: { lead: 0.93, keys: 0.82, bass: 0.66, brass: 1.0, drums: 1.08, pad: 1.1 },
   sections: {
     vamp: { bars: 2, chords: 'Am9 | Am9', kick: K1, hat: H1, bass: rep('1> . 8^ . 1 . 8^ . 1> . 8^ . 5 . 8^ .', 2), keys: KEYS_A },
     intro: {
       bars: 2, chords: 'Am9 | Am9', bass: '1> . 8^ . 1 . 8^ . 1> . 8^ . 5 . 8^ .', hat: 'x.x.x.x.x.x.x.x.', cym: REST + 'W...............',
       fill: { kick: 'X...X...X...X.X.', snare: '........X.X.XXXX' },
     },
-    A,
+    A: { ...A, gainDb: -3 },
     A2: { ...A, lead: HOOK, clav: CLAV_A2, fill: [FILLS[1], FILLS[3]], layers: { 1: { brass: BRASS_TOP, lead2: transpose(HOOK, -12) } } },
     B,
     A3,
@@ -144,6 +144,7 @@ export const MOUNTAIN: Song = {
       brass: bars(REST, REST, REST, '........X-.x.X--', REST, REST, REST, 'X-------x.x.X.f-'),
     },
     D: {
+      shape: 'breakdown',
       bars: 8, chords: 'Fmaj9 | G13 | Em7 | Am9 | Fmaj9 | G13 | Dm9 | E7alt',
       kick: bars(rep(K_HALF, 4), rep(K1, 3), 'X...X...X.X.XXXX'),
       snare: bars(rep('........X.......', 4), '....X.......X...', '....X...X...X...', 'X.X.X.X.X.X.X.X.', 'oooooooxxxxxxxXX'),
@@ -152,7 +153,7 @@ export const MOUNTAIN: Song = {
       brass: bars(rep(REST, 4), 'r-------........', REST, 'r-------........', 'x.x.x.x.X.X.X.X.'),
       layers: { 1: { clav: rep(REST, 8), perc: REST } },
     },
-    B2: { ...B, kick: K2, snare: S2, hat: H2, cym: CRASH, brass: BRASS_B2, lead2: transpose(BRIDGE, -12) },
+    B2: { ...B, gainDb: 2, kick: K2, snare: S2, hat: H2, cym: CRASH, brass: BRASS_B2, lead2: transpose(BRIDGE, -12) },
     A4: { ...A3, lead: HOOK_A4, lead2: undefined, brass: BRASS_A, layers: { 1: { brass: BRASS_TOP, lead2: transpose(HOOK_A4, -12) } } },
     T: {
       bars: 4, chords: 'Fmaj7#11 | G13 | Fmaj7#11 | E7alt', kick: K1, snare: S1, hat: H1, bass: BASS_T, keys: 'X-..X-..X-..X-..',

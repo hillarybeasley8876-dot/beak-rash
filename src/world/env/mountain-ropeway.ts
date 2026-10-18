@@ -7,6 +7,7 @@ import type { WorldCtx } from '../ctx';
 import { MeshBuf } from '../geom';
 import { box, cylinder, trs } from '../kit/shapes';
 import { rod } from '../scenery/props/mountain-bridge';
+import { sagAt } from '../scenery/props/mountain-deco';
 import { animatedMesh } from './mountain-anim';
 
 const C = (h: string): Color => new Color(h);
@@ -19,7 +20,6 @@ const GAP = 3.2, PER_LINE = 6, SPEED = 5.5;
 
 export interface RopewaySpec { a: Vector3; b: Vector3; sag: number }
 
-const sagAt = (a: Vector3, b: Vector3, t: number, sag: number): Vector3 => new Vector3().lerpVectors(a, b, t).setY(a.y + (b.y - a.y) * t - sag * 4 * t * (1 - t));
 
 /** Station building under the bullwheel at p (yaw = cable direction). */
 function station(buf: MeshBuf, p: Vector3, yaw: number, ground: number): void {
@@ -86,5 +86,5 @@ export function buildRopeway(ctx: WorldCtx, props: (x: number, z: number) => Mes
       uSag: { value: sag }, uSpeed: { value: SPEED / len },
     },
   });
-  console.info(`[mountain] ropeway ${Math.round(len)} m, sag ${sag.toFixed(1)}`);
+  ctx.log(`ropeway ${Math.round(len)} m, sag ${sag.toFixed(1)}`);
 }

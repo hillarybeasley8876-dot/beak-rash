@@ -1,4 +1,4 @@
-// Shared rider skeleton: every species uses the same 34 bones (unused ones simply get no weights).
+// Shared rider skeleton: every species uses the same 36 bones (unused ones simply get no weights).
 // Bind pose = identity rotations, bones placed at the species' joint positions (character space:
 // origin = saddle top under the pelvis, −Z forward, +X right; "L" = rider's left = −X).
 import { Bone, Matrix4, Skeleton, Vector3 } from 'three';
@@ -10,9 +10,11 @@ export const B = {
   clavL: 16, armL: 17, foreL: 18, handL: 19, clavR: 20, armR: 21, foreR: 22, handR: 23,
   thighL: 24, shinL: 25, footL: 26, thighR: 27, shinR: 28, footR: 29,
   tail1: 30, tail2: 31, earL: 32, earR: 33,
+  /** Wing primaries (birds): ride the forearm, fan out when the wing spreads. */
+  primL: 34, primR: 35,
 } as const;
 export type BoneName = keyof typeof B;
-export const BONE_COUNT = 34;
+export const BONE_COUNT = 36;
 
 const PARENT: readonly number[] = [
   -1, B.pelvis, B.spine, B.chest, B.neck1, B.neck2, B.neck3, B.head, B.jaw,
@@ -20,6 +22,7 @@ const PARENT: readonly number[] = [
   B.chest, B.clavL, B.armL, B.foreL, B.chest, B.clavR, B.armR, B.foreR,
   B.pelvis, B.thighL, B.shinL, B.pelvis, B.thighR, B.shinR,
   B.pelvis, B.tail1, B.head, B.head,
+  B.foreL, B.foreR,
 ];
 
 /** Joint positions in the bind pose. Paired joints are given for the LEFT side (x < 0). */
@@ -43,6 +46,7 @@ export function bindPositions(j: Joints): Vector3[] {
     L(j.clav), L(j.shoulder), L(j.elbow), L(j.wrist), R(j.clav), R(j.shoulder), R(j.elbow), R(j.wrist),
     L(j.hip), L(j.knee), L(j.ankle), R(j.hip), R(j.knee), R(j.ankle),
     L(j.tail[0]), L(j.tail[1]), L(j.ear), R(j.ear),
+    L(j.wrist), R(j.wrist),
   ];
 }
 

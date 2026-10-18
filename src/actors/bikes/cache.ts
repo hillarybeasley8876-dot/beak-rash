@@ -25,7 +25,7 @@ const variants = new Map<string, Variant>();
 
 export function buildTemplate(id: BikeId, quality: Quality): BikeTemplate {
   const def = BIKE_DEFS[id];
-  const b = new BikeBuilder(quality, def.detail);
+  const b = new BikeBuilder(quality);
   def.build(b);
   const { built, groups, markers } = b.bake();
   return { def, quality, built, groups, markers, tris: built.tris, drawCalls: built.hull ? 2 : 1 };

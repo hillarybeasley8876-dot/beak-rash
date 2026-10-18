@@ -9,7 +9,12 @@ import { PartSet, type BuiltGroup } from './build/partset';
 
 export type GroupName =
   | 'headset' | 'steer' | 'wheelR' | 'wheelF' | 'crank' | 'pedalL' | 'pedalR'
-  | 'crank2' | 'pedal2L' | 'pedal2R' | 'fish' | 'streamerL' | 'streamerR';
+  | 'crank2' | 'pedal2L' | 'pedal2R' | 'fish'
+  /** Kid-bike streamer chains (root at the grip end → mid → tip). */
+  | 'streamerL' | 'streamerL2' | 'streamerL3' | 'streamerR' | 'streamerR2' | 'streamerR3'
+  /** Per wheel: spokes/mag arms (child of the wheel, dissolved at speed), speed-blur disc and knobbly tread
+   *  (siblings of the wheel, turned at a capped rate so they never strobe). */
+  | 'spokesR' | 'spokesF' | 'blurR' | 'blurF' | 'treadR' | 'treadF';
 export type MarkerName = 'saddle' | 'gripL' | 'gripR' | 'pedalL' | 'pedalR' | 'basket' | 'rack' | 'stoker' | 'bell';
 /** null = the bike root (static frame). */
 export type Parent = GroupName | null;
@@ -29,8 +34,6 @@ export interface BikeDef {
   wheelRadius: number;
   wheelbase: number;
   drive: DriveSpec;
-  /** Segment-count multiplier on top of quality (busy bikes trade smoothness for the tri budget). */
-  detail?: number;
   build(b: BikeBuilder): void;
 }
 
@@ -42,6 +45,8 @@ export interface TemplateGroup {
   quaternion: Quaternion;
   /** Inverse of the bone's bike-space rest matrix (skeleton bind inverse). */
   bindInverse: Matrix4;
+  /** Angular period (rad) of a spinning pattern on this bone (spoke / tread spacing), if declared. */
+  period?: number;
 }
 
 export interface TemplateMarker { name: MarkerName; parent: Parent; position: Vector3 }
@@ -55,9 +60,10 @@ export class BikeBuilder {
   private readonly frame = new PartSet();
   private readonly groups = new Map<GroupName, GroupRec>();
   private readonly marks = new Map<MarkerName, { parent: Parent; pos: Vector3 }>();
+  private readonly periods = new Map<GroupName, number>();
 
-  constructor(readonly quality: Quality, detail = 1) {
-    this.seg = segScale(QUALITY_SCALE[quality] * detail);
+  constructor(readonly quality: Quality) {
+    this.seg = segScale(QUALITY_SCALE[quality]);
   }
 
   /** Declare a moving group pivoting at `pos` with rest rotation `rot` (both bike space). */
@@ -70,6 +76,15 @@ export class BikeBuilder {
     return rec.parts;
   }
 
+  /** Declare a group with `like`'s pivot and rest rotation, under `parent` (default: like's own parent). */
+  alias(name: GroupName, like: GroupName, parent?: Parent): PartSet {
+    const src = this.groups.get(like);
+    if (!src) throw new Error(`[bikes] group ${name}: ${like} not declared yet`);
+    const pos = new Vector3(), q = new Quaternion(), scale = new Vector3();
+    src.world.decompose(pos, q, scale);
+    return this.group(name, parent === undefined ? src.parent : parent, pos, new Euler().setFromQuaternion(q));
+  }
+
   /** Parts list of a declared group, or of the static frame (null). */
   parts(name: Parent): PartSet {
     if (name === null) return this.frame;
@@ -79,6 +94,9 @@ export class BikeBuilder {
   }
 
   has(name: GroupName): boolean { return this.groups.has(name); }
+
+  /** Record the angular period of the pattern a spinning group carries (animate.ts reads it). */
+  period(name: GroupName, rad: number): void { this.periods.set(name, rad); }
 
   marker(name: MarkerName, parent: Parent, pos: Vector3): void {
     this.marks.set(name, { parent, pos: pos.clone() });
@@ -96,7 +114,7 @@ export class BikeBuilder {
       const local = this.worldOf(g.parent).clone().invert().multiply(g.world);
       const position = new Vector3(), quaternion = new Quaternion(), scale = new Vector3();
       local.decompose(position, quaternion, scale);
-      groups.push({ name: g.name, parent: g.parent, position, quaternion, bindInverse: g.world.clone().invert() });
+      groups.push({ name: g.name, parent: g.parent, position, quaternion, bindInverse: g.world.clone().invert(), period: this.periods.get(g.name) });
       all.absorb(g.parts, i + 1);
     });
     const markers: TemplateMarker[] = [];

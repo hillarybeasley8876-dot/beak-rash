@@ -1,9 +1,12 @@
 // title: key art + ransom-note logo, prompt-joke subtitle, pulsing PRESS ANY KEY. Any key/click → menu
-// (the shell unlocks audio on that same gesture).
+// (the shell unlocks audio on that same gesture). Back keys (Esc / Backspace / pad B) are not "any key":
+// nothing lies behind the title, and mashing back on the menu must not bounce menu <-> title.
 import './title.css';
 import { ART } from '../../data/assets';
 import { artImage, backdrop, h, pelicanSvg, ransom, starSvg, svg } from '../p5';
 import { frame, type ScreenFactory } from '../screen';
+
+const BACK_KEYS = new Set(['Escape', 'Backspace']);
 
 export const titleScreen: ScreenFactory = (ctx) => {
   const bg = backdrop({
@@ -14,8 +17,10 @@ export const titleScreen: ScreenFactory = (ctx) => {
     speedlines: true,
   });
   const f = frame({ id: 'title', bg });
+  // The key art sits in the stage (not the full-bleed bg), so the crop that keeps the whole pelican, red
+  // beak hook included, and its distance to the logo are the same at 16:9 and 16:10.
   const art = artImage(ART.title, 'br-title-art', () => f.stage.prepend(drawnHero()));
-  if (art) f.bg.append(h('div', { class: 'br-title-artbox' }, art));
+  if (art) f.stage.prepend(h('div', { class: 'br-title-artbox' }, art));
   else f.stage.append(drawnHero());
   f.stage.append(
     h('div', { class: 'br-title-logo' },
@@ -39,7 +44,7 @@ export const titleScreen: ScreenFactory = (ctx) => {
     ctx.go('menu');
   };
   const onKey = (e: KeyboardEvent): void => {
-    if (!e.repeat && !e.metaKey && !e.ctrlKey) proceed();
+    if (!e.repeat && !e.metaKey && !e.ctrlKey && !BACK_KEYS.has(e.code)) proceed();
   };
   window.addEventListener('keydown', onKey);
   f.root.addEventListener('pointerdown', (e) => {
@@ -47,7 +52,9 @@ export const titleScreen: ScreenFactory = (ctx) => {
   });
   return {
     root: f.root,
-    onAction() {
+    onAction(a) {
+      // Pad B also fires attackR first: isDown('back') tells that twin apart from a real attack key.
+      if (a === 'back' || a === 'pause' || ctx.app.input.isDown('back')) return false;
       proceed();
       return true;
     },

@@ -1,7 +1,7 @@
 // UI sounds for the HUD's own cut-ins. The audio unit already voices the countdown, skills, SHOWTIME,
 // KO / WRECKED cinematics, BUSTED, FINISH and incoming projectiles, so the HUD only adds the sounds of
-// what it alone shows: intro calling cards, place callouts, FINAL STRETCH, the BUSTED stamp + ticket
-// countdown and achievement chips.
+// what it alone shows: intro banner + calling cards, place callouts, FINAL STRETCH, the BUSTED stamp +
+// ticket countdown, achievement chips, and the KO splash slash when no cinematic ran (no cine:ko peak).
 import type { AudioSystem } from '../../core/contracts';
 
 export type Sfx = (id: string, opts?: { volume?: number; pitch?: number }) => void;

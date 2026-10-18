@@ -1,5 +1,5 @@
 /* P5 component kit (ui-screens). Pieces: ransom text, slanted buttons, jagged panels, halftone,
-   stars, stat bars, meters, pills, coins, hint bar, portraits, toasts, stamps, modal, wipe. */
+   stars, stat bars, meters, pills, coins, hint bar, portraits, toasts, stamps, wipe. */
 
 /* ---------- ransom-note lettering ---------- */
 .br-rn { display: inline-flex; align-items: center; gap: 0.05em; line-height: 1; white-space: nowrap; filter: drop-shadow(0.05em 0.06em 0 var(--ink)); }
@@ -94,6 +94,10 @@
 .br-choice { display: inline-flex; gap: 10px; }
 .br-pill { padding: 4px 18px 2px; font-family: var(--f-cn-block); font-weight: 400; font-size: 28px; color: rgba(255, 255, 255, 0.55); transform: skewX(var(--skew)); border: 3px solid rgba(255, 255, 255, 0.25); }
 .br-pill.is-on { color: var(--ink); background: var(--white); border-color: var(--white); }
+.br-meter.is-pickable i { position: relative; cursor: pointer; }
+.br-meter.is-pickable i::after { content: ''; position: absolute; inset: -16px -4px; }
+.br-choice.is-pickable .br-pill { cursor: pointer; }
+.br-choice.is-pickable .br-pill:not(.is-on):hover { color: var(--white); border-color: var(--white); }
 
 /* ---------- coins ---------- */
 .br-coins { display: inline-flex; align-items: center; gap: 12px; padding: 8px 26px 6px 18px; background: var(--ink); transform: skewX(var(--skew)); box-shadow: 6px 6px 0 var(--red); }
@@ -110,6 +114,8 @@
 .br-key.is-pad, .br-ui.is-pad .br-key.is-kb { display: none; }
 .br-key.is-pad { min-width: 0; width: 1.6em; height: 1.6em; padding: 0; line-height: 1.6em; border-radius: 50%; }
 .br-ui.is-pad .br-key.is-pad { display: inline-block; }
+/* Device-specific twins (pause sheet, how-to skill keys): only the active device's glyph shows. */
+.br-ui:not(.is-pad) .br-pad-only, .br-ui.is-pad .br-kb-only { display: none !important; }
 
 /* ---------- portraits ---------- */
 .br-portrait { position: relative; overflow: hidden; }
@@ -124,7 +130,13 @@
 .br-cursor::after { background: var(--white); transform: translate(-14px, 10px); z-index: -1; }
 
 /* ---------- toasts ---------- */
-.br-toast { position: absolute; right: 40px; padding: 10px 30px 8px; max-width: 46vw; font-family: var(--f-cn-block); font-weight: 400; font-size: clamp(16px, 1.5vw, 30px); color: var(--white); background: var(--ink); transform: skewX(var(--skew)); box-shadow: 7px 7px 0 var(--red); transition: top 0.18s var(--ease-out); }
+.br-toast-lane { pointer-events: none; transition: opacity 0.12s linear; }
+.br-toast-lane.is-quiet { opacity: 0; }
+.br-toast { position: absolute; right: 64px; display: flex; align-items: center; gap: 14px; max-width: 560px; padding: 8px 28px 6px 10px; font-family: var(--f-cn-block); font-weight: 400; font-size: 32px; line-height: 1.2; color: var(--white); background: var(--ink); transform: skewX(var(--skew)); box-shadow: 7px 7px 0 var(--red); transition: top 0.18s var(--ease-out); }
+.br-toast-icon { position: relative; flex: none; display: grid; place-items: center; width: 50px; height: 50px; font-style: normal; transform: skewX(calc(var(--skew) * -1)); }
+.br-toast-icon svg { position: absolute; inset: 0; width: 100%; height: 100%; animation: br-spin 6s linear infinite; }
+.br-toast-icon b { position: relative; font-family: var(--f-display); font-size: 26px; line-height: 1; color: var(--ink); }
+.br-toast.is-meme .br-toast-icon b { font-family: var(--f-cn-block); font-size: 20px; color: var(--white); }
 .br-toast.is-warn { background: var(--red); box-shadow: 7px 7px 0 var(--ink); }
 .br-toast.is-meme { background: var(--white); color: var(--ink); box-shadow: 7px 7px 0 var(--red); }
 .br-toast.is-in { animation: br-toast-in 0.24s var(--ease-slam) both; }
@@ -133,20 +145,19 @@
 /* ---------- stamp ---------- */
 .br-stamp { display: inline-grid; place-items: center; width: 1.3em; height: 1.3em; font-family: var(--f-display); font-weight: 400; color: var(--red); border: 0.08em solid var(--red); border-radius: 50%; transform: rotate(-14deg); box-shadow: 0 0 0 0.03em var(--white) inset, 0 0 0 0.03em var(--white); background: rgba(255, 255, 255, 0.06); }
 
-/* ---------- modal (confirm) ---------- */
-.br-modal { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(11, 11, 15, 0.72); z-index: 20; }
-.br-modal-box { min-width: 760px; padding: 44px 64px 40px; text-align: center; rotate: -2deg; animation: br-pop 0.22s var(--ease-slam) both; }
-.br-modal-title { font-family: var(--f-cn-block); font-weight: 400; font-size: 56px; margin-bottom: 10px; }
-.br-modal-text { font-size: 28px; color: rgba(255, 255, 255, 0.8); margin-bottom: 34px; }
-.br-modal-row { display: flex; gap: 44px; justify-content: center; font-size: 46px; }
-
 /* ---------- wipe ---------- */
 .br-wipe-box { position: absolute; left: -30%; top: -40%; width: 160%; height: 180%; transform: rotate(-13deg); }
 .br-wipe-shard { position: absolute; left: -2%; width: 104%; transform: translateX(-105%); background: var(--red); clip-path: var(--clip); will-change: transform; }
 .br-wipe-shard.is-black { background: var(--ink); }
 .br-wipe-shard.is-hot { background: var(--red-hot); }
+.br-wipe-shard.is-white { background: var(--white); }
+/* Leading edge: a white slash just inside the jagged right edge (ink on the white shard). */
+.br-wipe-shard::before { content: ''; position: absolute; top: 0; bottom: 0; right: 2.6%; width: 14px; background: var(--white); }
+.br-wipe-shard.is-white::before { background: var(--ink); }
 .br-wipe-slash { position: absolute; left: 0; right: 0; top: 46%; height: 6px; background: var(--white); opacity: 0.85; }
 .br-wipe-shard.is-black .br-wipe-slash { background: var(--red); }
+.br-wipe-shard.is-white .br-wipe-slash { background: var(--red); opacity: 1; }
+.br-wipe-fill { position: absolute; inset: 0; background: var(--ink); opacity: 0; }
 .br-wipe-fade { position: absolute; inset: 0; background: var(--ink); opacity: 0; }
 
 /* ---------- backdrops ---------- */
@@ -154,3 +165,8 @@
 .br-backdrop.is-red { background: radial-gradient(ellipse at 70% 40%, var(--red-hot), var(--red) 55%, var(--red-deep)); }
 .br-backdrop.is-black { background: radial-gradient(ellipse at 30% 40%, #1d1d25, var(--ink) 70%); }
 .br-backdrop.is-split { background: linear-gradient(112deg, var(--ink) 0 46%, var(--white) 46% 47.2%, var(--red) 47.2% 100%); }
+
+/* ---------- track stills (ui/track-stills.ts) ---------- */
+.br-still { position: absolute; inset: 0; overflow: hidden; background: var(--ink); }
+.br-still-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; transition: filter 0.16s; }
+.br-still-dots { position: absolute; inset: 0; background-image: radial-gradient(circle, rgba(11, 11, 15, 0.55) 0 32%, transparent 34%); background-size: 9px 9px; -webkit-mask-image: linear-gradient(180deg, transparent 45%, #000 100%); mask-image: linear-gradient(180deg, transparent 45%, #000 100%); }

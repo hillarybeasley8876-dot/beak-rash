@@ -50,12 +50,13 @@ export class FaceRig {
     const ps = this.ps, m = this.def.meta;
     this.t += dt;
     this.nextBlink -= dt;
+    const blinkTime = m.blinkTime ?? 0.13;
     if (this.nextBlink <= 0) {
-      this.blinkLeft = 0.13;
-      this.nextBlink = 1.6 + this.rand() * 3.2 + (this.rand() < 0.2 ? -1.3 : 0);
+      this.blinkLeft = blinkTime;
+      this.nextBlink = blinkTime * 6 + 1 + this.rand() * 3.2 + (this.rand() < 0.2 ? -1.3 : 0);
     }
     this.blinkLeft = Math.max(0, this.blinkLeft - dt);
-    const blink = this.blinkLeft > 0 ? Math.sin((1 - this.blinkLeft / 0.13) * Math.PI) : 0;
+    const blink = this.blinkLeft > 0 ? Math.sin((1 - this.blinkLeft / blinkTime) * Math.PI) : 0;
     const base = clamp(m.sleepy + cue.squint * 0.42 - cue.wide * 0.35, -0.3, 1);
     const target = Math.max(base, blink, cue.blink);
     this.lid = damp(this.lid, target, 30, dt);

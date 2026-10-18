@@ -51,15 +51,28 @@ export function asphaltTexture(renderer: WebGLRenderer, halfWidth: number): Canv
   // Worn wheel tracks: slightly darker bands in every lane.
   for (const lane of [-5.25, -1.75, 1.75, 5.25]) {
     for (const off of [-0.75, 0.75]) {
-      g.fillStyle = 'rgba(30,32,40,0.10)';
+      g.fillStyle = 'rgba(30,32,40,0.14)';
       g.fillRect(X(lane + off - 0.35), 0, 0.7 * pxPerM, H);
     }
   }
   speckle(g, W, H, rng, 9000, 0.09);
-  // Faint patch repairs.
-  for (let i = 0; i < 5; i++) {
-    g.fillStyle = 'rgba(40,42,50,0.12)';
-    g.fillRect(rng.range(0, W - 80), rng.range(0, H - 60), rng.range(30, 90), rng.range(20, 70));
+  // Patch repairs with tar-sealed seams, and a few sealed cracks running along the road.
+  for (let i = 0; i < 7; i++) {
+    const x = rng.range(0, W - 90), y = rng.range(0, H - 70), w = rng.range(30, 90), h = rng.range(20, 70);
+    g.fillStyle = 'rgba(40,42,50,0.09)';
+    g.fillRect(x, y, w, h);
+    g.strokeStyle = 'rgba(20,20,26,0.2)';
+    g.lineWidth = 2;
+    g.strokeRect(x, y, w, h);
+  }
+  g.strokeStyle = 'rgba(18,18,24,0.3)';
+  for (let i = 0; i < 6; i++) {
+    g.lineWidth = rng.range(1.2, 2.2);
+    let x = rng.range(20, W - 20), y = rng.range(0, H * 0.6);
+    g.beginPath();
+    g.moveTo(x, y);
+    for (let k = 0; k < 6; k++) { x += rng.range(-10, 10); y += rng.range(12, 26); g.lineTo(x, y); }
+    g.stroke();
   }
   const line = (m: number, wM: number, color: string, y0 = 0, y1 = H): void => {
     g.fillStyle = color;

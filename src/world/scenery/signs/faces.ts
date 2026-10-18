@@ -10,17 +10,10 @@ type G = CanvasRenderingContext2D;
 export function cell(atlas: SignAtlas, w: number, h: number, draw: (g: G, w: number, h: number) => void): AtlasRect | null {
   const c = atlas.alloc(w, h);
   if (!c) {
-    console.warn('[track] sign atlas full; skipping a sign face');
+    console.warn(`[track] sign atlas full; skipping a ${w}×${h} sign face`);
     return null;
   }
-  const g = atlas.g;
-  g.save();
-  g.translate(c.x, c.y);
-  g.beginPath();
-  g.rect(0, 0, w, h);
-  g.clip();
-  draw(g, w, h);
-  g.restore();
+  atlas.paint(c.x, c.y, c.w, h, draw);
   return c.rect;
 }
 
@@ -183,5 +176,23 @@ export function gantryFace(atlas: SignAtlas, word: string, sub: string): AtlasRe
     }
     label(g, word, w / 2, h * 0.47, 92, P5.white, FONT.en, 400);
     label(g, sub, w / 2, h * 0.88, 18, P5.yellow, FONT.cn, 400);
+  });
+}
+
+/** FINISH header (5:1): ransom-note word on black with a red jagged band, stars and a yellow tagline. */
+export function finishFace(atlas: SignAtlas, rng: Rng, word: string, sub: string): AtlasRect | null {
+  return cell(atlas, 1024, 208, (g, w, h) => {
+    g.fillStyle = P5.black;
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = P5.red;
+    g.beginPath();
+    g.moveTo(0, h * 0.18); g.lineTo(w, h * 0.04); g.lineTo(w, h * 0.7); g.lineTo(w * 0.5, h * 0.78); g.lineTo(0, h * 0.86);
+    g.closePath();
+    g.fill();
+    halftone(g, 0, 0, w, h, 'rgba(255,255,255,0.12)', 14);
+    star(g, 62, h * 0.45, 46, P5.yellow, 0.2);
+    star(g, w - 62, h * 0.45, 46, P5.yellow, -0.2);
+    ransom(g, rng, word, 120, 6, w - 240, h * 0.8);
+    label(g, sub, w / 2, h * 0.9, 24, P5.yellow, FONT.cn, 400);
   });
 }

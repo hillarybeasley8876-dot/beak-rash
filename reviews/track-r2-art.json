@@ -1,0 +1,71 @@
+{
+  "unit": "track",
+  "round": 2,
+  "lens": "art",
+  "pass": false,
+  "score": 7,
+  "summary": "Big step up from r1 (6). The coast now reads as a sunny, characterful, toon-styled Riviera at 1920x1080 and 70-85 km/h. Done: pale limestone rock with block strata and a broken lip, a fitted-out tunnel (lamps, jet fans, black P5 sawtooth on the red dado, exit signs, portal facade under a rocky cap), olive terraces/hedges/flowers/ground cover inland (flat-green blocks down from 6-10 % to 2-3 % of the frame), beach life on the promenade, big readable ransom-note billboards, varied pastel villas, a real FINISH arch, P5 grandstands with animal crowds, thin surf lines, bluer fog. One major defect blocks the pass. At the default (high) quality the limestone cutting/cliff faces carry visible shadow acne: a woven moire plus smeared streaks that shimmer with camera motion at the hairpin entry, the tunnel approach and the tunnel exit/bridge cutting. Minors: hard sun shadows inside the tunnel, rock faces that still read as planar block cladding, empty start/finish beaches, a sparse mid-ground with a loud farmland quilt, and blank single-colour flags. No popping (full-track sweep), 0 errors in __br.errors, tsc 0 errors. Evidence: shots/review/track/r2-art/ (g/ in-game 1920x1080, v/ sandbox, acne/ high-vs-low pairs, s1-s11 sheets, acne.mjs/acne.py/crawl.mjs/hf.py/flat.py/pops.mjs).",
+  "issues": [
+    {
+      "severity": "major",
+      "title": "Shadow acne shimmers on the limestone cutting/cliff faces at default quality (hairpin entry s 1260-1320, tunnel approach s 1890-1930, tunnel exit / bridge cutting s 2088-2120)",
+      "detail": "At quality=high (the game default) the rock faces show a fine woven/checker moire with chevron ripples, plus long smeared dark streaks. At quality=low (no shadow map) the same faces are clean: s9-acne.jpg (f-1270 vs low-1270) and s11-acne2.jpg (sandbox 1300/1920/2100, high vs low, 2x zoom). Measured in-game at 1920x1080, the rock regions carry 2.0-2.4x the high-frequency energy at high vs low (f-1278 14.4 vs 7.2, f-1890 13.5 vs 5.7, f-2088 9.1 vs 4.2; hf.py). In the sandbox sweep (acne.mjs + acne.py) the pattern covers 5.7-10.2 % of the frame at s 1290-1310, 1900-1930 and 2100-2120, with weaker spots at 1260-1280 and 1360-1370. It shimmers: a 5 cm camera move changes 3x more pixels in those regions at high than at low (s 1300: 9.5 vs 3.1; s 1920: 12.3 vs 4.2; crawl.mjs), and at 20 m/s the camera moves 33 cm per frame. Cause: the near ribbons both cast and receive shadows (terrain/near.ts:122-123), and on faces nearly parallel to the coast sun (dir 0.42,-0.82,-0.39) env/lights.ts:45-46 uses normalBias 0.03 (under one shadow texel: 2048 map over 92 m = 4.5 cm) and bias -0.0004. This sits right on the r1 major #1 area, so it undoes much of the rock fix at the most photogenic corners.",
+      "fix": "In env/lights.ts set normalBias to about 1.5 shadow texels (high ~0.07, medium ~0.11) and bias to about -0.001. In the terrain/rock material, fade the received shadow by smoothstep(0.0, 0.25, dot(N, L)): faces turned from the sun already sit in the dark toon band, so nothing is lost. Alternatively, keep castShadow only on the crest props and make the near-ribbon rock bands not self-shadow. Re-run shots/review/track/r2-art/acne.mjs --from 1150 --to 2200 --step 10 with acne.py until no frame is flagged."
+    },
+    {
+      "severity": "minor",
+      "title": "Tunnel still reads as sunlit: hard rider sun shadows on the tunnel road, lamp pools not readable, unreadable portal plate (s 1945-2095)",
+      "detail": "Inside the tunnel the pelican casts a crisp directional sun shadow across the road. It is present at high and absent at low (s9-acne.jpg, bottom row f-1990 vs low-1990). The sun is only dimmed to x0.4 (env/lights.ts), so the shell looks open to the noon sky. The road is uniformly dark, with no visible light pools under the 9 m lamp rows (f-1990 crop). The new portal facade works, but its 鹈鹕岬隧道 lintel plate is a tiny box that cannot be read on approach (f-1880 crop, s5-crops.jpg).",
+      "fix": "Drive sun.shadow.intensity (LightShadow.intensity, available in three 0.186) to 0 with the same roof factor used for sun/hemi in env/lights.ts. Make the lamp pools readable: elliptical additive pools at the 9 m lamp spacing, 30-40 % brighter than the darkened road, plus a faint matching wash on the walls. Enlarge the lintel plate 2-3x and use the ransom-note face style."
+    },
+    {
+      "severity": "minor",
+      "title": "Rock faces still read as planar block cladding rather than a natural cliff (calanque / hairpin walls s 1160-1440, cutting s 1880-1940)",
+      "detail": "The colour (pale limestone) and the biplanar block-strata texture are fixed, and the r1 seam and smear are gone. From the chase camera, though, the hairpin and calanque walls are still huge, smooth, uniformly tilted planes covered in painted rectangular blocks: a masonry retaining wall more than a calanque (f-1300, f-1330, f-1370, cu-crag; s10-closeups.jpg). The 0.35-1.7 m band push-back (terrain/crag.ts) barely registers at 5-30 m. The top edge runs as a near-continuous line round the hairpin. The face has no ledges with scrub, no overhangs, no buttresses and no tonal variation beyond one tan.",
+      "fix": "Step the faces in larger 2-4 m offsets every 6-12 m (buttresses, recesses, overhanging ledges with a dark underside). Put scrub/pine tufts and faceted boulders on ledges, darken block joints with AO, add a cool shadow tint (~#8f93a8) and occasional ochre/white bands, and break the lip silhouette with spurs every 15-25 m."
+    },
+    {
+      "severity": "minor",
+      "title": "Start and finish beaches are 40-60 m of bare flat sand (s 0-160 behind the start stands, s ~2990-3300 sprint/finish)",
+      "detail": "Beach life (dressing/coast/beach.ts) only follows the 'umbrellas' marks on the promenade and the village (layouts/coast.ts). The sand between the road and the sea at the start and along the final 300 m, the climax of the race, is empty: high60, high3280 (s7-intro-high.jpg), f-3060 (s4-finish.jpg). Seen from above and during the intro/KO orbits it reads as an unfinished beige band.",
+      "fix": "Add umbrellas marks for the sprint/finish/start beaches, or a festival fan zone behind the stands: tents, inflatable pelicans, flag-waving animal crowd, food stalls, a giant beach ball and a lifeguard tower. Keep it all in the existing props/thin/crowd batches."
+    },
+    {
+      "severity": "minor",
+      "title": "Mid-ground hills stay sparse beyond the ~45 m cover band; the far farmland quilt is loud and aliased",
+      "detail": "The near field is fixed: flat-green 24-px blocks dropped from 6-10 % (r1) to 2-3 % of the frame (flat.py on f-1005/1640/1700/2300). Slopes 50-300 m out are still smooth green gradients with sparse lollipop pines (f-1005, f-1640, f-1700, f-2300; s2-inland.jpg), and the olive-terrace walls are plain tan boxes (f-1700 crop, cu-terr). The far farmland is a saturated purple/yellow/green patchwork pasted over the hills, and its furrows show fine moire (f-60 crop in s6-zoom.jpg; high60, high3280).",
+      "fix": "Add a second fog-culled ring of bush clusters, rock outcrops and cypress groups at 45-150 m (one batch, 160 m cells). Give the terrace walls a capstone row and stone joints, and add a few footpaths up to the hill villages. Desaturate the farmland 20-30 % and fade or band-limit the furrows beyond ~150 m (mip bias or a distance fade in terrain/farmland.ts)."
+    },
+    {
+      "severity": "minor",
+      "title": "Start/finish flags are blank single-colour rectangles (dressing/coast/event.ts FLAG_COLS, scenery/props/event.ts flagPole)",
+      "detail": "The flag cloth is plain red, black, yellow or white with a white trailing edge, with no emblem. A black flag hangs in the top-right corner of the first gameplay frame as an untextured slab (f-60 crop, s6-zoom.jpg). The white ones at the finish read as placeholders next to the polished FINISH arch (f-3220, f-3265, cu-stands).",
+      "fix": "Map emblem faces from the sign atlas onto the cloth (pelican head, P5 star, 鹕 glyph). Use chequered flags around the finish and a jagged or swallowtail cut, and drop the plain white and plain black variants."
+    },
+    {
+      "severity": "minor",
+      "title": "cross-unit: intro title card overlaps the START gantry header (intro-2)",
+      "detail": "During the intro flyover the 'PELICAN BAY 鹈鹕湾海滨公路' title card sits on top of the gantry's START header, so it reads 'PELICAN BAYRT' (g/intro-2.png, s7-intro-high.jpg). This is race/ui-screens, not track.",
+      "fix": "race / ui-screens: offset the title card, or frame that intro shot so the gantry header stays clear of the card."
+    }
+  ],
+  "r1_followup": [
+    "A1 rock walls (major): partly fixed. Colour, texture, seam and smear are fixed, and the lip props work. New shadow acne (issue 1); the faces still look planar (issue 3).",
+    "A2 inland + beach (major): mostly fixed. Near field (cover, terraces, hedges, flowers, grass tint) and promenade beach life are fixed. Open: empty start/finish beaches (issue 4) and a sparse mid-ground (issue 5).",
+    "A3 tunnel (major): mostly fixed. Fixtures, jet fans, sawtooth dado, exit signs, portal facade, rock cap and light dimming are in. Open: hard sun shadows, lamp pools not readable, tiny plate (issue 2).",
+    "Billboards: fixed. 10 x 5.6 m, the ransom-note band is readable at ~40 m and the art is good (f-1640 crop).",
+    "Villas: fixed. Pastel walls, wings, balconies, pergolas, bougainvillea (f-2520, f-2620, cu-villa).",
+    "Asphalt: acceptable. Wheel paths, patch seams, cracks and painted 慢 are visible (f-3060, cu-crag); flat grey is still 18-22 % of the frame but stays readable.",
+    "Fog: fixed. Bluer distance and a saturated mid-ground (f-60, f-250).",
+    "FINISH gantry: fixed. Chunky striped pillars, ransom-note FINISH 终点, inflatable pelicans, fans (f-3265).",
+    "Bridge cove ends: fixed as far as visible from high views (high2150, high2150b).",
+    "Grandstands: fixed. Striped awnings, banners, species crowd (intro-0..3).",
+    "Sea foam: fixed. Thin surf lines and no blotches (high60, high3280)."
+  ],
+  "verified_ok": [
+    "No popping: pops.mjs sweep over s 0-3330 at 1 m steps flagged only the periodic lane-dash aliasing (every 12 m), the tunnel exit and the finish pillars passing.",
+    "window.__br.errors empty in every in-game run (all units, traffic on and off, quality high and low); tsc --noEmit 0 errors.",
+    "Road readability at 70-85 km/h is good in every frame, and so are the landmarks: lighthouse, red arch bridge, market with bunting, START/FINISH gantries.",
+    "Palette: coherent turquoise/cream/terracotta with P5 red accents (curbs, barriers, bridge, gantries, dado)."
+  ]
+}

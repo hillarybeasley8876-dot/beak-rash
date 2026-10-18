@@ -12,8 +12,8 @@ import { layout, standardRig } from '../parts/layout';
 import { wheel, type WheelSpec } from '../parts/wheel';
 import type { BikeBuilder, BikeDef } from '../template';
 
-const BLACK = '#1b1c21', CHROME = '#d3d8df', GOLD = '#c9a24a', LEATHER = '#6b3f2a';
-const TYRE = 0.02;
+const BLACK = '#1d2433', CHROME = '#d3d8df', GOLD = '#c9a24a', LEATHER = '#6b3f2a';
+const TYRE = 0.024;
 
 const L = layout({
   R: 0.33, wb: 1.06, bb: [0.3, 0.085], seatAngle: 68, saddleY: 0.76,
@@ -48,13 +48,13 @@ export const erba: BikeDef = {
       clusterY: 0.712, topY: 0.712, downY: 0.665, dropoutX: 0.06,
     });
     const rimR = L.s.R - TYRE * 1.55;
-    const w: WheelSpec = { R: L.s.R, tyre: TYRE, rim: 'box', rimDepth: 0.016, rimColor: CHROME, spokes: 16, spokeColor: CHROME, hubW: 0.05 };
-    wheel(b.parts('wheelR'), L.hubR, w, seg);
-    wheel(b.parts('wheelF'), L.hubF, w, seg);
-    fender(frame, L.hubR, L.s.R, -18, 122, 0.034, BLACK, seg, 1);
-    fender(st, L.hubF, L.s.R, 48, 172, 0.034, BLACK, seg, 1);
+    const w: WheelSpec = { R: L.s.R, tyre: TYRE, rim: 'box', rimDepth: 0.016, rimColor: CHROME, spokes: true, spokeColor: CHROME, hubW: 0.05 };
+    wheel(b, 'R', L.hubR, w);
+    wheel(b, 'F', L.hubF, w);
+    fender(frame, L.hubR, L.s.R, -18, 122, 0.034, BLACK, seg);
+    fender(st, L.hubF, L.s.R, 48, 172, 0.034, BLACK, seg);
     const steererTop = L.headTop.clone().addScaledVector(L.axis, 0.05);
-    fork(st, L, { halfW: 0.055, r: 0.015, look: main, kind: 'rigid', crown: { color: CHROME } }, steererTop, seg);
+    fork(st, L, { halfW: 0.056, r: 0.018, look: main, kind: 'rigid', crown: { color: CHROME } }, steererTop, seg);
     const clamp = steererTop.clone().add(v(0, 0.035, -0.03));
     stem(st, steererTop, clamp, CHROME, seg);
     const bars = sweptBar(st, clamp, 0.25, 0.16, 0.02, CHROME, '#2a2420', seg);
@@ -68,17 +68,17 @@ export const erba: BikeDef = {
     frame.add(cyl(rearTop, bend, 0.0042, 0.0042, 4), { color: CHROME, outline: 0.003 });
     rodBrake(frame, L.hubR, rimR, TYRE, 118, bend, CHROME, seg);
     lamp(st, L.headBot.clone().add(v(0, 0.01, -0.085)), v(0, 0, -1), L.headBot.clone().add(v(0, 0.0, -0.03)), CHROME, seg, 0.042);
-    seatpost(frame, L, 0.712, 0.013, CHROME, seg);
+    seatpost(frame, L, 0.712, 0.017, CHROME, seg);
     saddle(frame, L.saddle, 'wide', LEATHER, seg);
     springs(b, L.saddle);
     drivetrain(b, L, { crank: L.s.crank, ringR: 0.09, teeth: 24, cogR: 0, cogTeeth: 0, rings: [], armX: 0.09, armColor: CHROME, pedalColor: '#2b2b2b' });
-    chainGuard(frame, L.bb, 0.09, L.hubR, 0.04, 0.072, BLACK, seg, 1, 'guard');
-    const rackTop = rack(frame, L.hubR, L.s.R * 2 + 0.06, 0.3, 0.78, 0.075, d.cluster.clone().add(v(0, -0.02, 0.02)), CHROME, seg);
+    chainGuard(frame, L.bb, 0.09, L.hubR, 0.04, 0.072, BLACK, seg, 'guard');
+    const rackTop = rack(frame, L.hubR, L.s.R * 2 + 0.06, 0.3, 0.78, 0.1, d.cluster.clone().add(v(0, -0.02, 0.02)), CHROME, seg);
     b.marker('rack', null, rackTop);
-    reflector(frame, v(0, L.hubR.y + Math.sin(0.2) * 0.372, L.hubR.z + Math.cos(0.2) * 0.372), v(0, 0.2, 1), '#e01b24', 0.045, 0.03);
+    reflector(frame, v(0, L.hubR.y + Math.sin(0.2) * 0.372, L.hubR.z + Math.cos(0.2) * 0.372), v(0, 0.2, 1), '#e01b24', 0.075, 0.046);
     const n = new Vector3(0, L.axis.z, -L.axis.y);
     decal(frame, 'badge', L.headMid.clone().addScaledVector(n, 0.033), n, L.axis, 0.05, 0.05);
-    for (const y of [L.headBot.y + 0.005, L.headTop.y - 0.005]) frame.add(cyl(L.onAxis(y - 0.004), L.onAxis(y + 0.004), 0.033, 0.033, seg(10, 6)), { color: GOLD });
+    for (const y of [L.headBot.y + 0.005, L.headTop.y - 0.005]) frame.add(cyl(L.onAxis(y - 0.004), L.onAxis(y + 0.004), 0.033, 0.033, seg(16, 8)), { color: GOLD });
     riderMarkers(b, L, bars);
   },
 };

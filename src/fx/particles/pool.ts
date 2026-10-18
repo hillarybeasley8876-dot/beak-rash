@@ -2,7 +2,7 @@
 // instanced buffer. Only freshly written slots are uploaded each frame.
 import {
   AdditiveBlending, DoubleSide, DynamicDrawUsage, InstancedBufferGeometry, InstancedInterleavedBuffer,
-  InterleavedBufferAttribute, Mesh, NormalBlending, PlaneGeometry, ShaderMaterial, type IUniform, type Texture,
+  InterleavedBufferAttribute, Mesh, NormalBlending, PlaneGeometry, ShaderMaterial, type IUniform, type Texture, type Vector3,
 } from 'three';
 import { ATLAS_COLS } from './atlas';
 import { PARTICLE_FRAG, PARTICLE_VERT } from './shaders';
@@ -32,7 +32,7 @@ export function blankSpec(): ParticleSpec {
   };
 }
 
-export interface SharedUniforms { uTime: IUniform<number>; uTimeReal: IUniform<number>; uAnchors: IUniform<unknown> }
+export interface SharedUniforms { uTime: IUniform<number>; uTimeReal: IUniform<number>; uAnchors: IUniform<unknown>; uCull: IUniform<Vector3> }
 
 export class ParticlePool {
   readonly mesh: Mesh<InstancedBufferGeometry, ShaderMaterial>;
@@ -64,7 +64,7 @@ export class ParticlePool {
     const material = new ShaderMaterial({
       vertexShader: PARTICLE_VERT,
       fragmentShader: PARTICLE_FRAG,
-      uniforms: { uTime: shared.uTime, uTimeReal: shared.uTimeReal, uAnchors: shared.uAnchors, uAtlasCols: { value: ATLAS_COLS }, tAtlas: { value: atlas } },
+      uniforms: { uTime: shared.uTime, uTimeReal: shared.uTimeReal, uAnchors: shared.uAnchors, uCull: shared.uCull, uAtlasCols: { value: ATLAS_COLS }, tAtlas: { value: atlas } },
       defines: additive ? { FX_ADDITIVE: '' } : {},
       transparent: additive,
       depthWrite: !additive,

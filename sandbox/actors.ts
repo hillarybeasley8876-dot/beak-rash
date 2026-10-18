@@ -1,5 +1,5 @@
 // Actors sandbox entry: loop, fake physics for the bench riders, and the window.__actors script API.
-import { Euler, Quaternion, Vector3 } from 'three';
+import { type Bone, Euler, Quaternion, Vector3 } from 'three';
 import type { ViewCue } from '../src/core/contracts';
 import { damp } from '../src/core/math';
 import type { CharacterId, CrashCause, Side, StatusId, WeaponId } from '../src/core/types';
@@ -8,6 +8,7 @@ import { B } from '../src/actors/rig/skeleton';
 import { speciesAsset, speciesDef } from '../src/actors/species';
 import { CharacterBuilder } from '../src/actors/kit/builder';
 import { buildPanel } from './actors-panel';
+import { castSkill, skillCheck, type SkillReport } from './actors-skills';
 import { P, ROSTER_IDS, S, cam, controls, errors, placeCamera, renderer, resize, riders, scene, spawn } from './actors-scene';
 
 const q = new Quaternion(), e = new Euler(0, 0, 0, 'YXZ'), pos = new Vector3();
@@ -76,6 +77,17 @@ const api = {
   action(kind: 'attack' | 'heavy' | 'skill' | 'ult' | 'bell' | 'hit', side: Side, dur: number, skillId: string | null = null): void {
     for (const r of riders) r.state.action = { kind, side, t: 0, dur, weapon: r.state.weapon, skillId, resolved: false };
   },
+  /** Cast a skill like combat does (cue + ≤ 0.35 s cast action for non-lockout skills + the caster's statuses). */
+  skill(id: string): void {
+    castSkill(riders, id);
+  },
+  /** Every skill on its species: seconds of readable pose and the fastest hand move (cm/frame) at 60 fps. */
+  skillCheck(): SkillReport[] {
+    return skillCheck((c) => {
+      api.set({ character: c, mode: 'ride' });
+      return riders[0] as (typeof riders)[number];
+    }, (n) => api.step(n));
+  },
   weapon(w: WeaponId): void {
     for (const r of riders) { r.state.weapon = w; r.view.setWeapon(w); }
   },
@@ -101,26 +113,66 @@ const api = {
     for (let i = 0; i < n; i++) tick(dt);
   },
   realtime(): void { manual = false; },
-  /** Max foot/grip IK error (m) over `frames` steps of riding for the current riders. */
-  check(frames = 120): { foot: number; grip: number } {
-    let foot = 0, grip = 0;
-    const t = new Vector3();
+  /** Max foot/grip error (m) in WORLD space (rendered bones, squash scale included) over `frames` steps of riding.
+   *  cues = true also fires land/boost/respawn/ko (hands measured) and hit/heavy/ult (feet only) on the way. */
+  check(frames = 120, cues = false): { foot: number; grip: number } {
+    let foot = 0, grip = 0, handsFree = -1;
+    const t = new Vector3(), b = new Vector3();
+    const plan: Record<number, [() => void, number]> = cues ? {
+      10: [() => api.cue('land', { intensity: 1 }), 0], 40: [() => api.cue('boost'), 0], 75: [() => api.cue('respawn'), 0],
+      105: [() => api.cue('ko'), 0], 135: [() => api.cue('hit', { side: 1 }), 30], 170: [() => api.action('heavy', 1, 0.52), 36],
+      210: [() => api.action('ult', 1, 1.6), 100],
+    } : {};
     for (let f = 0; f < frames; f++) {
+      const p = plan[f];
+      if (p) { p[0](); handsFree = f + p[1]; }
       tick(1 / 60);
       for (const r of riders) {
-        const v = r.view, m = v.inst.def.meta, ps = v.ps, inp = v.input;
+        const v = r.view, m = v.inst.def.meta, inp = v.input, bones = v.inst.rig.bones;
+        v.root.updateMatrixWorld(true);
+        const bw = v.body.matrixWorld;
         for (const [bone, pedal] of [[B.footL, inp.pedalL], [B.footR, inp.pedalR]] as const) {
           const side = bone === B.footL ? -1 : 1;
-          t.set(pedal.x + side * m.ankleLift[0], pedal.y + m.ankleLift[1], pedal.z + m.ankleLift[2]);
-          foot = Math.max(foot, t.distanceTo(ps.mp[bone] as Vector3));
+          t.set(pedal.x + side * m.ankleLift[0], pedal.y + m.ankleLift[1], pedal.z + m.ankleLift[2]).applyMatrix4(bw);
+          foot = Math.max(foot, t.distanceTo((bones[bone] as Bone).getWorldPosition(b)));
         }
+        if (f <= handsFree) continue;
         for (const [bone, g] of [[B.handL, inp.gripL], [B.handR, inp.gripR]] as const) {
-          t.set(g.x, g.y + m.gripDrop, g.z + GRIP_BACK);
-          grip = Math.max(grip, t.distanceTo(ps.mp[bone] as Vector3));
+          t.set(g.x, g.y + m.gripDrop, g.z + GRIP_BACK).applyMatrix4(bw);
+          grip = Math.max(grip, t.distanceTo((bones[bone] as Bone).getWorldPosition(b)));
         }
       }
     }
     return { foot: +foot.toFixed(4), grip: +grip.toFixed(4) };
+  },
+  /** Over light/heavy swings on both sides for the current rider: smallest weapon-tip ↔ head distance (m) and the
+   *  largest tip / grip move (m) in one frame outside the striking window (hand swaps must not teleport the weapon). */
+  weaponClearance(weapons: WeaponId[] = ['saltfish', 'pan', 'leek', 'keyboard', 'umbrella']): { head: number; pop: number; grip: number } {
+    let min = Infinity, pop = 0, grip = 0;
+    const tipW = new Vector3(), head = new Vector3(), prev = new Vector3(), gripW = new Vector3(), prevGrip = new Vector3();
+    for (const w of weapons) {
+      api.weapon(w);
+      for (const [kind, side, dur] of [['attack', 1, 0.32], ['attack', -1, 0.32], ['heavy', 1, 0.52], ['heavy', -1, 0.52]] as const) {
+        api.step(15);
+        api.action(kind, side, dur);
+        for (let f = 0; f < Math.round(dur * 60) + 10; f++) {
+          api.step(1);
+          const v = (riders[0] as (typeof riders)[number]).view, bones = v.inst.rig.bones;
+          v.root.updateMatrixWorld(true);
+          v.extras.weapon.tipWorld(tipW);
+          v.extras.weapon.pivot.getWorldPosition(gripW);
+          min = Math.min(min, tipW.distanceTo((bones[B.head] as Bone).getWorldPosition(head)));
+          if (f > 0 && !v.cues.strikeState.active) {
+            pop = Math.max(pop, tipW.distanceTo(prev));
+            grip = Math.max(grip, gripW.distanceTo(prevGrip));
+          }
+          prev.copy(tipW);
+          prevGrip.copy(gripW);
+        }
+      }
+    }
+    api.weapon('none');
+    return { head: +min.toFixed(3), pop: +pop.toFixed(3), grip: +grip.toFixed(3) };
   },
   /** Average CPU ms per view.update over `frames` frames for the current riders (timer-resolution safe). */
   perf(frames = 300): number {

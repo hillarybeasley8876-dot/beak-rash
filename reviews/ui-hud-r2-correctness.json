@@ -1,0 +1,49 @@
+{
+ "pass": false,
+ "score": 7,
+ "summary": "Re-review of ui-hud. All 12 round-1 issues are fixed and I checked each one in real races: worn/stolen/dropped weapon uses match rider.weaponUses (2/5 -> 1/5 with the last-use blink -> wings), merged callouts rewrite text/style (DRIFT L2 二段, the arrow follows up/down, SLINGSHOT 尾流弹射), the BUSTED ticket counts 罚停4->1 with no invented +4S (final timer 0:39.09 = results 39.097), no police glow when the corgi is off at 91 %, intro cards match race introFocus in 41/45 samples per seed (the misses are card swaps), the skill band retires under WRECKED, the km readout is clear of the badge, in-view casters flash their tag instead of an edge chevron, ONE MORE! plays after the KO cinematic, and the incoming-torpedo chip counts 0.7 s->0.1 s and clears. Values are exact: in a full autopilot race at 720p (1,078 samples) place, of, timer, km/h, HP, SP, KO, coins, km-left and weapon all match the sim. The only differences are my own rounding: 14 cooldown readings, plus one km/h reading at a .5 boundary. Across 774 tag samples, place, name and HP match. Tags track heads within 0.2 px at p99 and never show for crashed or invisible riders. Every cut-in fires on its event: countdown, band, chips, SHOWTIME, KO/DOUBLE/TRIPLE with and without fx, WRECKED, BUSTED, FINISH, PERFECT, DRIFT, NEAR MISS, SLIPSTREAM/SLINGSHOT, ONE MORE!, place, FINAL STRETCH, pickups, GOOD START and the achievements. A restart re-attaches cleanly, there are no console errors, ui.update averages 0.17 ms and fps is the same as with ?stub=hud (about 122). Still below a commercial bar because overlays pile up: the new player quip covers rival taunt bubbles docked on the right edge at every resolution, stacked skill chips cut each other's titles, rear chevrons clump together, the player's own bell bubble sits in the middle of the road view, and measuring a taunt causes 1-3 ms layout spikes.",
+ "issues": [
+  {
+   "severity": "major",
+   "title": "Player quip bubble covers rival taunt bubbles docked on the right edge",
+   "detail": "quip.ts/css/quip.css puts the quip above the portrait (.qp right 26px, bottom 374px in the bottom-right corner). It is outside the bubble layout pass: world/bubbles.ts dock() stacks off-screen speakers' bubbles on the right edge from y = H-430k, and float()/settle() only avoid tags and other bubbles. Real autopilot race (seed 2, 1280x720, shots/review/ui-hud/r2-correctness/t3-overlap.mjs): the quip overlapped a taunt bubble in 19 samples over 40 s. In shots/review/ui-hud/r2-correctness/t3-1280x720-s2-worst.png, 神烦狗's docked 'wow. 你好慢.' is hidden under '借过！翅膀比路宽！'. Busy layout (shots/review/ui-hud/r2-correctness/t7-layout.mjs): overlap 162x24 px at 1280x720, 182x27 at 1440x900, 243x36 at 1920x1200 and 324x48 at 2560x1440 ('我滑我快乐，你蹬你辛苦！' is cut off by '张嘴！全吞了！' in t7-*-busy.png). This is the same pile-up that round 1 flagged as major, brought back by the quip added in fix round 1.",
+   "fix": "Make the quip an obstacle for bubbles: pass its rect (while visible) into Bubbles.update and start the right-side dock stack above it. Or have the quip wait, or shift aside, while a right-docked bubble is up. Add a sandbox scene asserting 0 quip/bubble overlaps (quip + docked taunt)."
+  },
+  {
+   "severity": "minor",
+   "title": "Stacked rival skill chips cut each other's titles",
+   "detail": "cutins/chips.ts stacks skill chips with GAP = 76 px at 1080p, but a .chip-card is 85 px tall, plus a 3 px outline and a 6 px offset shadow. Measured heights 56/63/85/113 px at k .667/.75/1/1.333 against a step of 50.7/57/76/101 px. Every chip below another loses the top of its nameEn line: in shots/review/ui-hud/r2-correctness/crop-chips-intro.jpg, 'HONK', 'MINE!' and 'OIIA SPIN' are half hidden; in t7-*-busy.png, DOGE SHIELD and HONK. In natural play (t3, pack at the start) chips overlapped in 49 samples over 40 s. Achievement chips (ACH_GAP 98) are fine.",
+   "fix": "Stack by measured height (offsetHeight measured once per chip, times k, plus a margin) or set GAP to at least 96. Keep the stack step from the actual card height for mixed skill/achievement stacks."
+  },
+  {
+   "severity": "minor",
+   "title": "Rear threat chevrons pile into one illegible clump",
+   "detail": "world/edges.ts puts every rear chevron at x = clamp(W/2 + side*0.3W, 0.2W, 0.6W), y = H-92k, with no de-overlap. shots/review/ui-hud/r2-correctness/t15-chev.mjs (5 angry rivals behind, 720p): the 鹅 and 鸥 chevrons share 43 of 67 px. 猫 and 柴 both clamp to 0.6W and sit exactly on top of each other, so one glyph is lost, and they reach the HP/SP bars (bars at 801 px, chevrons to 806-808) — see crop-chev.jpg. In natural play (t3): chevron/chevron overlaps in 13 samples and chevron/HP-SP-bar overlaps in 40.",
+   "fix": "Sort the visible rear chevrons by x and spread them at about 80k px spacing inside the free band, or merge chevrons on the same side into one with stacked glyphs and a count. Take the right clamp from the cluster's measured left edge minus the chevron half-width."
+  },
+  {
+   "severity": "minor",
+   "title": "Player's own taunt bubble sits in the middle of the road view",
+   "detail": "combat emits the player's bell (叮叮叮！) and gulp swallow (咕嘟！) as 'taunt' events, and bubbles.ts floats them 0.7 m above the hero's head. At 1280x720 the box centre lands at (653, 308), with the screen centre at (640, 360), for 2.6 s (shots/review/ui-hud/r2-correctness/t11-extra.mjs, crop-ach-bell.jpg). That is right over the road ahead, and the brief says the HUD never covers the road ahead centre. The bell is a frequent action (3 s cooldown, +SP). Player lines already have a home in the bottom-right quip.",
+   "fix": "Route taunts whose riderId is the player to the Quip (e.g. a quip.sayLine(text) with skill priority), or dock them by the cluster. Keep world bubbles for rivals only."
+  },
+  {
+   "severity": "minor",
+   "title": "Measuring a taunt bubble forces a synchronous layout (ui.update spikes)",
+   "detail": "bubbles.ts measure() reads offsetWidth/offsetHeight in the same ui.update that just wrote the new text (show() resets w=0), which forces a reflow. shots/review/ui-hud/r2-correctness/t9-perf.mjs (autopilot, 4,200 frames, 1920x1080): avg 0.17 ms, p99 0.40 ms, but 16 frames go over 0.5 ms (10 over 1 ms, max 2.9 ms), and every one is a frame with a taunt event. The brief asks for at most 0.5 ms per frame and no layout thrash. tags.ts boxOf() does the same once per tag.",
+   "fix": "Never read layout after a write inside ui.update. Write the text while the bubble is hidden, read its size at the start of the next frame (before any writes), then show it. Alternatively use a ResizeObserver, or estimate the width from glyph count for the fixed font."
+  },
+  {
+   "severity": "minor",
+   "title": "Floating taunt bubbles ignore the static HUD modules",
+   "detail": "settle() only clamps to top 150k / bottom H-120k and avoids tags and bubbles; none of the corner modules count as obstacles. In t3 (720p, seed 2), the '不急，不急。' bubble of a rider low on the left landed on the speedometer dial (about 1,474 px²) for shots/review/ui-hud/r2-correctness/t3-1280x720-s2.json frame 1854.",
+   "fix": "Feed the bubble pass the rects of the static modules (speedo, cluster, place/timer, counters plus the chip column, callout stack) as obstacles. Measure them once per resize, since they are static."
+  },
+  {
+   "severity": "minor",
+   "title": "cross-unit: ui-screens toasts land on the HUD chip column",
+   "detail": "race police.ts sends the corgi's lines through app.ui.toast (.br-toast, top right under the counters), and the HUD's rival-skill and achievement chips use the same spot (right 34k, top 150k). shots/review/ui-hud/r2-correctness/t16-toast.mjs at 720p: toast [956,101,1243,138] against the HONK chip [1147,98,1263,154], an overlap of about 96x37 px. Police toasts come in bursts of 2-3 (see t4-1280x720-busted-6.png).",
+   "fix": "Agree on a lane with ui-screens. For example, the HUD moves its chip column below the toast lane (top about 230k) while toasts are up, or ui-screens moves in-race toasts to the left or bottom."
+  }
+ ]
+}

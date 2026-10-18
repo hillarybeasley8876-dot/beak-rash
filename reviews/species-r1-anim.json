@@ -1,0 +1,79 @@
+{
+  "pass": false,
+  "score": 5,
+  "summary": "Anim critic, species r1. Steady riding is solid: feet stay locked to the pedals through the whole crank cycle on all species (0.0 cm world error riding/weaving), paws sit on the grips (<=3 cm while weaving), counter-lean and head stabilisation read in the chase cam, and the in-game KO slow-mo tumble is smooth. Six major problems: (1) the crash tumble sinks the body up to 68 cm and the bike 20-30 cm into the road, and the bike comes to rest balanced upright on one wheel; (2) whole-mesh squash lifts the feet 5-16 cm off the pedals and pushes the paws past the grips on hit, heavy, ult and honk; (3) land, boost, respawn, taunt, victory and defeat are never triggered in the real game; (4) during the strike the weapon points into the attacker's own beak/helmet; (5) when a hit cancels a swing, the wings teleport 31-69 cm in one frame; (6) doge shield and bell don't read, and flash and chill are weak. Evidence: shots/review/species/r1-anim/*.jpg plus the probe-*.mjs, contact.mjs, squash.mjs, crash-strip.mjs, ko-strip.mjs and game-strip.mjs outputs. No console errors; tsc is clean for src/actors.",
+  "issues": [
+    {
+      "severity": "major",
+      "title": "Crash tumble sinks into the road; bike ends balanced upright on a wheel",
+      "detail": "src/actors/crash.ts + rig/tumble-body.ts. The body collides only as one 0.26 m sphere at the spine, and the bike as one 0.42 m sphere at BIKE_COM. Measured as the lowest skinned vertex vs ground y=0 (probe-crash.mjs, pelican at 14 m/s): the character goes down to -0.60 m (0.1x run) / -0.68 m (1x run), the head is buried at ~0.9-1.2 s (crash.jpg tile '993ms': head gone, only a white blob and wing visible), and it rests 6-22 cm inside the asphalt. The bike sits 20-30 cm inside the road from 0.5 s to the end of the 2.6 s crash. It ends standing vertically on one wheel (crash.jpg tiles 1143-2493 ms), because the flop torque only acts when |up.N| > 0.35. Players see this every time they pass a wreck.",
+      "fix": "Give the tumble multi-point contacts. Body: after posing, sample head, pelvis, chest, hands, feet and tail world points with radii; push the body RB out by the worst penetration and apply the contact impulse at that point so it rolls instead of sinking. Bike: contact points on both wheel rims (4-6 per wheel), bar ends, saddle and pedals, resolved per point against the ground plane. Make the flop also topple a vertical bike: when |up.N| < 0.35, torque about the forward axis so it falls on its side. Add a regression check: lowest vertex >= -0.02 m over the whole crash."
+    },
+    {
+      "severity": "major",
+      "title": "Squash/stretch scales the whole mesh after IK: feet leave pedals, paws overshoot grips",
+      "detail": "src/actors/view.ts sets inst.mesh.scale = (1+sq/2, 1-sq, 1+sq/2) around the saddle origin AFTER RidePose solved the IK, so every squash moves the end effectors. World error, rendered bones vs pedal/grip targets (contact.mjs, all species): hit 8-10 cm, heavy 7-8 cm, ult 14-16 cm, honk 5.6 cm, spit 4 cm, and land 12-14 cm / respawn 12-15 cm / boost 6-7 cm once those cues are wired. Paws are off by 4-8 cm. squash.jpg shows the feet floating above the pedals on land +2f/+3f, respawn +1f, hit +3f and ult dive. In the real game combat sets action 'hit', so every hit plays squash 0.2. tools/actors-check.mjs misses this because it measures model-space bones (ps.mp) without the mesh scale.",
+      "fix": "Solve the IK in squashed space: divide the pedal and grip targets by the squash scale before RidePose.update (y/(1-sq), x and z/(1+sq/2)), so they land exactly after the scale. Or apply squash as bone scale on spine/chest/neck/head only, leaving the pelvis-down chain and the arm end effectors unscaled. Extend actors-check to measure world-space bones during every cue, and fail above 1 cm."
+    },
+    {
+      "severity": "major",
+      "title": "land, boost, respawn, taunt, victory and defeat cues never play in the real game",
+      "detail": "A grep for '.cue(' in src finds only combat triggering attack, heavy, hit, stun, ko, skill, ult and bell. Nothing calls view.cue('land'|'boost'|'respawn'|'taunt'|'victory'|'defeat'). RiderViewImpl neither listens to app.bus nor derives these cues from RiderState. So hops and jumps land with no squash, boosts get no stretch, respawn gets no pop-in, the taunt speech bubble (bus 'taunt') shows with no gesture, and nobody celebrates or slumps at the finish. These animations exist only in the sandbox.",
+      "fix": "In view.ts, derive the cues from RiderState transitions: airborne true->false gives 'land' (intensity from air time), a boostTime jump gives 'boost', entering 'respawning' gives 'respawn', and mode 'finished' gives 'victory' (place <= 3) or 'defeat'. Subscribe to bus 'taunt' (filtered by riderId) to fire 'taunt' toward the nearest rival side, and unsubscribe in dispose(). Wire this only after the squash fix, or the feet will float on every landing."
+    },
+    {
+      "severity": "major",
+      "title": "Weapon strikes point into the attacker's own beak/helmet, never into the rival lane",
+      "detail": "swing.jpg (fish attack R, frames 6-10 at u .31-.52; pan heavy R at u .38-.58) and chase.jpg ('fish attack R strike', 'pan heavy R strike', 'leek heavy L strike'). During the active window the arm extends sideways, but the weapon points up and inward: the fish and the pan face overlap the pelican's own beak and helmet, and the smear trails above its head. From the chase cam it reads as the rider bonking itself instead of hitting a rival at 0.4..reach m to the side. Cause: WeaponHolder.attach aims the weapon 62% toward +Y from the forearm (fine on the bars), then the swing's wrist keys (+0.6..+1.1 rad) roll it further inward.",
+      "fix": "While cues.strikeState.weight > 0, blend the weapon pivot so it continues the forearm line outward and forward, with the tip ~weapon.reach out to the side at the strike apex. Curb or flip the wrist flick so it sweeps forward-outward, and keep the follow-through low across the front wheel. Add a check that the weapon tip stays > 25 cm from the head bone during swings."
+    },
+    {
+      "severity": "major",
+      "title": "Cue/action interruptions pop: hit-cancels teleport the wings in one frame",
+      "detail": "src/actors/rig/cues.ts. reach() keeps only the strongest request, and fromAction() drops the cancelled action instantly; there is no cross-fade or inertialisation. Per-frame jump at 60 fps (probe-interrupt.mjs): attack->hit moves the hand 53.6 cm in one frame, heavy->hit moves the hand 31 cm and the head 23.6 cm, gulp->hit 45 cm, ult->hit 69 cm, and a taunt overridden by a heavy jumps 38 cm when the weights cross. Combat replaces the victim's swing with 'hit' on every trade and counter-hit, so the swinging wing snaps back to the bar on the impact frame and then flails.",
+      "fix": "Inertialise the pose. Keep last frame's arm targets/blends (and head/spine offsets); when the active action or the winning reach() source changes, decay the difference over ~0.08-0.12 s. A simpler alternative: let a cancelled action fade its weight out over 100 ms instead of vanishing. Test that no hand moves more than ~15 cm in a frame on any interrupt."
+    },
+    {
+      "severity": "major",
+      "title": "Signature/utility poses don't read: doge shield, bell (and weak sloth flash, capybara chill)",
+      "detail": "cues.ts skill(). 'doge' is only head yaw + squint, with both paws on the bars (spin.jpg 'doge shield front'); the brief asks for paw up + shades glint. 'bell' is just a wrist flick on the grip, so hands stay at 0.0 cm (contact.mjs) and it looks identical to riding from behind (chase.jpg 'bell', cues-pel.jpg 'bell'). 'flash' is a plain forward tuck (clip.jpg 'sloth flash side'). 'chill' raises both arms straight up and reads as 'hands up', not zen (spin.jpg 'capy chill back'). The pelican wing dash is a rigid T-pose with plank-like wings (clip.jpg).",
+      "fix": "doge: lift the near-side paw palm-out in front of the face, tilt the head, add a squint and shades-glint timing beat. bell: thumb/wing flick toward the bell (bikes' markers.bell), head turned back over the shoulder, beak open on each ding, readable from 6 m behind. flash: deep crouch, one arm thrown back, cadence x2, hair streaming. chill: lean back with paws behind the head or folded on the belly. wing dash: sweep the wings back ~30 deg with tips fanned and the body tucked low."
+    },
+    {
+      "severity": "minor",
+      "title": "Crash start and rest transitions snap limbs (visible on WRECKED)",
+      "detail": "crash.ts poseBody(). On the first crash frame the legs jump 104 deg and the body turns to face the camera with its legs flipped up (crash.jpg tile 2). The gains f and s switch discretely when air > 0.05 or resting toggles, so limbs snap 12-13 deg in single frames at 0.1x (probe-crash.mjs f1032/f1064/f1131), where everything else moves < 1.5 deg per frame. In the KO cinematic the flash and starburst mostly hide the first snap; the side camera on WRECKED does not.",
+      "fix": "Capture the ride pose at crash start and slerp from it into the flail over ~0.15 s sim (that becomes a lovely 1.5 s unfold at 0.1x). Damp f and s toward their targets (lambda ~8) instead of switching on air/resting."
+    },
+    {
+      "severity": "minor",
+      "title": "OIIA spin: legs stay pinned to the pedals and pass through each other",
+      "detail": "ride.ts leg(). The knee pole is fixed in bike space while the pelvis yaws 720 deg. probe-spin.mjs: the thigh segments come within 1.3 cm of each other at u=0.33, and knees/shins within 6.6 cm at u=0.58, so the thick thighs interpenetrate and twist under the torso. The fat body hides most of it from behind (clip.jpg), but it shows from the side (spin.jpg 'u=.40 side').",
+      "fix": "During 'spin', blend the leg IK targets from the pedals to body-relative tucked feet (or a splayed spinning-cat pose), rotate the knee poles with the pelvis yaw, and return to the pedals over the last 15%."
+    },
+    {
+      "severity": "minor",
+      "title": "Pigeon ghost is a strobe, not a fade; respawn/invuln blink is a hard whole-rider toggle",
+      "detail": "view.ts visibleFor(). 'invisible' shows the root 1 frame in 7 at 30 Hz (hard ~4 Hz flashes); the brief asks for a fade. 'respawning' toggles rider + bike fully on/off every 62 ms (game.jpg 'respawn blink' tiles), and invuln hides 1/4 of the time. It reads as an arcade flicker rather than a polished materialise.",
+      "fix": "Drive a per-instance opacity/dither uniform (screen-door dither via onBeforeCompile on the rider's toon material): the ghost fades to ~0.15 with a shimmer; respawn plays a white-flash pulse + alpha ramp; invuln uses a soft pulse instead of hiding the model."
+    },
+    {
+      "severity": "minor",
+      "title": "Held weapons are invisible from the chase cam while riding",
+      "detail": "WeaponHolder points the weapon up-forward out of the fist on the bar, so it hides in front of the body. From the chase view, pan and keyboard are not visible at all while riding (chase.jpg 'pan riding (held)', 'keyboard riding'); only the goose's umbrella pokes out. Players and rivals can't see who is armed until a swing starts.",
+      "fix": "In the riding grip, angle the weapon outward/back past the shoulder (or tuck it under the wing pointing back), so 30-50% of it shows from 6 m behind; keep the strike orientation fix above."
+    },
+    {
+      "severity": "minor",
+      "title": "Corgi's feet paddle mid-air 42 cm above pedals that turn by themselves",
+      "detail": "meta.shortLegs: the feet circle in the air in time with the crank (contact.mjs: corgi feet 42.6 cm from the pedals in every state; pedal-sheet.jpg row 4). It is meant as the short-legs meme, but from the side it reads as a self-pedalling bike. The brief suggests pedal extenders/blocks.",
+      "fix": "Add stacked pedal blocks or extender stilts (an actors-owned prop parented to the bike's pedal markers) that reach the paddling feet, so the comically short legs visibly drive the crank."
+    },
+    {
+      "severity": "minor",
+      "title": "cross-unit: KO victim's visual body flies through the chase camera after the slow-mo",
+      "detail": "ko.jpg +1300..1750 ms: once time ramps back to 1x, the actors' tumble body (launched with rider.crash.vel, 0.7 v forward and ~5.5 m/s up) is overtaken by the player and passes right by the chase camera, filling the right third of the frame for ~0.5 s. The cause spans sim (launch velocity), actors (the free tumble body diverges from the sim slide) and camera.",
+      "fix": "Coordinate across units. Actors could pull the visual body toward the sim's crashed-rider position over time, or cap its height. Camera/fx could add a near-plane fade for bodies closer than ~1.5 m."
+    }
+  ]
+}

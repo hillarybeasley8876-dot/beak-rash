@@ -9,10 +9,14 @@
 .co-near .co-bg { background: var(--ink); }
 .co-near .co-sh { background: var(--red); }
 .co-near .co-en { color: var(--paper); }
-.co-near .co-cn { color: var(--sp); }
+.co-near .co-cn { color: var(--paper); }
 .co-drift .co-bg { background: var(--dc, #2FA8FF); }
 .co-drift .co-en { color: var(--paper); -webkit-text-stroke: 7px var(--ink); }
-.co-slip .co-bg { background: var(--sp); }
+/* Slipstream / slingshot: white plate with a band of ink speed stripes at its left end, clear of the text. */
+.co-slip { padding-left: 52px; }
+.co-slip .co-bg {
+  background: repeating-linear-gradient(-60deg, var(--ink) 0 7px, var(--paper) 7px 14px) 0 0 / 36px 100% no-repeat, var(--paper);
+}
 .co-slip .co-en { color: var(--ink); -webkit-text-stroke: 0; }
 .co-place .co-bg { background: var(--ink); }
 .co-place .co-en { color: var(--paper); font-family: "Anton", sans-serif; }
@@ -37,4 +41,4 @@
   padding: 8px 26px 4px; background: var(--ink); color: var(--paper); transform: skewX(-14deg); white-space: nowrap;
 }
 .fs-text b { font: 400 64px/1 "Anton", sans-serif; letter-spacing: 3px; }
-.fs-text i { font: 400 50px/1 "ZCOOL QingKe HuangYou", sans-serif; font-style: normal; color: var(--sp); }
+.fs-text i { font: 400 50px/1 "ZCOOL QingKe HuangYou", sans-serif; font-style: normal; color: var(--hot); }

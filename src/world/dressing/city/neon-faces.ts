@@ -129,3 +129,45 @@ export function p5Face(atlas: SignAtlas, rng: Rng, text: string): AtlasRect | nu
     ransom(g, rng, text, w * 0.17, h * 0.1, w * 0.64, h * 0.8);
   });
 }
+
+/** White heavy lettering skewed −9° with a black outline, centred at (x, y). */
+function slashText(g: G, text: string, x: number, y: number, size: number): void {
+  g.save();
+  g.translate(x, y);
+  g.transform(1, 0, -0.16, 1, 0, 0);
+  g.font = `900 ${Math.round(size)}px ${FONT.heavy}`;
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.lineJoin = 'round';
+  g.lineWidth = Math.max(4, size * 0.16);
+  g.strokeStyle = P5.black;
+  g.strokeText(text, 0, 0);
+  g.fillStyle = P5.white;
+  g.fillText(text, 0, 0);
+  g.restore();
+}
+
+/** P5 shop sign: jagged red panel in a thick black frame, white star, white slashed lettering. */
+export function p5FasciaFace(atlas: SignAtlas, rng: Rng, text: string): AtlasRect | null {
+  return cell(atlas, 384, 72, (g, w, h) => {
+    g.fillStyle = P5.black;
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = P5.red;
+    g.beginPath(); g.moveTo(12, 7); g.lineTo(w - 5, 4); g.lineTo(w - 14, h - 7); g.lineTo(5, h - 4); g.closePath(); g.fill();
+    star(g, 34, h / 2, h * 0.32, P5.white, rng.range(-0.3, 0.3));
+    slashText(g, text, w / 2 + 18, h / 2 + 2, fit(g, text, FONT.heavy, h * 0.6, w - 100, 900));
+  });
+}
+
+/** P5 blade sign (1:3): black board, red slanted panel, white stacked characters. */
+export function p5BladeFace(atlas: SignAtlas, rng: Rng, text: string): AtlasRect | null {
+  return cell(atlas, 96, 288, (g, w, h) => {
+    const chars = Array.from(text).slice(0, 4);
+    g.fillStyle = P5.black;
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = P5.red;
+    g.beginPath(); g.moveTo(8, 14); g.lineTo(w - 6, 6); g.lineTo(w - 10, h - 14); g.lineTo(6, h - 6); g.closePath(); g.fill();
+    const step = (h - 24) / chars.length, size = Math.min(w * 0.7, step * 0.8);
+    chars.forEach((ch, i) => slashText(g, ch, w / 2 + rng.range(-3, 3), 12 + step * (i + 0.5), size));
+  });
+}

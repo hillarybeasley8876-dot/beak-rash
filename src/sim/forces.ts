@@ -16,11 +16,16 @@ export const NEUTRAL_SURFACE: Readonly<SurfaceMods> = { top: 1, grip: 1, wobble:
 
 const MAX_SPEED = 60;
 
+/** The bike's own flat-road top speed with the race's rubber band (≤ 0 / NaN → neutral), no boosts or statuses. */
+export function bikeTop(sr: SimRider): number {
+  const rubber = sr.r.rubber > 0 ? Math.min(sr.r.rubber, T.rubberMax) : 1;
+  return sr.tune.top * rubber;
+}
+
 /** Flat-road top speed right now, before boosts (bike, race rubber band, statuses, surface, draft). */
 export function baseTop(sr: SimRider, surf: SurfaceMods): number {
   const r = sr.r;
-  const rubber = r.rubber > 0 ? Math.min(r.rubber, T.rubberMax) : 1;
-  return Math.max(0.1, sr.tune.top * rubber * r.mods.speedMul * surf.top * (1 + T.draftTop * r.draft));
+  return Math.max(0.1, bikeTop(sr) * r.mods.speedMul * surf.top * (1 + T.draftTop * r.draft));
 }
 
 export function longitudinal(sr: SimRider, c: Controls, surf: SurfaceMods, dt: number): void {
@@ -46,7 +51,9 @@ export function longitudinal(sr: SimRider, c: Controls, surf: SurfaceMods, dt: n
     a += slopeA;
     if (r.drifting) a -= T.driftBleed * v;
     if (finished) a -= T.finishBrake;
+    if (sr.pushOff > 0 && v < T.respawnSpeed) a = Math.max(a, T.respawnPush); // respawn push-off
   }
+  sr.pushOff = Math.max(0, sr.pushOff - dt);
   r.speed = Math.min(MAX_SPEED, Math.max(0, v + a * dt));
   sr.accel = (r.speed - v) / dt;
 }

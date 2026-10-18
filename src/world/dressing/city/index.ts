@@ -5,11 +5,12 @@ import { ensureFonts } from '../../fonts';
 import { SignAtlas } from '../../scenery/signs/atlas';
 import type { TerrainField } from '../../terrain/field';
 import { loadBillboardArt } from '../coast/signage';
+import { buildRain } from '../../env/city-rain';
 import { buildWetRoad } from '../../env/city-wet';
 import { finishDress, makeDress } from '../dress';
 import { skyline, streetWalls } from './blocks';
 import { REFLECT_LAYER } from './batch';
-import { finishCity, makeCity, type City } from './city';
+import { finishCity, makeCity, paintAtlases, type City } from './city';
 import { ALL_CITY_TEXT, GANTRY } from './lines';
 import { neonSigns } from './neon';
 import { crossings, Pools, scramble, sidewalks } from './paint';
@@ -20,6 +21,9 @@ import { finishScreen, neonGantry } from './gantries';
 import { retainingWalls, tunnelFitOut } from './underpass';
 import { viaduct } from './viaduct';
 import { farFill } from './farfill';
+import { farBank } from './farbank';
+import { billboardCanyon } from './canyon';
+import { hazardStripes, p5Pylons, streetP5Boards } from './p5';
 import { bridgeLights } from './bridge';
 import { BANNERS, citySignage } from './signs';
 import { ROAD_SIGNS } from '../../../data/memes';
@@ -52,14 +56,14 @@ function life(c: City): void {
   const stops = marksOf(c, 'busStop');
   const nStalls = stalls(c);
   const people = crowds(c, marksOf(c, 'crossing').map((m) => m.s), marksOf(c, 'scramble').map((m) => m.s), stops, marksOf(c, 'subway'));
-  kerbProps(c);
+  const nTrees = kerbProps(c);
   for (const m of marksOf(c, 'stalls')) {
     marketGate(c, m.s - 12, '鹈鹕夜市', 'NIGHT MARKET');
     marketGate(c, m.s + m.len + 8, '鹈鹕夜市', 'SEE YOU TONIGHT');
     lanternStrings(c, m.s - 8, m.s + m.len + 4);
   }
   const nCables = cables(c);
-  console.info(`[track] city life: ${people} pedestrians, ${nStalls} stalls, ${nCables} cable runs`);
+  console.info(`[track] city life: ${people} pedestrians, ${nStalls} stalls, ${nTrees} trees, ${nCables} cable runs`);
 }
 
 /** Road paint and street furniture (after the buildings, so props keep clear of their lots). */
@@ -74,27 +78,37 @@ function streets(c: City, pools: Pools): void {
   citySignage(c);
   const lamps = streetLamps(c, pools);
   retainingWalls(c);
-  tunnelFitOut(c, pools);
+  tunnelFitOut(c);
   console.info(`[track] city streets: ${lamps} lamps, ${cross.length} crossings`);
 }
 
 export async function dressCity(ctx: WorldCtx, field: TerrainField): Promise<void> {
-  const [art] = await Promise.all([loadBillboardArt(ctx.id), ensureFonts([...ALL_CITY_TEXT, ...BANNERS, ...ROAD_SIGNS, '前方起飞 0123456789. KM'])]);
+  // Fonts load while the city builds: the deferred atlases record every face and paint them at the end,
+  // repainting once more only if the fonts were late (machine under load).
+  const fonts = ensureFonts([...ALL_CITY_TEXT, ...BANNERS, ...ROAD_SIGNS, '前方起飞 0123456789. KM'], 4000);
+  const art = await loadBillboardArt(ctx.id);
   const t0 = performance.now();
-  const d = makeDress(ctx, field, new SignAtlas(2048, 2048), ctx.rng.fork(0xc17e));
+  const d = makeDress(ctx, field, new SignAtlas(2048, 2048, true), ctx.rng.fork(0xc17e));
   const c = makeCity(d);
   const pools = new Pools(ctx);
   landmarks(c, art);
   streetWalls(c);
+  const canyon = billboardCanyon(c, art);
+  const boards = streetP5Boards(c), pylons = p5Pylons(c);
+  const jump = ctx.L.features.find((f) => f.kind === 'jumpCrest');
+  const peak = jump?.data?.peak;
+  hazardStripes(c, typeof peak === 'number' ? peak : null, c.d.rng.fork(0x4a2));
   skyline(c);
-  const blocks = farFill(c);
+  const blocks = farFill(c) + farBank(c);
   neonSigns(c, art);
   streets(c, pools);
   life(c);
   pools.build();
+  paintAtlases(c, await fonts);
   const meshes = [...finishCity(c), ...finishDress(d)];
   // Lamps and lit props glow in the wet road too.
   for (const m of meshes) if (m.name.startsWith('glow:')) m.layers.enable(REFLECT_LAYER);
   buildWetRoad(ctx, REFLECT_LAYER);
-  console.info(`[track] city dressing: ${meshes.length} batched meshes, ${c.slots.length} sign slots, ${blocks} fill blocks, ${Math.round(performance.now() - t0)} ms`);
+  buildRain(ctx);
+  console.info(`[track] city dressing: ${meshes.length} batched meshes, ${c.slots.length} sign slots, ${blocks} fill blocks, ${canyon} canyon scaffolds, ${boards} P5 boards, ${pylons} P5 pylons, ${Math.round(performance.now() - t0)} ms`);
 }

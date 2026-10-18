@@ -64,10 +64,28 @@ export function buildSides(def: LayoutDef, starts: number[], sMin: number, n: nu
   return out;
 }
 
+/** Narrowest blended step width that still draws a rock face at the bound (profile.ts WALL_TOE rule). */
+const FACE_W = 2.5;
+
+/**
+ * Blend parameter where the edge kind switches: the midpoint, except into / out of a 'rock' edge
+ * whose wall only forms once the blended step is narrow: there the switch waits for the face, so
+ * bounds() never reports a wall before (or after) one is drawn at the edge.
+ */
+function edgeSwitch(a: SideDef, b: SideDef): number {
+  const ga = a.ground, gb = b.ground;
+  if (ga.abs !== gb.abs || ga.detached !== gb.detached || (a.edge === 'rock') === (b.edge === 'rock')) return 0.5;
+  const into = b.edge === 'rock';
+  const wFrom = into ? ga.stepW : gb.stepW, wTo = into ? gb.stepW : ga.stepW;
+  if (wTo >= FACE_W || wFrom <= FACE_W) return 0.5;
+  const t = (wFrom - FACE_W) / (wFrom - wTo);
+  return into ? t : 1 - t;
+}
+
 function fill(o: SideSamples, i: number, a: SideDef, b: SideDef, t: number): void {
   const late = t >= 0.5 ? b : a;
   o.shoulder[i] = a.shoulder + (b.shoulder - a.shoulder) * t;
-  o.edge[i] = Math.max(0, EDGE_KINDS.indexOf(late.edge));
+  o.edge[i] = Math.max(0, EDGE_KINDS.indexOf((t >= edgeSwitch(a, b) ? b : a).edge));
   o.surface[i] = Math.max(0, SURFACES.indexOf(late.surface));
   o.ground[i] = blendGround(a.ground, b.ground, t);
 }

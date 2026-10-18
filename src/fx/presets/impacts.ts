@@ -52,11 +52,11 @@ function stars(k: Kit, pos: Vec3Like, o: BurstOpts, count: number, colors: reado
   }
 }
 
-/** Thin expanding ring that erodes to a hairline. */
+/** Comic shock ring (segmented, tapering) that erodes to its segment cores. */
 export function ring(k: Kit, pos: Vec3Like, o: BurstOpts, from: number, to: number, life: number, color: string): void {
   const s = k.at(pos);
   k.p.colors(s, color);
-  s.frame = FRAME.ring; s.life = life; s.size0 = from; s.size1 = to; s.erode = true; s.realtime = true;
+  s.frame = FRAME.shock; s.life = life; s.size0 = from; s.size1 = to; s.erode = true; s.realtime = true; s.rot = k.range(0, 6.28);
   inherit(s, o, 0.9);
   k.p.emit(s);
 }
@@ -69,27 +69,32 @@ function pow(k: Kit, pos: Vec3Like, o: BurstOpts, size: number, outer: string, o
 
 export const hit: Preset = (k, pos, o) => {
   const sc = o.scale ?? 1;
-  glow(k, pos, o, 0.55 * sc, '#ffe08a');
+  glow(k, pos, o, 0.3 * sc, '#fff4c8', 0.05);
   pow(k, pos, o, 0.62 * sc, '#ffe600', '#ff8a00', 0.15);
-  pop(k, pos, o, FRAME.rays, 1.0 * sc, 1.35, 0.1, '#ffffff');
+  pop(k, pos, o, FRAME.rays, Math.min(1.2, 1.0 * sc), 1.2, 0.08, '#ffffff');
   sparks(k, pos, o, k.n(8, o), 7, '#fff6b0', '#ff6a00');
   stars(k, pos, o, Math.ceil(k.n(3, o)), ['#ffe600', '#ffffff', '#ff1e3c']);
 };
 
-export const hitHeavy: Preset = (k, pos, o) => {
+/** Heavy hit without the impact lines (the KO punctuation adds its own when the blow is lethal). */
+export const hitKo: Preset = (k, pos, o) => {
   const sc = o.scale ?? 1;
   glow(k, pos, o, 0.6 * sc, '#ffb060', 0.1);
   pow(k, pos, o, 1.0 * sc, '#ff1e3c', '#ff8a00', 0.2);
-  pop(k, pos, o, FRAME.rays, 1.8 * sc, 1.35, 0.12, '#ffffff');
   sparks(k, pos, o, k.n(14, o), 9, '#fff6b0', '#ff3c00');
   stars(k, pos, o, Math.ceil(k.n(5, o)), ['#ffe600', '#ffffff', '#ff1e3c']);
 };
 
-/** KO punctuation: an oversized red POW over a white one, wide manga lines (real-time). */
+export const hitHeavy: Preset = (k, pos, o) => {
+  hitKo(k, pos, o);
+  pop(k, pos, o, FRAME.rays, Math.min(1.2, 1.1 * (o.scale ?? 1)), 1.2, 0.08, '#ffffff');
+};
+
+/** KO punctuation: an oversized red POW over a white one, thin manga impact lines (real-time). */
 export function koPow(k: Kit, pos: Vec3Like, o: BurstOpts): void {
   const sc = (o.scale ?? 1) * 1.3;
   pow(k, pos, o, 1.15 * sc, '#ff1e3c', '#ffe600', 0.32);
-  pop(k, pos, o, FRAME.rays, 2.3 * sc, 1.3, 0.2, '#ffffff');
+  pop(k, pos, o, FRAME.rays, Math.min(1.6, 1.3 * sc), 1.15, 0.08, '#ffffff');
   glow(k, pos, o, 0.8 * sc, '#ffd0a0', 0.12);
 }
 
@@ -99,12 +104,21 @@ export const crit: Preset = (k, pos, o) => {
   stars(k, pos, o, Math.ceil(k.n(6, o)), ['#ff1e3c', '#ffe600']);
 };
 
+/** Shield block: a pale cracked hexagon face snaps up and shatters into inked shards in 0.12 s. */
 export const block: Preset = (k, pos, o) => {
   const sc = o.scale ?? 1;
-  glow(k, pos, o, 0.6 * sc, '#8fe3ff');
-  ring(k, pos, o, 0.4 * sc, 1.5 * sc, 0.18, '#9be7ff');
-  pop(k, pos, o, FRAME.spark4, 0.55 * sc, 1.2, 0.14, '#ffffff', '#5ad1ff');
-  sparks(k, pos, o, k.n(10, o), 6, '#e8fbff', '#2a8cff');
+  pop(k, pos, o, FRAME.hex, 0.75 * sc, 1.12, 0.12, '#e6f8ff', '#9fe3ff');
+  for (let i = 0; i < 6; i++) {
+    const s = k.at(pos, 0.12 * sc);
+    k.p.colors(s, '#e6f8ff', '#5ad1ff');
+    s.frame = FRAME.shard; s.realtime = true; s.delay = 0.1;
+    launch(s, k.dir(d, o.dir, 1), k.range(2.5, 4.5) * sc);
+    s.life = k.range(0.18, 0.26); s.size0 = k.range(0.12, 0.2) * sc; s.size1 = s.size0 * 0.6;
+    s.rot = k.range(0, 6.28); s.spin = k.range(-14, 14); s.drag = 2; s.gravity = 9;
+    inherit(s, o, 0.9);
+    k.p.emit(s);
+  }
+  sparks(k, pos, o, k.n(8, o), 6, '#e8fbff', '#2a8cff');
 };
 
 /** Metal sparks (pan hits, wall scrapes, crashes). */

@@ -1,0 +1,71 @@
+{
+  "unit": "bikes",
+  "round": 1,
+  "lens": "art",
+  "pass": false,
+  "score": 6,
+  "summary": "All seven bikes are complete and easy to tell apart: decals, the 01 plate, the cartoon QR plate, the 28·载重 chain case, the fish passenger, streamers and the bell are all there. Each bike costs 2 draw calls and 0 errors on coast, city and mountain. The art falls short of a polished commercial stylised game for four reasons. The biggest silhouettes are faceted: tyres are 22-28-gons with 5-sided cross-sections and rims are 16-20-gons. The MTB's 'knobbly' tyres read as a plain lobed polygon, so its defining feature fails. Wheels look frozen or spin backwards at race speed (wagon-wheel effect) because there is no speed blur. Materials are flat matte: chrome is flat grey, the erba's black frame collapses into a silhouette, and there is no rim light. Construction is realistic and thin rather than the chunky designer-vinyl toy the brief asks for: raw tube intersections, a crude fork crown bar, box pedals and slab saddles. In the chase camera at speed the rider hides the bike, and from behind all seven read as the same thin sliver.",
+  "evidence_dir": "/Users/minimax/m/beak-rash/shots/review/bikes/r1-art/",
+  "issues": [
+    {
+      "severity": "major",
+      "title": "Faceted tyres/rims; MTB 'knobbly' tyres read as a plain 11-lobed polygon",
+      "detail": "parts/wheel.ts tyreGeo builds the tyre as a TorusGeometry with 28 tubular × 5 radial segments (24 with knobs). The per-bike detail factor then cuts it further: mtb 0.9 gives 22 segments, tandem 0.78 gives 22. Rims are seg(20) (16 on the tandem). The two largest silhouettes on every bike are visibly polygonal in the garage turntable and in in-game close views. The knob trick pushes every other ring out by 1.2 cm, which gives 11 broad flat lobes and no visible knobs (r-mtb-r34.png, z-mtb-r34-tyre.png, MTB in s-game-q34.jpg). Rim inner edges show straight segments (z-rb-r34-tyre.png) and the tandem tyres are 22-gons (r-tandem-f34.png). Medium/low quality drops roadbike tyres to 20/14-gons and rims to 15/10-gons.",
+      "fix": "Exempt tyres and rims from `detail` and set floors: tyres >= 44 tubular × 6 radial on high (>= 32 on low), rims >= 36. To pay for it, replace the 12-16 three-sided spoke cylinders (6 tris each, ~190 tris per bike) with one alpha-tested spoke card per wheel side from the decal atlas (4 tris per wheel). Also trim hidden detail: gear tooth counts, hub lathes, chain strip segments. If the bike is still over budget, record a high-quality cap of ~3.6k tris in status (8 bikes × +0.6k ≈ 5k tris, under 1 % of the 460-880k tris measured per frame in game). For the MTB, keep a round 44-segment tyre and add a ring of 28-32 small bevelled tread blocks so the outline is round with square teeth."
+    },
+    {
+      "severity": "major",
+      "title": "Wheels don't read as spinning at race speed (wagon-wheel strobing, no speed blur)",
+      "detail": "animate.ts only rotates the real spoke/mag geometry by speed/R each frame. At 60 fps the per-frame angle lands close to a multiple of the spoke spacing, so wheels look stopped or turn backwards. At 20 m/s: roadbike and fixie spokes move +3.2° and +0.7° per frame (look stopped); the shared bike's 5-arm mag wheel moves -6.1° per frame (backwards), and -32.5° per frame at 12 m/s. The kidbike's 4-arm mag alternates between ±18° and ±29° per frame; erba and MTB crawl backwards at 2-7° per frame. Rivals are seen side-on for the whole race (overtakes, s-game-q34.jpg), so wheels look stuck. This fails the brief bar 'wheels spin correctly with speed' visually.",
+      "fix": "Put the spokes/mag arms on their own bone per wheel. Add an alpha-tested radial-streak blur-disc card (atlas) on a sibling bone. In animate.ts, above ~6 rad/s, fade the spokes out (bone scale to 0) and fade the blur disc in (scale 0 to 1), turning the disc slowly forward. Optionally add 2-3 tyre tread marks or a valve so rolling still reads. This stays within 2 draw calls."
+    },
+    {
+      "severity": "major",
+      "title": "Flat matte materials: chrome isn't chrome, black erba frame collapses, no rim light",
+      "detail": "build/material.ts bodyMaterial is a plain MeshToonMaterial (vertex colour × atlas, 3-band ramp) with no specular and no rim term. Chrome bars, racks and rims (erba, tandem), the silver calipers and bells, and gloss paint all render as flat grey or flat colour. The erba's black frame becomes a featureless black shape: tube volumes and joints vanish into the outline (r-erba-side.png, r-erba-f34.png, gr-3.png, erba in s-game-q34.jpg). SPEC §5 requires a cool rim light; there is none. Close up in the garage the bikes look like untextured plastic.",
+      "fix": "In bodyMaterial onBeforeCompile add two terms. (a) A hard-edged toon specular band (view-dependent), scaled by a new per-vertex 'gloss' attribute written by PartSet: chrome 1, gloss paint 0.5, rubber and saddles 0. (b) A stepped cool rim (#9fd8ff, fresnel step ~0.65, strength ~0.35). Lift the erba black to a blue-black (#1d2433) so its lit band and highlight read, and make the gold pinstripes glossy. File a core request so render/toon.ts gets the same rim and the riders match."
+    },
+    {
+      "severity": "major",
+      "title": "Generic realistic-thin construction instead of chunky designer-vinyl toy bikes",
+      "detail": "The brief asks for 'seven chunky, characterful toy-style bicycles' and SPEC §5 for 'designer-vinyl toys / chunky cartoon'. These are realistic bike geometries with only ~1.3× tube radii. Thin tubes meet as raw cylinder intersections with no fillets at the head tube, seat cluster or BB. The fork crown (parts/frame.ts) is a plain horizontal bar sticking ~3 cm out of both sides of the head tube (z-rb-r34-head.png). Pedals are bare boxes (parts/drive.ts, box 72×20×62 mm), saddles are slabs, and the drop bars are lumpy faceted tubes. In the lineup they read as ordinary bikes with outlines (r-lineup.png).",
+      "fix": "Push toy proportions without moving any marker. Main tubes ×1.35-1.5 radius with sphere/torus fillets at the head tube ends, seat cluster and BB shell. Fatter tyres (tyre tube radius 0.024-0.03; 0.022 on the roadbike). Rounded capsule pedals with the reflector inset. Rounded ellipsoid/lathe saddles. A fork crown flush with the blades (no wider than head tube plus blades, rounded shoulders). Smooth drop bars with readable hoods (add segments only there). Afterwards, re-check clearance against the pelican fit."
+    },
+    {
+      "severity": "minor",
+      "title": "Drivetrain reads as flat grey cut-outs",
+      "detail": "Chainring/cog outline is 0.004 m, scaled ×0.55 near the camera (~2 mm), so it is effectively invisible. The chain is a 5.5 mm grey strip with no outline (parts/drive.ts strip, outline 0). The crank spider reads as a black 'X' sticker on a flat grey disc (z-rb-side-drive.png, r-fixie-side.png).",
+      "fix": "Chainring outline 0.008 with a darker inner face and bolt circle. Chain in #2a2c31 with an atlas link pattern, 8 mm wide with a 0.004 outline. Spider as 4-5 rounded arms."
+    },
+    {
+      "severity": "minor",
+      "title": "Salted-fish passenger is neither grumpy nor visibly strapped on",
+      "detail": "defs/fish.ts: a round eye with a thin brow line reads neutral or surprised. The red strap is a floating band around the fish body, attached to nothing. The body lathe is faceted (r-fish-close.png, r-fish-close2.png).",
+      "fix": "Heavy angled brow, half-lidded eye and a down-turned mouth decal (or a 'dead fish' X eye). A strap of two bands that wrap both the fish and the stoker seatpost/saddle, with a buckle. More segments on the fish lathe."
+    },
+    {
+      "severity": "minor",
+      "title": "From the chase camera all bikes read as the same thin sliver",
+      "detail": "At chase distance the rider hides the bike. What remains is a ~25 px-wide strip of rear tyre (s-game-chase-crops.jpg, s-game-rear-zoom.jpg). Roadbike, MTB and erba look identical from behind, and the roadbike's 01 plate faces sideways.",
+      "fix": "Give each bike a rear-facing signature above the rear tyre: roadbike tail plate or red tail light, MTB orange mudguard, erba wider chrome rack and red reflector, kidbike pastel fender. Fatter rear tyres from issue 4 also help."
+    },
+    {
+      "severity": "minor",
+      "title": "Rival tint wipes out signature colours",
+      "detail": "build/partset.ts tintColors repaints every part with paint > 0, including the shared bike's fenders and chain case and the erba's chain case (r-lineup-tint.png, s-lineup-var-s.jpg). A blue 共享单车 or a blue 二八大杠 loses its whole joke. Dark accent tints (#2a2a2a) turn the roadbike, MTB and fixie frames black.",
+      "fix": "Tint only the main tubes (or an accent stripe or decal). Leave signature parts unpainted: shared bike yellow fenders, chain case and basket; erba black chain case and chrome. Lift tints whose luminance is below ~0.2."
+    },
+    {
+      "severity": "minor",
+      "title": "Kid-bike streamers are rigid flat cards",
+      "detail": "defs/kidbike.ts streamers rotate as one stiff bundle (animate.ts set(s, X, ...)) and have no outline. At speed they are straight sticks (r-kidbike-side.png).",
+      "fix": "Split each streamer into 2-3 bones with phase-lagged sway, and give them a 0.003 outline or a two-tone colour."
+    },
+    {
+      "severity": "minor",
+      "title": "cross-unit: garage turntable shows the bikes small and passes through edge-on views",
+      "detail": "ui-screens garage: the bike fills only ~25 % of the screen, and the full 360° spin shows edge-on frames: the MTB becomes a thin vertical line in gr-4.png (s-garage.jpg). This hides the bikes in the one place they are meant to be shown off.",
+      "fix": "(ui-screens) Swing ±60° around a 3/4 view instead of a full spin, and frame the bike at ~45 % of screen height."
+    }
+  ]
+}

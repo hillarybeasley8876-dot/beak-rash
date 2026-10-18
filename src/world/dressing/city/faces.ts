@@ -48,8 +48,8 @@ export function gateFace(atlas: SignAtlas, title: string, sub: string): AtlasRec
     g.fillStyle = '#0d0a16';
     g.fillRect(0, 0, w, h);
     frameTube(g, 8, 8, w - 16, h - 16, '#ffe600', 4);
-    tube(g, title, w / 2, h * 0.42, fit(g, title, FONT.cn, h * 0.56, w - 80), '#ff2d95', FONT.cn);
-    tube(g, sub, w / 2, h * 0.8, fit(g, sub, FONT.en, h * 0.2, w - 160), '#22e8ff', FONT.en);
+    tube(g, title, w / 2, h * 0.38, fit(g, title, FONT.cn, h * 0.46, w - 80), '#ff2d95', FONT.cn);
+    tube(g, sub, w / 2, h * 0.8, fit(g, sub, FONT.en, h * 0.15, w - 160), '#22e8ff', FONT.en);
   });
 }
 

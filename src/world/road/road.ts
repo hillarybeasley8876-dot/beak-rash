@@ -5,17 +5,17 @@ import { toonRamp } from '../../render/toon';
 import type { TrackFrame } from '../../core/types';
 import type { WorldCtx } from '../ctx';
 import { GridGeo, MeshBuf, frameOffset } from '../geom';
-import { CURB_W } from '../layout/query';
+import { CURB_BLOCK, CURB_W } from '../layout/query';
 import { SURFACES, type SideSamples } from '../layout/sides';
 import { ROAD_PERIOD, asphaltTexture, grainTexture } from './textures';
 
-export const SHOULDER_COLORS: Record<string, string> = {
+const SHOULDER_COLORS: Record<string, string> = {
   road: '#73767d', curb: '#73767d', grass: '#7dbb52', sand: '#f1dfab', dirt: '#b98d5a', water: '#4fb6c9', wall: '#8a8a8a',
 };
 const CURB_H = 0.03;
 
 /** Visual s range of the road (run-up before the start, run-off after the finish). */
-export function roadRange(ctx: WorldCtx): { s0: number; s1: number } {
+function roadRange(ctx: WorldCtx): { s0: number; s1: number } {
   return { s0: ctx.L.sMin, s1: ctx.L.sMin + ctx.L.n - 1 };
 }
 
@@ -25,17 +25,22 @@ export function buildRoad(ctx: WorldCtx): void {
   const rows = Math.round(s1 - s0) + 1;
   const hw = L.halfWidth;
   const fr = q.frameVis(0);
-  // ---- asphalt
+  // ---- asphalt (vertex colours: large-scale tone drift so the 12 m texture period never reads)
   const asphalt = new GridGeo(rows, 2);
+  const tone = new Color();
   for (let r = 0; r < rows; r++) {
     const s = s0 + r;
     q.frameVis(s, fr);
     const v = s / ROAD_PERIOD;
     asphalt.set(r, 0, frameOffset(fr, -hw, 0), fr.up, 0, v);
     asphalt.set(r, 1, frameOffset(fr, hw, 0), fr.up, 1, v);
+    const base = 0.97 + 0.04 * Math.sin(s * 0.071 + 1.3) + 0.025 * Math.sin(s * 0.173 + 0.4) + 0.015 * Math.sin(s * 0.41 + 2.1);
+    const skew = 0.02 * Math.sin(s * 0.047 + 0.7);
+    asphalt.color(r, 0, tone.setScalar(base - skew));
+    asphalt.color(r, 1, tone.setScalar(base + skew));
   }
-  const roadMat = ctx.own(new MeshToonMaterial({ map: ctx.own(asphaltTexture(app.renderer, hw)), gradientMap: toonRamp() }));
-  const road = new Mesh(ctx.own(asphalt.build()), roadMat);
+  const roadMat = ctx.own(new MeshToonMaterial({ map: ctx.own(asphaltTexture(app.renderer, hw)), gradientMap: toonRamp(), vertexColors: true }));
+  const road = new Mesh(ctx.own(asphalt.build({ colors: true })), roadMat);
   road.name = 'road';
   road.receiveShadow = true;
   ctx.group.add(road);
@@ -75,14 +80,13 @@ function shoulderColor(sd: SideSamples, i: number): string {
 function buildCurbs(ctx: WorldCtx, fr: TrackFrame): void {
   const { q, L } = ctx;
   const hw = L.halfWidth;
-  const BLOCK = 1.5;
+  const BLOCK = CURB_BLOCK;
   const red = new Color('#e5191c'), white = new Color('#f6f4ef');
   const profile: Array<[number, number]> = [[0, 0], [0.1, CURB_H], [CURB_W - 0.1, CURB_H], [CURB_W, 0]];
   const quads: Array<{ side: -1 | 1; s: number; color: Color }> = [];
   for (const side of [-1, 1] as const) {
-    const flags = side < 0 ? q.curbL : q.curbR;
     for (let s = Math.ceil(L.sMin / BLOCK) * BLOCK; s + BLOCK <= L.sMin + L.n - 1; s += BLOCK) {
-      if (!flags[q.sampleAt(s)] || !flags[q.sampleAt(s + BLOCK)]) continue;
+      if (!q.curbAt(s + BLOCK / 2, side)) continue;
       quads.push({ side, s, color: Math.round(s / BLOCK) % 2 === 0 ? red : white });
     }
   }

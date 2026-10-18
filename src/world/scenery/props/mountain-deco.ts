@@ -20,7 +20,7 @@ const rot = new Quaternion(), eul = new Euler(), pos = new Vector3(), scl = new 
 export function lantern(props: MeshBuf, glow: MeshBuf, x: number, y: number, z: number, rng: Rng, scale = 1): void {
   const r = 0.34 * scale, h = 0.4 * scale, cap = 0.11 * scale;
   const cy = y - cap - h * 0.92;
-  sphere(glow, trs(x, cy, z, 0, r, h, r, m), rng.pick(PAL.lantern), 8, 6);
+  sphere(glow, trs(x, cy, z, 0, r, h, r, m), rng.pick(PAL.lantern), 7, 5);
   cylinder(props, trs(x, y - cap, z, 0, r * 0.52, cap, r * 0.52, m), PAL.cap, 8);
   cylinder(props, trs(x, cy - h * 0.98, z, 0, r * 0.5, cap, r * 0.5, m), PAL.cap, 8);
   cylinder(props, trs(x, cy - h - 0.34 * scale, z, 0, 0.035 * scale, 0.3 * scale, 0.035 * scale, m), PAL.tassel, 4, 1, 1, false);

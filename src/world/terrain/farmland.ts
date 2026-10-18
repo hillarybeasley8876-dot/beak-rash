@@ -5,9 +5,11 @@ import { Color } from 'three';
 import { smoothstep } from '../../core/math';
 import type { Noise2 } from './noise';
 
-/** Crop colours: wheat, young crop, lavender, olive grove, ploughed earth, sunflowers. */
-const PALETTE = ['#e6c35c', '#a3cf5a', '#a58bd3', '#6f9a45', '#c49461', '#f3cf37'].map((h) => new Color(h));
-const HEDGE = new Color('#4d7a35');
+/** Crop colours (wheat, young crop, lavender, olive grove, ploughed earth, sunflowers), toned 28 % toward
+ *  grey-green so the quilt sits behind the near scenery instead of shouting over it. */
+const MUTE = new Color('#9aa878');
+const PALETTE = ['#e6c35c', '#a3cf5a', '#a58bd3', '#6f9a45', '#c49461', '#f3cf37'].map((h) => new Color(h).lerp(MUTE, 0.28));
+const HEDGE = new Color('#557d3c');
 
 /**
  * Farm weight (0..1) of a far-grid vertex: u = metres beyond the drivable edge, ny = normal.y,
@@ -35,10 +37,13 @@ vec3 farmField(vec2 xz, out float hedge) {
   int k = int(floor(h * 6.0));
   vec3 c = uFarmPal[0];
   for (int i = 1; i < 6; i++) if (i == k) c = uFarmPal[i];
-  float along = fract(h * 13.37) < 0.5 ? f.x * 78.0 : f.y * 54.0;
-  c *= 1.0 - 0.14 * smoothstep(0.3, 0.5, abs(fract(along / 3.4) - 0.5));
+  // Furrows (3.4 m) and hedges (1-2 m) fade out once they shrink below a few pixels (no moire far off).
+  float along = (fract(h * 13.37) < 0.5 ? f.x * 78.0 : f.y * 54.0) / 3.4;
+  float fur = 1.0 - smoothstep(0.12, 0.35, fwidth(along));
+  c *= 1.0 - 0.14 * fur * smoothstep(0.3, 0.5, abs(fract(along) - 0.5));
   vec2 e = min(f, 1.0 - f) * vec2(78.0, 54.0);
-  hedge = 1.0 - smoothstep(1.0, 2.0, min(e.x, e.y));
+  float he = min(e.x, e.y), hw = fwidth(he);
+  hedge = (1.0 - smoothstep(1.0 - hw, 2.0 + hw, he)) * (1.0 - 0.7 * smoothstep(0.6, 2.5, hw));
   return c;
 }`;
 /** Runs after the vertex colour is applied (grainC comes from the map chunk). */

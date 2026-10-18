@@ -1,8 +1,8 @@
 // Results screen building blocks: standings table, podium (+ victory / defeat lines), grade stamp + quote,
-// coin counter, achievement chips. Line picks are seeded by the race so a re-mount says the same thing.
+// coin counter (achievements live in results-achievements.ts). Line picks are seeded by the race, so a
+// re-mount says the same thing.
 import type { RaceResult } from '../../core/contracts';
 import { Rng } from '../../core/rng';
-import { ACHIEVEMENTS, type AchievementDef } from '../../data/achievements';
 import { ROSTER } from '../../data/roster';
 import { GRADE_QUOTES } from '../../data/strings';
 import { fishSvg, h, headSvg, jagged, portrait, reducedMotion, starSvg, svg } from '../p5';
@@ -48,7 +48,7 @@ export function podium(results: RaceResult[], seed: number): HTMLDivElement {
   top.forEach((r, i) => {
     const def = ROSTER[r.character];
     el.append(h('div', { class: `br-pod is-p${i + 1}${r.isPlayer ? ' is-player' : ''}`, vars: { '--delay': `${380 + i * 110}ms`, '--clip': jagged(`pod${i}`, { jx: 3, jy: 3, notches: 1 }) } },
-      h('div', { class: 'br-pod-frame' }, portrait(r.character, { mood: i === 0 ? 'smug' : 'main' })),
+      h('div', { class: 'br-pod-frame' }, portrait(r.character, { mood: 'smug' })),
       h('div', { class: 'br-pod-plate' }, h('b', { text: def.name }), h('span', { text: def.codename })),
       h('div', { class: 'br-pod-block' }, h('span', { text: String(i + 1) })),
       podiumLine(r, i + 1, seed)));
@@ -56,15 +56,32 @@ export function podium(results: RaceResult[], seed: number): HTMLDivElement {
   return el;
 }
 
+/** Rubber-stamp ink: speckled holes + a slightly wobbly edge (filter referenced by results.css). */
+const INK_FILTER = `<svg width="0" height="0" aria-hidden="true"><filter id="br-ink" x="-8%" y="-8%" width="116%" height="116%">
+<feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="2" seed="4" result="n"/>
+<feColorMatrix in="n" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -9 6.4" result="holes"/>
+<feComposite in="SourceGraphic" in2="holes" operator="in" result="speckled"/>
+<feTurbulence type="turbulence" baseFrequency="0.045" numOctaves="2" seed="9" result="warp"/>
+<feDisplacementMap in="speckled" in2="warp" scale="4" xChannelSelector="R" yChannelSelector="G"/>
+</filter></svg>`;
+
 export function gradeBlock(reward: Reward, seed: number): HTMLDivElement {
   const quote = pickLine(GRADE_QUOTES[reward.grade.grade], seed);
   return h('div', { class: `br-grade is-${reward.grade.grade.toLowerCase()}` },
-    h('div', { class: 'br-grade-stamp' }, svg(starSvg({ points: 16, inner: 0.82, fill: 'none', stroke: '#e5191c', strokeWidth: 9, seed: 'stamp' }), 'br-grade-ring'), h('b', { text: reward.grade.grade })),
+    h('div', { class: 'br-grade-stamp' },
+      svg(INK_FILTER, 'br-grade-defs'),
+      svg(starSvg({ points: 16, inner: 0.82, fill: 'none', stroke: '#e5191c', strokeWidth: 9, seed: 'stamp' }), 'br-grade-ring'),
+      h('div', { class: 'br-grade-ink' }, h('b', { text: reward.grade.grade }))),
     h('div', { class: 'br-grade-title' }, h('small', { text: 'RANK' }), h('span', { text: reward.grade.title })),
     quote ? h('div', { class: 'br-grade-quote', text: quote }) : null);
 }
 
-export interface CoinCounter { el: HTMLDivElement; tick(dt: number): boolean }
+export interface CoinCounter {
+  el: HTMLDivElement;
+  tick(dt: number): boolean;
+  /** Jump to the end (a press during the count-up skips the show). */
+  skip(): void;
+}
 
 /** +coins count-up with the balance rolling alongside; tick() returns true while counting. */
 export function coinCounter(reward: Reward, sfx: (id: string) => void): CoinCounter {
@@ -91,33 +108,16 @@ export function coinCounter(reward: Reward, sfx: (id: string) => void): CoinCoun
       bal.textContent = String(Math.round(reward.balanceBefore + (reward.balanceAfter - reward.balanceBefore) * eased));
       if (k > 0 && k < 1 && t - lastSfx > 0.07) {
         lastSfx = t;
-        sfx('ui.coin');
+        sfx('ui.count');
       }
-      if (k >= 1) el.classList.add('is-done');
+      if (k >= 1) {
+        el.classList.add('is-done');
+        if (reward.coins > 0) sfx('ui.coin');
+      }
       return k < 1;
     },
+    skip() {
+      if (t < dur) t = dur - 1e-6;
+    },
   };
-}
-
-const MAX_CHIPS = 3;
-const LONG_NAME = 6;
-
-function chip(a: AchievementDef, i: number): HTMLDivElement {
-  return h('div', { class: `br-ach-chip${[...a.name].length > LONG_NAME ? ' is-long' : ''}`, vars: { '--delay': `${1700 + i * 140}ms` }, title: a.desc },
-    h('i', { class: 'br-ach-icon' }, svg(starSvg({ points: 12, inner: 0.78, fill: '#e5191c', stroke: '#0b0b0f', strokeWidth: 10, seed: `ach-${a.id}` })), h('b', { class: 'br-ach-glyph', text: a.icon })),
-    h('b', { class: 'br-ach-name', text: a.name }), h('span', { class: 'br-ach-desc', text: a.desc }));
-}
-
-/** Achievements unlocked this race (catalogue order): up to three chips, then "+N" for the rest. */
-export function achievementChips(ids: readonly string[]): HTMLDivElement {
-  const list = ACHIEVEMENTS.filter((a) => ids.includes(a.id));
-  const rest = list.slice(MAX_CHIPS);
-  const el = h('div', { class: `br-ach${list.length > 2 ? ' is-many' : ''}` }, h('span', { class: 'br-tag is-white br-ach-tag', text: list.length ? '新成就' : '成就' }));
-  if (!list.length) el.append(h('span', { class: 'br-ach-none', text: '本场无新成就，下次一定。' }));
-  list.slice(0, MAX_CHIPS).forEach((a, i) => el.append(chip(a, i)));
-  if (rest.length) {
-    el.append(h('div', { class: 'br-ach-more', vars: { '--delay': `${1700 + MAX_CHIPS * 140}ms` }, title: rest.map((a) => a.name).join(' · ') },
-      h('b', { text: `+${rest.length}` }), h('span', { text: 'MORE' })));
-  }
-  return el;
 }

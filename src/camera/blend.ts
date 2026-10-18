@@ -3,13 +3,14 @@
 // arcs around the rider (cylindrical lerp of radius / azimuth / height about the anchor's up axis) instead
 // of flying a straight world line through traffic, and its orientation slerps in the same frame.
 // Short residual blends stretch (up to 0.35 s) so the camera never exceeds ~15 m/s / 480°/s relative to the
-// rider; starts too far from the chase pose (> 90° or > 12 m) hard-cut on the release whoosh instead of
-// whipping ~170° across the scene in a third of a second.
+// rider; starts too far from the chase pose hard-cut on the release whoosh instead of whipping across the
+// scene: > 12 m away, or a turn whose peak rate would exceed 300°/s (≈ 56° in 0.35 s: 5°/frame at 60 fps,
+// 10°/frame at 30 fps), since an unblurred whip that fast strobes.
 import { Quaternion, Vector3, type PerspectiveCamera } from 'three';
 import { DEG, lerp, wrapAngle } from '../core/math';
 import type { CamPose } from './chase';
 
-export const BLEND = { cutAngle: 90 * DEG, cutDist: 12, maxSpeed: 15, maxTurn: 480 * DEG, maxDur: 0.35 };
+export const BLEND = { cutRate: 300 * DEG, cutDist: 12, maxSpeed: 15, maxTurn: 480 * DEG, maxDur: 0.35 };
 
 /** Peak rate of the smootherstep ramp relative to its average. */
 const PEAK = 1.875;
@@ -80,13 +81,13 @@ export class Blend {
       const dist = this.from.pos.distanceTo(pose.pos);
       this.lastGap.angle = ang;
       this.lastGap.dist = dist;
-      if (ang > BLEND.cutAngle || dist > BLEND.cutDist) {
+      const need = PEAK * Math.max(dist / BLEND.maxSpeed, ang / BLEND.maxTurn);
+      this.dur = Math.max(this.dur, Math.min(BLEND.maxDur, need));
+      if ((PEAK * ang) / this.dur > BLEND.cutRate || dist > BLEND.cutDist) {
         this.t = 1;
         this.cuts++;
         return;
       }
-      const need = PEAK * Math.max(dist / BLEND.maxSpeed, ang / BLEND.maxTurn);
-      this.dur = Math.max(this.dur, Math.min(BLEND.maxDur, need));
       this.rel.pos.copy(this.from.pos).sub(anchor.pos).applyQuaternion(this.inv);
       this.rel.quat.copy(this.inv).multiply(this.from.quat);
       this.rel.fov = this.from.fov;

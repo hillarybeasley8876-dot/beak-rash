@@ -1,5 +1,6 @@
 // loading: P5 calendar date card (today, 宜/忌 of the day, track weather), track title, meme tip, road-shaped progress
-// bar with a pedalling pelican. Stays up a short beat so the card can be read (leave()).
+// bar with a pedalling pelican. Stays up ≥ 2 s so the tip can be read (leave()); the new race's sim
+// clock is held meanwhile, so its intro starts when the card goes.
 import './loading.css';
 import type { TrackId } from '../../core/types';
 import { LOADING_ART } from '../../data/assets';
@@ -23,7 +24,10 @@ const WEATHER_ICON: Record<TrackId, string> = {
 const luckRow = (kind: 'good' | 'bad', mark: string, text: string): HTMLDivElement =>
   h('div', { class: `is-${kind}${[...text].length > 4 ? ' is-long' : ''}` }, h('i', { text: mark }), h('span', { text }));
 
-const MIN_SHOW_MS = 900;
+/** From mount (under the cover wipe): long enough to read the tip after it lands. */
+const MIN_SHOW_MS = 2000;
+/** Clock layer that keeps the freshly built race (intro flyover, countdown) frozen behind the card. */
+const HOLD_LAYER = 'ui:loading';
 const MIN_SHOW_DIRECT_MS = 250;
 
 export const loadingScreen: ScreenFactory = (ctx) => {
@@ -56,7 +60,7 @@ export const loadingScreen: ScreenFactory = (ctx) => {
     h('div', { class: 'br-load-blurb', text: info.blurb }));
 
   const tip = TIPS[Math.floor(Math.random() * TIPS.length)] ?? '';
-  const tipBox = h('div', { class: 'br-load-tip br-anim-rise', vars: { '--clip': jagged('tip', { jx: 1.5, jy: 7, notches: 2 }), '--delay': '120ms' } },
+  const tipBox = h('div', { class: 'br-load-tip br-anim-rise', vars: { '--clip': jagged('tip', { jx: 1.5, jy: 7, notches: 2 }), '--delay': '0ms' } },
     h('span', { class: 'br-tag is-red br-load-tip-tag', text: 'TIPS 小贴士' }),
     h('p', { text: tip }));
 
@@ -103,9 +107,17 @@ export const loadingScreen: ScreenFactory = (ctx) => {
       const left = minShow - (performance.now() - t0);
       target = 1;
       setBar(Math.max(shown, 0.98));
-      await wait(Math.max(120, left));
+      ctx.app.clock.setScale(HOLD_LAYER, 0);
+      try {
+        await wait(Math.max(120, left));
+      } finally {
+        ctx.app.clock.clearScale(HOLD_LAYER);
+      }
       setBar(1);
     },
-    dispose: off,
+    dispose: () => {
+      off();
+      ctx.app.clock.clearScale(HOLD_LAYER);
+    },
   };
 };

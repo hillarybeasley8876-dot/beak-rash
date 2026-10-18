@@ -21,7 +21,7 @@ const WALLS: Record<string, WallDef> = {
   corner: W({ tall: 0.3, widths: [7, 12] }),
   street: W({ front: [2.6, 3.4], tall: 0.08, floors: [2, 5], widths: [7, 12] }),
   scramble: W({ front: [7, 10], tall: 0.85, widths: [16, 26], back: 0.9 }),
-  arcade: W({ front: [0.4, 0.8], tall: 0, floors: [2, 4], widths: [6, 10], back: 0.8 }),
+  arcade: W({ front: [1.6, 2.2], tall: 0, floors: [2, 4], widths: [6, 10], back: 0.8 }),
   chicane: W({ front: [2.5, 4], tall: 0.15, widths: [7, 12] }),
   ramp: W({ front: [4, 9], tall: 0.4, floors: [3, 7], widths: [10, 18] }),
   expressway: W({ front: [5, 10], tall: 0.5, floors: [4, 8], widths: [12, 20] }),
@@ -103,7 +103,7 @@ export function skyline(c: City): void {
       const w = rng.range(16, 30), dd = rng.range(16, 30);
       if (!c.lots.fits(sp.pos.x, sp.pos.z, sp.faceRoad, w, dd, 6)) continue;
       c.lots.claim(sp.pos.x, sp.pos.z, sp.faceRoad, w, dd);
-      skylineBlock(c.cb.far.at(sp.pos.x, sp.pos.z), sp.pos.x, STREET, sp.pos.z, sp.faceRoad, w, dd, rng.range(40, 130), rng);
+      skylineBlock(c.cb.far.at(sp.pos.x, sp.pos.z), sp.pos.x, STREET, sp.pos.z, sp.faceRoad, w, dd, rng.range(40, 130), rng, c.cb.lights.at(sp.pos.x, sp.pos.z));
     }
   }
 }

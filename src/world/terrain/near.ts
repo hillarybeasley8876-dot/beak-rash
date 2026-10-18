@@ -1,13 +1,16 @@
 // Near terrain: one ribbon per side from the drivable edge out to ~52 m, rows every 2 m, sharing
 // the road edge vertices exactly (no seams). Chunked so camera and shadow frustum culling work.
-// Also answers exact ground-height queries for prop placement (same triangles as rendered).
+// Also answers exact ground-height queries for prop placement (same triangles as rendered; on
+// craggy rock faces the bands are pushed back, terrain/crag.ts, so heights there are approximate).
 import { Color, Mesh, Vector3 } from 'three';
 import type { TrackFrame } from '../../core/types';
 import type { WorldCtx } from '../ctx';
+import type { GroundDef } from '../layout/types';
 import { GridGeo, frameOffset } from '../geom';
+import { cragOffset, wallHeight, type CragOffset } from './crag';
 import { terrainMat } from './material';
 import type { TerrainField } from './field';
-import { WALL_TOE, groundColor, isShore } from './profile';
+import { WALL_TOE, groundColor, isShore, tintNoise } from './profile';
 
 /** Column offsets beyond the drivable edge (m). Dense near the edge for walls, steps and beaches. */
 export const NEAR_U = [0, WALL_TOE, 0.15, 0.35, 0.6, 0.9, 1.25, 1.8, 2.4, 3, 4.6, 6.6, 9, 12, 16, 21, 27, 34, 42, 52];
@@ -65,12 +68,13 @@ export function buildNearTerrain(ctx: WorldCtx, field: TerrainField): NearRibbon
   const mat = terrainMat(ctx);
   const fr: TrackFrame = q.frameVis(0);
   const edge = new Vector3(), p = new Vector3(), rh = new Vector3();
+  const crag: CragOffset = { out: 0, up: 0 };
   const ribbons: NearRibbon[] = [];
   for (const side of [-1, 1] as const) {
     const scale = foldScale(ctx, field, side, s0, rows);
     const h = new Float32Array(rows * cols);
     const pos = new Float32Array(rows * cols * 3);
-    const mats: string[] = new Array(rows * cols);
+    const mats = new Array<GroundDef['mat']>(rows * cols);
     const shore = new Uint8Array(rows);
     for (let r = 0; r < rows; r++) {
       const s = s0 + r * ROW_STEP;
@@ -81,11 +85,17 @@ export function buildNearTerrain(ctx: WorldCtx, field: TerrainField): NearRibbon
       rh.set(fr.right.x, 0, fr.right.z).normalize().multiplyScalar(side);
       const edgeY = edge.y;
       shore[r] = isShore(g) ? 1 : 0;
+      const wallH = L.def.crags ? wallHeight(g, edgeY, fr.pos.y) : 0;
       for (let c = 0; c < cols; c++) {
         const u = colU(c, scale[r] ?? 1);
         p.copy(edge).addScaledVector(rh, u);
         const res = c === 0 && !g.detached ? { h: edgeY, bump: null } : field.shape(g, edgeY, fr.pos.y, u, p.x, p.z);
         if (field.mod && c > 0) res.h = field.mod.height(s, side, u, p.x, p.z, res.h);
+        if (wallH > 0 && c > 0) {
+          cragOffset(field.noise, s, c, u, res.h - edgeY, g, wallH, crag);
+          p.addScaledVector(rh, crag.out);
+          res.h += crag.up;
+        }
         const k = r * cols + c;
         h[k] = res.h;
         pos[k * 3] = p.x; pos[k * 3 + 1] = res.h; pos[k * 3 + 2] = p.z;
@@ -120,7 +130,9 @@ export function buildNearTerrain(ctx: WorldCtx, field: TerrainField): NearRibbon
 }
 
 /** Vertex colours from material, height and steepness (the colour attribute shares geo.col). */
-function colorize(nrm: Float32Array, geo: GridGeo, mats: string[], shore: Uint8Array, field: TerrainField, r0: number, r1: number, cols: number, side: -1 | 1): void {
+function colorize(
+  nrm: Float32Array, geo: GridGeo, mats: Array<GroundDef['mat']>, shore: Uint8Array, field: TerrainField, r0: number, r1: number, cols: number, side: -1 | 1,
+): void {
   const c = new Color();
   for (let r = r0; r <= r1; r++) {
     for (let col = 0; col < cols; col++) {
@@ -128,10 +140,10 @@ function colorize(nrm: Float32Array, geo: GridGeo, mats: string[], shore: Uint8A
       const vi = (r - r0) * cols + cc;
       const x = geo.pos[vi * 3] ?? 0, y = geo.pos[vi * 3 + 1] ?? 0, z = geo.pos[vi * 3 + 2] ?? 0;
       const n = field.noise.get(x / 23, z / 23);
-      const mat = (mats[r * cols + col] ?? 'grass') as 'sand' | 'grass' | 'rock' | 'dirt' | 'stone';
+      const mat = mats[r * cols + col] ?? 'grass';
       // The flat toe at a wall's foot takes the face's colour (no grass seam along rock walls).
       const ny = (NEAR_U[col] ?? 0) <= WALL_TOE ? Math.min(nrm[vi * 3 + 1] ?? 1, nrm[toeFace(vi, side) * 3 + 1] ?? 1) : nrm[vi * 3 + 1] ?? 1;
-      groundColor(mat, y, ny, NEAR_U[col] ?? 0, n, shore[r] === 1, c);
+      groundColor(mat, y, ny, NEAR_U[col] ?? 0, n, shore[r] === 1, c, tintNoise(field.noise, x, z));
       geo.color(r - r0, cc, c);
     }
   }

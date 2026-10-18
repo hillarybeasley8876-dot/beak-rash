@@ -1,6 +1,7 @@
 // Crashes and respawns (SPEC §6): launch the body (forward 0.7 v, up 4–7 m/s, lateral, spin 4–9 rad/s)
 // into rider.crash for the actors view, slide the sim body to a stop, then after 2.6 s respawn at a
-// safe x near the crash point: 0.6 s 'respawning' blink, 2 s invulnerability, HP back to ≥ 70 %.
+// safe x near the crash point: 0.6 s 'respawning' blink, 2 s invulnerability, HP back to ≥ 70 %, then a
+// short push-off from standstill up to 6 m/s (forces.ts) instead of popping to speed in one step.
 // End-on into a solid obstacle the body never tunnels through it: low ones (cars, props) are vaulted, high
 // and far enough to pass the far end before dropping to roof height; tall ones (vans, trucks, buses) bounce
 // it back off their tail (or nose), slower than the vehicle, which brakes away from it.
@@ -109,7 +110,7 @@ export function respawnRider(ctx: SimCtx, sr: SimRider): void {
   sr.oilTime = sr.wetTime = 0;
   sr.slip = sr.pitch = 0;
   sr.onRamp = false;
-  sr.carryTime = sr.yawEase = sr.driftExit = sr.crashBack = 0;
+  sr.carryTime = sr.yawEase = sr.driftExit = sr.crashBack = sr.landPitch = sr.scrape = sr.scrapePose = 0;
   sr.wallSide = 0;
   sr.swipeLatch = -1;
   dropStatus(r, 'oiled');
@@ -123,7 +124,7 @@ export function respawningUpdate(sr: SimRider): void {
   if (r.modeTime < T.respawnTime) return;
   r.mode = 'racing';
   r.modeTime = 0;
-  r.speed = T.respawnSpeed;
+  sr.pushOff = T.respawnPushTime;
 }
 
 /** Lateral slot on the asphalt near the crash x with the most room from traffic and riders. */

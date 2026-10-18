@@ -1,0 +1,22 @@
+/* Shell chrome outside the 1920×1080 stage (sized with --s): the pad-only "sound off" chip. */
+.br-sound-chip {
+  position: absolute;
+  left: 50%;
+  top: calc(20px * var(--s));
+  z-index: 7;
+  display: none;
+  align-items: baseline;
+  gap: calc(14px * var(--s));
+  padding: calc(6px * var(--s)) calc(24px * var(--s)) calc(4px * var(--s));
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: calc(26px * var(--s));
+  transform: translateX(-50%) skewX(var(--skew));
+  box-shadow: calc(6px * var(--s)) calc(6px * var(--s)) 0 var(--ink);
+  animation: br-pulse 1.6s ease-in-out infinite;
+}
+.br-ui.needs-sound .br-sound-chip { display: inline-flex; }
+.br-sound-chip b { font-family: var(--f-display); letter-spacing: 0.06em; }
+.br-sound-chip span { font-family: var(--f-cn-block); }
+/* Wrapped Chinese copy on screens and toasts avoids one- or two-glyph widows (the HUD layer is untouched). */
+.br-screens, .br-toasts { text-wrap: pretty; }

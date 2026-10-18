@@ -10,7 +10,11 @@ interface Flair { preset: string; at: Anchor; opts?: BurstOpts; follow?: boolean
 interface SkillFlair { cast?: Flair[]; hit?: Flair[]; end?: Flair[] }
 
 const TABLE: Record<string, SkillFlair> = {
-  'pelican.torpedo': { cast: [{ preset: 'poof', at: 'head', opts: { scale: 0.6 } }], hit: [{ preset: 'scales', at: 'event' }] },
+  // Torpedo hits land 15+ m ahead: a big heavy POW + a fan of scales so the hit reads at that distance.
+  'pelican.torpedo': {
+    cast: [{ preset: 'poof', at: 'head', opts: { scale: 0.6 } }],
+    hit: [{ preset: 'hitHeavy', at: 'event', opts: { scale: 1.5 } }, { preset: 'scales', at: 'event', opts: { scale: 1.6 } }],
+  },
   'pelican.gulp': { cast: [{ preset: 'poof', at: 'head', opts: { color: '#ffd0b0', color2: '#ff9a6a', scale: 0.8 } }], hit: [{ preset: 'sparkle', at: 'event', opts: { color: '#ff9a6a' } }] },
   'pelican.wing': { cast: [{ preset: 'feathers', at: 'body', opts: { count: 8 } }, { preset: 'boost', at: 'body', opts: { color: '#9fdcff' } }] },
   'goose.honk': { cast: [{ preset: 'shout', at: 'head' }] },

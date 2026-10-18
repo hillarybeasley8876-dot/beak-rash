@@ -24,7 +24,7 @@ export const aura: Preset = (k, pos, o) => {
   const g = k.at(pos);
   g.y = o.ground ?? pos.y;
   k.p.colors(g, o.color ?? '#9fe3ff');
-  g.frame = FRAME.ring; g.mode = 2; g.erode = true; g.life = 0.9; g.size0 = 1; g.size1 = 6 * sc;
+  g.frame = FRAME.shock; g.mode = 2; g.erode = true; g.life = 0.9; g.size0 = 1; g.size1 = 6 * sc;
   inherit(g, o, 0.95);
   k.p.emit(g);
   for (let i = 0; i < k.n(10, o); i++) {

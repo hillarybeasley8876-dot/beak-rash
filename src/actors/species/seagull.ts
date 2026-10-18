@@ -22,6 +22,7 @@ const spec: BirdSpec = {
   wing: {
     kind: 'fold', arm: [0.062, 0.055, 0.046], color: GREY, feather: LIGHT, edge: 0x5a6270, chord: [0.05, 0.12, 0.08],
     trail: [-0.8, -0.5, 0.3], primaries: { n: 0, len: 0, w: 0, color: GREY, tip: BLACK, tipFrac: 0 },
+    fan: { n: 5, len: 0.24, w: 0.048, color: GREY, tip: BLACK, tipFrac: 0.45, droop: 0.2, spread: 0.32, seg: 2 },
     fist: { r: [0.048, 0.038, 0.054], color: GREY, toes: 3, curl: true, toeR: 0.018, budget: 170 },
   },
   flank: {
@@ -52,6 +53,7 @@ export const seagull: SpeciesDef = {
   build(b) {
     buildBird(b, J, spec);
     addHelmet(b, { c: [0, 0.762, -0.37], r: [0.123, 0.105, 0.143], pitch: -0.3, color: YELLOW, stripe: 0x1d1d22, strap: { chin: [0, 0.645, -0.43] } });
-    addFry(b, [0.075, 0.67, -0.54], 0.16, [0.2, 0.25, 1.15]);
+    // Fries clamped in the beak, sticking out of its right side (outward, a bit forward and down), not across the face.
+    addFry(b, [0.025, 0.665, -0.565], 0.19, [0, 0.4, -1.75]);
   },
 };

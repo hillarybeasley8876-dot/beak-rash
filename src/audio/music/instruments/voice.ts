@@ -7,6 +7,9 @@ import type { Band } from '../band';
 
 export function osc(b: Band, type: OscillatorType, frequency = 110, detune = 0): OscillatorNode {
   const o = new OscillatorNode(b.ctx, { type, frequency, detune });
+  // Pitch moves (scoops, slides, rips, falls) step once per 4 ms render quantum: inaudible, and the
+  // oscillator stays on the constant-increment path (≈ −10 % of the music's render time).
+  o.frequency.automationRate = 'k-rate';
   o.start(b.ctx.currentTime);
   b.own(o);
   return o;

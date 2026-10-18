@@ -2,7 +2,7 @@
 // counter-lean / tuck, stabilised head that looks at targets, wings/arms IK'd to the grips (or to cue
 // targets) and legs IK'd to the pedals with ankling. Everything in character space (origin = saddle).
 import { Euler, Quaternion, Vector3 } from 'three';
-import { clamp, clamp01, damp, lerp } from '../../core/math';
+import { clamp, clamp01, damp, smoothstep } from '../../core/math';
 import type { SpeciesDef } from '../species/types';
 import type { ArmCue, CueOut } from './cue-types';
 import { ARM, LEG, aimEnd, chainLengths, solveChain, type Chain } from './limb-ik';
@@ -20,6 +20,8 @@ export interface RideInput {
   airborne: boolean;
   /** Look target in character space (null = straight ahead). */
   look: Vector3 | null;
+  /** The bike's bell in character space (null = no bell marker): the right paw's target while ringing. */
+  bell: Vector3 | null;
 }
 
 const e = new Euler(0, 0, 0, 'YXZ');
@@ -39,10 +41,22 @@ export class RidePose {
   legScale = 1;
   armScale = 1;
   private t = 0;
+  /** 1 / mesh squash scale: grip/pedal targets are solved in squashed mesh space so they land after the scale. */
+  private readonly unsquash = new Vector3(1, 1, 1);
   private headYaw = 0;
   private headPitch = 0;
+  /** Bind-space wing normals (left, right): spread wings fan their primaries about them. */
+  private readonly wingN: [Vector3, Vector3];
 
-  constructor(private readonly ps: PoseState, private readonly def: SpeciesDef) {}
+  constructor(private readonly ps: PoseState, private readonly def: SpeciesDef) {
+    const J = def.joints, up = def.meta.armUp;
+    const d = new Vector3(J.wrist[0] - J.elbow[0], J.wrist[1] - J.elbow[1], J.wrist[2] - J.elbow[2]).normalize();
+    const t = new Vector3(up[0], up[1], up[2]);
+    t.addScaledVector(d, -t.dot(d)).normalize();
+    const nL = new Vector3().crossVectors(d, t);
+    const dR = d.clone().setX(-d.x), tR = t.clone().setX(-t.x);
+    this.wingN = [nL, new Vector3().crossVectors(dR, tR)];
+  }
 
   /** Size limbs to the bike: legs reach the far pedal point, wings reach the grips. */
   fit(inp: RideInput): void {
@@ -59,7 +73,12 @@ export class RidePose {
     const sh = ps.rest(B.armL);
     const grip = inp.gripL;
     const d = Math.hypot(sh.x - grip.x, sh.y - (grip.y + this.def.meta.gripDrop), sh.z - grip.z - GRIP_BACK);
-    this.armScale = clamp(d / (0.95 * (a1 + a2)), 1, 1.55);
+    this.armScale = clamp(d / (0.95 * (a1 + a2)), 1, 1.85);
+  }
+
+  /** The mesh is scaled (sx, sy, sx) about the saddle after the pose (view.ts squash/stretch). */
+  squashTo(sx: number, sy: number): void {
+    this.unsquash.set(1 / sx, 1 / sy, 1 / sx);
   }
 
   update(inp: RideInput, cue: CueOut, dt: number): void {
@@ -84,6 +103,7 @@ export class RidePose {
     ps.ls[B.footL] = ps.ls[B.footR] = 1 / this.legScale;
     ps.ls[B.armL] = ps.ls[B.armR] = this.armScale;
     ps.ls[B.handL] = ps.ls[B.handR] = 1 / this.armScale;
+    ps.ls[B.head] = this.def.meta.headScale ?? 1;
     // Spine: tuck folds forward, counter-lean keeps the torso a bit more upright than the bike.
     const pitch = -(tuck * 0.32 + stand * 0.12 + cue.spinePitch + cue.lie * 0.6);
     const roll = -inp.lean * 0.28 - rock * 0.6 + cue.spineRoll;
@@ -93,10 +113,10 @@ export class RidePose {
     ps.fkChain([B.pelvis, B.spine, B.chest]);
     this.neckAndHead(inp, cue, crank, pedalling, dt);
     ps.fkChain([B.clavL, B.clavR]);
-    this.arm(ARM.L, inp.gripL, cue.armL, cue, tuck);
-    this.arm(ARM.R, inp.gripR, cue.armR, cue, tuck);
-    this.leg(LEG.L, inp.pedalL, inp.pedalL.z - inp.pedalR.z, crank);
-    this.leg(LEG.R, inp.pedalR, inp.pedalR.z - inp.pedalL.z, crank + Math.PI);
+    this.arm(ARM.L, inp.gripL, cue.armL, cue, tuck, null);
+    this.arm(ARM.R, inp.gripR, cue.armR, cue, tuck, inp.bell);
+    this.leg(LEG.L, inp.pedalL, inp.pedalL.z - inp.pedalR.z, crank, cue);
+    this.leg(LEG.R, inp.pedalR, inp.pedalR.z - inp.pedalL.z, crank + Math.PI, cue);
   }
 
   private neckAndHead(inp: RideInput, cue: CueOut, crank: number, pedalling: number, dt: number): void {
@@ -116,47 +136,75 @@ export class RidePose {
     }
     this.headYaw = damp(this.headYaw, yaw, 7, dt);
     this.headPitch = damp(this.headPitch, pitch, 7, dt);
-    rot(q, this.headPitch + cue.headPitch - this.stand * 0.05, this.headYaw + cue.headYaw + cue.spin, -inp.lean * 0.45 + cue.headRoll);
+    const sway = Math.sin(crank) * (m.headSway ?? 0) * pedalling;
+    rot(q, this.headPitch + cue.headPitch - this.stand * 0.05, this.headYaw + cue.headYaw + cue.spin + sway, -inp.lean * 0.45 + cue.headRoll);
     q2.copy(ps.mq[B.neck3] as Quaternion).slerp(q, 0.88);
     ps.setModelRot(B.head, q2);
     rot(ps.lq[B.jaw] as Quaternion, -0.75 * cue.jaw, 0, 0);
-    const p = cue.pouch;
-    (ps.lsv[B.pouch] as Vector3).set(1 + p * 0.9, 1 + p * 1.7, 1 + p * 0.35);
+    const p = cue.pouch; // the pouch balloons sideways first, so a gulp shows on both sides of the neck from behind
+    (ps.lsv[B.pouch] as Vector3).set(1 + p * 1.05, 1 + p * 0.5, 1 + p * 0.35);
     ps.fkChain([B.jaw, B.pouch, B.hat]);
   }
 
-  private arm(c: Chain, grip: Vector3, ac: ArmCue, cue: CueOut, tuck: number): void {
+  private arm(c: Chain, grip: Vector3, ac: ArmCue, cue: CueOut, tuck: number, bell: Vector3 | null): void {
     const ps = this.ps, m = this.def.meta, s = c.side;
     // Grip pose: wrist just above/behind the grip, elbows out (more when tucked), feathers trailing down-back.
     target.set(grip.x, grip.y + m.gripDrop, grip.z + GRIP_BACK);
+    if (bell && cue.bellReach > 0) target.lerp(v.set(bell.x, bell.y + m.gripDrop, bell.z + GRIP_BACK), clamp01(cue.bellReach));
+    target.multiply(this.unsquash);
     pole.set(s * (0.9 + tuck * 0.5), 0.05, 0.45);
     w.set(0, -0.8, 0.6);
     const spread = cue.wings;
     if (spread > 0) {
+      // Spread wing: out to the side, swept back ~25°, flapping (turning with the body in the OIIA spin).
       const sh = ps.mp[c.root] as Vector3;
-      target.lerp(v.set(sh.x + s * 0.62, sh.y + 0.1, sh.z + 0.12), spread);
-      pole.lerp(v.set(0, 0.15, 1), spread);
-      w.lerp(v.set(0, 0.05, 1), spread);
+      target.lerp(v.set(s * 0.58, 0.16 + 0.09 * cue.flap, 0.26).applyAxisAngle(UP, cue.spin).add(sh), spread);
+      pole.lerp(v.set(0, 0.15, 1).applyAxisAngle(UP, cue.spin), spread);
+      w.lerp(v.set(0, 0.05, 1).applyAxisAngle(UP, cue.spin), spread);
     }
     if (ac.blend > 0) {
       target.lerp(ac.target, ac.blend);
       pole.lerp(ac.pole, ac.blend);
     }
     bindPole.set(-s * m.armUp[0], m.armUp[1], m.armUp[2]);
+    this.stretchArm(c, target);
     solveChain(ps, c, target, pole, bindPole, w);
     // Hand: wrap forward-down over the bar; free hands continue the forearm (+ cue wrist flick).
     const fore = v.subVectors(ps.mp[c.end] as Vector3, ps.mp[c.mid] as Vector3).normalize();
     const wrap = clamp01(1 - ac.blend - spread);
     const dir = target.set(0, -0.75, -0.7).normalize().multiplyScalar(wrap).addScaledVector(fore, 1 - wrap).normalize();
     if (ac.wrist !== 0) dir.applyAxisAngle(pole.clone().cross(dir).normalize(), ac.wrist);
+    if (spread > 0) dir.setY(dir.y - 0.4 * spread).normalize(); // spread wing: raised arm (dihedral), hand droops ~20°
     const bindFore = pole.subVectors(ps.rest(c.end), ps.rest(c.mid));
     aimEnd(ps, c, bindFore, bindPole, dir, w);
+    if (m.wings) this.fan(c, spread);
+  }
+
+  /** Spread wings grow their primaries fan out of the wrist and swing it out past the hand, swept back (folded,
+   *  the fan is scaled away inside the feather fist); the fist shrinks as it opens into the fan. */
+  private fan(c: Chain, spread: number): void {
+    const ps = this.ps, prim = c.side === -1 ? B.primL : B.primR;
+    (ps.lq[prim] as Quaternion).setFromAxisAngle(this.wingN[c.side === -1 ? 0 : 1], -2.45 * spread);
+    ps.ls[prim] = smoothstep(0.05, 0.45, spread);
+    ps.ls[c.end] = (ps.ls[c.end] ?? 1) * (1 - 0.45 * spread);
+    ps.fk(prim);
+  }
+
+  /** Stretchy arm: a lean or squash/stretch that pulls the target out of reach lengthens the limb (≤ +15 %). */
+  private stretchArm(c: Chain, tgt: Vector3): void {
+    const ps = this.ps;
+    ps.ls[c.root] = this.armScale;
+    ps.fk(c.root);
+    const [a1, a2] = chainLengths(ps, c);
+    const k = clamp(tgt.distanceTo(ps.mp[c.root] as Vector3) / ((a1 + a2) * (ps.msc[c.root] ?? 1) * 0.985), 1, 1.15);
+    ps.ls[c.root] = this.armScale * k;
+    ps.ls[c.end] = 1 / (this.armScale * k);
   }
 
   /** Ankle target for a pedal (feet ride slightly above/behind the pedal axle). */
   private pedalTarget(c: Chain, pedal: Vector3, out: Vector3): Vector3 {
     const l = this.def.meta.ankleLift;
-    return out.set(pedal.x + c.side * l[0], pedal.y + l[1], pedal.z + l[2]);
+    return out.set(pedal.x + c.side * l[0], pedal.y + l[1], pedal.z + l[2]).multiply(this.unsquash);
   }
 
   /** Pull the pelvis back toward the pedals when standing/bobbing would overstretch a leg. */
@@ -183,9 +231,10 @@ export class RidePose {
     }
   }
 
-  private leg(c: Chain, pedal: Vector3, dz: number, phase: number): void {
+  private leg(c: Chain, pedal: Vector3, dz: number, phase: number, cue: CueOut): void {
     const ps = this.ps, m = this.def.meta, s = c.side;
     this.pedalTarget(c, pedal, target);
+    const tuck = cue.legTuck;
     if (m.shortLegs) {
       // Legs too short for the pedals: little feet paddle the air in time with the crank.
       const hip = ps.rest(c.root), [l1, l2] = chainLengths(ps, c);
@@ -193,11 +242,18 @@ export class RidePose {
       target.set(hip.x + s * 0.02, hip.y - (l1 + l2) * 0.72 + Math.sin(phase) * r, hip.z - (l1 + l2) * 0.25 - Math.cos(phase) * r);
     }
     pole.set(s * 0.2, 0.15, -1);
+    if (tuck > 0) {
+      // OIIA spin: feet leave the pedals and tuck under the body, knees turning with the pelvis.
+      const [l1, l2] = chainLengths(ps, c);
+      ps.fk(c.root);
+      w.set(s * 0.05, -(l1 + l2) * 0.55, -(l1 + l2) * 0.35).applyAxisAngle(UP, cue.spin).add(ps.mp[c.root] as Vector3);
+      target.lerp(w, tuck);
+      pole.lerp(v.set(s * 0.2, 0.15, -1).applyAxisAngle(UP, cue.spin), tuck);
+    }
     bindPole.set(s * 0.12, 0.25, -1);
     solveChain(ps, c, target, pole, bindPole, pole);
     // Ankling: toes dip through the bottom of the stroke.
     const ank = -0.08 + 0.2 * Math.sin(phase) + (dz > 0 ? 0.05 : 0);
     aimEnd(ps, c, v.set(0, 0, -1), UP, w.set(0, Math.sin(ank), -Math.cos(ank)), UP);
-    void lerp;
   }
 }

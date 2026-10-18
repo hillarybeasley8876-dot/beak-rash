@@ -5,12 +5,14 @@ import { SKILLS } from '../../../data/skills';
 import type { Session } from '../../../core/contracts';
 import type { GameEvents } from '../../../core/events-map';
 import { el } from '../dom';
-import { Bubbles } from './bubbles';
+import { Bubbles, type BubbleObstacles } from './bubbles';
 import { DamageNumbers } from './damage';
 import { EdgeWarnings } from './edges';
 import { IncomingWarning } from './incoming';
 import type { Projector } from './project';
+import { GaugeOcclusion } from './occlusion';
 import { NameTags } from './tags';
+import { HudZones } from './zones';
 
 const WARN_RANGE = 30;
 
@@ -21,6 +23,11 @@ export class WorldOverlay {
   private damage: DamageNumbers;
   readonly edges: EdgeWarnings;
   readonly incoming: IncomingWarning;
+  /** Static HUD module rects + the keep-clear area above the vanishing point, for this viewport. */
+  readonly zones = new HudZones();
+  private occlusion = new GaugeOcclusion();
+  /** A rider alongside is behind the battle cluster's gauges this frame (the HUD dims them). */
+  gaugesCovered = false;
   private session: Session | null = null;
 
   constructor(private proj: Projector, parent: HTMLElement, edgesParent: HTMLElement) {
@@ -28,7 +35,7 @@ export class WorldOverlay {
     this.tags = new NameTags(this.root);
     this.damage = new DamageNumbers(this.root);
     this.bubbles = new Bubbles(this.root);
-    this.edges = new EdgeWarnings(edgesParent);
+    this.edges = new EdgeWarnings(edgesParent, this.root);
     this.incoming = new IncomingWarning(edgesParent);
   }
 
@@ -71,14 +78,25 @@ export class WorldOverlay {
     this.tags.castFlash(r.id, glyph);
   }
 
-  /** Call after proj.begin() for this frame. */
-  update(dt: number, k: number): void {
+  dispose(): void {
+    this.tags.dispose();
+  }
+
+  /** Layout reads (tag sizes): call at the start of the HUD frame, before any DOM writes. */
+  measure(): void {
+    this.tags.measure();
+  }
+
+  /** Call after proj.begin() for this frame; `dyn` = the quip and chip-column rects (bubbles avoid them). */
+  update(dt: number, k: number, dyn: BubbleObstacles): void {
     const s = this.session;
     if (!s) return;
-    this.tags.update(s, this.proj, k, dt);
-    this.bubbles.update(s, this.proj, k, dt, this.tags.boxes());
+    this.zones.update(this.proj.width, this.proj.height, k);
+    this.tags.update(s, this.proj, this.zones, dyn.callouts, k, dt);
+    this.edges.update(s, this.proj, this.zones, k, dt);
+    this.bubbles.update(s, this.proj, k, dt, [...this.tags.boxes(), ...this.edges.boxes()], this.zones, dyn);
     this.damage.update(this.proj, k, dt);
-    this.edges.update(s, this.proj, k, dt);
+    this.gaugesCovered = this.occlusion.covered(s, this.proj, this.zones.gauges);
     this.incoming.update(s, this.proj, k, dt);
   }
 }

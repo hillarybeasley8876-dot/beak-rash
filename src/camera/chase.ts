@@ -1,26 +1,33 @@
-// Chase camera in track space: s is exact (s − dist), lateral/height/look-at use critically damped
-// springs, so the camera never lags behind at 20 m/s yet absorbs lateral moves and jumps. Distance,
-// height, look-ahead and FOV grow with speed (FOV keeps widening above the bike's top speed); roll follows
-// the lean; heading blends 70/30 tangent/bike. Follow springs run on sim time, so hit-stop freezes them
-// and slow-mo slows them with the world. Crashed: a close, slowly orbiting shot of the tumbling body.
-// The eye rises over solid obstacles in its way (avoid.ts) instead of entering a vehicle.
+// Chase camera in track space: s is exact (dist world metres back along the line at the camera's lateral
+// offset, with the same curve metric as the physics, so the inside or outside of a tight bend never zooms the
+// rider in or out), lateral/height/look-at use critically damped springs, so the camera never lags behind at
+// 20 m/s yet absorbs lateral moves and jumps. Distance, height, look-ahead and FOV grow with speed (FOV keeps
+// widening above the bike's top speed, counter-dollied); roll follows the lean; heading blends 70/30
+// tangent/bike. Follow springs run on sim time, so hit-stop freezes them and slow-mo slows them with the
+// world. Crashed: a close, slowly orbiting shot of the tumbling body (out over the sea for a water crash,
+// horizon kept in frame). The eye slides / lifts past riders hiding the player (occlude.ts) and rises over
+// solid obstacles in its way (avoid.ts) instead of entering a vehicle.
 import { Matrix4, Quaternion, Vector3 } from 'three';
 import { clamp, clamp01, damp, DEG, lerp, springStep } from '../core/math';
 import { Poser } from '../sim/pose';
 import { bikeTune } from '../sim/tuning';
-import { trackEnd } from '../sim/state';
+import { emptyFrame, trackEnd } from '../sim/state';
 import type { Session } from '../core/contracts';
+import type { TrackFrame } from '../core/types';
 import type { Anchor } from './blend';
 import { ObstacleAvoid, type TrackPoint } from './avoid';
+import { RiderOcclude } from './occlude';
 
 export const CHASE = {
   dist: [4.3, 5.1], height: [1.9, 2.2], ahead: [5, 9], fov: [60, 70], // SPEC §6 (hero ≥ 24 % of the height)
   lookHeight: 1.0, minHeight: 1.2, headingBlend: 0.3, rollK: 0.18,
   omegaX: 10, omegaY: 9, omegaLookX: 11, omegaLookY: 9.5,
   airFollow: 0.8, airLook: 0.65, surgeK: 0.04, surgeMax: 0.5,
+  surgeDollyRamp: 2,                  // deg of FOV beyond the speed FOV over which the counter-dolly takes the surge out
   fovOver: 11, overMax: 0.4,          // +deg per 1.0 of speed above the bike's top (capped at +40 % speed)
   crashDist: 4.3, crashHeight: 1.6, crashFov: 58, crashOrbit: 12 * DEG, crashBodyLambda: 20, crashLambda: 4,
-  crashZoomMin: 30, crashRise: 0.15, crashRiseMax: 1.5, // held back by the world edge: zoom (deg floor) + rise per m
+  crashZoomMin: 40, crashRise: 0.15, crashRiseMax: 1.5, // held back by the world edge: zoom (deg floor) + rise per m
+  crashOverWater: 10, crashHorizon: 6, // crash cam: m it may hover past a water edge; deg the horizon keeps below the top
   dipOmega: 13, dipLook: 0.5,         // landing dip spring (1/s) and how much of it the look point shares
   edgeMargin: 1.0,                    // m the eye keeps inside bounds() (cliff faces sit a little inside them)
   riderMid: 0.8,                      // m: the rider point the sight line must reach (obstacle avoidance)
@@ -45,8 +52,9 @@ export class ChaseCam {
   private bodyS = 0; private bodyX = 0; private followS = 0; private followX = 0; private offS = 0; private offX = 0;
   private eye = new Vector3(); private look = new Vector3(); private anchorV = new Vector3(); private fwd = new Vector3();
   private up = new Vector3(); private rt = new Vector3(); private tg = new Vector3();
-  private m = new Matrix4(); private q = new Quaternion();
+  private m = new Matrix4(); private q = new Quaternion(); private fr: TrackFrame = emptyFrame();
   private avoid = new ObstacleAvoid();
+  private occ = new RiderOcclude();
   private eyeT: TrackPoint = { s: 0, x: 0, y: 0 }; private riderT: TrackPoint = { s: 0, x: 0, y: 0 };
 
   /** Snap every spring to the current target (new session, respawn, teleport). */
@@ -73,6 +81,7 @@ export class ChaseCam {
     this.lastSpeed = r.speed;
     this.lastS = r.s;
     this.avoid.reset();
+    this.occ.reset();
   }
 
   /** Landing dip: the camera drops by about `depth` m (peak after ~1/ω s) and springs back. */
@@ -84,6 +93,7 @@ export class ChaseCam {
     return {
       dist: this.dist, height: this.y, ahead: this.ahead, fovBase: this.fovBase, roll: this.roll, surge: this.surge,
       offS: this.offS, offX: this.offX, dip: this.dipY, lift: this.avoid.lift,
+      occSide: this.occ.side, occLift: this.occ.lift,
     };
   }
 
@@ -128,7 +138,11 @@ export class ChaseCam {
     if (crashed) this.orbit += CHASE.crashOrbit * this.orbitSide * dt;
     else {
       this.orbit = 0;
-      this.orbitSide = r.x >= 0 ? 1 : -1; // swing toward the road centre, away from the nearer edge
+      // Swing toward the road centre, away from the nearer edge, unless that edge is the sea: then swing out over
+      // it, so a body that falls in is seen against the beach and the road instead of open water.
+      const side = r.x >= 0 ? 1 : -1;
+      const rb = session.track.bounds(clamp(r.s, 0, trackEnd(session.track)));
+      this.orbitSide = (side > 0 ? rb.rightKind : rb.leftKind) === 'water' ? -side : side;
     }
     this.roll = damp(this.roll, crashed ? 0 : r.lean * CHASE.rollK, 10, dt);
     const hy = CHASE.headingBlend * r.yaw * (1 - this.crashBlend) + this.orbit * this.crashBlend;
@@ -150,20 +164,44 @@ export class ChaseCam {
     [this.ly, this.lyv] = springStep(this.ly, this.lyv, CHASE.lookHeight + r.y * CHASE.airLook, CHASE.omegaLookY, dt);
     [this.dipY, this.dipV] = springStep(this.dipY, this.dipV, 0, CHASE.dipOmega, dt);
     if (this.lookBack && !crashed) return this.lookBackPose(session, kick);
-    const camS = this.followS - this.dist * Math.cos(hy) - this.surge;
+    const camS = this.alongS(session, this.followS, -(this.dist * Math.cos(hy) + this.surge), (this.x + this.followX) / 2);
     const b = session.track.bounds(clamp(camS, 0, trackEnd(session.track)));
-    const camX = clamp(this.x, -b.left + CHASE.edgeMargin, b.right - CHASE.edgeMargin);
+    // The crash cam may hover over the sea past a water edge (nothing solid there), closer to a body that fell in.
+    const sea = lerp(CHASE.edgeMargin, -CHASE.crashOverWater, this.crashBlend);
+    const xMin = -b.left + (b.leftKind === 'water' ? sea : CHASE.edgeMargin);
+    const xMax = b.right - (b.rightKind === 'water' ? sea : CHASE.edgeMargin);
+    this.y = Math.max(this.y, CHASE.minHeight);
+    const eyeY = Math.max(CHASE.minHeight, this.y + this.dipY);
+    // Riders in the camera gap: slide / lift the eye so the hero stays in view (judged from the natural eye).
+    Object.assign(this.eyeT, { s: camS, x: clamp(this.x, xMin, xMax), y: eyeY });
+    Object.assign(this.riderT, { s: this.followS, x: this.followX, y: r.y });
+    this.occ.update(session, this.eyeT, this.riderT, dt, this.eyeT.x - xMin, xMax - this.eyeT.x, !crashed);
+    const camX = clamp(this.x + this.occ.side, xMin, xMax);
     this.offS = camS - r.s;
     this.offX = camX - r.x;
-    this.y = Math.max(this.y, CHASE.minHeight);
     const rise = crashed ? Math.min(CHASE.crashRiseMax, CHASE.crashRise * Math.abs(this.x - camX)) * this.crashBlend : 0;
-    Object.assign(this.eyeT, { s: camS, x: camX, y: Math.max(CHASE.minHeight, this.y + this.dipY) + rise });
-    Object.assign(this.riderT, { s: this.followS, x: this.followX, y: CHASE.riderMid + r.y });
+    Object.assign(this.eyeT, { s: camS, x: camX, y: eyeY + rise + this.occ.lift });
+    this.riderT.y = CHASE.riderMid + r.y;
     this.poser?.place(camS, camX, this.avoid.update(session, this.eyeT, this.riderT, dt), this.eye);
-    this.poser?.place(this.followS + this.ahead, this.lx, this.ly + this.dipY * CHASE.dipLook, this.look);
+    const lookS = this.alongS(session, this.followS, this.ahead, (this.lx + this.followX) / 2);
+    this.poser?.place(lookS, this.lx, this.ly + this.dipY * CHASE.dipLook, this.look);
     if (view) this.look.lerp(view.anchor('body', this.anchorV), this.crashBlend);
     const dist = Math.hypot(this.dist, this.y - CHASE.lookHeight);
-    return this.finish(this.crashZoom(this.fovBase) + kick, this.crashZoom(this.fovRef), dist);
+    const fov = this.crashZoom(this.fovBase) + kick;
+    if (this.crashBlend > 0.001) this.keepHorizon(fov);
+    return this.finish(fov, this.crashZoom(this.fovRef), dist, this.surge);
+  }
+
+  /**
+   * The s that lies `d` world metres from s0 along the road (negative = back) on the line at lateral offset x:
+   * Δs = d / (1 − κ·x), the physics' curve metric, with κ sampled mid-span (one fixed-point refinement).
+   */
+  private alongS(session: Session, s0: number, d: number, x: number): number {
+    const tr = session.track;
+    const end = trackEnd(tr);
+    const metric = (s: number): number => clamp(1 - tr.frameAt(clamp(s, 0, end), this.fr).curvature * x, 0.7, 1.3);
+    const s1 = s0 + d / metric(s0 + d / 2);
+    return s0 + d / metric((s0 + s1) / 2);
   }
 
   /**
@@ -179,6 +217,16 @@ export class ChaseCam {
     return lerp(fov, Math.max(CHASE.crashZoomMin, zoom), this.crashBlend);
   }
 
+  /** Crash cam: never pitch so far down that the horizon leaves the frame (a body in the sea, seen from the road). */
+  private keepHorizon(fov: number): void {
+    this.fwd.subVectors(this.look, this.eye);
+    const flat = Math.hypot(this.fwd.x, this.fwd.z);
+    const limit = -Math.max(0, fov / 2 - CHASE.crashHorizon) * DEG;
+    const pitch = Math.atan2(this.fwd.y, flat);
+    if (pitch >= limit || flat < 1e-3) return;
+    this.look.y = this.eye.y + Math.tan(lerp(pitch, limit, this.crashBlend)) * flat;
+  }
+
   private lookBackPose(session: Session, kick: number): CamPose {
     const r = session.player;
     this.poser?.place(r.s + 4.4, r.x, r.y + 1.75, this.eye);
@@ -188,11 +236,13 @@ export class ChaseCam {
 
   /**
    * Counter-dolly: FOV beyond `ref` (kicks, over-top speed) moves the eye toward the rider (`dist` m away)
-   * so it keeps its on-screen size while the world stretches. Negative kicks (impact punch-ins) stay zooms.
+   * so it keeps its on-screen size while the world stretches; while it does, the acceleration surge (the eye
+   * lagging back) is taken out too, so a boost never shrinks the rider. Negative kicks (punch-ins) stay zooms.
    */
-  private finish(fov: number, ref: number, dist: number): CamPose {
+  private finish(fov: number, ref: number, dist: number, surge = 0): CamPose {
     if (fov > ref + 1e-3 && dist > 0) {
-      const d = dist * (1 - Math.tan((ref * DEG) / 2) / Math.tan((fov * DEG) / 2));
+      const lag = Math.max(0, surge) * clamp01((fov - ref) / CHASE.surgeDollyRamp);
+      const d = lag + dist * (1 - Math.tan((ref * DEG) / 2) / Math.tan((fov * DEG) / 2));
       this.fwd.subVectors(this.look, this.eye).normalize();
       this.eye.addScaledVector(this.fwd, d);
     }

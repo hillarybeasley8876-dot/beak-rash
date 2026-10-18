@@ -70,3 +70,42 @@ export function chainLoop(c1: V3, r1: number, c2: V3, r2: number, perArc: number
   arc(c1, r1, base - phi, base + phi - Math.PI * 2);
   return pts;
 }
+
+/** One-sided strip facing `normal` through a closed loop, resampled into equal segments of about `pitch`,
+ *  each mapped to the full uv tile (u along, v across): one chain link per segment from an atlas tile. */
+export function linkStrip(loop: readonly V3[], halfW: number, pitch: number, normal: V3): BufferGeometry {
+  const lens: number[] = [];
+  let total = 0;
+  for (let i = 0; i < loop.length; i++) {
+    const d = (loop[i] as V3).distanceTo(loop[(i + 1) % loop.length] as V3);
+    lens.push(d);
+    total += d;
+  }
+  const n = Math.max(8, Math.round(total / pitch)), step = total / n;
+  const at = (s: number): Vector3 => {
+    let i = 0;
+    while (i < lens.length - 1 && s > (lens[i] as number)) s -= lens[i++] as number;
+    return (loop[i] as V3).clone().lerp(loop[(i + 1) % loop.length] as V3, s / Math.max(1e-9, lens[i] as number));
+  };
+  const pts = Array.from({ length: n }, (_, k) => at(k * step));
+  const pos: number[] = [], uv: number[] = [], nor: number[] = [], idx: number[] = [];
+  const side = (i: number): Vector3 => {
+    const t = (pts[(i + 1) % n] as Vector3).clone().sub(pts[(i - 1 + n) % n] as Vector3).normalize();
+    return t.cross(normal).normalize().multiplyScalar(halfW);
+  };
+  for (let k = 0; k < n; k++) {
+    const a = pts[k] as Vector3, b = pts[(k + 1) % n] as Vector3, oa = side(k), ob = side(k + 1), base = k * 4;
+    for (const [p, u, v] of [[a.clone().add(oa), 0, 1], [a.clone().sub(oa), 0, 0], [b.clone().add(ob), 1, 1], [b.clone().sub(ob), 1, 0]] as const) {
+      pos.push(p.x, p.y, p.z);
+      uv.push(u, v);
+      nor.push(normal.x, normal.y, normal.z);
+    }
+    idx.push(base, base + 2, base + 1, base + 1, base + 2, base + 3);
+  }
+  const g = new BufferGeometry();
+  g.setAttribute('position', new BufferAttribute(new Float32Array(pos), 3));
+  g.setAttribute('normal', new BufferAttribute(new Float32Array(nor), 3));
+  g.setAttribute('uv', new BufferAttribute(new Float32Array(uv), 2));
+  g.setIndex(idx);
+  return g;
+}

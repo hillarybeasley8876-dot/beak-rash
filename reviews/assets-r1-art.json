@@ -1,0 +1,76 @@
+{
+  "unit": "assets",
+  "round": 1,
+  "lens": "art",
+  "pass": false,
+  "score": 5.5,
+  "summary": "Strong, consistent bold-sticker P5 look (same ink weight, red/black bursts, halftone) and real humour (penguin balance bike, pigeon shrug, sloth tandem with salted-fish passenger, 咸鱼 hammock, capybara onsen). Portrait accents match roster/3D colours, the eyes strips sell the skill/SHOWTIME bands and the KO splash cards read well; manifest valid (66 files, 12 MB, no __br.errors). But it is not shippable: shiba_hurt carries an SS-rune lookalike that appears on the KNOCK OUT splash; 14/18 billboards put their subject's head under the track's text band, so in game you see headless pelicans; the title key art (first impression) has a four-limbed hero, an off-model rival pack and is upscaled 1.41x; and the hero pelican lacks its defining pink-orange pouch in all three core portraits. Several smaller cut-out/anatomy/on-model slips remain. Evidence: shots/review/assets/r1-art/.",
+  "issues": [
+    {
+      "severity": "blocker",
+      "title": "shiba_hurt: paired white lightning bolts in each black lens read as the SS runes, shown on the KO splash",
+      "detail": "public/assets/portraits/shiba_hurt.{webp,png}: the 'cracked' pixel sunglasses were rendered as two parallel white zig-zag bolts per lens (white-on-black, under a black helmet) = the SS sig-rune insignia. hurt busts are the victim card of every KNOCK OUT splash (src/ui/hud/cutins/splashes.ts:30), so it shows at the game's money shot every time the shiba is KO'd; the bolts stay readable under the red X. Hate-symbol lookalike = legal issue in some markets (e.g. Germany) and a store/ratings risk; violates SPEC pillar 5. Evidence: shots/review/assets/r1-art/z_shiba_hurt_glasses.jpg, s_ko_cards.jpg (centre card).",
+      "fix": "Re-roll shiba_hurt with 'pixel sunglasses knocked crooked, one lens with a single jagged white crack line, spiral dizzy eyes visible above/through the glasses, no lightning bolts, no zig-zag symbols', or repaint both lenses solid black with one diagonal crack. Re-check every asset at 2x zoom for paired bolts/runes before shipping."
+    },
+    {
+      "severity": "major",
+      "title": "Billboards break their own 'calm top band' contract: in game the text band hides the characters' heads",
+      "detail": "The manifest promises 'each keeps a calm band at the top for overlaid text' and the track draws a red/black ransom-note band over the top ~45% of every poster (src/world/scenery/signs/faces.ts artBillboard, band = 14 px + 38% h; used by coast, city screens and mountain). Most posters centre their subject vertically, so the joke disappears: coast_1 pelican head, coast_3 heart-sunglasses pelican head (verified in game: s_coast_bbzoom.jpg from r_coast_bb0b/bb1b/bb2b.png), coast_4 penguin face, coast_5 seagull face, city_2 cat face, city_3 claw + pelican, city_5 shiba head, city_6 egg, mountain_1 capybara head + yuzu, mountain_2 the whole sloth, mountain_4 goose head, mountain_5 meatball. Only coast_2, city_1, mountain_3, mountain_6 survive. Simulation of all 18: shots/review/assets/r1-art/b_banded.jpg (bin/band.py).",
+      "fix": "Re-roll (or re-compose) so the subject sits entirely in the lower 55% of the frame with plain sky/flat background above ('the subject fills the lower half, the upper 45% is empty plain sky'); a cheap fallback is to shrink each poster into the lower 55% and extend the background colour upward. Verify every poster with bin/band.py-style simulation and an in-game drive-by before shipping."
+    },
+    {
+      "severity": "major",
+      "title": "Title key art: four-limbed hero, off-model rival pack, upscaled 1.41x, beak tip off-screen",
+      "detail": "public/assets/art/title.webp (first thing the player sees): the pelican has both wings spread AND two gloved hands on the bars (z_title_pelican.jpg); the pack is off-model and incomplete vs SPEC 5 / the prompt: no orange cat and no pigeon, shiba and penguin wear red helmets (should be black / yellow), the sloth wears a blue-grey helmet and holds the seagull's fries, the seagull has no helmet or fry, all ride identical red bikes (z_title_pack.jpg). Only 1344x768 but shown object-fit cover at 1890x1080 on the 1080p title screen (1.41x, 2.8x on Retina: visibly soft in s_ui_zoom.jpg), and the painted red hook sits at x~93% so the title layout crops it off (ui_title.png).",
+      "fix": "Re-roll with 'wings gripping the drop bars (no hands, exactly two wings)', list every rival with its helmet colour and prop (cat red helmet, pigeon teal, shiba black + pixel shades, penguin yellow on a balance bike, seagull yellow + fry, sloth brown on a tandem), keep the hero's beak tip inside the central 75%; deliver >= 1920x1080 (re-generate at higher res or 2x anime upscaler such as Real-ESRGAN), same for garage.webp."
+    },
+    {
+      "severity": "major",
+      "title": "Hero pelican off-model in the core portraits: no pink-orange gular pouch",
+      "detail": "pelican_main/_smug/_hurt (HUD cluster all race long, KO/SHOWTIME cards, menu fallback, settings) show only an orange lower mandible; the SPEC-5 defining 'stretchy pink-orange gular pouch' (Big Gulp skill) is missing, although PROMPTS.md asks for it and the 3D model has it (src/actors/species/pelican.ts POUCH 0xf8a07e). pelican_smug's 'fish tail poking out of the pouch' therefore pokes out of its chest. The hero also drifts across the set: pink pouch in loading_1, flat duck-like spatula beak in pelican_eyes, goggles over the eyes in title/menu/results, no helmet in loading_3. Evidence: c_pelican.jpg, z_pelican_main_dark.jpg, k_cuts.jpg.",
+      "fix": "Re-roll the pelican trio with the pouch as the lead feature ('a big saggy salmon-pink throat pouch hanging under the lower beak, clearly visible, the fish tail sticking out of the pouch') or paint it in with a cutout.py tint pass like the beak-tip fix; lock one model sheet (beak shape, pouch, helmet + goggles on the helmet) and use it as an image reference for every pelican image."
+    },
+    {
+      "severity": "minor",
+      "title": "sloth_eyes: blank white pupil-less discs read as holes in the face; lowest-res strip",
+      "detail": "public/assets/portraits/sloth_eyes.webp: both eyes are flat white circles with no pupil or highlight (SPEC 5 'expressive eyes: sclera + pupil + highlight'); in the skill / rival cut-in band they look like punched holes or a horror effect, not 'snapping wide open' (s_eyes_band.jpg bottom-left, z_sloth_eyes.jpg). Also the smallest strip (968x553) after the --frame crop.",
+      "fix": "Re-roll: 'wide-open eyes with tiny black pupils and bright highlights, small yellow electric sparks around the eye patches', or paint pupils + highlights in; keep the strip >= 1200 px wide."
+    },
+    {
+      "severity": "minor",
+      "title": "goose_hurt anatomy: a long neck with feet and no body or wings",
+      "detail": "public/assets/portraits/goose_hurt.webp: below the head the goose is one white tube ending in two orange feet, no body or wings (c_goose.jpg right, s_halo.jpg bottom-right). The KO card crop mostly hides it, but the full image is on-file for any other consumer.",
+      "fix": "Re-roll as a proper bust (head, neck, chest, folded wings) cropped above the feet, like goose_smug."
+    },
+    {
+      "severity": "minor",
+      "title": "White die-cut halo left around capybara_main and sloth_smug",
+      "detail": "Both keep a 3-6 px white sticker border inside the burst, unlike the other 38 portraits and against the prompt's 'no white outline'; visible on the results podium (ui_results.png 3rd-place card, s_ui_zoom.jpg) and on the dark gallery (s_halo.jpg).",
+      "fix": "Re-roll, or extend tools/cutout.py to strip a near-white band touching the figure's outer ink line when it is enclosed by the burst (colour-to-alpha against the burst red/black), then re-check on dark and red backdrops."
+    },
+    {
+      "severity": "minor",
+      "title": "On-model slips in key art and the seagull set",
+      "detail": "loading_3: pelican without its helmet/goggles, pigeon in a red helmet (accent is teal #3fbf8f) (z_loading_3.jpg); results.webp: capybara in a red cap instead of its amber helmet; all four seagull images lack SPEC 5's red spot on the yellow beak although {SEAGULL} asks for it (z_seagull_beak.jpg).",
+      "fix": "Tint/repaint (cutout.py --tint style) the seagull beak spot and the wrong helmets, or re-roll loading_3 with the cast named with helmet colours."
+    },
+    {
+      "severity": "minor",
+      "title": "city_1 and city_5 are inset picture-in-picture panels, not full-bleed posters",
+      "detail": "Both put the illustration in a smaller rectangle on a flat navy field (city_1 subject ~40% of the poster), despite {STYLE_BILL} demanding full-bleed and the status claiming pillarboxed rolls were rejected; on LED screens / billboards they read as a small sticker inside a dark frame (b_city.jpg).",
+      "fix": "Re-roll full-bleed, or crop to the inner panel and extend it to 16:9."
+    },
+    {
+      "severity": "minor",
+      "title": "Low resolution for full-screen and large-band art",
+      "detail": "garage.webp 1344x768 is shown cover at 1344x1080 (1.41x upscale) behind the garage turntable; billboards are 1008x576; eyes strips 968-1260 px wide feed the 1520 px SHOWTIME band and 900 px skill band, so all are upscaled on Retina/4K. Commercial stylised UIs ship key art at >= 2x display size.",
+      "fix": "Run a 2x anime/illustration upscaler on title, garage and the eyes strips (re-export WebP q85); keep cut-outs <= 900 px as briefed."
+    },
+    {
+      "severity": "minor",
+      "title": "cross-unit: title framing crops the beak tip; results podium mixes full-body and bust portraits",
+      "detail": "ui-screens: .br-title-art (object-position 42% 50%) cuts off the pelican's red hooked tip at 1080p (ui_title.png); results podium uses 'smug' busts for 1st but full-body riding 'main' images for 2nd/3rd, so the cards have different subject scale (ui_results.png).",
+      "fix": "ui-screens: shift the title object-position once the re-rolled title keeps the beak inside the safe area; use smug busts for all three podium cards."
+    }
+  ]
+}

@@ -31,11 +31,11 @@
 .spd-tag-m { position: relative; width: 120px; background: var(--ink); overflow: hidden; }
 .spd-tag-f { position: absolute; inset: 6px; transform-origin: 0 50%; }
 .spd-tag.boost .spd-tag-k { background: var(--red); color: var(--paper); }
-.spd-tag.boost .spd-tag-f { background: repeating-linear-gradient(-60deg, var(--sp) 0 10px, var(--hot) 10px 20px); animation: brh-chev 0.3s linear infinite; }
+.spd-tag.boost .spd-tag-f { background: repeating-linear-gradient(-60deg, var(--paper) 0 10px, var(--hot) 10px 20px); animation: brh-chev 0.3s linear infinite; }
 .spd-tag.draft .spd-tag-k { background: var(--paper); color: var(--ink); }
 .spd-tag.draft .spd-tag-f { background: repeating-linear-gradient(90deg, var(--paper) 0 14px, transparent 14px 20px); }
-.spd-tag.draft.is-ready .spd-tag-k { background: var(--sp); }
-.spd-tag.draft.is-ready { box-shadow: 5px 5px 0 var(--ink), 0 0 18px 3px rgba(255, 230, 0, 0.75); }
+.spd-tag.draft.is-ready .spd-tag-k { background: var(--ink); color: var(--paper); box-shadow: inset 0 0 0 3px var(--paper); }
+.spd-tag.draft.is-ready { box-shadow: 5px 5px 0 var(--red), 0 0 0 3px var(--paper); }
 @keyframes brh-chev { to { background-position: 40px 0; } }
 @media (prefers-reduced-motion: reduce) {
   .spd.is-drift .spd-spark, .spd-tag.boost .spd-tag-f { animation: none; }

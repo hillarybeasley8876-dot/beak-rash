@@ -39,22 +39,22 @@ export function arcSweep(hub: V3, rf: number, a0: number, a1: number, profile: R
 }
 
 /** Mudguard around the tyre from a0° to a1°. */
-export function fender(ps: PartSet, hub: V3, R: number, a0: number, a1: number, halfW: number, color: string, seg: Seg, paint = 0): void {
+export function fender(ps: PartSet, hub: V3, R: number, a0: number, a1: number, halfW: number, color: string, seg: Seg): void {
   const prof = [[0.004, -halfW], [0.013, -halfW * 0.45], [0.013, halfW * 0.45], [0.004, halfW]] as const;
-  ps.add(arcSweep(hub, R + 0.012, a0, a1, prof, seg(9, 5)), { color, outline: 0.008, paint });
+  ps.add(arcSweep(hub, R + 0.012, a0, a1, prof, seg(18, 9)), { color, outline: 0.012 });
 }
 
 /** Flat rear rack over the wheel; returns the platform top centre (→ rack marker). */
 export function rack(ps: PartSet, hub: V3, y: number, z0: number, z1: number, halfW: number, front: V3, color: string, seg: Seg): V3 {
-  const o = { color, outline: 0.006 };
+  const o = { color, outline: 0.008 };
   for (const s of [-1, 1]) {
-    ps.add(tube([v(s * halfW, y, z0), v(s * halfW, y, z1), v(s * halfW * 0.7, y - 0.03, z1 + 0.04)], 0.008, seg(4, 3), 4), o);
-    ps.add(cyl(v(s * halfW, y, z1 - 0.02), v(s * 0.055, hub.y, hub.z), 0.007, 0.007, 4), o);
-    ps.add(cyl(v(s * halfW, y, z0), front.clone().setX(s * 0.03), 0.006, 0.006, 4), o);
+    ps.add(tube([v(s * halfW, y, z0), v(s * halfW, y, z1), v(s * halfW * 0.7, y - 0.03, z1 + 0.04)], 0.008, seg(8, 4), 6), o);
+    ps.add(cyl(v(s * halfW, y, z1 - 0.02), v(s * 0.055, hub.y, hub.z), 0.007, 0.007, 6), o);
+    ps.add(cyl(v(s * halfW, y, z0), front.clone().setX(s * 0.03), 0.006, 0.006, 6), o);
   }
   for (let k = 0; k < 4; k++) {
     const z = z0 + ((z1 - z0) * (k + 0.5)) / 4;
-    ps.add(cyl(v(-halfW, y + 0.004, z), v(halfW, y + 0.004, z), 0.0065, 0.0065, 4), o);
+    ps.add(cyl(v(-halfW, y + 0.004, z), v(halfW, y + 0.004, z), 0.0065, 0.0065, 6), o);
   }
   return v(0, y + 0.012, (z0 + z1) / 2);
 }

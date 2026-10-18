@@ -4,13 +4,10 @@
 import { Bone, Group, Matrix4, Object3D, Skeleton, SkinnedMesh, Sphere, type BufferGeometry } from 'three';
 import type { BikeId, Quality } from '../../core/types';
 import { createAnimator } from './animate';
-import { bodyMaterial, hullMaterial } from './build/material';
+import { bodyMaterial, depthMaterial, hullMaterial } from './build/material';
 import { acquire } from './cache';
 import type { GroupName, MarkerName } from './template';
 import type { BikeMarkers, BikeModel } from './types';
-
-/** Markers plus the bell lever (where a wing tip goes to ring it). */
-export interface BikeMarkersEx extends BikeMarkers { bell?: Object3D }
 
 function skinned(geo: BufferGeometry, skeleton: Skeleton, bounds: Sphere, isHull: boolean): SkinnedMesh {
   const mesh = new SkinnedMesh(geo, isHull ? hullMaterial() : bodyMaterial());
@@ -22,6 +19,7 @@ function skinned(geo: BufferGeometry, skeleton: Skeleton, bounds: Sphere, isHull
     mesh.renderOrder = -1;
   } else {
     mesh.castShadow = true;
+    mesh.customDepthMaterial = depthMaterial();
     mesh.userData.noOutline = true; // has its own hull; generic outline passes must skip it
   }
   mesh.name = isHull ? 'bike:hull' : 'bike:body';
@@ -68,7 +66,7 @@ export function createBikeModel(id: BikeId, opts: { quality: Quality; tint?: str
     if (!o) throw new Error(`[bikes] ${id} is missing marker ${n}`);
     return o;
   };
-  const markers: BikeMarkersEx = {
+  const markers: BikeMarkers = {
     saddle: need('saddle'), gripL: need('gripL'), gripR: need('gripR'), pedalL: need('pedalL'), pedalR: need('pedalR'),
     basket: marks.get('basket'), rack: marks.get('rack'), stoker: marks.get('stoker'), bell: marks.get('bell'),
   };

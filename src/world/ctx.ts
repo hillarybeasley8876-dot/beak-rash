@@ -31,13 +31,17 @@ export interface WorldCtx {
   /** One owned instance per key (shared textures/materials between builders). */
   shared<T extends Disposable>(key: string, make: () => T): T;
   onUpdate(fn: Updater): void;
+  /** Build diagnostics (`[track] …`), printed only with the `debug` URL parameter. */
+  log(msg: string): void;
+  /** Progress within the current build stage (0 … 1), reported as `flow:loading` (track.ts maps it). */
+  progress(f: number): void;
   /** Terrain height at (s, x); set by the terrain builder, before dressing runs. */
   ground: GroundFn;
   /** Terrain height at a world point (x, z). */
   groundWorld: (wx: number, wz: number) => number;
 }
 
-export function createCtx(base: Omit<WorldCtx, 'own' | 'shared' | 'onUpdate' | 'ground' | 'groundWorld'>): {
+export function createCtx(base: Omit<WorldCtx, 'own' | 'shared' | 'onUpdate' | 'log' | 'ground' | 'groundWorld'>): {
   ctx: WorldCtx; updaters: Updater[]; owned: Disposable[];
 } {
   const owned: Disposable[] = [];
@@ -59,6 +63,9 @@ export function createCtx(base: Omit<WorldCtx, 'own' | 'shared' | 'onUpdate' | '
     },
     onUpdate: (fn) => {
       updaters.push(fn);
+    },
+    log: (msg) => {
+      if (base.app.params?.has('debug')) console.info(`[track] ${msg}`);
     },
     ground: (s) => base.q.frameAt(s).pos.y,
     groundWorld: () => 0,

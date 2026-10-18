@@ -45,7 +45,8 @@ export function oilTexture(renderer: WebGLRenderer): CanvasTexture {
       g.strokeStyle = cols[i % cols.length] ?? '#ffffff';
       g.globalAlpha = 0.55;
       g.beginPath();
-      g.ellipse(128 + rng.range(-40, 40), 128 + rng.range(-50, 50), rng.range(16, 46), rng.range(10, 30), rng.range(0, 3), 0, Math.PI * rng.range(0.8, 1.6));
+      const cx = 128 + rng.range(-40, 40), cy = 128 + rng.range(-50, 50);
+      g.ellipse(cx, cy, rng.range(16, 46), rng.range(10, 30), rng.range(0, 3), 0, Math.PI * rng.range(0.8, 1.6));
       g.stroke();
     }
     g.globalAlpha = 0.9;
@@ -107,19 +108,32 @@ export function checkerTexture(renderer: WebGLRenderer, cols: number): CanvasTex
   }, renderer);
 }
 
-/** Big painted word on the asphalt (read from the rider's view: text runs bottom→top). */
-export function wordTexture(renderer: WebGLRenderer, text: string, color = '#f5f5f0'): CanvasTexture {
-  return make(512, 256, (g) => {
+/** Big painted word on the asphalt (read from the rider's view: text runs bottom→top). If its font is
+ *  not loaded yet the word is painted with a fallback and repainted once the font arrives. */
+export function wordTexture(renderer: WebGLRenderer, text: string, color = '#f5f5f0', font: string = FONT.en): CanvasTexture {
+  const spec = `400 150px ${font}`;
+  const paint = (g: CanvasRenderingContext2D): void => {
+    g.clearRect(0, 0, 512, 256);
     g.fillStyle = color;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.font = `400 150px ${FONT.en}`;
+    g.font = spec;
     g.save();
     g.translate(256, 128);
     g.scale(1, 1.6);
     g.fillText(text, 0, 0);
     g.restore();
-  }, renderer);
+  };
+  const t = make(512, 256, paint, renderer);
+  if (typeof document !== 'undefined' && document.fonts && !document.fonts.check(spec, text)) {
+    document.fonts.load(spec, text).then(() => {
+      const g = (t.image as HTMLCanvasElement).getContext('2d');
+      if (!g) return;
+      paint(g);
+      t.needsUpdate = true;
+    }, (err: unknown) => console.warn('[track] road word font failed', text, err));
+  }
+  return t;
 }
 
 /** One grid row: three bracket slots across the road (u = x across, v = along). */

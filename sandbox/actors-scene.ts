@@ -8,6 +8,8 @@ import {
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { captureErrors } from '../src/core/debug';
 import type { AppContext } from '../src/core/contracts';
+import { EventBus } from '../src/core/events';
+import type { GameEvents } from '../src/core/events-map';
 import { createRiderState } from '../src/core/rider';
 import type { BikeId, CharacterId, Quality, RiderState } from '../src/core/types';
 import { RiderViewImpl } from '../src/actors/view';
@@ -30,7 +32,7 @@ const grid = new GridHelper(400, 200, '#6c7a5c', '#7c8a68');
 grid.position.y = 0.002;
 scene.add(ground, grid);
 const quality = (P.get('quality') ?? 'high') as Quality;
-export const app = { quality, params: P } as unknown as AppContext;
+export const app = { quality, params: P, bus: new EventBus<GameEvents>() } as unknown as AppContext;
 
 export const ROSTER_IDS: CharacterId[] = ['pelican', 'goose', 'capybara', 'cat', 'shiba', 'pigeon', 'penguin', 'seagull', 'sloth', 'corgi'];
 
@@ -63,16 +65,17 @@ controls.autoRotate = P.get('turntable') === '1';
 controls.autoRotateSpeed = 1.6;
 const VIEWS: Record<string, [number, number, number]> = {
   front: [0, 0.18, -1], back: [0, 0.25, 1], side: [-1, 0.12, 0], right: [1, 0.12, 0], top: [0, 1, 0.01],
-  '34': [-0.8, 0.32, -0.75], '34b': [-0.7, 0.4, 0.8], chase: [0, 0.38, 1],
+  '34': [-0.8, 0.32, -0.75], '34b': [-0.7, 0.4, 0.8], chase: [0, 0.38, 1], r34: [0.8, 0.32, -0.75], r34b: [0.75, 0.35, 0.8],
 };
 
 export function placeCamera(): void {
   const gallery = S.mode === 'gallery';
   const ty = Number(P.get('ty') ?? (gallery ? 0.8 : 1.05));
-  controls.target.set(0, ty, gallery ? 0 : Number(P.get('tz') ?? -0.2));
+  const tx = gallery ? 0 : Number(P.get('tx') ?? 0);
+  controls.target.set(tx, ty, gallery ? 0 : Number(P.get('tz') ?? -0.2));
   const d = VIEWS[S.view] ?? VIEWS['34'] ?? [0, 0, 1];
   const L = Math.hypot(...d), dist = gallery ? Math.max(S.dist, 8) : S.dist;
-  cam.position.set((d[0] / L) * dist, ty + (d[1] / L) * dist, controls.target.z + (d[2] / L) * dist);
+  cam.position.set(tx + (d[0] / L) * dist, ty + (d[1] / L) * dist, controls.target.z + (d[2] / L) * dist);
   controls.update();
 }
 

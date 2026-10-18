@@ -83,7 +83,7 @@ export class PostPipeline {
       tonemap: r.toneMapping === NoToneMapping ? 0 : 1,
     });
     const lens = camera instanceof PerspectiveCamera ? camera : null;
-    this.composite.sync(state, this.sceneRT.texture, bloomTex, lens ? this.sceneRT.depthTexture : null, lens ?? { near: 0.1, far: 1000 }, this.size, timeReal);
+    this.composite.sync(state, this.sceneRT.texture, bloomTex, this.sceneRT.depthTexture, lens, this.size, timeReal);
     r.setRenderTarget(null);
     t?.begin('composite');
     this.quad.render(r);

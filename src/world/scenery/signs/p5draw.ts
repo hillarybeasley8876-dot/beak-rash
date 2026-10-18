@@ -76,7 +76,8 @@ export function ransom(g: G, rng: Rng, text: string, x: number, y: number, w: nu
       g.textAlign = 'center';
       g.textBaseline = 'middle';
       const ascii = /[\x20-\x7e]/.test(ch);
-      g.font = `${ascii ? 400 : rng.chance(0.5) ? 400 : 900} ${Math.round(s * (ascii ? 0.9 : 0.78))}px ${ascii ? FONT.en : rng.chance(0.6) ? FONT.cn : FONT.heavy}`;
+      const weight = ascii ? 400 : rng.chance(0.5) ? 400 : 900;
+      g.font = `${weight} ${Math.round(s * (ascii ? 0.9 : 0.78))}px ${ascii ? FONT.en : rng.chance(0.6) ? FONT.cn : FONT.heavy}`;
       g.fillText(ch, 0, s * 0.04);
       g.restore();
       cx += size * 0.98;

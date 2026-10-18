@@ -1,0 +1,64 @@
+{
+  "unit": "ui-screens",
+  "round": 2,
+  "lens": "interaction",
+  "pass": false,
+  "score": 7.5,
+  "summary": "Re-review with real units: keyboard-only, mouse-only, and a fake standard gamepad driven through core pollPad, at 1280x720 plus checks at 1920x1080 and 2560x1600. The flows are now solid. Every screen is reachable. Esc/B backs out everywhere: menu goes to title, settings goes to pause mid-race with focus back on 设置, pause resumes, results goes home, modals answer no. Focus is visible and inside the viewport on every navigable screen at all three sizes, with no text overflow. Selections persist: menu, quick race, garage, settings, howto, career, and the career ladder after Esc on results. Races start with the right config: track, quick/career mode, career level = tier, and the bought bike. Restart keeps seed and config, and 下一站 runs the next event. Esc spam always lands in a consistent pause/race state, and pausing during intro or countdown freezes it. 0 console errors across 15 probes. Round-1 fixes verified: the confirm modal now answers Space, pad A and pad B (was the blocker). Also fixed: double-click/transition gating, settings pills/ticks/drag, the reduced-motion wipe (shards stay parked, fade only, instant count-up), parked pointer, locked-click toasts, clickable CTAs with pad glyphs, selection memory, the '+N MORE' sheet, pad audio unlock + SOUND OFF chip, and stick X / trigger filtering / hold-to-repeat on the pad. The r1 results major is only partly fixed. Space mashed every 180 ms is ignored. But Space/A at a hop rhythm (450 ms) launches 下一站 0.96 s after the reveal. Mashing pad B (also the right swing) leaves results after 1.26 s and then ping-pongs menu <-> title. Polish gaps vs a commercial game: no auto-pause on blur, tab hide or pad disconnect; no keyboard hold-to-repeat; hint glyph gaps on results; save reset possible mid-race; weak career focus; credits ignore reduced motion and the wheel; a results toast overlap; quality only applies after a reload. One major, so not a pass. Evidence: shots/review/ui-screens/r2-interaction/ (*.log, sheet-*.jpg, crop-*.jpg).",
+  "issues": [
+    {
+      "severity": "major",
+      "title": "Results still get dismissed by finish-line input: a hop rhythm on Space/A fires 下一站, and mashing pad B (right swing) bails to the menu",
+      "detail": "results.ts treats a confirm as mashing only when it arrives < 320 ms (MASH_MS) after the previous one. It applies no mash filter to 'back', and the lock (LOCK_MS) is only 900 ms after entered(). Probe mash.mjs used real units, coast seed 7, with the player put 25 m before the line. (1) Space every 180 ms, the r1 cadence and the only one tools/ui-input.mjs tests: results stay up. (2) Space every 450 ms, a natural hop rhythm (hop airtime is about 0.38 s, SPEC §6): results settled at 10.79 s, and by 11.75 s NEON NIGHT was loading. The default focus 下一站 fired 0.96 s after the reveal, before the grade stamp (1.22 s) and the coin count-up (mash-space450.log, mash-space450.png). (3) Pad B every 220 ms, swinging right at a rival on the line (B = attackR + back): results settled at 6.72 s and went to the main menu at 7.98 s. The same presses then bounce menu -> title -> menu -> title, because the menu's back opens the title and the title takes any action as 'press any key' (mash-padB.log). The r1 major is fixed for fast mashing only.",
+      "fix": "In results.ts: (a) gate 'back' exactly like 'confirm'. (b) Keep the action row inert, ideally hidden and sliding in afterwards, until the show has finished: stamp plus count-up, about 1.6-2.0 s after entered(), or until a skip press has finished it. (c) After that, accept only a press that follows at least 400 ms with no menu/game action. Track the last action time for confirm AND back (and hop/attackR) in the shell, or require every key and pad button to be released once after the row appears. (d) Default focus on 再来一局, or at least never let the first accepted press start a different track. Make the title ignore 'back'/'pause' so B cannot ping-pong menu <-> title. Add 450 ms Space and 220 ms pad-B cadences to tools/ui-input.mjs."
+    },
+    {
+      "severity": "minor",
+      "title": "No auto-pause when the window loses focus, the tab is hidden, or the gamepad disconnects",
+      "detail": "Probe blur.mjs, during a live race: window 'blur', visibilitychange to hidden, and 'gamepaddisconnected' all leave screen=race with clock scale 1. grep finds no such listener in src. On the desktop build or in a windowed browser, alt-tabbing away mid-race keeps the race running with input cleared (core Input clears keys on blur), so the player crashes or falls behind. A pad dropping out mid-race does the same. Commercial games pause on all three.",
+      "fix": "In shell.ts, while a session is attached and its phase is not 'finished', listen for window 'blur', document 'visibilitychange' (hidden) and 'gamepaddisconnected', and emit flow:pause {paused:true}, the same path as raceAction. Toast '手柄断开了，已暂停' on disconnect."
+    },
+    {
+      "severity": "minor",
+      "title": "Keyboard has no hold-to-repeat in menus (the gamepad does)",
+      "detail": "Holding ArrowDown for 1.2 s, with OS auto-repeat keydowns, moves menu focus once (pad-repeat.log: 1 move), because core Input drops e.repeat. Holding the d-pad or stick moves 9 times in 1.2 s thanks to ui/pad-menu.ts. Taking master volume from 90 to 0 needs 9 separate taps of the left arrow, and the 7-bike list and 9-event career grid are tap-only.",
+      "fix": "In shell.ts, add a keydown listener for menu screens (not race/intro). When e.repeat is set and the code maps to up/down/left/right (arrows/WASD), call onAction(dir), throttled to the PadMenu REPEAT_EVERY of about 110 ms. Alternatively, list 'forward directional repeats to onAction' under core requests and drop the local listener later."
+    },
+    {
+      "severity": "minor",
+      "title": "Results hints: Esc/B leave results with no hint, and the achievement sheet footer stays keyboard-only on a pad",
+      "detail": "The results hint bar shows only '←→ 切换' and 'ENTER 确定' (misc2.log), yet Esc/B leaves results immediately, and B is also the right-swing button (see the major). In pad mode the '+N MORE' sheet footer still reads 'ENTER / ESC 收起' (hard-coded in results-achievements.ts, misc2-ach-sheet-pad.png), while every other hint switches to A/B.",
+      "fix": "Add a clickable HINT_BACK to the results hint bar, labelled with the destination (主菜单 or 巡回赛). Build the sheet footer from keyGlyph('ENTER','A') + keyGlyph('ESC','B') so .is-pad swaps it."
+    },
+    {
+      "severity": "minor",
+      "title": "重置存档 is reachable mid-race (pause > 设置) and settings can open focused on it",
+      "detail": "Pause > 设置 opens settings with the session alive. Settings recalls the last-used row, so after one visit to 重置存档 it reopens focused on it, even from pause (mouse-1280x720.log: 'pause dbl-click 设置' -> focus 重置存档). Resetting mid-race wipes coins, bikes and career while the race keeps the old bike. At the finish, progress.ts applyRewards writes career.unlocked = max(1, ev.index). So a reset during a tier-3 career race followed by a top-3 finish unlocks events 2-9 on a 'fresh' save.",
+      "fix": "In settings.ts, when ctx.session() is set, mark the reset row disabled (is-disabled + onDenied toast '比赛中不能重置存档') or leave it out. Never recall the reset row: open on 主音量 instead."
+    },
+    {
+      "severity": "minor",
+      "title": "Career focus is the weakest focus state in the game and nearly disappears on locked events",
+      "detail": "A focused career card gets only a thin red offset edge and a small lift. On a locked event the chain tape crosses the card's upper half, so the only cue is a red sliver at the bottom-right (crop-career-focus.jpg, kb/1280x720-04-career-locked.png). Elsewhere the cursor is loud: menu = jagged red band, track cards = GO! sticker + lift, garage/settings = white/red rows. A pad player at couch distance has to read the detail panel to find the focus.",
+      "fix": "In career.css, give .br-car-ev.is-focus the menu-style jagged red cursor frame (or a 6 px white rim plus a corner 'GO!' / 'LOCKED' sticker). Raise it above .br-car-chain (z-index) and fade the tape under the focused card (opacity about .55)."
+    },
+    {
+      "severity": "minor",
+      "title": "Credits keep auto-scrolling under prefers-reduced-motion and ignore the mouse wheel",
+      "detail": "With reducedMotion 'reduce', the credits roll still moves at 70 px/s (reduced-motion.log: translateY -33 -> -139 px in 1.5 s). The CSS kill-switch in tokens.css does not reach this JS motion, and SPEC §5 says to honour reduced motion. The mouse wheel does not scroll the roll (mouse-1280x720.log: only the auto-scroll moved it); only the up/down keys nudge it.",
+      "fix": "In credits.ts, use SPEED 0 when reducedMotion() is true (manual scrolling only), or pause auto-scroll for a few seconds after any manual nudge. Add a 'wheel' listener on .br-cr-view that adds e.deltaY (converted to stage px) to y and calls wrap()."
+    },
+    {
+      "severity": "minor",
+      "title": "Results: the unlock toast lands on the winner's speech bubble",
+      "detail": "The toast lane (toast.ts: TOP 136 px, right-aligned) puts '解锁新赛事：霓虹夜城（TIER 1）' directly over the 1st-place speech bubble and the top of the winner card for 2.6 s (kbrace/1280x720-05-results.png, crop-top-edges.jpg). On the other screens the lane sits clear of content.",
+      "fix": "Show the unlock inside the results layout (a stamped chip next to the grade, or a line in the reward box) instead of a toast. Or give Toasts a per-screen lane and use the strip above the hint bar on results."
+    },
+    {
+      "severity": "minor",
+      "title": "cross-unit: quality only applies after a reload, and nothing offers the reload",
+      "detail": "Settings > 画质 saves and toasts '画质设置会在重启游戏后生效', but there is no restart path. In a browser the player must reload by hand, and changing it mid-race (pause > 设置) silently does nothing. core/game.ts creates the renderer once (accepted in status/ui-screens.md 'Known issues').",
+      "fix": "Core: expose a live quality switch (pixel ratio, shadows, post toggles). Until then ui-screens can confirm '立即重启生效？' and call location.reload() after saving, when no race is live."
+    }
+  ]
+}

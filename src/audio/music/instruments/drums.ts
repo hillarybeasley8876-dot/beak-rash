@@ -1,12 +1,14 @@
 // Drum kit (all synthesized). Every hit (kick, snare, rim, toms, clap, hats, shaker, tambourine,
 // ride, crash, cowbell) plays a sample rendered once (drum-samples.ts): one buffer source + gain,
 // alive only while it sounds, so no oscillators, pitch glides or filter chains run on the audio
-// thread. The rare long effects (swell, riser) create short-lived nodes. Gains are calibrated so
+// thread. The song's grooves go further: record() … flush() pre-mixes a whole bar of hits into one
+// buffer (drum-mix.ts). The rare long effects (swell, riser) create short-lived nodes. Gains are calibrated so
 // the drum strip at trim 1 peaks around −10 dBFS on accents; the noise hits sit 3.5 dB (cymbals
-// 5.5 dB) over the former live voices, which had sounded early (pre-onset swells) and so carried
-// more energy than their envelopes.
+// 7 dB: top-end air above the hook's band) over the former live voices, which had sounded early
+// (pre-onset swells) and so carried more energy than their envelopes.
 import { noise } from '../../dsp/noise';
 import { filter } from '../../dsp/env';
+import { mixBar, type BarHit } from './drum-mix';
 import { playSample, type DrumSample } from './drum-samples';
 import type { Band } from '../band';
 
@@ -17,7 +19,12 @@ export class DrumKit {
   private pans = new Map<number, StereoPannerNode>();
   private turns = new Map<DrumSample, number>();
   /** The ringing open hat, choked by the next hat like a closing pedal. */
-  private openHat: { gain: GainNode; level: number; end: number } | null = null;
+  private openHat: { gain: GainNode | null; hit: BarHit | null; level: number; end: number } | null = null;
+  /** Hits being collected for a pre-mixed bar (null = every hit plays at once). */
+  private rec: BarHit[] | null = null;
+  private recStart = 0;
+  /** Scheduled bar buffers (until their end), so a re-phase can silence what is still to come. */
+  private bars: Array<{ src: AudioBufferSourceNode; gain: GainNode; end: number }> = [];
 
   constructor(private b: Band) {}
 
@@ -37,16 +44,52 @@ export class DrumKit {
     return p;
   }
 
-  /** A sample hit at `level` (its takes rotate); returns the hit's gain node. */
-  private sample(kind: DrumSample, t: number, level: number, pan = 0): GainNode {
+  /** A sample hit at `level` (its takes rotate): played now, or added to the bar being recorded. */
+  private sample(kind: DrumSample, t: number, level: number, pan = 0): GainNode | BarHit {
     const turn = (this.turns.get(kind) ?? 0) + 1;
     this.turns.set(kind, turn);
-    return playSample(this.b.ctx, kind, turn, t, level, this.panned(pan));
+    if (!this.rec) return playSample(this.b.ctx, kind, turn, t, level, this.panned(pan));
+    const hit: BarHit = { kind, take: turn, at: t, level, pan };
+    this.rec.push(hit);
+    return hit;
+  }
+
+  /** Collect the following hits into one buffer that starts at `start` (see flush). */
+  record(start: number): void {
+    this.rec = [];
+    this.recStart = start;
+  }
+
+  /** Mix the recorded hits and schedule them as one buffer source. */
+  flush(): void {
+    const hits = this.rec;
+    this.rec = null;
+    const buffer = hits ? mixBar(this.b.ctx, hits, this.recStart) : null;
+    if (!buffer) return;
+    const now = this.b.ctx.currentTime;
+    this.bars = this.bars.filter((x) => x.end > now);
+    const src = new AudioBufferSourceNode(this.b.ctx, { buffer });
+    const gain = new GainNode(this.b.ctx, { gain: 1 });
+    src.connect(gain).connect(this.out);
+    src.start(this.recStart);
+    this.bars.push({ src, gain, end: this.recStart + buffer.duration });
+  }
+
+  /** Pre-mixed hits stop at `at` (8 ms fade): the song re-phased or went back into its vamp. */
+  cut(at: number): void {
+    for (const bar of this.bars) {
+      if (bar.end <= at) continue;
+      bar.gain.gain.setValueAtTime(1, at);
+      bar.gain.gain.linearRampToValueAtTime(0, at + 0.008);
+      bar.src.stop(at + 0.01);
+    }
+    this.bars = [];
+    this.openHat = null;
   }
 
   kick(t: number, vel: number): void {
     this.sample('kick', t, 0.76 * vel);
-    this.b.duck(t, 0.42 * vel);
+    this.b.duck(t, 0.3 * vel);
   }
 
   snare(t: number, vel: number, ghost = false): void {
@@ -63,16 +106,21 @@ export class DrumKit {
 
   hat(t: number, vel: number, open: boolean): void {
     this.choke(t);
-    const level = (open ? 0.64 : 0.55) * vel;
-    const gain = this.sample(open ? 'hatOpen' : 'hat', t, level, 0.28);
-    if (open) this.openHat = { gain, level, end: t + OPEN_HAT_S };
+    const level = (open ? 0.43 : 0.37) * vel;
+    const played = this.sample(open ? 'hatOpen' : 'hat', t, level, 0.36);
+    if (!open) return;
+    const live = played instanceof GainNode;
+    this.openHat = { gain: live ? played : null, hit: live ? null : played, level, end: t + OPEN_HAT_S };
   }
 
   private choke(t: number): void {
     const o = this.openHat;
     if (!o || t >= o.end) return;
-    o.gain.gain.setValueAtTime(o.level, t);
-    o.gain.gain.linearRampToValueAtTime(0, t + 0.008);
+    if (o.hit) o.hit.chokeAt = t;
+    else if (o.gain) {
+      o.gain.gain.setValueAtTime(o.level, t);
+      o.gain.gain.linearRampToValueAtTime(0, t + 0.008);
+    }
     this.openHat = null;
   }
 
@@ -81,7 +129,7 @@ export class DrumKit {
   }
 
   tambourine(t: number, vel: number): void {
-    this.sample('tamb', t, 0.68 * vel, 0.42);
+    this.sample('tamb', t, 0.54 * vel, 0.42);
   }
 
   tom(t: number, vel: number, which: 1 | 2 | 3): void {
@@ -89,11 +137,11 @@ export class DrumKit {
   }
 
   crash(t: number, vel: number): void {
-    this.sample('crash', t, 0.3 * vel, -0.2);
+    this.sample('crash', t, 0.25 * vel, -0.2);
   }
 
   ride(t: number, vel: number): void {
-    this.sample('ride', t, 0.25 * vel, 0.32);
+    this.sample('ride', t, 0.21 * vel, 0.32);
   }
 
   /** Reverse-cymbal swell that lands exactly on `t + dur` (section transitions, stingers). */

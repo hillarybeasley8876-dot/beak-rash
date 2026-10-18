@@ -1,0 +1,90 @@
+{
+ "unit": "sim",
+ "round": 3,
+ "lens": "feel",
+ "pass": false,
+ "score": 7.0,
+ "summary": "Fix round 2 is real. Both r2 feel majors and every r2 minor are fixed, and the r2 camera major is fixed too: 0 eye-in-vehicle frames in 7 real traffic crashes. feel-telemetry passes 105/106; the only FAIL is ultHandback, because the fx unit fails to load right now. On the real coast at dt 1/30, 1/60 and 1/144: 0-60 km/h 4.42 s, top 20.0 m/s, brake 12.5 m/s^2, tau63 0.083 s, input visible in 1 frame (3 frames = 17-25 ms with real keys at 120 fps), no release overshoot, hop 0.375 s, ramp 0.63 s, crest 0.83 s. Walls give exactly 1 impact per approach, then a scrape. Committed drifts reach L1/L2/L3 at 0.53-0.65 / 1.10-1.41 / 1.77-2.35 s on all 9 corners. PERFECT has to be earned. Light knocks shove a pressing AI. A 12 s scripted run agrees across frame rates within 1-2 frames. Soaks show 0 NaN, out-of-bounds or tunnelling. Steering, drift and crash strips read cleanly. Two new majors, both in core interactions: (1) releasing an L3 drift mid-corner throws the bike outward (60 deg heading swing, 4-12 m run-wide, a wall crash on L46 with a neutral stick) because the boost speed outgrows the capped steer authority; (2) rider-rider bumps snap the heading 20-25 deg in one frame and loop every 0.4 s with damage while pressing. Minors: dead wall-scrape pose, respawn speed pop, no brake/landing pitch, drift restarting against walls, telemetry blind spots, and two cross-unit items. Fails on the two majors; score 7.0.",
+ "r2_followup": {
+  "feel: wall pinball (major)": "FIXED. scripts/wall.mjs: 4 real walls x steer 0.3/0.6/1 x dt 1/30, 1/60, 1/144 give exactly 1 'wall' event each, then 14-20 scrapes and 0 crashes. Full lock gives 0 yaw reversals; steering away reaches |vx| >= 2 m/s in 0-1 frames; the impact yaw is rate-limited (10 / 5 / 2.1 deg per frame = 300 deg/s at every rate).",
+  "feel: drift charge 2x slow on real curves (major)": "FIXED for committed drifts: L1 0.53-0.65, L2 1.10-1.41, L3 1.77-2.35 s on L380/R320/L60/R60/R90/L46/R90/R300/L340, frame-rate independent (drift.txt). A line-holding drift charges at ~45 % (see major 1).",
+  "feel: hero size (minor)": "FIXED via the SPEC change: fovAtTop 70.2, dist 4.3-5.1 m.",
+  "feel: PERFECT unconditional (minor)": "FIXED. Real ramp: straight PERFECT; full air steer NOT perfect; steer then calm for 0.2 s PERFECT; full steer + Space before touchdown PERFECT; identical at 30/60/144 fps (air.txt). Hop spam gives 16 hops, 0 PERFECT, -0.8 m/s.",
+  "feel: drift on rails (minor)": "FIXED. r2 hairpin.mjs: R150/R60/R30 drifts hold; R15 drifts run wide into the wall and bounce, no crash (r2-hairpin.txt).",
+  "feel: light knock vs pressing AI (minor)": "FIXED. Live combat + AI on a straight: a light hit shoves the goose 1.12 m (scripts/knockreal.mjs); telemetry lightSteerDisp 0.476 m.",
+  "feel: telemetry blind to majors (minor)": "FIXED for the r2 items (wallPin, driftTiming, PERFECT, knock checks). New blind spots: minor 'Telemetry is green over both majors'.",
+  "feel: cross-unit coast bends too gentle": "FIXED by track: L60/R60 chicane, R90, L46, R90. Grip at full throttle through them needs mean |steer| 0.52-0.53 and peaks near full lock (kbcorners.txt).",
+  "camera: crash cam inside vehicles (major)": "FIXED. Copied t7-traffic.mjs, seeds 5 and 3, real traffic: 0 eye-in-box frames in 7 crashes (cars vaulted, vans bounce back); telemetry trafficCam eyeInBox 0/0/0.",
+  "camera: respawn glide (minor)": "FIXED. Respawn cuts under the blink, rider centred (strips/respawn.jpg 2.62 s); respawnCam onScreen 1.0.",
+  "camera: SHOWTIME settle (minor)": "NOT RE-VERIFIABLE: fx fails to load (cross-unit). The code fix is present in rig.ts.",
+  "camera: pause (minor)": "FIXED. pauseCam: 0 rotation, 0 movement and 0 FOV change during pause.",
+  "camera: water crash speck (minor)": "FIXED. strips/water.jpg: the FOV narrows 53 -> 32 deg and the pelican stays readable in the sea; the respawn cut is clean.",
+  "camera: telemetry (minor)": "FIXED. trafficCam, respawnCam, ultHandback and pauseCam scenarios added."
+ },
+ "issues": [
+  {
+   "severity": "major",
+   "title": "Releasing an L3 drift mid-corner flings the bike outward: the nose swings ~60 deg past the tangent, it runs 4-12 m wide, and on L46 a neutral stick crashes it into the outside wall",
+   "detail": "This is the core skill loop in the corners built for it. scripts/driftexit.mjs (real coast, L3 released at 1.83 s, 1.9 m inside the centre): on L46 the heading goes from 37 deg into the bend to -10 / -18 / -25 deg out of it within ~0.3 s (up to 4.2 deg/frame) with the stick full / half / neutral. Outward lateral speed reaches 4.7 / 8.5 / 12.2 m/s and the bike runs 3.9 / 9.0 / 12.2 m wide. With the stick neutral it is a 'wall' crash. L60 runs 0 / 2.8 / 7.0 m wide and R90 runs 0 / 1.8 / 6.9 m wide. scripts/driftexit2.mjs: releasing Shift and the arrow key together at L3 (core Input ramp, fall 11/s) crashes on L46 at +1.38-1.40 s at dt 1/30, 1/60 and 1/144, hits the R90 outer wall, and runs 4.8 m wide on L60. strips/release.jpg: pink sparks, release at 1.95 s, the nose already points outward at 2.08 s, then the bike crosses the road under speed lines into the wall (crash at 3.22 s). Cause: steering.ts steerAuthority() caps at lerp(4.5, 7.5, clamp01(v/top)) = 7.5 m/s, while curvePush = kappa*v^2*0.8 keeps growing with the boosted speed. At 26.5 m/s on R46 the push is 12.2 m/s, so even full lock runs wide. During an L3 boost the tightest radius full lock can hold grows from 43 m to 75 m. The release ramp (driftExitTime 0.2 s) hands over to grip almost at once, and nothing keeps the post-release |vx| below wallCrashAngle (12.2 / 26.5 m/s = 24.7 deg > 24 deg). The charge rules push players into exactly this: a drift that holds a line needs about -0.64 counter-steer and charges at ~45 % rate (drift.txt B: L1 1.17-1.48 s, L2 2.50-3.27 s, no L3 within 3.5 s). L3 therefore comes only from cutting to the inside, which on L46 and R90 puts the natural 'release at pink' in mid-corner. A commercial kart racer never lets your own mini-turbo throw you off the road.",
+   "fix": "(1) Corner with the boost instead of against it. Above top speed, scale the lateral authority by (v/top)^2, or compute the curve push with v clamped to baseTop(sr), so a boost never shrinks the radius you can hold. (2) After a release, keep the drift's curve-push cancel and fade it out over ~0.5 s (extend the exit ramp), so the mini-turbo leaves along the drift line. (3) Clamp |vx| <= v*tan(20 deg) for ~0.5 s after a release, so a mistake bounces and never wrecks. (4) Ease the yaw from the drift angle to the grip heading without overshooting past the road tangent (at most ~10 deg out). Add a telemetry scenario: release at L3 on L46/R60/R90 with full, half and neutral stick. It passes with 0 crashes, <= 2 m run-wide at full stick, and a heading swing that never ends more than 10 deg pointing out of the bend."
+  },
+  {
+   "severity": "major",
+   "title": "Rider-rider side bumps snap the heading 20-25 deg in one frame, and pressing into a rival loops a bump every 0.4 s with damage both ways",
+   "detail": "Wall bounces got a yaw rate limit in fix round 2. Rider contacts did not: contacts.ts sideBySide() flips vx with restitution 0.8 above 1.5 m/s closing and never sets sr.yawEase, so attitude.ts snaps yaw = atan2(vx, v) in one frame. scripts/bumpyaw.mjs: the player's yaw goes -20.0 -> +1.7 deg between two frames, i.e. 25 deg/frame at 60 fps (1500 deg/s) and 24 deg/frame at 144 fps (3400 deg/s). The rival snaps 16 deg. pose.ts applies r.yaw directly, so the model visibly twitches. scripts/bump.mjs (rival holds its line, combat stubbed: bump-nocombat.txt): pressing into it at steer 0.3 / 0.6 / 1 gives 7-8 rider:bump events in 3 s at dt 1/30, 1/60 and 1/144 (one every 0.37-0.45 s). The player's yaw swings -23..+5 deg with up to 5 reversals/s. Each event triggers shake and sfx, and every hard bump (> 3) deals 2-5 damage. 3 s of full-lock pressing costs the player 43 HP (~40 % of the bar) against 21-22 for the heavier goose. With the rival pushing back (sandwich.txt) it is 9 bumps and -44 HP. strips/bump.jpg shows the bounce-apart / come-back loop (contacts at 0.52, 0.92, 1.32 and 1.72 s). Autopilot races still show 5-8 player bumps/min (soak-*.json), so the snap is seen several times a minute. Barging is a natural move in a Road Rash-like game, and this is the r2 wall pinball again, between riders.",
+   "fix": "Set sr.yawEase = T.yawEaseTime on both riders whenever a side contact bounces (e > 0), exactly as surfaces.ts impact() does. Add a pair latch like wallSide. After a bounce, re-contacts of the same pair within ~0.6 s while either rider still steers toward the other become inelastic shoves (e = 0) with no event and no damage, until they separate by more than ~0.4 m. Deal bump damage once per approach. Telemetry: the press scenario already counts sideBumps (6) but never checks it. Assert <= 1 bump per approach over 3 s of steady pressing and a per-frame yaw step <= 5 deg at 60 fps for both riders."
+  },
+  {
+   "severity": "minor",
+   "title": "Scraping a wall at full lock shows a dead-straight, upright bike: yaw 0, lean 0, so the input reads as doing nothing",
+   "detail": "The latch fix stops the pinball (verified below). Once latched, though, edge() sets vx = 0, so attitude.ts yields yaw = atan2(0, v) = 0, and on a straight lean = 0. wall.txt: s2000 tunnel, full lock for 4 s, late yaw exactly 0.0..0.0 at all three frame rates. strips/wall.jpg 1.02-2.52 s: the pelican rolls along the wall perfectly straight and upright while the player holds full right, with only grass specks and a slow 20 -> 13 m/s bleed. Commercial racers show the contact: the nose pressed a few degrees into the wall, the bike leaning on it, grinding wobble.",
+   "fix": "In attitude.ts add a scrape pose driven by the scrape pressure (sr.vxWant toward the latched wall): yaw toward the wall about 5 deg x pressure, lean into it about 8 deg x pressure, plus a small 12-15 Hz wobble. vx stays 0, so physics is unchanged."
+  },
+  {
+   "severity": "minor",
+   "title": "Respawn goes from 0 to 6 m/s in a single frame at the end of the blink",
+   "detail": "crash.ts respawningUpdate() holds speed 0 for 0.6 s, then sets r.speed = respawnSpeed in one step. strips/respawn.txt: 3.12 s v 0.0 -> 3.22 s v 6.2. The rider pops from a standstill to 21.6 km/h (strips/respawn.jpg 3.12 -> 3.32 s). Every crash ends with this pop.",
+   "fix": "Ramp it: start the 'racing' mode at ~1.5 m/s with a short push-off boost (accel x2 for 0.4 s), or interpolate the speed 0 -> 6 m/s over 0.25 s at the end of 'respawning'."
+  },
+  {
+   "severity": "minor",
+   "title": "No weight cues in the bike pose: braking at 12.5 m/s^2 and hard landings leave the pitch at 0",
+   "detail": "misc.txt: a full brake from 20 m/s stops in 1.60 s / 15.8 m with pitch 0.0..0.0 throughout. sr.pitch only follows ramps and the air arc (attitude.ts pitchT), so there is no nose dive, no rear unloading and no compression on a 0.8 s crest landing. Acceleration and braking numbers are on spec, but the bike looks weightless under them, and the landing dip lives only in the camera.",
+   "fix": "Feed the pitch target from the longitudinal acceleration (about -0.25 deg per m/s^2 of braking, a small rear squat under boost) and add a landing compression impulse (~4 deg nose-down spring, 0.15 s). Keep the existing damping (pitchLambda 9)."
+  },
+  {
+   "severity": "minor",
+   "title": "A drift ended by a wall or bump restarts on the very next frame while still pressed against the wall",
+   "detail": "drift.ts sets driftLock only after a rewarded release, so endDrift(ctx, sr, false) from a wall impact (k > 0.15), a hard bump or a knock leaves Shift + steer free to start a new drift at once. keysrt.txt (real keyboard, realtime): 'drift:end0@1.68 drift:start0@1.69', i.e. a Shift + D drift into the wall restarted 10 ms after the wall killed it and scraped on with no charge. It reads as stuck and spams rider:drift events.",
+   "fix": "Also apply driftLock (0.3 s) on forced ends, or require Shift to be released and pressed again after a forced end. Do not start a drift while sr.wallSide points the way the drift would go."
+  },
+  {
+   "severity": "minor",
+   "title": "Telemetry is green over both majors, and some deliberate SPEC deviations live only in status notes",
+   "detail": "feel-telemetry: 105/106 checks pass (tele/metrics.json); the one FAIL is the cross-unit ultHandback. Gaps: no scenario releases a drift inside a tight bend (major 1); press logs sideBumps 6 but checks only jitter, and nothing checks per-frame yaw steps for rider contacts (major 2); driftTiming tests full commitment only (a line-holding drift charges at ~45 %). Deviations not reflected in SPEC section 6: L1 mini-turbo 0.3 s (SPEC 0.45 s), PERFECT after a plain hop needs 0.55 s air (SPEC 0.35 s), and a wall crash needs > 24 deg impact (SPEC only says 'hard angle'). The choices are sound, but critics measuring against SPEC will keep tripping on them.",
+   "fix": "Add the scenarios from majors 1 and 2, plus a 'line-hold drift' charge-rate report. File a core request so SPEC section 6 states the L1 0.3 s boost, the hop PERFECT rule and the 24 deg wall-crash angle."
+  },
+  {
+   "severity": "minor",
+   "title": "cross-unit: fx (and briefly actors) failing to load blocks re-verification of the r2 SHOWTIME hand-back",
+   "detail": "In several runs today '/src/fx/ko/camera.ts' did not export 'shotFor' (fx fell back to its stub), the fx.composite shader failed ('varying vKoMid does not match any VERTEX varying'), and actors failed twice (support-points.ts 'objectSupports', wheel.ts 'SPOKE_PERIOD'). As a result ultHandback.cinematic = false (the only telemetry FAIL). The r2 camera minor 'SHOWTIME exit lands on an unsettled pose' could not be re-checked, even though the fix (chase springs on dtReal behind a cinematic) is in rig.ts.",
+   "fix": "fx/actors units: fix the broken exports and shader. sim: re-run feel-telemetry --only ultHandback and the camera critic's t5u-ult.mjs once fx loads."
+  },
+  {
+   "severity": "minor",
+   "title": "cross-unit: rider meshes overlap at the SPEC contact distance (0.75 m), so every side bump shows merged silhouettes",
+   "detail": "contacts.ts keeps the centres >= 0.75 m apart (bump.txt minDx 0.75 in every case, so physics is correct). strips/bump.jpg at 0.52, 0.92, 1.32 and 1.72 s still shows the pelican's body and wings inside the goose's. Wing-gripped bars plus a body are wider than half of 0.75 m.",
+   "fix": "Either SPEC/sim raises contactDx to ~0.9 m (and nearPassGap with it), or actors keep each rider's visual half-width <= 0.37 m at the shoulders."
+  }
+ ],
+ "verified_ok": [
+  "SPEC 6 longitudinal (stub + real track): 0-60 km/h 4.42 s, top 20.0, coast 0.6, brake 12.5 m/s^2; -13 % descent settles 21-23.5 m/s; +10 % climb 19.8 -> 19.3 m/s.",
+  "Steering: tau63 0.083 s, visible next frame, no overshoot or counter-lean on release, lean max 28 deg on straights and 38 deg cap; real keys at 120 fps 17-25 ms; a 50 ms tap moves 9 cm; low speed responsive (3 m/s: 1 frame).",
+  "Frame-rate independence: dtcompare.txt (slalom, two drifts, hop, brake, wall at 30/60/144 and random dt) agrees within 1-2 frames on events and about 1 m in s over 12 s.",
+  "Slipstream: draft 0.83 at 0.5 s, 1.0 at 1 s, +7.5 % speed, slingshot 0.6 s after pulling out (draft.txt). Oil yaw -11.8..+10.7 deg, steerable; puddle light; boost pad +27 %.",
+  "Crash and respawn: traffic vault reads well (strips/crash.jpg: helmet pops off, bike cartwheels, body slides); water crash with splash; respawn at a safe x, blink, 2 s invulnerability.",
+  "Soaks 90 s @60, 60 s @30, 45 s @144 (8 riders, traffic, police): 0 NaN, 0 out-of-bounds, 0 tunnelling, 0 negative y. The only s/x jumps come from combat's pigeon ghost and gulp carry.",
+  "tsc: 0 errors in src/sim and src/camera (2 remaining errors are in src/actors/bikes)."
+ ],
+ "evidence": "shots/review/sim/r3-feel/ (scripts/*.mjs, *.txt, soak-*.json, tele/metrics.json, strips/*.jpg)"
+}

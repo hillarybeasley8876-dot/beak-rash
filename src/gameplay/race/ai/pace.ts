@@ -24,6 +24,11 @@ const SPRINT_BEHIND = 8;              // a hunter this far behind the player may
 const MAX_RUBBER = 0.35;              // max top-speed factor above the rider's own bike (kidbike → pace + 8 %)
 const MIN_RUBBER = 0.7;               // floor of the factor that holds a fast bike to its cap (fixie 22.5 → 15.8 m/s)
 const RUBBER_RATE = 0.1;              // 1/s: how fast rider.rubber moves (0.08 settles in under a second)
+/** A grudge closing the last metres to the player (fight.ts) may ride pace ×1.06, or the player's speed + 1.5 m/s
+ * when that is higher (a boosted player), for a few seconds, also in view: an angry rival visibly chasing you. */
+const PAYBACK_PACE = 1.06, PAYBACK_CLOSE = 1.5;
+const PAYBACK_RATE = 0.4;             // 1/s: rubber rate while closing in for a payback
+export const paybackPace = (pace: number, player: RiderState): number => Math.max(pace * PAYBACK_PACE, player.speed + PAYBACK_CLOSE);
 
 export interface PaceInput {
   rider: RiderState;
@@ -36,6 +41,8 @@ export interface PaceInput {
   chaseCam: boolean;
   /** Recently respawned (after a KO or crash): no catch-up, so the knock-down costs a real gap. */
   recovering: boolean;
+  /** A grudge closing the last metres to the player (Fighter.paybackChase): paybackPace(), also in view. */
+  payback: boolean;
 }
 
 /** A rival's base pace (m/s): the level reference plus its per-rider offset. */
@@ -55,18 +62,21 @@ export function paceCap(i: PaceInput): number {
   if (i.chaseCam && -d > UNSEEN_BEHIND) cap = pace * (1 + CATCH_UP * smoothstep(UNSEEN_BEHIND, CATCH_FULL, -d));
   // A rider hunting the player from behind stops easing off (its own bike + draft decide); pulses stay unseen.
   if (i.huntingPlayer) cap = Math.max(cap, pace * (1.04 + 0.01 * (i.level - 1)));
+  if (i.payback) cap = Math.max(cap, paybackPace(pace, p));
   return cap;
 }
 
 /**
- * Ease `rider.rubber` toward cap ÷ own bike top: the whole cap while unseen, at most the base `pace` in view
- * (1 when not racing). Statuses such as chill still slow the rider down: the sim multiplies both in.
+ * Ease `rider.rubber` toward cap ÷ own bike top: the whole cap while unseen, at most `inView` (the base pace, or
+ * a grudge's payback pace) in view (1 when not racing). Statuses such as chill still slow the rider down: the
+ * sim multiplies both in.
  */
-export function easeRubber(r: RiderState, cap: number, pace: number, unseen: boolean, dt: number): void {
-  const goal = unseen ? cap : Math.min(cap, pace);
+export function easeRubber(r: RiderState, cap: number, inView: number, unseen: boolean, dt: number, payback = false): void {
+  const goal = unseen ? cap : Math.min(cap, inView);
   const want = r.mode === 'racing' ? clamp(goal / Math.max(1, topOf(r)), MIN_RUBBER, 1 + MAX_RUBBER) : 1;
   const now = r.rubber > 0 ? r.rubber : 1;
-  r.rubber = now + clamp(want - now, -RUBBER_RATE * dt, RUBBER_RATE * dt);
+  const rate = (payback ? PAYBACK_RATE : RUBBER_RATE) * dt;
+  r.rubber = now + clamp(want - now, -rate, rate);
 }
 
 /** Is a rider behind the player far enough to be out of the chase camera? */

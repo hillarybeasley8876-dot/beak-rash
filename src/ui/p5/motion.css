@@ -30,9 +30,10 @@
   100% { transform: scale(1) rotate(0); opacity: 1; }
 }
 @keyframes br-spin { to { rotate: 360deg; } }
+/* Prompts throb at full opacity (a translucent pill lets the art bleed through its text). */
 @keyframes br-pulse {
-  0%, 100% { opacity: 1; scale: 1; }
-  50% { opacity: 0.55; scale: 0.97; }
+  0%, 100% { scale: 1; }
+  50% { scale: 1.045; }
 }
 @keyframes br-drift { to { background-position: 160px -96px; } }
 @keyframes br-scroll-lines { to { background-position: 200px 0; } }

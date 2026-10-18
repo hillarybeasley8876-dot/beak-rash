@@ -29,7 +29,7 @@ export function lighthouse(buf: MeshBuf, glow: MeshBuf, x: number, y: number, z:
   cylinder(buf, trs(x, top + 2.65, z, 0, 1.7, 0.25, 1.7, m), DARK, 12);
   cone(buf, trs(x, top + 2.9, z, 0, 1.6, 1.5, 1.6, m), RED, 12);
   sphere(buf, trs(x, top + 4.5, z, 0, 0.25, 0.25, 0.25, m), DARK, 6, 4);
-  villa(buf, x + 6.5, y, z + 1.5, rng.range(0, 6), rng, { floors: 1, w: 6, d: 4.5, sink: 2 });
+  villa(buf, x + 6.5, y, z + 1.5, rng.range(0, 6), rng, { floors: 1, w: 6, d: 4.5, sink: 2, plain: true });
 }
 
 /** Wooden pier from (x, y, z) heading along yaw `ry` for `len` metres; deck top at y. */

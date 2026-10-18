@@ -10,6 +10,7 @@ export interface Tracked {
   readonly vel: Vector3;     // world velocity (m/s)
   readonly head: Vector3;
   readonly body: Vector3;
+  readonly bike: Vector3;    // bike root (separates from the body in a crash)
   readonly wheelR: Vector3;
   readonly fwd: Vector3;     // bike heading (unit)
   readonly right: Vector3;
@@ -23,7 +24,7 @@ const MAX_SPEED = 45;
 
 function entry(): Entry {
   return {
-    pos: new Vector3(), vel: new Vector3(), head: new Vector3(), body: new Vector3(), wheelR: new Vector3(),
+    pos: new Vector3(), vel: new Vector3(), head: new Vector3(), body: new Vector3(), bike: new Vector3(), wheelR: new Vector3(),
     fwd: new Vector3(0, 0, -1), right: new Vector3(1, 0, 0), ground: 0, dist: 0, prev: new Vector3(), valid: false,
   };
 }
@@ -65,10 +66,12 @@ export class RiderTracker {
       if (view) {
         view.anchor('head', e.head);
         view.anchor('body', e.body);
+        view.anchor('bike', e.bike);
         view.anchor('wheelR', e.wheelR);
       } else {
         e.head.copy(e.pos).y += 1.9;
         e.body.copy(e.pos).y += 1.3;
+        e.bike.copy(e.pos).y += 0.5;
         e.wheelR.copy(e.pos).addScaledVector(e.fwd, -0.55).y += 0.3;
       }
       e.ground = session.track.toWorld(r.s, r.x, 0, this.tmp).y;

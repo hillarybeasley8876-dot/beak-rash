@@ -1,6 +1,7 @@
 // Intro flyover: track title banner + a P5 "calling card" (roster title + tagline) for the rival the race
 // camera is presenting. Like race's IntroCamera.focus(): the subject is the rider nearest (in s, ≤ 4.5 m)
 // to the camera's look point (where the view ray meets the look-target height); cards change with the subject.
+// Each card takes the lower corner (right or left) that covers less of its rider on screen.
 import '../css/intro.css';
 import { Vector3 } from 'three';
 import { easeInOutCubic } from '../../../core/math';
@@ -13,7 +14,7 @@ import { enter, exit, fadeOut } from '../anim';
 import { PortraitCard } from '../badge';
 import { el } from '../dom';
 import { setRansom } from '../ransom';
-import type { Projector } from '../world/project';
+import { newPoint, type Projector } from '../world/project';
 import { animateGlyphs } from './splash';
 
 const MIN_SHOW = 0.25;
@@ -27,12 +28,24 @@ const INTRO_FALLBACK = 3.6;
 /** The next card waits for the previous one to drop out of the way. */
 const ENTER_DELAY = 0.08;
 
-interface Card { r: RiderState; root: HTMLDivElement; glyphs: HTMLElement[]; t: number }
+/** Calling-card boxes (stage px, css/intro.css .ic): lower right, or lower left (.is-left). */
+const CARD = { w: 660, h: 340, top: 610, right: 1180, left: 80 };
+
+/** side: +1 lower right (enters from the right), −1 lower left (enters from the left). */
+interface Card { r: RiderState; root: HTMLDivElement; glyphs: HTMLElement[]; t: number; side: number }
+interface Leaving { root: HTMLDivElement; t: number; side: number }
+
+/** Overlap area of two [l, t, r, b] boxes. */
+const overlapArea = (a: number[], b: number[]): number =>
+  Math.max(0, Math.min(a[2] ?? 0, b[2] ?? 0) - Math.max(a[0] ?? 0, b[0] ?? 0)) *
+  Math.max(0, Math.min(a[3] ?? 0, b[3] ?? 0) - Math.max(a[1] ?? 0, b[1] ?? 0));
 
 export class IntroCards {
   private banner: HTMLDivElement;
   private card: Card | null = null;
-  private leaving: Array<{ root: HTMLDivElement; t: number }> = [];
+  private leaving: Leaving[] = [];
+  private head = newPoint();
+  private feet = newPoint();
   private active = false;
   private t = 0;
   private duration = INTRO_FALLBACK;
@@ -42,7 +55,8 @@ export class IntroCards {
   private d = new Vector3();
   private v = new Vector3();
 
-  constructor(private stage: HTMLElement) {
+  /** `cue` runs when the track banner or a calling card slams in (its sound). */
+  constructor(private stage: HTMLElement, private cue: (what: 'banner' | 'card') => void = () => {}) {
     this.banner = el('div', 'ib', stage);
     this.banner.style.visibility = 'hidden';
   }
@@ -67,6 +81,7 @@ export class IntroCards {
     this.active = true;
     this.t = 0;
     this.bannerOut = 0;
+    this.cue('banner');
   }
 
   stop(immediate = false): void {
@@ -97,7 +112,31 @@ export class IntroCards {
     if (subject.isPlayer) {
       if (card) this.retire(card);
       this.card = null;
-    } else this.show(subject);
+    } else this.show(subject, this.sideFor(subject, session, proj));
+  }
+
+  /** The lower corner whose card covers less of the rider's on-screen box (the half the rider is not on
+   *  when neither covers it yet). */
+  private sideFor(r: RiderState, session: Session, proj: Projector): number {
+    const W = proj.width;
+    const H = proj.height;
+    const k = Math.min(W / 1920, H / 1080);
+    proj.project(proj.riderHead(session, r, 0.1, this.v), this.head);
+    proj.project(session.track.toWorld(r.s, r.x, r.y, this.v), this.feet);
+    if (!this.head.onScreen && !this.feet.onScreen) return 1;
+    const half = Math.abs(this.feet.y - this.head.y) * 0.35;
+    const cx = (this.head.x + this.feet.x) / 2;
+    const rider = [cx - half, Math.min(this.head.y, this.feet.y), cx + half, Math.max(this.head.y, this.feet.y)];
+    const box = (x: number): number[] => {
+      const l = W / 2 + (x - 960) * k;
+      const t = H / 2 + (CARD.top - 540) * k;
+      return [l, t, l + CARD.w * k, t + CARD.h * k];
+    };
+    const onLeft = overlapArea(rider, box(CARD.left));
+    const onRight = overlapArea(rider, box(CARD.right));
+    // Clear on both sides now: the camera keeps closing in, so take the half the rider is not on.
+    if (Math.abs(onLeft - onRight) < 1) return cx > W / 2 ? -1 : 1;
+    return onLeft < onRight ? -1 : 1;
   }
 
   /** Rider nearest the camera's look point (null = nobody near it: keep the current card). */
@@ -127,10 +166,10 @@ export class IntroCards {
     return best;
   }
 
-  private show(r: RiderState): void {
+  private show(r: RiderState, side: number): void {
     if (this.card) this.retire(this.card);
     const def = ROSTER[r.character];
-    const root = el('div', 'ic', this.stage);
+    const root = el('div', side < 0 ? 'ic is-left' : 'ic', this.stage);
     el('div', 'ic-sh', root);
     const body = el('div', 'ic-card', root);
     const pc = el('div', 'ic-pc', body);
@@ -144,27 +183,30 @@ export class IntroCards {
     el('div', 'ic-tag', body, `「${def.tagline}」`);
     const skill = SKILLS[def.skill];
     if (skill) el('span', '', el('div', 'ic-skill', body), skill.glyph);
-    this.card = { r, root, glyphs, t: this.leaving.length ? -ENTER_DELAY : 0 };
+    this.card = { r, root, glyphs, t: this.leaving.length ? -ENTER_DELAY : 0, side };
     this.drawCard(this.card);
+    this.cue('card');
   }
 
   private drawCard(c: Card): void {
     const t = Math.max(0, c.t);
     const inT = enter(t, 0.16);
-    c.root.style.transform = `translateX(${((1 - inT) * 900).toFixed(0)}px) rotate(${(-4 - (1 - inT) * 8).toFixed(2)}deg)`;
+    const tilt = c.side < 0 ? 4 + (1 - inT) * 8 : -4 - (1 - inT) * 8;
+    c.root.style.transform = `translateX(${((1 - inT) * 900 * c.side).toFixed(0)}px) rotate(${tilt.toFixed(2)}deg)`;
     c.root.style.opacity = c.t < 0 ? '0' : '1';
     animateGlyphs(c.glyphs, t, 0.08, 0.05);
   }
 
   private retire(c: Card): void {
-    this.leaving.push({ root: c.root, t: 0 });
+    this.leaving.push({ root: c.root, t: 0, side: c.side });
   }
 
   private updateLeaving(dt: number): void {
     this.leaving = this.leaving.filter((l) => {
       l.t += dt;
       const o = exit(l.t, OUT, OUT);
-      l.root.style.transform = `translate(${(o * -140).toFixed(0)}px, ${(o * 460).toFixed(0)}px) rotate(${(-4 - o * 16).toFixed(1)}deg)`;
+      const rot = (4 + o * 16) * -l.side;
+      l.root.style.transform = `translate(${(o * -140 * l.side).toFixed(0)}px, ${(o * 460).toFixed(0)}px) rotate(${rot.toFixed(1)}deg)`;
       l.root.style.opacity = fadeOut(l.t, OUT, OUT).toFixed(3);
       if (l.t < OUT) return true;
       l.root.remove();

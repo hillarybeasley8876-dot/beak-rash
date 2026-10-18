@@ -21,6 +21,8 @@
 .cl-name i { font: 400 22px/1 "Bebas Neue", sans-serif; font-style: normal; color: var(--red); letter-spacing: 1px; }
 
 .cl-bars { position: absolute; right: 236px; bottom: 84px; width: 440px; transform: skewX(-14deg); }
+/* Riders alongside behind the gauges: cluster.ts occlude() dims bars, diamonds and weapon slot. */
+.cl-bars, .cl .sk, .cl .wp { opacity: var(--gauge-op, 1); }
 .cl-row { position: relative; display: flex; align-items: center; height: 44px; }
 .cl-row + .cl-row { margin-top: 8px; }
 .cl-k {

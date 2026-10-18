@@ -6,7 +6,10 @@
 // aF = frame velocity xyz (inherited from a moving rider, not slowed by drag), frame damping · aT = birth (real s).
 // Motion always runs on sim time; `realtime` particles animate (life/size/colour) on real time.
 // Modes: 0 billboard · 1 velocity-stretched · 2 flat on the ground · 3 flutter (sway + flip) · 4 orbit anchor
-// · 5 world line along the velocity (wind streaks: the quad spans depth too, so lines converge in perspective).
+// · 5 world line along the velocity (wind streaks: the quad spans depth too, so lines converge in perspective;
+// constant ~2.5 px screen width, alpha tapering to both ends).
+// Every sprite shrinks away within 1.2-2.5 m of the lens, billboards never exceed 35 % of the screen height,
+// and uCull fades whatever was born in a real-time window (KO debris on the cinematic hand-back).
 
 export const PARTICLE_VERT = /* glsl */ `
 attribute vec4 aP;
@@ -21,7 +24,9 @@ uniform float uTime;
 uniform float uTimeReal;
 uniform float uAtlasCols;
 uniform vec3 uAnchors[16];
+uniform vec3 uCull;
 varying vec2 vUv;
+varying float vLineY;
 varying vec3 vCol;
 varying float vT;
 varying float vErode;
@@ -71,10 +76,17 @@ void main() {
 #ifndef FX_ADDITIVE
   if (erode < 0.5) size *= 1.0 - smoothstep(0.72, 1.0, t);
 #endif
+  if (uCull.z > 0.0 && aT.x >= uCull.x && aT.x <= uCull.y) size *= 1.0 - smoothstep(uCull.z, uCull.z + 0.1, uTimeReal);
+  float dist = max(-(modelViewMatrix * vec4(p, 1.0)).z, 0.01);
+  size *= smoothstep(1.2, 2.5, dist);
+  bool isFlat = mode > 1.5 && mode < 2.5;
+  bool isLine = mode > 4.5;
+  if (!isFlat && !isLine) size = min(size, 0.7 * dist / projectionMatrix[1][1]);
   float rot = orbit ? sin(age * 5.0 + seed * 6.28) * 0.35 : aS.z + aS.w * age;
   vec2 corner = position.xy;
+  vLineY = 0.0;
   vec4 mv;
-  if (mode > 1.5 && mode < 2.5) {
+  if (isFlat) {
     vec2 c = rot2(corner, rot) * size;
     mv = modelViewMatrix * vec4(p + vec3(c.x, 0.02, c.y), 1.0);
   } else if (mode > 0.5 && mode < 1.5) {
@@ -85,14 +97,17 @@ void main() {
     vec2 perp = vec2(-dir.y, dir.x);
     float len = max(size, sp * aX.w);
     mv.xy += dir * corner.y * len + perp * corner.x * size;
-  } else if (mode > 4.5) {
+  } else if (isLine) {
     vec4 c = modelViewMatrix * vec4(p, 1.0);
     vec3 vv = (modelViewMatrix * vec4(vel, 0.0)).xyz;
     float sp = length(vv);
     vec3 dir = sp > 1e-4 ? vv / sp : vec3(0.0, 1.0, 0.0);
     vec3 side = cross(dir, normalize(c.xyz));
     side = length(side) > 1e-4 ? normalize(side) : vec3(1.0, 0.0, 0.0);
-    mv = vec4(c.xyz + dir * corner.y * max(size, sp * aX.w) + side * corner.x * size, 1.0);
+    // The streak sprite lights ~20 % of the quad width: 0.023 NDC of quad = ~2.5 px of line at 1080p.
+    float width = size > 0.0 ? 0.023 * dist / projectionMatrix[1][1] : 0.0;
+    mv = vec4(c.xyz + dir * corner.y * max(size, sp * aX.w) + side * corner.x * width, 1.0);
+    vLineY = corner.y;
   } else {
     if (mode > 2.5) {
       float ph = age * (3.0 + seed * 4.0) + seed * 6.28;
@@ -119,10 +134,11 @@ varying vec2 vUv;
 varying vec3 vCol;
 varying float vT;
 varying float vErode;
+varying float vLineY;
 void main() {
   vec4 tex = texture2D(tAtlas, vUv);
 #ifdef FX_ADDITIVE
-  float a = tex.a * (1.0 - smoothstep(0.55, 1.0, vT));
+  float a = tex.a * (1.0 - smoothstep(0.55, 1.0, vT)) * (1.0 - 4.0 * vLineY * vLineY);
   if (a < 0.004) discard;
   gl_FragColor = vec4(vCol * tex.rgb, a);
 #else

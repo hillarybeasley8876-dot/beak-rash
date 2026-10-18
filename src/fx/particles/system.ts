@@ -32,7 +32,7 @@ export class Particles {
   constructor(quality: Quality) {
     const cap = CAPACITY[quality];
     this.density = cap.density;
-    this.shared = { uTime: { value: 0 }, uTimeReal: { value: 0 }, uAnchors: { value: this.anchors } };
+    this.shared = { uTime: { value: 0 }, uTimeReal: { value: 0 }, uAnchors: { value: this.anchors }, uCull: { value: new Vector3() } };
     const atlas = particleAtlas();
     this.solid = new ParticlePool(cap.solid, false, atlas, this.shared);
     this.add = new ParticlePool(cap.add, true, atlas, this.shared);
@@ -43,6 +43,16 @@ export class Particles {
   /** Particle clock (sim seconds). */
   get now(): number {
     return this.clock;
+  }
+
+  /** Particle real clock (seconds since the last clear); marks for cull(). */
+  get nowReal(): number {
+    return this.clockReal;
+  }
+
+  /** Fade out (0.1 s, from now) every particle born since `fromReal` (KO debris on the cinematic hand-back). */
+  cull(fromReal: number): void {
+    this.shared.uCull.value.set(fromReal, this.clockReal, this.clockReal);
   }
 
   /** A blank spec to fill in and pass to emit() (shared scratch object). */
@@ -85,6 +95,7 @@ export class Particles {
     this.add.clear();
     this.clock = this.clockReal = 0;
     this.shared.uTime.value = this.shared.uTimeReal.value = 0;
+    this.shared.uCull.value.set(0, 0, 0);
   }
 
   dispose(): void {

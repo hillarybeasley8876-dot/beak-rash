@@ -11,9 +11,12 @@ import { el, w } from './dom';
 import { TICKET_HOLD, wireHudEvents } from './events';
 import { preloadHudFonts } from './fonts';
 import { Counters, PlaceBlock } from './place';
+import { hudSfx } from './sfx';
 import { ProgressStrip } from './progress';
+import { Quip } from './quip';
 import { Speedo } from './speedo';
 import { WorldOverlay } from './world/overlay';
+import type { BubbleObstacles } from './world/bubbles';
 import { Projector } from './world/project';
 
 /** Reference layout is 1920×1080; everything scales by k = min(w/1920, h/1080). */
@@ -22,6 +25,7 @@ export const REF_H = 1080;
 
 export function createHud(app: AppContext, layer: HTMLElement): Hud {
   void preloadHudFonts();
+  const sfx = hudSfx(app.audio);
   const root = el('div', 'brh is-off', layer);
   const rootW = w(root);
   const proj = new Projector(app.camera);
@@ -29,13 +33,14 @@ export function createHud(app: AppContext, layer: HTMLElement): Hud {
   const hudLayer = el('div', 'brh-hud', root);
   const edgesHost = el('div', 'brh-layer brh-edges-host', root);
   const corner = (cls: string): HTMLDivElement => el('div', `brh-corner ${cls}`, hudLayer);
-  const place = new PlaceBlock(corner('tl'));
+  const place = new PlaceBlock(corner('tl'), (n) => sfx('ui.count', { volume: 0.9, pitch: n === 1 ? 1.25 : 1 }));
   const progress = new ProgressStrip(corner('top'));
   const counters = new Counters(corner('tr'));
   const speedo = new Speedo(corner('bl'));
   const brCorner = corner('br');
+  const quip = new Quip(brCorner);
   const world = new WorldOverlay(proj, worldHost, edgesHost);
-  const cutins = new CutinLayer(root, hudLayer);
+  const cutins = new CutinLayer(root, hudLayer, sfx);
   let cluster: Cluster | null = null;
   let session: Session | null = null;
   let visible = false;
@@ -45,10 +50,15 @@ export function createHud(app: AppContext, layer: HTMLElement): Hud {
   /** Static HUD + world overlays fade out (160 ms, real time) for the intro flyover and cinematics. */
   let alpha = 0;
   const fadeW = [w(hudLayer), w(worldHost), w(edgesHost)];
+  /** This frame's quip and chip-column rects (taunt bubbles keep clear of them). */
+  const dyn: BubbleObstacles = { quip: null, chips: null, callouts: null };
+  const quipRect = { l: 0, r: 0, t: 0, b: 0 };
+  const chipsRect = { l: 0, r: 0, t: 0, b: 0 };
+  const calloutsRect = { l: 0, r: 0, t: 0, b: 0 };
 
   const unwire = wireHudEvents(app.bus, {
     session: () => session,
-    place, speedo, world, cutins,
+    place, speedo, world, cutins, quip,
     cluster: () => cluster,
     busted: () => (bustAt = session?.time ?? null),
   });
@@ -67,6 +77,7 @@ export function createHud(app: AppContext, layer: HTMLElement): Hud {
       if (s) preloadPortraits(s.player.character, s.riders.filter((r) => !r.isPlayer).map((r) => r.character));
       cluster?.root.remove();
       cluster = s ? new Cluster(brCorner, s.player.character) : null;
+      quip.reset(s?.player.character ?? null);
       progress.setRiders(s?.riders ?? []);
       alpha = 0;
       world.attach(s);
@@ -79,6 +90,7 @@ export function createHud(app: AppContext, layer: HTMLElement): Hud {
       const on = visible && session !== null;
       rootW.cls('is-off', !on);
       if (!on || !session) return;
+      world.measure(); // layout reads first, before this frame's writes
       resize();
       const p = session.player;
       const quiet = session.phase === 'intro' || cutins.cinematic;
@@ -88,15 +100,21 @@ export function createHud(app: AppContext, layer: HTMLElement): Hud {
       const held = bustAt !== null ? session.time - bustAt : p.modeTime;
       const ticket = p.mode === 'busted' ? Math.max(0, TICKET_HOLD - held) : 0;
       place.update(p.place, session.riders.length, p.finishTime ?? session.time, ticket, dtReal);
-      progress.update(session.track.length);
+      progress.update(session.track.length, dtReal);
       counters.update(p.kos, p.coins, dtReal);
       speedo.update(p, dtReal);
       cluster?.update(p, dtReal);
-      world.update(dtReal, k);
+      quip.update(dtReal, alpha);
+      dyn.quip = quip.rect(app.size.width, app.size.height, k, quipRect);
+      dyn.chips = cutins.chipsRect(app.size.width, k, chipsRect);
+      dyn.callouts = cutins.calloutsRect(app.size.width, app.size.height, k, calloutsRect);
+      world.update(dtReal, k, dyn);
+      cluster?.occlude(world.gaugesCovered, dtReal);
       cutins.update(dtReal, k, proj);
     },
     dispose() {
       unwire();
+      world.dispose();
       root.remove();
       session = null;
       cluster = null;

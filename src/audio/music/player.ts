@@ -6,6 +6,7 @@
 import { Rng } from '../../core/rng';
 import { noise } from '../dsp/noise';
 import { Band } from './band';
+import { buildStep, drumStep, type GrooveSource } from './groove';
 import { BASS_TOKEN, compileSong, tiedLength, tokenAt, type CompiledSection, type CompiledSong } from './compile';
 import { degreeOffset, noteToMidi, parseKey, voiceChord, type Chord, type Tonality } from './theory';
 import type { Engine } from '../engine';
@@ -16,6 +17,8 @@ const CHORD_LANES = ['keys', 'clav', 'brass', 'pad'] as const;
 type ChordLane = (typeof CHORD_LANES)[number];
 const CENTER: Record<ChordLane, number> = { keys: 63, clav: 68, brass: 71, pad: 60 };
 const LATE = 0.03;   // s: a step this far behind the clock is skipped, not played late
+const LEAD_VEL = 0.9;
+const LEAD2_VEL = 0.62; // the harmony / octave line under the hook
 const BUILD = 'build';
 
 export interface PlayerOpts {
@@ -52,6 +55,8 @@ export class SongPlayer {
   private building = false;
   private holdName: string | null = null;
   private crashNext = false;
+  /** Audio time up to which the drums are pre-mixed (drumBar). */
+  private drumsUntil = -Infinity;
   private semis = 0;
   private passes = new Map<string, number>();
   private voicings: Partial<Record<ChordLane, number[]>> = {};
@@ -134,6 +139,7 @@ export class SongPlayer {
    * Steps until then are skipped; a vamp hold ends.
    */
   cue(section: string, at: number): void {
+    this.cutDrums(this.nextTime);
     const i = this.form.indexOf(section);
     this.holdName = null;
     this.pendingForm = null;
@@ -150,6 +156,13 @@ export class SongPlayer {
     this.building = false;
     this.stepInSection = 0;
     this.nextTime = Math.min(this.nextTime, at);
+    this.cutDrums(this.nextTime);
+  }
+
+  /** Pre-mixed drums stop at `at` (what the old timeline still had queued); the next step re-mixes. */
+  private cutDrums(at: number): void {
+    this.band.drums.cut(at);
+    this.drumsUntil = -Infinity;
   }
 
   /**
@@ -251,25 +264,36 @@ export class SongPlayer {
     if (step === 0) {
       this.starts.push({ section: sec.name, at: this.nextTime });
       if (this.starts.length > 12) this.starts.shift();
+      this.band.section(this.nextTime, this.stepDur * 16, sec.gainDb, sec.shape);
     }
-    if (this.crashNext) {
-      this.crashNext = false;
-      if (this.tok(sec, 'cym', step) !== 'C') this.band.drums.crash(this.nextTime, 0.9);
-    }
-    if (this.building) this.buildStep(step % 16, t0);
-    this.drums(sec, step, t0);
+    if (this.nextTime >= this.drumsUntil - 1e-6) this.drumBar(sec, step);
     this.bass(sec, step, human(0.003), chord);
     for (const lane of CHORD_LANES) this.chordLane(lane, sec, step, human(0.006), chord);
-    this.leadLane('lead', sec, step, human(0.004), 0.9);
-    this.leadLane('lead2', sec, step, human(0.004), 0.62);
+    this.leadLane('lead', sec, step, human(0.004), LEAD_VEL);
+    this.leadLane('lead2', sec, step, human(0.004), LEAD2_VEL);
   }
 
-  /** The bar before the final stretch: a swelling riser and a 16th snare roll into the crash. */
-  private buildStep(step: number, t: number): void {
+  /** The drums from step `from` to the end of its bar, pre-mixed into one buffer (drum-mix.ts). */
+  private drumBar(sec: CompiledSection, from: number): void {
     const d = this.band.drums;
-    if (step === 0) d.riser(t, this.stepDur * 16, 1);
-    d.snare(t, 0.25 + 0.75 * (step / 15), step < 8 && step % 2 === 1);
-    if (step >= 12) d.tom(t, 0.7 + 0.08 * (step - 12), step < 14 ? 1 : 3);
+    const start = this.nextTime;
+    const end = Math.min(sec.steps, (Math.floor(from / 16) + 1) * 16);
+    const g: GrooveSource = {
+      kit: d, stepDur: this.stepDur, building: this.building,
+      tok: (x, lane, step) => this.tok(x, lane, step), vel: (c) => this.vel(c), random: () => this.rng.next(),
+    };
+    d.record(start);
+    if (this.crashNext) {
+      this.crashNext = false;
+      if (this.tok(sec, 'cym', from) !== 'C') d.crash(start, 0.9);
+    }
+    for (let s = from; s < end; s++) {
+      const t = start + (s - from) * this.stepDur + (s % 2 === 1 ? this.song.swing * this.stepDur : 0);
+      if (this.building) buildStep(g, s % 16, t);
+      drumStep(g, sec, s, t);
+    }
+    d.flush();
+    this.drumsUntil = start + (end - from) * this.stepDur;
   }
 
   private tok(sec: CompiledSection, lane: LaneName, step: number): string | null {
@@ -283,29 +307,6 @@ export class SongPlayer {
 
   private vel(c: string): number {
     return (VEL[c] ?? 0.8) * (0.94 + this.rng.next() * 0.12);
-  }
-
-  private drums(sec: CompiledSection, step: number, t: number): void {
-    const d = this.band.drums;
-    const k = this.tok(sec, 'kick', step);
-    if (k) d.kick(t, this.vel(k));
-    const s = this.building ? null : this.tok(sec, 'snare', step);
-    if (s === 'r') d.rim(t, this.vel('x'));
-    else if (s) d.snare(t, this.vel(s), s === 'g');
-    const c = this.tok(sec, 'clap', step);
-    if (c) d.clap(t, this.vel(c));
-    const h = this.tok(sec, 'hat', step);
-    if (h) d.hat(t, h === 'O' ? 0.85 : this.vel(h), h === 'O');
-    const p = this.tok(sec, 'perc', step);
-    if (p === 's' || p === 'S') d.shaker(t, this.vel(p));
-    else if (p === 't' || p === 'T') d.tambourine(t, this.vel(p));
-    else if (p === 'b' || p === 'B') d.cowbell(t, this.vel(p));
-    const tm = this.building ? null : this.tok(sec, 'tom', step);
-    if (tm === '1' || tm === '2' || tm === '3') d.tom(t, 0.75 + this.rng.next() * 0.2, Number(tm) as 1 | 2 | 3);
-    const cy = this.tok(sec, 'cym', step);
-    if (cy === 'C') d.crash(t, 0.9);
-    else if (cy === 'R') d.ride(t, this.vel('x'));
-    else if (cy === 'W') d.swell(t, (16 - (step % 16)) * this.stepDur, 1);
   }
 
   private bass(sec: CompiledSection, step: number, t: number, chord: Chord): void {
@@ -350,9 +351,22 @@ export class SongPlayer {
   private leadLane(lane: 'lead' | 'lead2', sec: CompiledSection, step: number, t: number, vel: number): void {
     const tok = this.tok(sec, lane, step);
     if (!tok) return;
+    // A lead2 note shadowing the lead an octave down sounds inside the lead voice (one oscillator more).
+    const doubled = this.doubled(sec, step);
+    if (lane === 'lead2' && doubled) return;
     const scoop = tok.endsWith('~');
     const midi = noteToMidi(scoop ? tok.slice(0, -1) : tok) + this.semis;
     const dur = this.len(sec, lane, step) * this.stepDur * 0.9;
-    this.band.lead(sec.voice ?? this.song.lead, lane === 'lead' ? 0 : 1).note(t, midi, dur, vel * (0.9 + this.rng.next() * 0.15), scoop);
+    const voice = this.band.lead(sec.voice ?? this.song.lead, lane === 'lead' ? 0 : 1);
+    voice.note(t, midi, dur, vel * (0.9 + this.rng.next() * 0.15), scoop, lane === 'lead' && doubled ? LEAD2_VEL / LEAD_VEL : 0);
+  }
+
+  /** The lead2 note at this step is the lead's own note an octave down, of the same length. */
+  private doubled(sec: CompiledSection, step: number): boolean {
+    const a = this.tok(sec, 'lead', step);
+    const b = this.tok(sec, 'lead2', step);
+    if (!a || !b) return false;
+    const pitch = (x: string): number => noteToMidi(x.endsWith('~') ? x.slice(0, -1) : x);
+    return pitch(b) === pitch(a) - 12 && this.len(sec, 'lead2', step) === this.len(sec, 'lead', step);
   }
 }

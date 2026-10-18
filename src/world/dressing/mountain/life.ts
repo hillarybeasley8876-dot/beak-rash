@@ -4,6 +4,7 @@ import { Vector3 } from 'three';
 import { buildBalloons, type BalloonSite } from '../../env/mountain-balloons';
 import { buildRopeway } from '../../env/mountain-ropeway';
 import { buildTurbines, type TurbineSite } from '../../env/mountain-turbines';
+import { sagAt } from '../../scenery/props/mountain-deco';
 import type { Dress } from '../dress';
 
 /** Highest points on `side` between s0..s1 at u 260–560 m, at least `gap` m apart. */
@@ -45,10 +46,9 @@ export function cableCar(d: Dress, s: number, side: -1 | 1): void {
   const sag = a.distanceTo(b) * 0.04;
   // Keep at least 16 m between the cable (gondolas hang 4.5 m) and anything below it.
   let worst = Infinity;
+  const tmp = new Vector3();
   for (let i = 1; i < 40; i++) {
-    const t = i / 40;
-    const p = new Vector3().lerpVectors(a, b, t);
-    p.y -= sag * 4 * t * (1 - t);
+    const p = sagAt(a, b, i / 40, sag, tmp);
     worst = Math.min(worst, p.y - ctx.groundWorld(p.x, p.z));
   }
   if (worst < 16) {

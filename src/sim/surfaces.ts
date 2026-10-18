@@ -47,6 +47,7 @@ export function resolveBounds(ctx: SimCtx, sr: SimRider, dt: number): void {
   const r = sr.r;
   sr.wallCooldown = Math.max(0, sr.wallCooldown - dt);
   sr.wallHitCooldown = Math.max(0, sr.wallHitCooldown - dt);
+  sr.scrape = 0;
   const tr = ctx.session.track;
   const b = tr.bounds(Math.min(r.s, trackEnd(tr)));
   const right = b.right - T.riderHalfWidth;
@@ -86,6 +87,7 @@ function edge(ctx: SimCtx, sr: SimRider, side: 1 | -1, kind: Surface, limit: num
   // Scraping: friction proportional to how hard the rider leans on the wall, sparks ~6×/s.
   const pressure = clamp01((sr.vxWant * side) / T.wallPressureFull);
   if (pressure <= 0) return;
+  sr.scrape = side * pressure; // pose: nose and lean into the wall (attitude.ts)
   r.speed = Math.max(0, r.speed - T.wallScrapeDecel * pressure * dt);
   if (pressure > 0.15 && sr.wallCooldown <= 0 && r.speed > 4) {
     sr.wallCooldown = T.wallScrapeEvery;

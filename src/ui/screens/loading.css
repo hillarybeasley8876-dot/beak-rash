@@ -69,6 +69,6 @@
 .br-road-text { position: absolute; left: 0; top: -84px; display: flex; align-items: baseline; gap: 18px; font-family: var(--f-display); font-weight: 400; }
 .br-road-label { font-size: 48px; letter-spacing: 0.12em; color: var(--white); }
 .br-road-pct { font-size: 86px; color: var(--white); min-width: 2.6em; text-align: right; text-shadow: 6px 6px 0 var(--red); }
-.br-load-art { position: absolute; right: 36px; top: 360px; width: 560px; height: 460px; object-fit: contain; object-position: right center; filter: drop-shadow(10px 10px 0 var(--ink)); --delay: 160ms; }
+.br-load-art { position: absolute; right: 36px; top: 280px; width: 560px; height: 460px; object-fit: contain; object-position: right center; filter: drop-shadow(10px 10px 0 var(--ink)); --delay: 0ms; }
 .br-scr-loading.has-art .br-load-tip { width: 560px; padding: 30px 40px 32px; }
 .br-scr-loading.has-art .br-load-tip p { font-size: 36px; }

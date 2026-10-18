@@ -6,8 +6,8 @@ import { Color, Matrix4 } from 'three';
 import type { Rng } from '../../../core/rng';
 import type { MeshBuf } from '../../geom';
 import { box, cone, cylinder, sphere, trs } from '../../kit/shapes';
+import { C } from './city-kit';
 
-const C = (h: string): Color => new Color(h);
 type Species = 'cat' | 'shiba' | 'pigeon' | 'penguin' | 'capybara' | 'goose' | 'pelican' | 'bunny';
 const SPECIES: Species[] = ['cat', 'cat', 'shiba', 'pigeon', 'pigeon', 'penguin', 'capybara', 'goose', 'pelican', 'bunny'];
 const FUR: Record<Species, Color[]> = {

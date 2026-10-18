@@ -8,12 +8,13 @@ import { riderRating } from '../grid';
 import { Brain, type AiWorld } from './brain';
 import type { HuntToken } from './fight';
 import { buildRacingLine } from './line';
-import { basePace, easeRubber, paceCap, unseenBehind } from './pace';
+import { basePace, easeRubber, paceCap, paybackPace, unseenBehind } from './pace';
 import { makePersonality } from './personality';
 import { Senses } from './sense';
 import { Taunts } from './taunts';
 
-const PACE_SPREAD = 0.02;   // ± pace offset between the strongest and the weakest rival
+const PACE_SPREAD = 0.02;   // ± pace offset between the best and the worst rival of the day
+const RANK_WEIGHT = 0.25;   // share of the offset that comes from strength rank (the rest is today's form)
 const RECOVER = 12;         // s after a respawn without catch-up (a KO buys a real gap)
 
 export interface AiDirector {
@@ -23,13 +24,14 @@ export interface AiDirector {
 }
 
 /**
- * Per-rider pace offsets within ±PACE_SPREAD: half from strength rank (strongest +, weakest −), half
- * from today's form (per race dice), so the strong riders lead more often without always winning.
+ * Per-rider pace offsets within ±PACE_SPREAD: mostly today's form (per race dice), a quarter from strength
+ * rank (strongest +, weakest −), so the favourites start a little quicker without owning the podium.
  */
 function paceOffsets(riders: readonly RiderState[], rng: Rng): Map<RiderId, number> {
   const rivals = riders.filter((r) => !r.isPlayer).sort((a, b) => riderRating(b) - riderRating(a));
   const n = Math.max(1, rivals.length - 1);
-  return new Map(rivals.map((r, i) => [r.id, PACE_SPREAD * (0.5 * (1 - (2 * i) / n) + 0.5 * rng.range(-1, 1))]));
+  const offset = (rank: number): number => PACE_SPREAD * (RANK_WEIGHT * (1 - (2 * rank) / n) + (1 - RANK_WEIGHT) * rng.range(-1, 1));
+  return new Map(rivals.map((r, i) => [r.id, offset(i)]));
 }
 
 export function createAi(session: Session): AiDirector {
@@ -77,9 +79,11 @@ export function createAi(session: Session): AiDirector {
     const huntingPlayer = b.fighter.hunt === p;
     const recovering = session.time - (respawnAt.get(r.id) ?? -Infinity) < RECOVER;
     const offset = offsets.get(r.id) ?? 0;
+    const payback = !recovering && b.fighter.paybackChase(p, dt);
     b.basePace = basePace(config.level, offset);
-    b.paceTop = paceCap({ rider: r, player: p, level: config.level, offset, huntingPlayer, chaseCam, recovering });
-    easeRubber(r, b.paceTop, b.basePace, unseenBehind(r, p, chaseCam, huntingPlayer), dt);
+    b.paceTop = paceCap({ rider: r, player: p, level: config.level, offset, huntingPlayer, chaseCam, recovering, payback });
+    const inView = payback ? paybackPace(b.basePace, p) : b.basePace;
+    easeRubber(r, b.paceTop, inView, unseenBehind(r, p, chaseCam, huntingPlayer), dt, payback);
   };
 
   const bellCheck = (b: Brain): void => {

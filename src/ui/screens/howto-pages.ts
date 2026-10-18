@@ -96,6 +96,7 @@ export function gamepadPage(): HTMLDivElement {
 
 export function skillsPage(): HTMLDivElement {
   const keys = ['U', 'I', 'O'];
+  const padKeys = ['LB', '✚↑', '✚↓'];
   const cards = [...PLAYER_SKILLS, PLAYER_ULT].map((id, i) => {
     const s = SKILLS[id];
     if (!s) return null;
@@ -103,7 +104,8 @@ export function skillsPage(): HTMLDivElement {
     const tip = HOWTO_SKILL_TIPS[id];
     return h('div', { class: `br-ht-skill${ult ? ' is-ult' : ''}`, vars: { '--i': i } },
       h('div', { class: 'br-ht-diamond' }, h('b', { text: s.glyph })),
-      h('kbd', { class: 'br-ht-skey', text: ult ? 'P' : keys[i] ?? '' }),
+      h('kbd', { class: 'br-ht-skey br-kb-only', text: ult ? 'P' : keys[i] ?? '' }),
+      h('kbd', { class: 'br-ht-skey br-pad-only', text: ult ? 'R3' : padKeys[i] ?? '' }),
       h('div', { class: 'br-ht-sname', text: s.name }),
       h('div', { class: 'br-ht-sen', text: s.nameEn }),
       h('p', { class: 'br-ht-sdesc', text: s.desc }),

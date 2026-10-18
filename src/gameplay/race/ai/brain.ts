@@ -28,6 +28,10 @@ const SKILL_EVERY = 0.5;
 const SOFT_CLOSING = 2;     // m/s: closing on a rider faster than this brakes instead of coasting
 const FOLLOW_DECEL = 4;     // m/s²: planned deceleration when closing on a rider ahead
 const CAP_SLACK = 0.5;      // m/s: aim this far above the pace cap (rubber makes the sim's top the cap itself)
+const DRAFT_TOP = 0.1;      // slipstream top-speed bonus (SPEC §6, sim tuning draftTop): a drafter may close on the wheel
+
+/** Speed command of one step: target m/s and whether only easing off the pedals (never braking). */
+interface SpeedGoal { target: number; soft: boolean }
 
 export class Brain {
   readonly driver = new Driver();
@@ -114,6 +118,7 @@ export class Brain {
 
   private desiredX(w: AiWorld, hw: number): number {
     const { r, p } = this;
+    if (r.mode === 'finished') return this.rollOutX(hw);
     const lineX = w.line.x(r.s + Math.max(8, r.speed * 0.7));
     const bend = smoothstep(0.002, 0.009, Math.abs(w.line.peakCurv(r.s, r.s + 40)));
     const own = clamp(p.lineBias + p.wander * Math.sin(this.time * 0.23 + this.wanderPhase), -hw + 1.6, hw - 1.6);
@@ -163,7 +168,8 @@ export class Brain {
     if (this.skillT <= 0 && w.time >= this.firstSkillAt) {
       this.skillT = SKILL_EVERY;
       const straight = this.straightAhead(w);
-      const view = { me: r, blips: w.senses.blips, blocked: this.plan.followGap < 8, straight, player: w.player, time: w.time, grudge: this.fighter.grudging };
+      const view = { me: r, blips: w.senses.blips, blocked: this.plan.followGap < 8, straight, player: w.player, time: w.time,
+        grudge: this.fighter.grudging, field: w.riders.length };
       useSkill(view, this.c, p.skillUse, this.rng.next());
     }
     if (this.ringBell) {
@@ -180,6 +186,7 @@ export class Brain {
       pace: Number.isFinite(this.paceTop) ? +this.paceTop.toFixed(2) : null, base: Number.isFinite(this.basePace) ? +this.basePace.toFixed(2) : null,
       top: +topOf(r).toFixed(2), rubber: +r.rubber.toFixed(3), aLat: +this.grip.aLat.toFixed(2), drift: this.drift.active,
       steer: +this.c.steer.toFixed(2), throttle: +this.c.throttle.toFixed(2), brake: +this.c.brake.toFixed(2),
+      fight: this.fighter.debug(),
     };
   }
 
@@ -189,14 +196,27 @@ export class Brain {
   }
 
   private drive(w: AiWorld): void {
-    const { r, c, p } = this;
-    if (r.mode === 'finished') {
-      // Roll out after the line: brake harder when still flying (boosted finishes).
-      c.throttle = 0;
-      c.brake = clamp((r.speed - 5) / 10, 0.1, 0.8);
-      return;
+    const { r, c } = this;
+    const g = r.mode === 'finished' ? this.rollOut() : this.raceSpeed(w);
+    this.followLimit(g);
+    if (r.mode === 'racing') this.huntLimit(g);
+    this.driver.speedTo(r, Math.max(0, g.target), c, g.soft);
+    c.drift = this.drift.active && c.brake === 0;
+    // The sim picks the drift direction from the steer sign on the press: lean into the bend first.
+    if (c.drift && !r.drifting) c.steer = this.drift.dir * Math.max(0.45, Math.abs(c.steer));
+    if (this.plan.hopAt !== null && this.hopCd <= 0 && !r.airborne) {
+      c.hop = true;
+      this.hopCd = 1.2;
     }
-    const boost = 1 + (r.boostTime > 0 ? r.boostPower : 0);
+    if (r.airborne) c.steer = clamp(-r.yaw * 2, -0.3, 0.3);
+  }
+
+  /** Racing speed: own top and the pace cap (× boosts and slipstream), corners ahead, the drift plan. */
+  private raceSpeed(w: AiWorld): SpeedGoal {
+    const { r, p } = this;
+    // Boosts and the slipstream lift the cap like they lift the sim's top: a drafter closes on the wheel ahead
+    // and slingshots past, so the leader of a pack (no draft) can be caught.
+    const boost = (1 + (r.boostTime > 0 ? r.boostPower : 0)) * (1 + DRAFT_TOP * r.draft);
     // Own bike top (× the race's rubber band factor, which the sim multiplies in) × statuses × boost.
     const top = topOf(r) * r.rubber * r.mods.speedMul * boost;
     // Aim above top speed so the pedals stay floored up to the pace cap (the rubber factor holds the sim's top
@@ -209,40 +229,56 @@ export class Brain {
     }
     const inside = (r.x - this.tx) * (this.drift.active ? this.drift.dir : 1);
     updateDrift(this.drift, r, w.line, p.drifter, p.skill, this.driftRoll, inside, this.stepDt);
-    let target = targetSpeed(base, cornerSpeed(w.line, r.s, r.speed, this.grip.aLat), this.drift.active);
-    // Soft (ease off, never brake) only while the pace cap is the binding limit or a rider ahead closes slowly;
-    // anything slow or stopped in front gets real braking.
-    let soft = cap < top + 2 && target >= base - 0.01;
+    const target = targetSpeed(base, cornerSpeed(w.line, r.s, r.speed, this.grip.aLat), this.drift.active);
+    // Soft (ease off, never brake) only while the pace cap is the binding limit; followLimit() and huntLimit()
+    // brake for anything slow or stopped in front.
+    return { target, soft: cap < top + 2 && target >= base - 0.01 };
+  }
+
+  /**
+   * Past the line the sim coasts the bike to a stop (its finish auto-brake, ~60 m): the brain never pedals, it
+   * pulls over (rollOutX) and brakes for anyone stopped ahead (followLimit).
+   */
+  private rollOut(): SpeedGoal {
+    this.drift.active = false;
+    return { target: this.r.speed - 0.7, soft: true };
+  }
+
+  /** Lane after the finish: the road edge, sides alternating by place, so later finishers have a clear road. */
+  private rollOutX(hw: number): number {
+    return (this.r.place % 2 === 1 ? 1 : -1) * (hw - 1.3);
+  }
+
+  /**
+   * Riders in a pack sit close (drafting), but closing fast on one brakes in time (stopping-distance speed);
+   * traffic and props get a real safety gap.
+   */
+  private followLimit(g: SpeedGoal): void {
+    const { r } = this;
     const { followSpeed, followGap, followKind } = this.plan;
-    if (followSpeed !== null) {
-      // Riders in a pack sit close (drafting), but closing fast on one brakes in time (stopping-distance
-      // speed); traffic and props get a real safety gap.
-      const rider = followKind === 'rider';
-      const room = followGap - (rider ? 1.2 : 3.5 + r.speed * 0.3);
-      const t = followSpeed + (rider && room > 0 ? Math.sqrt(2 * FOLLOW_DECEL * room) : room * 0.6);
-      if ((rider || room < 3.5 + r.speed * 0.3) && t < target) {
-        target = t;
-        soft = followKind === 'rider' && followGap > 0.6 && r.speed - followSpeed < SOFT_CLOSING;
-      }
+    if (followSpeed === null) return;
+    const rider = followKind === 'rider';
+    const room = followGap - (rider ? 1.2 : 3.5 + r.speed * 0.3);
+    const t = followSpeed + (rider && room > 0 ? Math.sqrt(2 * FOLLOW_DECEL * room) : room * 0.6);
+    if ((rider || room < 3.5 + r.speed * 0.3) && t < g.target) {
+      g.target = t;
+      g.soft = rider && followGap > 0.6 && r.speed - followSpeed < SOFT_CLOSING;
     }
+  }
+
+  /**
+   * A hunter rides alongside its prey: match its speed, closing in from behind (brake on slow prey); ahead of
+   * the prey it only eases off, unless it owes the player a payback (then it brakes to let the player come up).
+   */
+  private huntLimit(g: SpeedGoal): void {
     const goal = this.fighter.huntGoal();
     const prey = this.fighter.hunt;
-    if (goal && prey && Math.abs(goal.ds) < 25) {
-      const t = prey.speed + clamp(goal.ds * 0.8, -2.5, 5);
-      if (t < target) {
-        target = t;
-        soft = goal.ds < 0 || r.speed - prey.speed < SOFT_CLOSING;
-      }
+    if (!goal || !prey || Math.abs(goal.ds) >= 25) return;
+    const t = prey.speed + clamp(goal.ds * 0.8, -2.5, 5);
+    if (t < g.target) {
+      g.target = t;
+      g.soft = (goal.ds < 0 && !this.fighter.owes) || (goal.ds >= 0 && this.r.speed - prey.speed < SOFT_CLOSING);
     }
-    this.driver.speedTo(r, Math.max(0, target), c, soft);
-    c.drift = this.drift.active && c.brake === 0;
-    // The sim picks the drift direction from the steer sign on the press: lean into the bend first.
-    if (c.drift && !r.drifting) c.steer = this.drift.dir * Math.max(0.45, Math.abs(c.steer));
-    if (this.plan.hopAt !== null && this.hopCd <= 0 && !r.airborne) {
-      c.hop = true;
-      this.hopCd = 1.2;
-    }
-    if (r.airborne) c.steer = clamp(-r.yaw * 2, -0.3, 0.3);
   }
 
   /** Riders pinned against a wall or a stopped car pedal and steer back to the line. */

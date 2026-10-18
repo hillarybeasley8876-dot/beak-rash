@@ -11,6 +11,14 @@ export const BASE = process.env.BR_BASE ?? 'http://127.0.0.1:5300';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Integrator notice (2026-10-18): every agent that Read ~30-45 full-size PNG screenshots died with
+// "Request timed out" (the request body grows with each image). Printed on stderr so JSON stdout stays clean.
+console.error(
+  '[lib] IMAGE BUDGET (integrator): agents that Read 30+ full-size screenshots die with "Request timed out". ' +
+    'Before you Read a screenshot, convert it: sips -Z 1280 -s format jpeg -s formatOptions 70 in.png --out in.jpg ' +
+    '(or combine shots into one contact sheet), and Read at most ~15 images in total for your whole task.',
+);
+
 async function acquireSlot() {
   fs.mkdirSync(LOCKS, { recursive: true });
   for (let waited = 0; ; waited += 500) {

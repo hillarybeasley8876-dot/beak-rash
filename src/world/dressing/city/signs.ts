@@ -8,32 +8,50 @@ import { postSign } from '../../scenery/signs/boards';
 import { banners, chevrons, distanceMarkers, warning } from '../coast/signage';
 import type { City } from './city';
 import { CITY_SIGNS } from './lines';
-import { mount, towardRiders, zoneRuns } from './util';
+import { mount, signInset, towardRiders, zoneRuns } from './util';
 
 export const BANNERS = ['暴力鹈鹕 BEAK RASH', '霓虹夜城 欢迎你', '今日宜：撞人', 'V我50 小鱼干', 'SHOWTIME!', '夜骑请开灯'];
 
-/** Post sign at (s, side) just behind the kerb, facing the riders. */
+const TURN = 0.28;
+
+/** Nudges tried (m along the road) when a lot or prop already takes the spot behind the kerb. */
+const NUDGE = [0, -6, 6, -12, 12];
+
+/** Post sign near (s, side) behind the kerb, facing the riders; the board never reaches over the drivable edge. */
 function sign(c: City, s: number, side: -1 | 1, rect: AtlasRect | null, w: number, h: number): void {
   if (!rect) return;
-  const mt = mount(c, s, side, 0.5);
-  if (!mt || !c.d.place.claim(mt.sp.pos.x, mt.sp.pos.z, 0.5)) return;
-  const { sp } = mt;
-  postSign(c.d.b.props.at(sp.pos.x, sp.pos.z), c.d.b.faces.at(sp.pos.x, sp.pos.z), sp.pos.x, mt.y, sp.pos.z, towardRiders(c.d.ctx, s, side, 0.28), w, h, 1.6, rect);
+  for (const ds of NUDGE) {
+    const mt = mount(c, s + ds, side, signInset(w, TURN));
+    // Over drops the mount snaps onto the parapet, where a centred board would hang over the road.
+    if (!mt || mt.onDeck || !c.d.place.claim(mt.sp.pos.x, mt.sp.pos.z, 0.5)) continue;
+    const { sp } = mt;
+    postSign(c.d.b.props.at(sp.pos.x, sp.pos.z), c.d.b.faces.at(sp.pos.x, sp.pos.z), sp.pos.x, mt.y, sp.pos.z, towardRiders(c.d.ctx, s + ds, side, TURN), w, h, 1.6, rect);
+    return;
+  }
+  console.warn(`[track] city sign at s=${s} skipped (no room behind the kerb)`);
 }
 
+/** Road signs placed relative to the zones / marks they announce (they follow any layout change). */
 function roadSigns(c: City): void {
-  const { atlas } = c.d;
+  const { atlas, ctx } = c.d;
   const [limit, neon, metro, rain, , noHonk, camera] = CITY_SIGNS;
   const small = (text: string | undefined, fallback: string): string => (text ?? fallback).split('：')[1] ?? fallback;
-  sign(c, 175, 1, roundSignFace(atlas, '限速', small(limit, '看心情')), 1.4, 1.4);
-  sign(c, 380, 1, roadSignFace(atlas, neon ?? '霓虹路段 注意反光'), 2.6, 1.6);
-  sign(c, 292, 1, roadSignFace(atlas, metro ?? '地铁口 鸽子多'), 2.4, 1.5);
-  sign(c, 425, 1, roadSignFace(atlas, ROAD_SIGNS[8] ?? '急弯 别急'), 2.2, 1.4);
-  sign(c, 1040, 1, roadSignFace(atlas, ROAD_SIGNS[5] ?? '连续弯道 弯弯有鹅'), 2.8, 1.6);
-  sign(c, 1690, 1, warnFace(atlas, '鹅', rain ?? '雨天 鹅更滑'), 1.3, 1.5);
-  sign(c, 2620, 1, roundSignFace(atlas, '禁止', (noHonk ?? '禁止鹅叫').replace('禁止', '')), 1.4, 1.4);
-  sign(c, 2695, 1, roadSignFace(atlas, ROAD_SIGNS[8] ?? '急弯 别急'), 2.2, 1.4);
-  sign(c, 2990, 1, roadSignFace(atlas, camera ?? '前方测速 柯基执勤'), 2.8, 1.6);
+  const zone = (name: string): number | null => zoneRuns(ctx, [name])[0]?.[0] ?? null;
+  const subway = ctx.L.marks.find((m) => m.kind === 'subway')?.s ?? null;
+  const at = (s0: number | null, ds: number, rect: AtlasRect | null, w: number, h: number): void => {
+    if (s0 !== null) sign(c, s0 + ds, 1, rect, w, h);
+  };
+  const sharp = ROAD_SIGNS[8] ?? '急弯 别急';
+  at(zone('boulevard'), 15, roundSignFace(atlas, '限速', small(limit, '看心情')), 1.4, 1.4);
+  at(zone('boulevard'), 220, roadSignFace(atlas, neon ?? '霓虹路段 注意反光'), 2.6, 1.6);
+  at(subway, -18, roadSignFace(atlas, metro ?? '地铁口 鸽子多'), 2.4, 1.5);
+  // Corner warnings 35–42 m before the turn-in.
+  at(zone('corner'), -35, roadSignFace(atlas, sharp), 2.2, 1.4);
+  at(zone('chicane'), -42, roadSignFace(atlas, ROAD_SIGNS[5] ?? '连续弯道 弯弯有鹅'), 2.8, 1.6);
+  at(zone('riverside'), 54, warnFace(atlas, '鹅', rain ?? '雨天 鹅更滑'), 1.3, 1.5);
+  at(zone('avenue'), 50, roundSignFace(atlas, '禁止', (noHonk ?? '禁止鹅叫').replace('禁止', '')), 1.4, 1.4);
+  at(zone('hairpin'), -35, roadSignFace(atlas, sharp), 2.2, 1.4);
+  at(zone('sprint'), 72, roadSignFace(atlas, camera ?? '前方测速 柯基执勤'), 2.8, 1.6);
 }
 
 /** Chevrons on the outside of each corner zone (sign of the curvature picks the side). */

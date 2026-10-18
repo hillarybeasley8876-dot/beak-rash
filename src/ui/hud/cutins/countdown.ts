@@ -39,7 +39,14 @@ export function countdownCut(n: number): CutIn {
   };
 }
 
-export function skillBand(def: SkillDef, character: CharacterId, key: string): CutIn {
+/** The player's skill band. `thin()` turns it into a slim corner band (upper left) for skills whose
+ *  projectile must stay in view: the shot and its target sit right where the full band would be. */
+export interface BandCut extends CutIn {
+  readonly skillId: string;
+  thin(): void;
+}
+
+export function skillBand(def: SkillDef, character: CharacterId, key: string): BandCut {
   const root = el('div', 'ci ci-band');
   const strip = el('div', 'bd-strip', root);
   el('div', 'bd-lines', strip);
@@ -51,12 +58,20 @@ export function skillBand(def: SkillDef, character: CharacterId, key: string): C
   el('div', 'bd-en', txt, def.nameEn);
   el('div', 'bd-cn', txt, def.name);
   const dur = 0.68;
+  let slim = false;
   return {
     root,
     dur,
+    skillId: def.id,
+    thin() {
+      slim = true;
+      root.classList.add('is-thin');
+    },
     frame(t) {
-      const x = (1 - enter(t, 0.11)) * 2600 - exit(t, dur, 0.13) * 2600;
-      strip.style.transform = `rotate(-7deg) translateX(${x.toFixed(0)}px)`;
+      // Full band: in from the right, out to the left. Thin band: in from the left edge and back out.
+      const sweep = slim ? 1700 : 2600;
+      const x = (slim ? -1 : 1) * (1 - enter(t, 0.11)) * sweep - exit(t, dur, 0.13) * sweep;
+      strip.style.transform = `rotate(${slim ? -5 : -7}deg) translateX(${x.toFixed(0)}px)`;
       eyes.style.transform = `translateX(${(reducedMotion() ? 0 : -t * 70).toFixed(1)}px) scale(1.12)`;
       root.style.opacity = fadeOut(t, dur, 0.1).toFixed(3);
       txt.style.transform = `scale(${slam(t - 0.05, 0.14, 1.35).toFixed(3)})`;

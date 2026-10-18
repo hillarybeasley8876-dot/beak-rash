@@ -14,6 +14,8 @@ const FINAL_STRETCH = 0.85;
 export interface Standings {
   /** `dt` = the substep just simulated (for crossing-time interpolation and pass hysteresis). */
   update(dt: number): void;
+  /** After race:end (results final, no events): riders still crossing the line roll out instead of riding on. */
+  rollOutLate(): void;
   readonly order: readonly RiderState[];
   finishedCount(): number;
 }
@@ -86,6 +88,11 @@ export function createStandings(ctx: RaceCtx): Standings {
   return {
     order,
     finishedCount: () => finished,
+    rollOutLate() {
+      for (const r of session.riders) {
+        if (r.s >= length && r.mode === 'racing') { r.mode = 'finished'; r.modeTime = 0; }
+      }
+    },
     update(dt) {
       const racing = session.phase === 'racing' || session.phase === 'finished';
       for (const r of session.riders) r.progress = clamp01(r.s / length);

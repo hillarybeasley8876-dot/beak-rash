@@ -1,12 +1,28 @@
 // The player's continuous bike sounds, all speed-linked: wind, chain whirr (pedalling), freewheel
 // ticks (coasting), tyre roll + surface layers (curb rumble, grass swish, sand hiss, gravel
-// crunch, water), drift skid and boost jet. Layers that are silent get unplugged (no CPU).
-import { filter, steer } from '../dsp/env';
+// crunch, water), drift skid and boost jet. Layers that are silent get unplugged (no CPU). Wind and
+// roll filter the shared noise sources (k-rate cutoffs follow the speed); the chain whirr is a
+// pre-rendered loop (sfx/loop-buffers.ts). Sources run at playbackRate exactly 1 whenever the
+// clock does: a resampling buffer source costs the audio thread ≈ 2× a unity-rate one.
+import { filter, holdAt, steer } from '../dsp/env';
 import { impulseWave } from '../dsp/curves';
 import { noise } from '../dsp/noise';
+import { LOOP_REF, loopSource } from './loop-buffers';
 import { Rng } from '../../core/rng';
 import type { Engine } from '../engine';
 import type { Surface } from '../../core/types';
+
+/** Level match of the chain loop to the old live chain (band-pass 3600 Hz), measured offline, then
+ *  −2 dB with the wind (both sat on the music's hook band at race speed). */
+const CHAIN_TRIM = 0.85;
+/** Wind band centre (Hz) = WIND_LOW + WIND_SPAN · (speed / 20 m/s): it rises with speed, but stays
+ *  under the 1.2–3 kHz band the lead's harmonics need. */
+const WIND_LOW = 250;
+const WIND_SPAN = 1100;
+const WIND_LEVEL = 0.13;
+/** Continuous changes (speed, pedal) are followed at 25 Hz: every move is an automation event the
+ *  audio thread has to take in, and the 60 ms glides smooth the steps anyway. */
+const UPDATE_EVERY = 0.04;
 
 export interface LoopState {
   speed: number;        // m/s
@@ -53,9 +69,9 @@ export class BikeLoops {
   private white: AudioBufferSourceNode;
   private crackle: AudioBufferSourceNode;
   private windBand: BiquadFilterNode;
-  private teeth: OscillatorNode;
+  private chain: AudioBufferSourceNode;
+  private rollLow: BiquadFilterNode;
   private ratchet: OscillatorNode;
-  private rollLp: BiquadFilterNode;
   private rumble: OscillatorNode;
   private skidBand: BiquadFilterNode;
   private jetBand: BiquadFilterNode;
@@ -73,19 +89,18 @@ export class BikeLoops {
     const L = (): Layer => new Layer(engine, this.out);
     this.layers = { wind: L(), chain: L(), free: L(), roll: L(), curb: L(), grass: L(), sand: L(), dirt: L(), water: L(), skid: L(), jet: L() };
     const ly = this.layers;
-    this.windBand = filter(ctx, { type: 'bandpass', frequency: 400, Q: 0.6 });
+    // Always-on layers: wind (band-passed white), tyre roll (low-passed brown) and the chain whirr
+    // (a pre-rendered tooth-rate gated noise loop, rate-shifted with the cadence).
+    this.windBand = filter(ctx, { type: 'bandpass', frequency: WIND_LOW, Q: 0.6 });
     this.white.connect(this.windBand).connect(ly.wind.gain);
-    // Chain: noise amplitude-modulated at the chainring tooth rate, band-passed → buzzy whirr.
-    const vca = new GainNode(ctx, { gain: 0.5 });
-    this.teeth = new OscillatorNode(ctx, { type: 'square', frequency: 40 });
-    this.teeth.connect(new GainNode(ctx, { gain: 0.5 })).connect(vca.gain);
-    this.white.connect(vca).connect(filter(ctx, { type: 'bandpass', frequency: 3600, Q: 1 })).connect(ly.chain.gain);
+    this.chain = loopSource(ctx, 'chain', t, rng);
+    this.chain.connect(ly.chain.gain);
+    this.rollLow = filter(ctx, { type: 'lowpass', frequency: 320, Q: 0.7 });
+    brown.connect(this.rollLow).connect(ly.roll.gain);
     // Freewheel: band-limited impulse train = pawl ticks, a buzz at speed.
     this.ratchet = new OscillatorNode(ctx, { frequency: 20 });
     this.ratchet.setPeriodicWave(impulseWave(ctx, 40));
     this.ratchet.connect(filter(ctx, { type: 'bandpass', frequency: 4600, Q: 3 })).connect(ly.free.gain);
-    this.rollLp = filter(ctx, { type: 'lowpass', frequency: 260, Q: 0.7 });
-    brown.connect(this.rollLp).connect(ly.roll.gain);
     // Curb: rumble-strip pulses (AM of low noise at speed / strip spacing).
     const curbVca = new GainNode(ctx, { gain: 0.5 });
     this.rumble = new OscillatorNode(ctx, { type: 'square', frequency: 30 });
@@ -99,25 +114,36 @@ export class BikeLoops {
     this.white.connect(this.skidBand).connect(ly.skid.gain);
     this.jetBand = filter(ctx, { type: 'bandpass', frequency: 1200, Q: 1 });
     this.white.connect(this.jetBand).connect(ly.jet.gain);
-    for (const o of [this.teeth, this.ratchet, this.rumble]) {
+    for (const o of [this.ratchet, this.rumble]) {
       // Speed-linked rates glide over 60 ms: one value per render quantum is plenty (CPU).
       o.frequency.automationRate = 'k-rate';
       o.start(t);
     }
-    this.sources = [this.white, brown, this.crackle, this.teeth, this.ratchet, this.rumble];
+    this.sources = [this.white, brown, this.crackle, this.chain, this.ratchet, this.rumble];
   }
 
   private tuned = new Map<AudioParam, number>();
+  private lastAt = -Infinity;
+  private lastKey = '';
 
-  /** Move a parameter only when it changed by > 1 % (keeps the automation timeline short). */
+  /** Move a parameter (60 ms ramp) only when it changed by > 1 %; ramps land exactly on their value
+   *  (a playbackRate approaching 1 asymptotically would keep its source resampling). */
   private tune(p: AudioParam, value: number): void {
     const prev = this.tuned.get(p);
-    if (prev !== undefined && Math.abs(value - prev) <= Math.abs(prev) * 0.01) return;
+    if (prev === value || (prev !== undefined && value !== 1 && Math.abs(value - prev) <= Math.abs(prev) * 0.01)) return;
     this.tuned.set(p, value);
-    steer(p, this.engine.now, value, 0.06);
+    const now = this.engine.now;
+    holdAt(p, now);
+    p.linearRampToValueAtTime(value, now + 0.06);
   }
 
   update(st: LoopState): void {
+    // Discrete changes (surface, drift level, boost, air, on / off, pause) apply at once.
+    const key = `${st.surface}|${st.drift}|${st.boost}|${st.airborne}|${st.active}|${st.timeScale > 0.02}|${st.pedal > 0.1}`;
+    const now = this.engine.now;
+    if (key === this.lastKey && now - this.lastAt < UPDATE_EVERY) return;
+    this.lastKey = key;
+    this.lastAt = now;
     const ly = this.layers;
     const run = st.timeScale > 0.02 ? 1 : 0;
     const on = run * (st.active ? 1 : 0);
@@ -126,15 +152,17 @@ export class BikeLoops {
     const k = Math.min(1.3, v / 20);
     const ground = st.airborne ? 0 : 1;
     this.tune(this.white.playbackRate, slow);
-    this.tune(this.windBand.frequency, (250 + 1700 * k) * slow);
-    ly.wind.set(run * (0.012 + 0.2 * k * k) * (st.boost ? 1.35 : 1));
+    // Live band-pass power grew with its centre (constant Q); a rate-shifted buffer keeps its power.
+    // A constant-Q band-pass passes more power as its centre rises (the old loops scaled by √rate).
+    this.tune(this.windBand.frequency, (WIND_LOW + WIND_SPAN * k) * slow);
+    ly.wind.set(run * (0.012 + WIND_LEVEL * k * k) * (st.boost ? 1.35 : 1));
     const pedalling = st.pedal > 0.1 && ground > 0 && v > 0.5;
-    this.tune(this.teeth.frequency, (3 + v * 5.5) * slow);
-    ly.chain.set(on * (pedalling ? (0.03 + 0.07 * Math.min(1, k)) * (0.6 + 0.4 * st.pedal) : 0));
+    this.tune(this.chain.playbackRate, ((3 + v * 5.5) * slow) / LOOP_REF.chainTooth);
+    ly.chain.set(on * (pedalling ? (0.03 + 0.07 * Math.min(1, k)) * (0.6 + 0.4 * st.pedal) * CHAIN_TRIM : 0));
     this.tune(this.ratchet.frequency, Math.max(2, v * 7) * slow);
     ly.free.set(on * (!pedalling && v > 1.5 ? 0.05 + 0.04 * Math.min(1, v / 15) : 0));
-    this.tune(this.rollLp.frequency, 160 + v * 12);
-    ly.roll.set(on * ground * 0.22 * Math.min(1, v / 12) * SURFACE_ROLL[st.surface]);
+    this.tune(this.rollLow.frequency, 160 + v * 12);
+    ly.roll.set(on * ground * 0.18 * Math.min(1, v / 12) * SURFACE_ROLL[st.surface]);
     this.tune(this.rumble.frequency, Math.max(4, v / 0.35) * slow);
     const surf = (s: Surface, level: number, full: number): number => (st.surface === s ? on * ground * level * Math.min(1, v / full) : 0);
     ly.curb.set(surf('curb', 0.3, 8));

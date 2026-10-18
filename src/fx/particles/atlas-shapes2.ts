@@ -29,21 +29,28 @@ export function burst(c: Ctx): void {
 }
 
 /** Manga impact lines: thin tapered rays around an empty centre. */
+/** Manga impact lines: thin flat ink strokes (white keyline) from 45 % of the radius outward, tapering to
+ *  a point at both ends, so the centre (the victim's face) stays clear. */
 export function rays(c: Ctx): void {
-  const n = 22;
+  const n = 18;
   for (let i = 0; i < n; i++) {
-    const a = (i / n) * Math.PI * 2 + ((i * 5) % 3) * 0.06;
-    const r0 = 30 + ((i * 7) % 5) * 3;
-    const r1 = 52 + ((i * 3) % 4) * 2;
-    const w = 0.035 + (i % 2) * 0.02;
+    const a = (i / n) * Math.PI * 2 + ((i * 5) % 3) * 0.07;
+    const r0 = 29 + ((i * 7) % 5) * 2.5;
+    const r1 = 54 + ((i * 3) % 4) * 2;
+    const w = 0.028 + (i % 3) * 0.008;
+    const rm = r0 + (r1 - r0) * 0.62;
     c.beginPath();
-    c.moveTo(Math.cos(a - w) * r1, Math.sin(a - w) * r1);
-    c.lineTo(Math.cos(a) * r0, Math.sin(a) * r0);
-    c.lineTo(Math.cos(a + w) * r1, Math.sin(a + w) * r1);
+    c.moveTo(Math.cos(a) * r0, Math.sin(a) * r0);
+    c.lineTo(Math.cos(a - w) * rm, Math.sin(a - w) * rm);
+    c.lineTo(Math.cos(a) * r1, Math.sin(a) * r1);
+    c.lineTo(Math.cos(a + w) * rm, Math.sin(a + w) * rm);
     c.closePath();
-    c.fillStyle = '#ffffff';
+    c.lineJoin = 'miter';
+    c.lineWidth = 2.5;
+    c.strokeStyle = '#ffffff';
+    c.stroke();
+    c.fillStyle = '#0b0b0f';
     c.fill();
-    ink(c, 2.5);
   }
 }
 

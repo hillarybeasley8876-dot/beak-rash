@@ -15,8 +15,21 @@
 }
 .br-cr-roll { will-change: transform; }
 .br-cr-gap { height: 320px; }
-.br-cr-entry { display: flex; flex-direction: column; gap: 6px; margin: 0 0 46px var(--x); }
-.br-cr-role { align-self: flex-start; padding: 2px 16px 0; background: var(--red); font-family: var(--f-cn-block); font-weight: 400; font-size: 28px; transform: skewX(var(--skew)); }
-.br-cr-name { font-family: var(--f-cn-block); font-weight: 400; font-size: 58px; line-height: 1.1; color: var(--white); text-shadow: 5px 5px 0 var(--red-deep); }
+.br-cr-star { position: absolute; right: -260px; bottom: -300px; width: 1100px; height: 1100px; animation: br-spin 80s linear infinite; }
+.br-cr-star svg { width: 100%; height: 100%; display: block; }
+/* Name cards: skewed white / ink plates that slam in as they enter the view. */
+.br-cr-card { position: relative; isolation: isolate; width: fit-content; max-width: 760px; margin: 0 0 40px var(--x); padding: 14px 34px 16px; color: var(--ink); opacity: 0; transform: skewX(var(--skew)); }
+.br-cr-card::before { content: ''; position: absolute; inset: 0; z-index: -1; background: var(--white); clip-path: var(--clip); }
+.br-cr-card::after { content: ''; position: absolute; inset: 0; z-index: -2; background: var(--red); clip-path: var(--clip); transform: translate(10px, 10px); }
+.br-cr-card.is-ink { color: var(--white); }
+.br-cr-card.is-ink::before { background: var(--ink); box-shadow: inset 0 0 0 4px var(--white); }
+.br-cr-card.is-in { opacity: 1; animation: br-slam 0.34s var(--ease-slam) both; }
+.br-cr-card.has-face { padding-left: 128px; }
+.br-cr-sticker { position: absolute; left: -26px; top: 50%; width: 136px; height: 136px; translate: 0 -50%; transform: skewX(calc(var(--skew) * -1)) rotate(-8deg); }
+.br-cr-sticker svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.br-cr-face { position: absolute; inset: 16px; }
+.br-cr-role { display: block; width: fit-content; margin-bottom: 4px; padding: 2px 14px 0; background: var(--red); color: var(--white); font-family: var(--f-cn-block); font-weight: 400; font-size: 26px; }
+.br-cr-name { display: block; font-family: var(--f-cn-block); font-weight: 400; font-size: 52px; line-height: 1.1; text-wrap: balance; }
+.br-cr-name.is-latin { font-family: var(--f-bebas); font-size: 54px; letter-spacing: 0.03em; }
 .br-cr-outro { margin: 40px 0 30px; max-width: 900px; font-family: var(--f-cn-play); font-weight: 400; font-size: 36px; line-height: 1.4; color: rgba(255, 255, 255, 0.85); }
 .br-cr-logo { display: flex; flex-direction: column; gap: 18px; font-size: 96px; }

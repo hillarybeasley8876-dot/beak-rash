@@ -13,6 +13,9 @@ import { WeaponSlot } from './weapon';
 
 interface Bar { row: HTMLDivElement; fill: W; chunk: W | null; val: W; max: W | null }
 
+/** Gauge opacity while a rider alongside is behind them. */
+const GAUGE_DIM = 0.4;
+
 export class Cluster {
   readonly root: HTMLDivElement;
   readonly skills: SkillRow;
@@ -31,6 +34,8 @@ export class Cluster {
   private lastHp = -1;
   private lastMax = -1;
   private lastSp = -1;
+
+  private gaugeOp = 1;
 
   constructor(parent: HTMLElement, character: CharacterId) {
     const def = ROSTER[character];
@@ -112,5 +117,12 @@ export class Cluster {
     this.hurtW.op(this.hitT < 0.3 ? 0.55 * (1 - this.hitT / 0.3) : down ? 0.35 : 0);
     this.skills.update(r, dt);
     this.weapon.update(r, dt);
+  }
+
+  /** A rider alongside sits behind the gauges: fade bars, diamonds and weapon slot (not the portrait) to
+   *  GAUGE_DIM at once, and bring them back over ~0.2 s once it is clear. */
+  occlude(covered: boolean, dt: number): void {
+    this.gaugeOp = covered ? Math.max(GAUGE_DIM, this.gaugeOp - dt * 8) : Math.min(1, this.gaugeOp + dt * 3);
+    this.rootW.style('--gauge-op', this.gaugeOp >= 0.999 ? '1' : this.gaugeOp.toFixed(2));
   }
 }

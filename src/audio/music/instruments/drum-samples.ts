@@ -68,11 +68,18 @@ function drumBody(
   return scale === 1 ? x : x.map((v) => v * scale);
 }
 
-const HAT_NOISE: Array<[Parameters<typeof biquad>[2], number, number, number?]> = [['highpass', 7200, 0.6], ['peaking', 10500, 0.9, 6]];
+const HAT_NOISE: Array<[Parameters<typeof biquad>[2], number, number, number?]> = [['highpass', 7200, 0.6], ['peaking', 10500, 0.9, 3]];
 const CRASH_NOISE: Array<[Parameters<typeof biquad>[2], number, number, number?]> = [['highpass', 4200, 0.5], ['peaking', 7600, 0.7, 4]];
 
 const RECIPES: Record<DrumSample, Recipe> = {
-  kick: { seconds: 0.35, build: (sr, len, rng) => drumBody(sr, len, rng, 'sine', [[0, 165], [0.065, 54], [0.32, 44]], 0.002, 0.34, CLICK, 0.22 / 0.76) },
+  // Kick: the body holds ~35 ms, then rings out over 0.4 s, so its 50–56 Hz fundamental lands (sub weight).
+  kick: {
+    seconds: 0.44,
+    build: (sr, len, rng) => mixInto(
+      shapeEnv(glide(len, sr, 'sine', [[0, 150], [0.05, 56], [0.3, 50], [0.42, 47]]), sr, [[0.002, 1, 'lin'], [0.035, 0.88, 'lin'], [0.42, 0.0001, 'exp'], [0.43, 0, 'lin']]),
+      CLICK(sr, len, rng), 0.22 / 0.76,
+    ),
+  },
   tom1: { seconds: 0.36, build: (sr, len, rng) => drumBody(sr, len, rng, 'sine', [[0, 215], [0.18, 165]], 0.002, 0.34, TOM_CLICK, 0.1 / 0.62) },
   tom2: { seconds: 0.4, build: (sr, len, rng) => drumBody(sr, len, rng, 'sine', [[0, 160], [0.18, 122]], 0.002, 0.38, TOM_CLICK, 0.1 / 0.62) },
   tom3: { seconds: 0.44, build: (sr, len, rng) => drumBody(sr, len, rng, 'sine', [[0, 118], [0.18, 86]], 0.002, 0.42, TOM_CLICK, 0.1 / 0.62) },

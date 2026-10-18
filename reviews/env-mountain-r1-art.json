@@ -1,0 +1,82 @@
+{
+  "unit": "env-mountain",
+  "round": 1,
+  "lens": "art",
+  "pass": false,
+  "score": 5,
+  "summary": "Sunset Pass has every piece the brief asks for: village start, three hairpins, cliff road, tunnel, red suspension bridge, pagoda, cable car, turbines, balloons, cows, hot spring and a lakeside finish. A few moments are genuinely nice: the lakeside sunset with layered ridges, the bridge framed by the tunnel exit, the pagoda and the village. In the real game it is still well short of a polished stylised racer. (1) The mountain colour grade (tint #ffe0c2, multiplied onto sRGB by the fx composite at linear strength) floods every frame with red-orange: 70-91 % of pixels are red/orange hue, green is 1-3 % and blue ~1 %. Coast in game, for comparison, is 25 % red/orange and 45 % blue. (2) The sun is behind or beside the camera for 78 % of the lap, so the gold-pink sunset barely shows before the last 740 m. (3) The 240 m tunnel is a black tube behind a bare red-ring portal. (4) The waterfall is a flat, hard-edged noise card. (5) The terrain is camo noise with pinstriped plywood-looking cliffs. (6) The road reads as a kerbed motorway, the three hairpins look the same and detail density is low. I found no z-fighting or LOD popping (props are fog-culled at 900 m) and there were 0 runtime errors. Evidence (sandbox close-ups plus the 1920x1080 in-game chase view at speed): shots/review/env-mountain/r1-art/ (s2a/s2b/s2c/c1/crops1 sheets, g1/g2/st in-game sheets, sunface.mjs).",
+  "issues": [
+    {
+      "severity": "major",
+      "title": "In-game grade floods the pass with red-orange: tint #ffe0c2 wipes out green and violet (src/world/looks.ts MOUNTAIN_LOOK.grade)",
+      "detail": "With fx post on, the chase frames are 70-91 % red/orange hue against 50-63 % in the ungraded sandbox. Green falls to 1-3 % (sandbox 11-15 %), violet to 1-15 % (sandbox 17-39 %), and cool hues to ~1 %. Coast in game for reference: 25 % red/orange, 45 % blue, 10 % green (coast_ref.png vs mtn_ref.png). The sky zenith goes from violet #794e9b to maroon #7c355b and the horizon from pink #c5779e to coral #cc5159, so the brief's gold-pink-violet sky reads maroon-coral. Pines turn olive-brown, shadows lose their cool contrast, orange and brown riders melt into the road, and the red P5 HUD sits on a red world (g1.jpg, g2.jpg, st.jpg). Cause: fx/post/composite-glsl.ts multiplies the sRGB output by uTint, and three.js stores '#ffe0c2' linearised as (1.0, 0.75, 0.54), which cuts blue by 46 % and green by 25 %. Coast's '#fff8ec' survives that; the mountain tint does not.",
+      "fix": "Set grade.tint to about '#fff5ec' (or '#ffffff') and saturation to 1.06-1.10, and let the sky/sun shaders and sun colour carry the warmth. Keep a cool violet ambient ground (e.g. '#6a5a9a') so shadows contrast with the warm light. Judge the look in the real game with fx on, not in the track sandbox. Optional cross-unit request to fx: convert uTint to sRGB before multiplying."
+    },
+    {
+      "severity": "major",
+      "title": "Golden hour sits behind the camera for 78 % of the lap and the vistas are blocked (looks.ts sun.dir, layout headings, forest density)",
+      "detail": "sunface.mjs measures the chase view within 50 deg of the sun on only 22 % of the lap, all of it after s~2850. The start, village, climb, all three hairpins, the cliff, the bridge (128 deg off the sun), the summit (111 deg) and the crest jump (93 deg) all face the anti-sun violet sky in flat front light. There is no gold, no sun disc, no god rays and no backlit ridge until the last 740 m (compare sb_400...sb_2343 with sb_3000/3060/3150). The crest-jump and pagoda hero moment does not frame the sunset. The cliff road's drop side is lined with pines (DENSITY.cliff applies to both sides), which hides the exposure, and the summit is a flat meadow with no view down.",
+      "fix": "Re-aim MOUNTAIN_LOOK.sun.dir so the sun sits 25-45 deg off the cliff, summit and crest headings, and line up the ridge saddle with it. Widen the sky shader's gold band (toward-sun smoothstep 0.1-0.9 changed to about 0.0-0.55) so the horizon glows across half the sky. Raise the sun to about 14 deg (this also cures issue 12). Keep the cliff drop side tree-free so the lake, the switchbacks below and the ridges read. Compose the crest so the pagoda and the sun saddle are dead ahead at take-off."
+    },
+    {
+      "severity": "major",
+      "title": "The 240 m tunnel is a featureless dark tube with a bare red-ring portal (s 1651-1957)",
+      "detail": "At 21-23 m/s this is about 11 s of near-black screen in game (gm_1680, gm_1800 in g1.jpg). The ceiling is black, the walls are flat mauve over a dark red dado, and the emissive ceiling strips light nothing: no light pools on the road or walls, no wall detail, no fans, no signs. The portal is a thin red ring set into a plain cutting. In the sandbox a flat, untextured orange slab sits above it (sb_1665). From the approach the 'ridge' is a small brown mound (cu_portal), so you never feel you are punching through a mountain. The status calls the interior a track-unit issue, but this set piece is on the env-mountain brief ('long curved tunnel through the ridge (lit)').",
+      "fix": "Dress it in src/world/dressing/mountain (unit-owned). Portal: a stone headwall with a 落日隧道 plaque and two lamps, with strata rock and pines continuing above it. Inside: warm sodium wall lamps every ~12 m with additive, unlit light-pool quads on the road and walls; light lower-wall tiles with a stripe; jet fans every 60 m; green exit signs plus one meme sign; and a bright warm exit glow. The interior should read mid-grey-orange, not black."
+    },
+    {
+      "severity": "major",
+      "title": "Waterfall is a flat, hard-edged noise card and the gorge is jagged (env/mountain-waterfall.ts, dressing/mountain/gorge.ts)",
+      "detail": "From the bridge, the only gameplay view, the fall is a flat rectangle of blotchy blue-white value noise. Its sides are straight with dark outline edges, and it stands right beside the rail like a TV screen (cu_falls in c1.jpg, sb_2030_side, sb_2060, in game gm_1985). The ragged edge covers only about 7 % of the width (edge = min(x,1-x)*8). The streak noise reads as cells, not falling water. The parapets hide the plunge pool and mist. From above, the gorge walls are stair-stepped and the river is a flat purple plane with saw-tooth shore edges (sb_2050_high).",
+      "fix": "Bend the sheet over a rounded lip and taper it. Shade it with 2-3 hard toon bands (white streaks over mid blue) scrolling at different speeds, widen the ragged edges (about edge*2.5 with more noise) and add a white foam lip. Set it in a rock cleft 50-80 m upstream, angled so the deck sees it in 3/4 view with the foam pool and mist visible over the parapet (or drop the parapet to a rail at midspan). Smooth the gorge wall mesh and add river rocks with foam lines."
+    },
+    {
+      "severity": "major",
+      "title": "Terrain reads as generic noise: camo blotches, pinstriped plywood cliffs, stretched faces (env/mountain-grade.ts, mountain-relief.ts, mountain-legs.ts)",
+      "detail": "Every slope is a soft olive/brown/pink camo blend. Every steep face uses the same rust brown with fine horizontal pinstripes, which reads as wood grain or plywood and causes moiré at distance (sb_560 left, sb_1550 right, sb_870 right). Steep faces show vertically stretched texture (sb_1000_high centre). The switchback cut banks are long striped brown ribbons (sb_760_high and sb_870, top left). Mid-distance hills melt into low-contrast smears with ghost-like spurs (sb_120 and sb_230, left). None of this has the chunky, crisp toon read of a polished stylised game.",
+      "fix": "Use a toon-stepped terrain palette (2-3 flat tones per material) with a crisp grass/rock boundary driven by slope. Make strata broad 2-4 m bands with darker ledges instead of 20 cm pinstripes, and use triplanar or world-space mapping on faces steeper than 50 deg. Model the cut banks as stone retaining walls with coping and moss. Break up long faces with instanced rock-outcrop meshes, and give fogged hills a 2-tone value step so their silhouettes stay readable."
+    },
+    {
+      "severity": "major",
+      "title": "Road and roadside read as a racetrack or motorway: low detail density and three identical hairpins",
+      "detail": "Almost the whole pass is a 13 m four-lane carriageway with continuous red/white racing kerbs (added automatically on every curve tighter than R430, layout/query.ts), W-beam rails and bare flat grass planes. Small-scale scatter (grass tufts, flowers, ferns, shrubs, small rocks, km stones, walls) is almost absent, leaving big empty slopes (sb_700, sb_2150, the summit). Hairpins 1-3 look the same: flat grass island, concrete curb, rail and chevrons (sb_640, sb_870, sb_1100). The brief's signature switchbacks have no identity, and the whole thing does not read as a narrow sunset mountain pass.",
+      "fix": "Give each hairpin its own landmark: (a) a roadside shrine with a stone wall and lanterns, (b) a viewpoint lay-by with a parked camper and cyclists, (c) a rock outcrop with a trickle and a mossy wall. Add instanced roadside scatter in near cells (tufts, wildflowers, ferns, pebbles, stone posts) and low dry-stone walls on the uphill side. Core/track request: a LayoutDef option to turn off or restyle the auto kerbs (painted rumble edge or stone gutter), and a 2-lane plus wide-shoulder paint style for the mountain."
+    },
+    {
+      "severity": "minor",
+      "title": "Hot-spring capybaras are hidden behind their own sign (dressing/mountain/landmarks.ts hotSpring)",
+      "detail": "From the chase cam only the 卡皮巴拉温泉 board and the steam show. The pool, the four capybaras and the yuzu are fully hidden (cu_spring in c1.jpg, sb_3240), which the status admits. The visual payoff of a signature meme set piece is lost at speed.",
+      "fix": "Put the board beside or behind the pool (e.g. at sp.s+6 or u+4), facing the road at ~30 deg. Raise the pool on a low stone terrace 10-14 m from the edge so the capybara heads, yuzu and steam are visible for ~2 s on approach. Optionally add one capybara at the roadside fence."
+    },
+    {
+      "severity": "minor",
+      "title": "Trees: faceted cones, potato-like birch crowns on barber-pole trunks, far-forest spikes next to the road (props/mountain-trees.ts, dressing/mountain/forest.ts)",
+      "detail": "Pine tiers are 8-sided cones with visible facets. Birch crowns are faceted blobs on black/white striped trunks, so they read as road delineator posts with a potato on top (sb_400, sb_2680, cu_cows). This is off-model for the smooth designer-vinyl look in SPEC section 5. Far-forest single cones (unoutlined, flat-coloured, 8-12 m spikes) are allowed 8 m from any road (place.onRoad(x, z, 8)). On the stacked legs and the cliff they stand beside the outlined near trees as tall shards (sb_1000_high, sb_1250 left, crops1.jpg).",
+      "fix": "Give the pine tiers smooth normals, 12+ segments and 2-tone toon shading. Make birch crowns from 3-4 merged rounded blobs on white trunks with a few short dark dashes. Keep the far forest at least 40 m from any road sample, and give far pines a 2-tier silhouette."
+    },
+    {
+      "severity": "minor",
+      "title": "Tea terraces are lily-pad blobs on a smooth slope, not terraces (dressing/mountain/farm.ts)",
+      "detail": "437 flat-topped, irregular hedges with heavy outlines sit on a continuous slope with no steps or risers. They read as green felt patches (sb_400 right; crops1.jpg 'tea terraces').",
+      "fix": "Cut the slope into 1-1.5 m contour terraces with earth or stone risers. Run continuous rounded hedge rows along the contours, use a thinner outline, and add a pair of pickers or baskets for scale."
+    },
+    {
+      "severity": "minor",
+      "title": "Start gantry: lanterns cover the banner ('SUNSET ▮ASS') and the banner hides behind the HUD during the countdown (startGantry at 46, village/lantern marks)",
+      "detail": "The lantern string hangs in front of the banner text. The s=40 chase view reads '暴力鹈鹕 · ▮日山道 SUNSET ▮ASS' (sb_40) and the launch frame reads 'SUNSET P▮SS' (st_450). Every player sees that accidental crude word at the start, which breaks SPEC's no-crude rule. During the countdown (grid at s~32) the banner sits under the HUD progress strip at the top edge of the frame (st_200, st_360 in st.jpg).",
+      "fix": "Hang the lanterns below the banner's lower edge, or only from the posts. Move startGantry to about at:60-70 so the banner frames the road mid-screen during the countdown."
+    },
+    {
+      "severity": "minor",
+      "title": "Lake: pale cream sheet at the start, surf foam on an alpine lake, stepped shoreline (env/mountain-lake.ts)",
+      "detail": "Beside the village (s 100-300) the lake reads as a flat cream or white band, like fog or sand, with no reflection or ripples (sb_120, sb_230). White ocean-surf foam strips run along the shore (sb_760_high, sb_0_aerial), and the shoreline is saw-toothed where the water plane meets coarse terrain.",
+      "fix": "Keep a deeper sky-tinted body close to the camera as well, with fresnel toward the ridge colour, soft ripple bands and reflected ridge silhouettes. Replace the surf foam with a thin pebble/reed line, and smooth the shore with a beach-strip mesh or a finer terrain ring."
+    },
+    {
+      "severity": "minor",
+      "title": "Shadow acne on the village roofs under the 10 deg sun (scenery/props/mountain-house.ts)",
+      "detail": "Dark saw-tooth checker bands crawl over the roof planes near the ridge (sb_230; crops1.jpg 'village roof'). It is self-shadowing at a grazing sun angle and shimmers in motion.",
+      "fix": "Raise the sun to ~14 deg (see issue 2), or set receiveShadow=false on the roof planes. Cross-unit: ask track/core for a larger normalBias on the mountain directional light."
+    }
+  ]
+}

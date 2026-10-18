@@ -54,8 +54,8 @@ function balloon(buf: MeshBuf, c: Vector3, r: number, cols: [Color, Color]): voi
   }
 }
 
-const DECL = /* glsl */`attribute vec4 aDrift;`;
-// aDrift = (phase, radius, centre x, centre z): slow loop around the anchor + gentle bob.
+const DECL = /* glsl */`attribute vec2 aDrift;`;
+// aDrift = (phase, radius): slow loop around the anchor + gentle bob.
 const MOTION = /* glsl */`
 {
   float t = uLifeTime * 0.045 + aDrift.x;
@@ -75,13 +75,13 @@ export function buildBalloons(ctx: WorldCtx, sites: BalloonSite[], rng: Rng): vo
     const c = new Vector3(s.x, s.y, s.z);
     balloon(buf, c, rng.range(7, 10), SCHEMES[i % SCHEMES.length] as [Color, Color]);
     const ph = rng.range(0, 6.28), rad = rng.range(14, 28);
-    for (let k = start; k < buf.count; k++) drift.push(ph, rad, s.x, s.z);
+    for (let k = start; k < buf.count; k++) drift.push(ph, rad);
     pts.push(c);
   });
   const geo = buf.build();
-  geo.setAttribute('aDrift', new BufferAttribute(new Float32Array(drift), 4));
+  geo.setAttribute('aDrift', new BufferAttribute(new Float32Array(drift), 2));
   const bounds = new Sphere().setFromPoints(pts);
   bounds.radius += 50;
   animatedMesh(ctx, geo, { name: 'balloons', decl: DECL, motion: MOTION, attributes: ['aDrift'], outline: 0.22, bounds });
-  console.info(`[mountain] balloons: ${sites.length}`);
+  ctx.log(`balloons: ${sites.length}`);
 }

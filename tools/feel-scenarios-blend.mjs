@@ -91,7 +91,8 @@ const handoff = {
       window.__camProbe.reset();
     }, s);
     const probe = (n) => page.evaluate((n) => window.__camProbe(n), n);
-    for (const [tag, az] of [['back', 175], ['side', 60]]) {
+    // back: far behind the chase pose → cut; side: a ~45° residual blends; side70: would whip > 300°/s → cut
+    for (const [tag, az] of [['back', 175], ['side', 45], ['side70', 70]]) {
       await setup(400);
       await overrideAt(page, az, 4.5, 1.4);
       const a = analyse(await probe(80), 28);

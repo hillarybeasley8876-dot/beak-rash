@@ -8,11 +8,10 @@ import type { Rng } from '../../../core/rng';
 import type { AuxBuf } from '../../dressing/city/batch';
 import type { MeshBuf } from '../../geom';
 import { box, cylinder, sphere, trs } from '../../kit/shapes';
-import { fbox, winSpec } from './city-kit';
+import { C, fbox, winSpec } from './city-kit';
 
 export interface FaceSlot { pos: Vector3; yaw: number; w: number; h: number }
 
-const C = (h: string): Color => new Color(h);
 const STEEL = C('#8b93a3'), DARK = C('#1a1b22'), WOOD = C('#7a4a2c'), GLASS = C('#9fd6ff'), CONCRETE = C('#7d7b86');
 const COALS = new Color(2.6, 0.75, 0.15), LANTERN = new Color(2.4, 0.35, 0.18), WARM = new Color(2.2, 1.8, 1.2);
 const CUPS = [C('#ffb3c7'), C('#c9a27a'), C('#a8e6cf'), C('#ffd166'), C('#b8a9ff')];

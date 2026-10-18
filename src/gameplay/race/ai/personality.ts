@@ -31,13 +31,13 @@ type Temper = Pick<Personality, 'aggression' | 'skill' | 'drafter' | 'drifter' |
 
 const TEMPER: Record<CharacterId, Temper> = {
   pelican: { aggression: 0.6, skill: 0.85, drafter: 0.6, drifter: 0.7, wander: 0.3, taunty: 1, skillUse: 0.8, bell: 0.2, grudge: 0.6 },
-  goose: { aggression: 0.95, skill: 0.6, drafter: 0.3, drifter: 0.4, wander: 0.5, taunty: 1.5, skillUse: 0.9, bell: 0.5, grudge: 0.95 },
+  goose: { aggression: 0.95, skill: 0.6, drafter: 0.3, drifter: 0.4, wander: 0.5, taunty: 1.5, skillUse: 0.9, bell: 0.5, grudge: 1 },
   capybara: { aggression: 0.15, skill: 0.55, drafter: 0.5, drifter: 0.2, wander: 0.25, taunty: 0.7, skillUse: 0.6, bell: 0.05, grudge: 0.15 },
-  cat: { aggression: 0.65, skill: 0.8, drafter: 0.3, drifter: 0.8, wander: 1.1, taunty: 1.2, skillUse: 0.8, bell: 0.3, grudge: 0.8 },
-  shiba: { aggression: 0.45, skill: 0.75, drafter: 0.5, drifter: 0.6, wander: 0.5, taunty: 1, skillUse: 0.7, bell: 0.35, grudge: 0.6 },
-  pigeon: { aggression: 0.25, skill: 0.85, drafter: 0.95, drifter: 0.5, wander: 0.6, taunty: 1, skillUse: 0.8, bell: 0.15, grudge: 0.35 },
+  cat: { aggression: 0.65, skill: 0.8, drafter: 0.3, drifter: 0.8, wander: 1.1, taunty: 1.2, skillUse: 0.8, bell: 0.3, grudge: 0.9 },
+  shiba: { aggression: 0.45, skill: 0.75, drafter: 0.5, drifter: 0.6, wander: 0.5, taunty: 1, skillUse: 0.7, bell: 0.35, grudge: 0.8 },
+  pigeon: { aggression: 0.25, skill: 0.85, drafter: 0.8, drifter: 0.5, wander: 0.6, taunty: 1, skillUse: 0.8, bell: 0.15, grudge: 0.35 },
   penguin: { aggression: 0.4, skill: 0.7, drafter: 0.4, drifter: 1, wander: 0.4, taunty: 0.9, skillUse: 0.8, bell: 0.1, grudge: 0.45 },
-  seagull: { aggression: 0.75, skill: 0.7, drafter: 0.6, drifter: 0.5, wander: 0.8, taunty: 1.3, skillUse: 0.9, bell: 0.3, grudge: 0.85 },
+  seagull: { aggression: 0.75, skill: 0.7, drafter: 0.6, drifter: 0.5, wander: 0.8, taunty: 1.3, skillUse: 0.9, bell: 0.3, grudge: 0.95 },
   sloth: { aggression: 0.1, skill: 0.4, drafter: 0.2, drifter: 0.1, wander: 0.2, taunty: 0.6, skillUse: 0.7, bell: 0.05, grudge: 0.1 },
   corgi: { aggression: 0.5, skill: 0.8, drafter: 0.2, drifter: 0.3, wander: 0.2, taunty: 1, skillUse: 1, bell: 0, grudge: 0.5 },
 };
@@ -73,6 +73,6 @@ export function makePersonality(character: CharacterId, level: number, rng: Rng)
     playerFury: 1 + 0.1 * lv,
     huntBudget: lv < 2 ? 2 : 3,
     grace: 1.2 - 0.15 * lv,
-    grudge: clamp01(t.grudge * (0.85 + 0.05 * lv)),
+    grudge: clamp01(t.grudge * (0.9 + 0.05 * lv)),
   };
 }

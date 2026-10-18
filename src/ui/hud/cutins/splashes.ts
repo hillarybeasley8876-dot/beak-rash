@@ -20,10 +20,15 @@ const CRASH_CN: Record<CrashCause, string> = {
 let seed = 1;
 const nextSeed = (): number => (seed = (seed * 16807) % 2147483647);
 
-export function koSplash(chain: number, attacker: CharacterId | null, victim: CharacterId): CutIn {
+/** Over a KO cinematic (`cine`) the band sits flat in the lower 40 % of the frame (the HUD is hidden and the
+ *  tumbling victim owns the centre); without one it crosses the middle, clear of the corner modules. */
+const cineLayout = (cine: boolean): { cls: string; tilt: number } => (cine ? { cls: ' ci-cine', tilt: -5 } : { cls: '', tilt: -9 });
+
+export function koSplash(chain: number, attacker: CharacterId | null, victim: CharacterId, cine: boolean): CutIn {
   const c = Math.max(1, chain);
+  const lay = cineLayout(cine);
   return splashCut({
-    cls: 'ci-ko', title: 'KNOCK OUT!', scheme: 'mix', dur: c > 1 ? 1.05 : 0.95, seed: nextSeed(),
+    cls: `ci-ko${lay.cls}`, title: 'KNOCK OUT!', scheme: 'mix', dur: c > 1 ? 1.05 : 0.95, seed: nextSeed(), tilt: lay.tilt,
     pre: c > 1 ? CHAIN_EN[Math.min(c, 5)] ?? 'ULTRA' : undefined,
     cn: CHAIN_CN[Math.min(c, 5)] ?? '超神！', flash: true,
     left: attacker ? { id: attacker, mood: 'smug', name: ROSTER[attacker].name } : undefined,
@@ -31,9 +36,10 @@ export function koSplash(chain: number, attacker: CharacterId | null, victim: Ch
   });
 }
 
-export function wreckedSplash(player: CharacterId, cause: CrashCause, by: CharacterId | null): CutIn {
+export function wreckedSplash(player: CharacterId, cause: CrashCause, by: CharacterId | null, cine: boolean): CutIn {
+  const lay = cineLayout(cine);
   return splashCut({
-    cls: 'ci-wrecked', title: 'WRECKED', scheme: 'hot', dur: 0.9, seed: nextSeed(), tint: true,
+    cls: `ci-wrecked${lay.cls}`, title: 'WRECKED', scheme: 'hot', dur: 0.9, seed: nextSeed(), tint: true, tilt: lay.tilt,
     cn: CRASH_CN[cause], sub: by ? `by ${ROSTER[by].name}` : undefined,
     right: { id: player, mood: 'hurt', cross: false },
   });

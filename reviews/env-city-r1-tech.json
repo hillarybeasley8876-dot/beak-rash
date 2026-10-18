@@ -1,0 +1,55 @@
+{
+ "pass": false,
+ "score": 5,
+ "summary": "env-city does not pass round 1: score 5/10, with 1 blocker and 2 major issues. The blocker: choosing the low quality setting (Settings 画质 低) or ?quality=low freezes the city race on its first frame. city-wet.ts gives the wet-road shader a null uTexMat when the mirror is skipped, three.js throws and the game loop stops on a purple screen. Patching that one uniform makes the race run at 121 fps, which confirms the cause. The two majors: (1) the wet-road mirror has no occluders, so street-level buildings reflect through the tunnel roof and the underpass walls; 79-85 % of the in-tunnel reflection is leaked city; (2) several road signs reach up to 0.86 m into the drivable lane at head height, and riders and the camera pass through them. Apart from these the engineering is solid. tsc reports 0 errors, there is no `any`, and 38 files total 3,514 lines (largest 162), each with one job. track.test for the city has 0 fails and no leak. In game at 1920x1080 the environment alone costs at most 189 draw calls and 633k triangles, shadows and mirror included (budget 250 / 800k). The whole game stays at 157-267 calls and 667k-938k triangles, and the real-time autopilot runs at 121-123 fps (vsync cap) on this M1 Max. GPU time is 2.6 ms per frame at dpr 1; at dpr 2 it is 7.9-8.3 ms, of which the wet mirror is 1.5-2.1 ms. The city builds in 3.1-3.2 s. The world is identical across seeds 3/7/3 (same geometry and atlas hashes). Over 3 consecutive races GPU memory returns to baseline (geometries 379 -> 12-14, textures 51 -> 10). There are 0 console errors at high and medium quality, during KO cinematics and over a full autopilot race (finished at 172.7 s). There are also 5 minor issues, including one cross-unit note.",
+ "issues": [
+  {
+   "severity": "blocker",
+   "title": "quality=low freezes the city race: the wet-road shader gets a null uTexMat and three.js throws on the first frame",
+   "detail": "src/world/env/city-wet.ts:85-90 skips the RoadMirror at quality 'low' (mirror = null) but still builds the same ShaderMaterial, whose vertex shader uses `uniform mat4 uTexMat` (line 18 `vRefl = uTexMat * w`), with uTexMat: { value: null }. three.js setValueM4 reads null.elements, the uncaught TypeError escapes renderer.render, and the RAF loop dies. Repro: /?race=city&seed=3&quality=low, or Settings 画质 低 ('老电脑救星'). __br.errors = ['window.error: Uncaught TypeError: Cannot read properties of null (reading 'elements') @ three.module.js:5287']; after 9 s of real time the phase is still 'intro', v=0, and the screen is solid purple (shots/review/env-city/r1-tech/q_low.png). The coast at low runs fine. Setting uTexMat to an identity Matrix4 as the world is added makes the city race normally at low (racing, 121 fps, 0 errors; lowpatch.mjs), which confirms the root cause. The unit's own perf and race scripts only run quality=high.",
+   "fix": "Never hand a null to an active uniform. Either always pass `new Matrix4()` and a 1x1 black DataTexture, or (better) compile the overlay without the mirror at low: `defines: { USE_MIRROR: mirror ? 1 : 0 }` with `#if USE_MIRROR` around vRefl and the 9-tap loop. Add --quality low/medium runs to sandbox/city.perf.mjs and city.race.mjs so this cannot regress."
+  },
+  {
+   "severity": "major",
+   "title": "Wet-road mirror has no occluders: the street-level city reflects through the tunnel roof and the underpass walls",
+   "detail": "env/city-mirror.ts renders only REFLECT_LAYER (city:body/far/neon/screens/lights + glow). The tunnel vault (features/tunnel.ts), tunnelCap, city:walls, city:tiles, parapets and terrain are not on that layer, so nothing blocks the reflected view. Inside the tunnel (s 2296-2466) the road near the camera, which can only mirror the ceiling, shows the yellow/blue window grids of buildings standing on the street 8 m above. Measured with tunnel.mjs on the bottom 30 % of a 1080p frame: at s=2330 road luminance is 84.2 with the city batches, 71.3 with city:body/far/neon/screens hidden and 67.8 with the overlay off, so 79 % of the in-tunnel reflection is leaked city; at s=2380 it is 85 %. Visible in tunnel_2330.jpg and tunnel_2430.jpg. The 8 m retaining-wall cut (s 2186-2296) has the same problem with the buildings behind its walls.",
+   "fix": "Give the mirror occluders inside the unit's own files. Enable REFLECT_LAYER on city:walls and city:tiles (lit walls are the correct reflection). Add a black vault proxy ribbon over each tunnel feature, using `layers.set(REFLECT_LAYER)` so it is invisible in the main pass. Alternatively, fade uStrength to the tunnel's own LED strips and lamps (put those on the layer) while the camera's s is under a roof, reusing roofDistance from city-rain.ts."
+  },
+  {
+   "severity": "major",
+   "title": "Road signs stand up to 0.86 m inside the drivable lane at head height; riders and the chase camera pass through them",
+   "detail": "dressing/city/signs.ts:16-22 mounts every post 0.5 m beyond the drivable edge and turns the face toward riders (towardRiders, turn 0.28), so a board of width w reaches 0.48*w across the road: 0.84 m inside for the 2.8 m boards. intrusion.mjs projected vertices to track space and flagged those 0.05-3.2 m above the road: s=1040 '连续弯道' at x=7.04 with bound 7.9 (narrow arcade, 0.86 m in); s=2990 at x=8.64 with bound 9.5 (0.86 m); s=380 at x=8.74 (0.76 m); s=2695 at x=8.93 (0.57 m); s=425 about 0.6 m. The bus-stop post sign (street.ts:78, w 1.5, turn 0.5) reaches about 0.3 m in. These warnings sit just before the corners and the chicane, where riders run wide on the drivable sidewalk. In sheet_c.jpg (s=1028, x=6.9) the board fills the right quarter of the screen beside the rider. Props are not obstacles, so riders and the camera ghost through solid signs.",
+   "fix": "Offset the post by the face's half-extent, for example `mount(c, s, side, 0.3 + 0.5 * w * Math.cos(turn))`, and do the same for the bus-stop postSign. Alternatively anchor the board's inner edge at the kerb. Add a build-time check, like intrusion.mjs, that no prop or face vertex lies inside bounds(s) below 3.5 m."
+  },
+  {
+   "severity": "minor",
+   "title": "Additive lamp pools wash the tunnel and viaduct road to cream and drown the neon reflections",
+   "detail": "paint.ts Pools: HDR-tinted 7 m pools about every 13 m (staggered on both sides), plus tunnel pools every 9 m at x=+-2.2 with r=3.6 (underpass.ts:119), overlap into a continuous band. pools.mjs measured near-road luminance at 1080p: tunnel s=2380 is 123.3 with pools vs 29.5 without (4.2x); expressway s=1450 is 47.8 vs 28.8 (+66 %); boulevard s=300 is 29.7 vs 29.2. The tunnel floor reads as a lit white slab (sheet_b.jpg, tunnel_2330.jpg) and the viaduct as beige asphalt, against the brief's 'wet reflective road catching neon'.",
+   "fix": "Lower the pool peak (about 0.35) and radius where pools overlap (tunnel 4 m, offset per lane), or drop the tunnel pools since the vault strips and LED walls already light it. Check that near-road luminance stays within about 1.5x of the unlit road."
+  },
+  {
+   "severity": "minor",
+   "title": "Atlas text and poster art silently fall back after 2.5 s timeouts and are never redrawn",
+   "detail": "dressing/city/index.ts:83 waits on ensureFonts (386 unique glyphs across 3 CJK families) and on loadBillboardArt, each capped at 2.5 s. On a timeout the three 2048x2048 atlases are drawn once with fallback glyphs or without the poster art, and stay that way for the whole race, so the look depends on machine load. One of my in-game runs (perf2.mjs) logged '[warning] [track] fonts still loading after 2500 ms; signs may use fallback glyphs'.",
+   "fix": "After a timeout, await document.fonts.ready and the image promises, redraw the affected cells through the stored face closures, and set needsUpdate on neonTex, screenTex and faceTex. Or preload the city glyphs and art during the loading screen so the build never races them."
+  },
+  {
+   "severity": "minor",
+   "title": "Duplicated helpers, dead code, constants copied from the track unit, and coupling to coast internals",
+   "detail": "`ahead()` is defined 4 times (neon.ts:16, landmarks.ts:17, life.ts:19, gantries.ts:14) and the canvas `tex()` twice (paint-tex.ts:6, wall-tex.ts:6). underpass.ts:84 redefines WALL_H/CROWN/TOE although terrain/profile.ts exports WALL_TOE, and bridge.ts:9 copies APEX/PYLON_AT/RIB_W/RIB_D from features/bridge.ts, so any track-unit tweak silently misplaces the tiles, jet fans and arch neon. index.ts:7 and signs.ts:8 import from dressing/coast/signage. signs.ts:28-36 uses literal s positions (175 ... 2990), and layouts/city.ts:38 sums CREST by hand. Dead code: util.ts `roadPoint` has no callers, and the {kind:'skyline'} mark (layouts/city.ts:116) is never read. This breaks the global rules (extract logic repeated more than twice, no dead code).",
+   "fix": "Move ahead() and tex() into util.ts and import WALL_TOE. File a core request asking the track unit to export the tunnel and bridge profile constants and to move the shared signage helpers to scenery/signs. Derive sign positions from zones (corner s0 - 35) and compute CREST from the segment list. Delete roadPoint and the skyline mark."
+  },
+  {
+   "severity": "minor",
+   "title": "Per-frame allocations and a duplicated track projection in the render path",
+   "detail": "city-mirror.ts:38 allocates a new Vector3 every frame. city-rain.ts:74 allocates a two-element array 14 times per frame in roofDistance. city-wet.ts:106 and city-rain.ts:110 each run q.project(camera) every frame for the same point. Mirror CPU cost is 0.32-0.77 ms per frame (perf2.mjs); that is acceptable, but the GC churn on the hot path is avoidable.",
+   "fix": "Reuse a scratch Vector3, loop over s-d and s+d without building an array, and compute the camera's track s once per frame in a shared city updater (next to cityTime) that both modules read."
+  },
+  {
+   "severity": "minor",
+   "title": "cross-unit: disposed tracks stay reachable after endSession",
+   "detail": "Tested with leak2.mjs and leak3.mjs: after game.endSession() and a forced GC (CDP HeapProfiler.collectGarbage), WeakRefs to the city track group, the wet mesh, the neon material and the atlas canvas still resolve. The coast track behaves the same, so the retainer is outside env-city. GPU memory is released, and the heap does not grow per race (about 123 MB in race and after, 56 MB at the menu), but the last track (about 65 MB of JS heap plus typed arrays) stays pinned in menus and during the next race.",
+   "fix": "(integrator) Take a heap snapshot after endSession, find the closure or listener that still holds the session, and null it."
+  }
+ ]
+}

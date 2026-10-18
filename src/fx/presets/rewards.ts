@@ -1,7 +1,6 @@
 // Reward presets: finish confetti, coin sparkle, pickup bursts.
 import { Vector3 } from 'three';
 import { FRAME } from '../particles/atlas';
-import { ring } from './impacts';
 import { inherit, launch, type BurstOpts, type Kit, type Preset } from './kit';
 import type { Vec3Like } from '../../core/types';
 
@@ -28,10 +27,13 @@ function glints(k: Kit, pos: Vec3Like, o: BurstOpts, count: number, color: strin
   for (let i = 0; i < count; i++) {
     const s = k.at(pos, 0.25);
     k.p.colors(s, '#ffffff', color);
-    s.frame = i % 2 ? FRAME.star5 : FRAME.spark4;
+    // Needle glints twinkle: pop in, hold, gone within 0.15 s (staggered so the set keeps flickering).
+    const star = i % 3 === 2;
+    s.frame = star ? FRAME.star5 : FRAME.glint;
     launch(s, k.dir(d, { x: 0, y: 1, z: 0 }, 0.8), k.range(1, 2.5));
-    s.life = k.range(0.35, 0.55); s.size0 = k.range(0.08, 0.13); s.size1 = 0.04;
-    s.rot = k.range(0, 6.28); s.spin = k.range(-6, 6); s.drag = 3; s.gravity = -1;
+    s.life = star ? k.range(0.3, 0.45) : k.range(0.1, 0.15); s.delay = star ? 0 : k.range(0, 0.18);
+    s.size0 = star ? k.range(0.12, 0.18) : k.range(0.22, 0.32); s.size1 = star ? 0.04 : s.size0 * 0.8;
+    s.rot = star ? k.range(0, 6.28) : k.range(-0.3, 0.3); s.spin = star ? k.range(-6, 6) : 0; s.drag = 3; s.gravity = -1;
     inherit(s, o, 0.9);
     k.p.emit(s);
   }
@@ -52,19 +54,18 @@ export const coin: Preset = (k, pos, o) => {
   glints(k, pos, o, k.n(4, o), '#ffd23a');
 };
 
-/** Generic sparkle (SP can, perfect landing, combo). */
+/** Generic sparkle (SP can, perfect landing, combo): twinkling needle glints and a few stars. */
 export const sparkle: Preset = (k, pos, o) => {
-  glints(k, pos, o, k.n(7, o), o.color ?? '#ffe600');
-  ring(k, pos, o, 0.2, 1.4 * (o.scale ?? 1), 0.25, o.color ?? '#ffe600');
+  glints(k, pos, o, k.n(8, o), o.color ?? '#ffe600');
 };
 
-/** Fish (+HP): hearts rising inside a pink ring. */
+/** Fish (+HP): green '+' glyphs and a couple of hearts floating up. */
 export const heal: Preset = (k, pos, o) => {
-  ring(k, pos, o, 0.2, 1.2, 0.25, '#ff7ab8');
-  for (let i = 0; i < k.n(5, o); i++) {
-    const s = k.at(pos, 0.3);
-    k.p.colors(s, i % 2 ? '#ffffff' : '#ff4f9a', '#ff7ab8');
-    s.frame = FRAME.heart; s.vy = k.range(1.2, 2.2); s.vx = k.range(-0.5, 0.5); s.vz = k.range(-0.5, 0.5);
+  for (let i = 0; i < k.n(6, o); i++) {
+    const s = k.at(pos, 0.35);
+    const heart = i % 3 === 2;
+    k.p.colors(s, heart ? '#ff4f9a' : '#7dff8a', heart ? '#ff7ab8' : '#19c45a');
+    s.frame = heart ? FRAME.heart : FRAME.plus; s.vy = k.range(1.2, 2.2); s.vx = k.range(-0.5, 0.5); s.vz = k.range(-0.5, 0.5);
     s.life = k.range(0.6, 0.9); s.size0 = k.range(0.14, 0.2); s.size1 = s.size0; s.drag = 1.5;
     s.rot = k.range(-0.4, 0.4);
     inherit(s, o, 0.95);

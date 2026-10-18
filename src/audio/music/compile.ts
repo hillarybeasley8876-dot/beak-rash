@@ -15,6 +15,8 @@ export interface CompiledSection {
   /** Last-bar fill variants (rotating). */
   fills: LaneSteps[];
   layers: { 1: LaneSteps; 2: LaneSteps };
+  gainDb: number;
+  shape: 'breakdown' | undefined;
 }
 
 export interface CompiledSong {
@@ -97,6 +99,8 @@ function compileSection(song: Song, name: string, sec: Section): CompiledSection
       1: { ...laneSteps(song.layers?.[1]), ...laneSteps(sec.layers?.[1]) },
       2: { ...laneSteps(song.layers?.[2]), ...laneSteps(sec.layers?.[2]) },
     },
+    gainDb: sec.gainDb ?? 0,
+    shape: sec.shape,
   };
 }
 

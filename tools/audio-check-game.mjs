@@ -83,6 +83,22 @@ export async function gameCheck(args) {
     expect(midKo.muffle > 0.4, `KO slow-mo muffles the music (muffle ${(+midKo.muffle).toFixed(2)})`);
     const after = await h.eval(() => window.__br.audio.state());
     expect(after.muffle < 0.15, `muffle released after the cinematic (${(+after.muffle).toFixed(2)})`);
+    expect(ko.some((e) => e.kind === 'bark' && /^pelican_ko_/.test(e.id)), `player KO → the pelican's own quip after the cinematic (${ko.filter((e) => e.kind === 'bark').map((e) => e.id).join(' ') || 'no bark'})`);
+    await h.sleep(1500); // the KO quip's bark gap
+    // Clips stream in after unlock (two at a time): a bark whose clip is still loading is dropped.
+    await page.waitForFunction(() => ['pelican_taunt_0', 'pelican_taunt_1'].every((id) => window.__br.app.audio.rt.voices.clips.has(id)), null, { timeout: 20000 });
+    const bellAt = await nowMs();
+    // The autopilot may have rung its own bell within the taunt's 8 s cooldown, or a rival may be mid-bark:
+    // start from a clean slate (this checks the wiring; the gaps have their own logic).
+    await h.eval(() => {
+      window.__br.app.audio.cool.delete('pelicanTaunt');
+      window.__br.app.audio.rt.voices.barkGate = -Infinity;
+      window.__br.app.bus.emit('combat:bell', { riderId: 0, pos: { x: 0, y: 0, z: 0 }, angered: [1] });
+    });
+    // The taunt follows the bell by 350 ms (later on a loaded machine): wait up to 3 s for it to start.
+    await page.waitForFunction((at) => window.__br.audio.trace().some((e) => e.ms >= at && e.kind === 'bark' && e.id.startsWith('pelican_taunt_')), Math.floor(bellAt), { timeout: 3000 }).catch(() => null);
+    const bell = await since(bellAt);
+    expect(has(bell, 'sfx', 'bike.bell') && bell.some((e) => e.kind === 'bark' && /^pelican_taunt_/.test(e.id)), `bell that angers a rival → bell + pelican taunt (${bell.map((e) => e.id).join(' ')})`);
 
     await h.eval(() => window.__br.app.bus.emit('flow:pause', { paused: true }));
     await h.sleep(400);

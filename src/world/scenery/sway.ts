@@ -13,7 +13,8 @@ export type SwayMode = 'bob' | 'wave' | 'float';
 
 const MOTION: Record<SwayMode, string> = {
   bob: 'transformed.y += max(0.0, sin(uSwayTime * 7.0 + uv.x)) * 0.16 * uv.y;',
-  wave: 'transformed.x += sin(uSwayTime * 6.0 + uv.x - uv.y * 4.0) * 0.18 * uv.y; transformed.z += cos(uSwayTime * 5.0 + uv.x - uv.y * 3.0) * 0.12 * uv.y;',
+  wave: 'transformed.x += sin(uSwayTime * 6.0 + uv.x - uv.y * 4.0) * 0.18 * uv.y; '
+    + 'transformed.z += cos(uSwayTime * 5.0 + uv.x - uv.y * 3.0) * 0.12 * uv.y;',
   float: 'transformed.y += sin(uSwayTime * 1.3 + uv.x) * 0.16; transformed.x += sin(uSwayTime * 0.9 + uv.x * 1.7) * 0.05 * uv.y;',
 };
 

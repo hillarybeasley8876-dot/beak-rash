@@ -1,5 +1,5 @@
 // Bus → audio, part 2: melee (swings, per-weapon hits, crits, blocks), KOs, combos, weapons,
-// skills (cast / hit / end per id), SHOWTIME, pickups and rival taunts.
+// skills (cast / hit / end per id), SHOWTIME, pickups, rival taunts and the pelican's own lines.
 import { SFX } from './sfx/bank';
 import type { EventBus } from '../core/events';
 import type { GameEvents } from '../core/events-map';
@@ -22,10 +22,14 @@ function pickupSfx(kind: string): string {
   return 'pickup.coin';
 }
 
+/** s a KO line may wait for the bark channel after the cinematic. */
+const HELD_WAIT = 1.2;
+
 export function wireCombat(bus: EventBus<GameEvents>, h: Host): void {
   const isPlayer = (id: number | null): boolean => h.isPlayer(id);
   let lastCine = -Infinity;
-  /** Lines from a KO the cinematic is showing: they wait for its end (the announcer has the peak). */
+  /** Lines from a KO the cinematic is showing: they wait for its end (the announcer has the peak),
+   *  then for the bark channel (a short cinematic ends before the announcer's line), up to HELD_WAIT. */
   let heldBarks: Array<() => void> = [];
   const releaseBarks = (): void => {
     for (const bark of heldBarks.splice(0)) bark();
@@ -46,8 +50,14 @@ export function wireCombat(bus: EventBus<GameEvents>, h: Host): void {
     // player's KOs are cinematic: full-size and centred wherever the victim is.
     h.boom('ko.boom', mine ? null : pos, { volume: mine ? 1 : 0.8 });
     const barks: Array<() => void> = [];
-    if (attacker !== null && !isPlayer(attacker)) barks.push(() => h.bark(attacker, 'ko'));
-    if (!isPlayer(victim)) barks.push(() => h.bark(victim, 'hurt'));
+    // At most one line every 6 s is the pelican's own (its KO quip or its groan); it goes first,
+    // and the bark gap then drops the rival's line.
+    if (mine && h.cooldown('pelicanLine', 6)) {
+      const won = attacker !== null && isPlayer(attacker);
+      barks.push(() => h.bark(won ? attacker : victim, won ? 'ko' : 'hurt', undefined, HELD_WAIT));
+    }
+    if (attacker !== null && !isPlayer(attacker)) barks.push(() => h.bark(attacker, 'ko', undefined, HELD_WAIT));
+    if (!isPlayer(victim)) barks.push(() => h.bark(victim, 'hurt', undefined, HELD_WAIT));
     if (!mine) {
       for (const bark of barks) bark();
       return;
@@ -78,8 +88,10 @@ export function wireCombat(bus: EventBus<GameEvents>, h: Host): void {
   });
   bus.on('combat:weaponDrop', ({ pos }) => h.play('weapon.drop', pos));
   bus.on('combat:weaponBreak', ({ pos }) => h.play('weapon.break', pos));
-  bus.on('combat:bell', ({ riderId }) => {
+  bus.on('combat:bell', ({ riderId, angered }) => {
     if (h.cooldown(`bell${riderId}`, 0.6)) h.play('bike.bell', riderId);
+    // A bell that riled someone up: the pelican's taunt right after it (rate-limited).
+    if (isPlayer(riderId) && angered.length > 0 && h.cooldown('pelicanTaunt', 8)) setTimeout(() => h.bark(riderId, 'taunt'), 350);
   });
   bus.on('projectile:spawn', ({ target, pos }) => {
     // Something is homing in on the player: a short two-tone warning from where it was fired.

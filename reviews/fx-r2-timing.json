@@ -1,0 +1,192 @@
+{
+ "unit": "fx",
+ "round": 2,
+ "lens": "timing",
+ "pass": false,
+ "score": 7,
+ "summary": "Re-review of the KO/WRECKED/chain/SHOWTIME cinematics. I captured 50 ms real-time strips plus per-frame telemetry (clock layers, sim delta, camera, post params, victim/bike/wheel NDC, splash coverage), with and without the HUD, on coast, city and mountain. 0 __br.errors in every run; tsc is clean. All three round-1 majors are fixed. (1) The KO hold now ramps 0.1x -> 0.35x after the peak, so 0.338 s of sim plays before the release (r1: 0.178 s). The victim travels 3.6-3.8 m on camera, flips off the bike, and the bike cartwheels separately; body, bike and wheels stay in frame 100 % of the cinematic. (2) At the SHOWTIME impact all 3 victims stay in frame for the whole window. (3) Near walls the camera picks an in-bounds framing (city KO 'high', WRECKED 'sideHigh'; eye <= 6.9 m vs the 9.2 m limit) and the victim stays visible. The round-1 minors are also addressed. The hit-stop frames are crisp (no white wash). The start chroma punch renders at 33 ms, and the release whoosh, punch and FOV kick land on the first chase frame. A chain is capped at 1.78 s. Five framings vary between KOs, never the same one twice. The rise slow-mo is now visible after the cut-in. Timeline is exact and frame-rate independent: freeze 0-83 ms, cut at 83, 0.1x at 217, peak at 450, hold ramp 450-850, release at 1283 (1300 at 30 fps, 1299 at 144 fps, 1292 in real time; frame gaps max 10.3 ms), clock back to 1x at 1533, post clean at 1617. WRECKED: peak 283, release 883. A repeat within 10 s uses the short variant (release 517) with a new framing; slowmo 'short' and 'off' are respected for KOs. quitRace and race:end restore cleanly mid-KO and mid-rise. The KO/WRECKED HUD splashes are now a lower band and close about 0.1 s after cine:ko end. Remaining against a commercial bar: the SHOWTIME impact beat is muddled and its victims are specks (13-22 % / 9-11 % / 6-7 % of frame height). The letterbox pops off at the impact, and the hit-stop shows raw frames. A KO credited to the player during the SHOWTIME rise aborts the ult cinematic and breaks the cine:ult event protocol. Minors: the chain re-target swings the camera while a giant KO sprite fills the lens; the comic look ramps leave pink/half-look frames; the subject has no headroom under the top bar; the release cuts at the top of the arc; the apex hang is dead air; slowmo 'short' does not shorten the rise; there is no race-ended latch.",
+ "measured": {
+  "ko_full": {
+   "frozen_ms": [
+    0,
+    83
+   ],
+   "cut_ms": 83,
+   "slowmo_0.1_ms": 217,
+   "peak_ms": 450,
+   "hold_0.35_ms": 850,
+   "release_ms": 1283,
+   "first_chase_ms": 1300,
+   "scale_1_ms": 1533,
+   "post_clean_ms": 1617,
+   "sim_s_to_release": 0.338,
+   "victim_moved_m": 3.8,
+   "in_frame_pct": {
+    "body": 100,
+    "bike": 100,
+    "wheels": 100
+   },
+   "apex_at_ms": 1300,
+   "lands_ms": 1817,
+   "exits_chase_frame_ms": 1417
+  },
+  "wrecked": {
+   "cut_ms": 67,
+   "peak_ms": 283,
+   "release_ms": 883,
+   "post_clean_ms": 1167,
+   "sim_s_to_release": 0.278,
+   "framing": "side",
+   "apex_at_ms": 1000
+  },
+  "chain_0.3s": {
+   "second_ko_ms": 300,
+   "peak_ms": 450,
+   "release_ms": 1467,
+   "post_clean_ms": 1783,
+   "new_victim_enters_frame_ms": 400
+  },
+  "chain_0.9s": {
+   "repeak_ms": 900,
+   "release_ms": 1467,
+   "post_clean_ms": 1783
+  },
+  "repeat_within_10s": {
+   "peak_ms": 167,
+   "release_ms": 517,
+   "post_clean_ms": 767,
+   "sim_s": 0.148,
+   "framing": "rear34"
+  },
+  "slowmo_off": {
+   "scale": 1,
+   "camera": "chase",
+   "peak_ms": 100,
+   "end_ms": 683
+  },
+  "variety_7_kos": {
+   "coast": "high side high rear34 high front34 rear34",
+   "city": "front34 worm high rear34 front34 high front34",
+   "mountain": "front34 side high rear34 high front34 rear34"
+  },
+  "edge_city": {
+   "ko": "high, cam x <= 6.9 m (limit 9.2), victim in frame 99 %",
+   "wrecked": "sideHigh, cam x <= 6.1 m, victim in frame 98 %"
+  },
+  "ult": {
+   "rise_start_ms": 17,
+   "cutin_scale": 0.5,
+   "apex_0.25x_ms": [
+    1050,
+    1400
+   ],
+   "pelican_static_y8_ms": [
+    850,
+    1517
+   ],
+   "dive_ms": 1517,
+   "impact_ms": 1717,
+   "letterbox_at_impact": "1.0 -> 0 for 1717-1833 ms, back to 1.0 at 2017",
+   "peak_ms": 2217,
+   "release_ms": 3183,
+   "ult_end_ms": 3517,
+   "victims_in_frame_pct": [
+    100,
+    100,
+    100
+   ],
+   "victim_height_frac": [
+    "0.13-0.22",
+    "0.09-0.11",
+    "0.06-0.07"
+   ],
+   "pelican_center_ndc": "(+0.49..+0.68, -0.48..-0.75)"
+  },
+  "ult_slowmo_short": {
+   "rise": "identical to full (impact 1717 ms)",
+   "impact_release_ms": 2300
+  },
+  "ko_during_rise": "cine:ult end 467, KO cinematic 467-1750, chase 1767 mid-dive, cine:ult impact 2150 (after end)",
+  "errors": 0
+ },
+ "r1_followup": [
+  "FIXED major T0 KO hold: 0.338 s sim, tumble + cartwheel on camera, body/bike 100 % in frame (residual: cut lands at the apex, issue 6)",
+  "FIXED major T1 ult victims behind the lens: all 3 in frame 100 % (residual: victims tiny, impact beat muddled, issue 1)",
+  "FIXED major T2 bounds/occlusion: in-bounds framings near city walls, victim visible",
+  "MOSTLY FIXED minor T3 rise: slow-mo visible after the cut-in, dive followed (residual: static apex hang, last dive frame half under the bar, issue 7)",
+  "FIXED minor T4 hit-stop wash: frozen KO frames crisp",
+  "FIXED minor T5 pulses: start punch at 33 ms, whoosh/punch/kick on the first chase frame, rush unmasked",
+  "FIXED minor T6 chain length: window <= 1.78 s, second victim staged apart (new: messy re-target, issue 3)",
+  "FIXED minor T7 variety: 5 framings scored + random, never twice in a row",
+  "IMPROVED cross-unit HUD splash: KO/WRECKED band closes ~0.1 s after cine:ko end; TRIPLE band still covers the ult cluster (issue 11)"
+ ],
+ "evidence": "shots/review/fx/r2-timing/ (cap.mjs + rec.mjs scenarios, ultko/ultshort/ultsize/endmid/variety.mjs, data/*.json, sheets sheet-*.jpg, grids grid-*.jpg, ana.py/stats.py/sheet.py/grid.py)",
+ "issues": [
+  {
+   "severity": "major",
+   "title": "SHOWTIME impact beat is muddled and its victims are specks: the letterbox pops off at the impact, the hit-stop shows raw frames, and the 3 victims are stacked mid-frame at 6-22 % of frame height (src/fx/ko/look.ts applyLook, cine.ts start cutNow, cluster.ts ultDefs)",
+   "detail": "Real-combat SHOWTIME, 3 low-HP rivals 8/14/20 m ahead, UI stubbed: data/ult-real-noui.json, sheet-ult-impact.jpg, grid-ult-key.jpg. With the HUD: data/ult-real.json, grid-ui.jpg. The rise leaves the bars at 1.0 up to 1700 ms. At the impact (1717 ms) applyLook restarts them from 0, because barIn and inK start at tl.slowAt (0.12 s): the bars vanish for 1717-1833 ms and slide back in by 2017 ms. After the 2 inverted impact frames, the 120 ms hit-stop shows raw, un-letterboxed frames dominated by combat's translucent red volume (1750, 1800 ms), then a pink half-look ramp (1850-1950 ms). In the hold (1983-3183 ms) the ultBehind camera sits 11.6-13.1 m from the nearest victim with a 44 -> 38 deg lens. ultsize.mjs measures victim heights of 13-22 %, 9-11 % and 6-7 % of the frame, all stacked at NDC x -0.25..+0.35, y -0.26..+0.06. With the HUD, the TRIPLE KNOCK OUT lettering lands on them from 2217 ms. The pelican's centre sits at NDC (+0.49..+0.68, -0.48..-0.75): it is cut at the bottom-right corner, half under the bar. A normal KO frames its victim at ~37 % of the frame height; the game's signature triple KO gets a third of that.",
+   "fix": "When the window continues an ult rise (cutNow), start barIn and the look weight at 1 (a CineStart flag, e.g. continueLook). Hold a crisp inked/inverted impact frame plus the full comic look across the hit-stop instead of ramping in after slowAt. Reframe the cluster from a 3/4 side angle (115-135 deg off the heading, 6-8 m, FOV 48-52), with the nearest victim as the hero on the upper third (NDC y +0.2..+0.45) and the others in depth. Keep every victim above NDC y -0.15 (the peak splash band), and keep the pelican either fully inside |y| < 0.6 or out of frame. Add fx.cine.mjs ult assertions: nearest victim >= 25 % of frame height, and letterbox >= 0.95 on every frame from the impact to the release."
+  },
+  {
+   "severity": "major",
+   "title": "A KO credited to the player during the SHOWTIME rise aborts the rise, plays an unrelated KO cinematic, returns to chase mid-dive, and emits cine:ult impact after cine:ult end (src/fx/ko/director.ts onKo)",
+   "detail": "ultko.mjs: real-combat SHOWTIME, then a rival 30 m ahead is KO'd with lastHitBy = player 450 ms into the rise. In play this comes from a torpedo fired just before the ult, or from a recently hit rival losing its last HP in a bump. onKo calls this.rise.abort() and this.cine.releaseNow(): the 'ult' layer is cleared and cine:ult end goes out at 467 ms. A front34 KO cinematic of the far rival then runs 467-1750 ms, and the chase camera returns at 1767 ms with the pelican still in the air. The dive lands at 2150 ms and opens the impact window with cine:ult impact, after the end, followed later by a second cine:ult end. The SHOWTIME rise (hero camera, apex slow-mo) is lost. The protocol documented in status/fx.md (start -> impact -> end), which the UI cut-ins and audio stingers rely on, is broken.",
+   "fix": "Give the ult priority: while rise.active (or an ult window is running), never abort it. Emit cine:ko start for the KO so listeners skip their fallbacks, and add it to a pending chain count. onUltImpact then hands that count to the impact window, as takeOver already does for same-instant KOs, and the KO's peak is deferred to the impact window's peak. Play at most a 0.05 s hit-stop. Only a player WRECKED may cancel the rise, and then cine:ult end is emitted exactly once. Add a check case: KO at rise t = 0.45 s -> events start, impact, end in order, rise camera kept."
+  },
+  {
+   "severity": "minor",
+   "title": "Chain re-target swings the close camera to the new victim while its ~3 m KO punctuation fills the frame; particles have no near-camera fade (src/fx/ko/cine.ts addKo/subject, presets/impacts.ts koPow, particles VS)",
+   "detail": "testKo({chainAfter: 0.3}) on coast, UI stubbed: sheet-chain-noui.jpg, grid-chain-retarget.jpg, data/chain-noui.json. At 300 ms addKo switches this.victim. The shot keeps its front34 template, and the damped focus (lambda 9) swings toward the new body, which starts at NDC x +2.83, enters the frame at ~400 ms and is centred by ~550 ms. Meanwhile the new victim's real-time punctuation (koPow 2.3 x 1.3 m rays + oversized POW, the hitHeavy burst and a 0.35 white flash) plays 3-5 m from the lens. At 350 ms half the frame is a giant white/black sprite; at 400-450 ms two full-size star bursts fill the frame with the victim cut at the right edge. A late chain (0.9 s) shows the same swing (victim in frame 90 %). Normal KOs share the root cause: at the short-variant hand-back (sheet-short-off.jpg, 800 ms), a crash-debris hex nut passes the chase lens as a black hexagon about 1/6 of the frame.",
+   "fix": "On a chain re-target, cut instead of swinging: at the chain hit-stop, switch to a freshly picked framing for the new victim (pickFraming with avoid = current, same confine). Alternatively, keep the first victim and widen to a two-shot when the second is within 6 m. Fade particles by camera distance in the vertex shader (alpha 0 below 1.2 m, full above 2.5 m), and cap real-time punctuation sprites at ~35 % of the screen height."
+  },
+  {
+   "severity": "minor",
+   "title": "Comic-look ramps leave muddy colour frames on every cut: a half-applied look at 117-167 ms, and a pink/magenta wash over the chase view at 1317-1383 ms (src/fx/ko/look.ts applyLook inK / wc)",
+   "detail": "data/ko-real-noui.json, grid-ko-key.jpg (150 and 1350 ms), sheet-ko-noui-b.jpg. The look weight ramps in over 0.14 s after the cut (ko 0.10 at 100 ms, 0.57 at 150, 0.97 at 200), so the 150 ms frame shows a grey half-toned subject on half-formed rays. On the hand-back, the subject-masked burst is gone on the first chase frame, but the tone map fades over 0.14 s on the chase view (ko 0.96 at 1300 ms, 0.54 at 1350, 0.07 at 1400). For 3-4 frames the race is a flat pink/magenta wash. The same happens on WRECKED (950 ms), the short variant (550 ms) and the SHOWTIME release (3250 ms). It reads as a grading glitch, not as a manga slam or whoosh.",
+   "fix": "Snap the look in on the cut frame (a step at slowAt, with one ink/inverted frame covering the switch). Drop the tone map within 1-2 frames of the hand-back (wc = smoothstep(release, release + 0.03)), and let the whoosh lines, chroma punch and FOV kick carry the transition. Keep the slower fades only for the bars, grain and vignette."
+  },
+  {
+   "severity": "minor",
+   "title": "The front34 hold pins the victim under the top bar: no headroom, limbs slide under the letterbox late in the tumble, and the attacker is chopped at the frame edge (src/fx/ko/camera.ts createShot fit, cine.ts subject)",
+   "detail": "data/ko-real-noui.json, grid-ko-key.jpg (1150, 1250 ms). The shot frames the body-bike midpoint (w 0.5), so the body anchor sits at NDC y +0.45..+0.54 for the whole hold while the bike sits at -0.3. createShot sizes the fit radius to 0.8 of the half-height, but the 12 % bars cover |NDC y| > 0.76. When the body flips (1100-1150 ms), the feet slide under the top bar. The attacking pelican drifts to NDC x +0.75..+0.79 and is cut by the right edge from ~1000 ms. With the HUD, the KNOCK OUT band covers the lower ~45 %, so the subject is squeezed between the band and the top bar.",
+   "fix": "While letterboxed, fit to 0.6 of the half-height so the bars are accounted for. Weight the focus toward the body (w 0.3-0.35) so the body rides the upper third with headroom. Either keep the attacker inside 0.7 NDC, or push the orbit far enough to drop it out of frame cleanly."
+  },
+  {
+   "severity": "minor",
+   "title": "The release cuts away at the top of the arc: the KO victim's fall and landing, and most of the WRECKED tumble, play in the chase view (src/fx/ko/look.ts FULL / WRECKED)",
+   "detail": "ko-real-noui: the body rises from 2.02 to 2.96 m and peaks exactly at the release (1283-1400 ms). It lands at ~1817 ms, by which time it has left the chase frame (exit at 1417 ms, 4.8 m travelled in the first 0.5 s after the cut). WRECKED (wrecked-real-noui, sheet-wrecked-noui.jpg): 0.278 s of sim plays before the release at 883 ms. The pelican is only lifting off the saddle at 600-850 ms; it peaks at ~1000 ms and lands at ~1480 ms in the chase view, small and behind a rival. SPEC section 8 asks for the camera on the tumbling pelican.",
+   "fix": "For WRECKED, use holdAt 0.2 and holdScale 0.55 so ~0.45 s of sim plays inside its 0.9 s. For KO, release no earlier than releaseAt and only after the body passes its apex (vy < 0), capped by WINDOW_MAX; or ramp the hold to 0.45x so the fall begins on camera."
+  },
+  {
+   "severity": "minor",
+   "title": "The SHOWTIME apex hang is dead air: a static, small pelican for ~0.6 s; the last dive frame is half under the bar (src/fx/ko/rise.ts APEX_AT / APEX_SCALE / RESUME_AT, rise shot dist + orbit)",
+   "detail": "ult-real-noui (sheet-ult-rise.jpg; grid-ult-key.jpg at 1250 and 1700 ms). Combat parks the pelican at y = 8.00 from sim 0.46 to 0.71 s. fx applies 0.25x from 950 ms, so the pelican is motionless from 850 to 1517 ms while the camera barely moves (orbit -12 deg/s, FOV 63 -> 64). With the HUD, the visible part after the cut-in (1000-1500 ms) is a pelican 15-20 % of the frame tall in an empty sky above a banner, and the 0.5x under the cut-in (150-950 ms) is never seen. At 1700 ms, the last frame before the impact, the pelican's centre is at NDC y -0.72, half under the bottom bar. With the UI stubbed, the course banner also hides the rising pelican at 250-450 ms: the rise shot has no occlusion test.",
+   "fix": "Move the deep slow-mo onto the last 0.3 s of the climb (ramp to 0.3x while still rising; back to 1x as the hang starts). Push in during the hang (dist 6.8 -> 4.5 m, orbit 30-40 deg/s) so the SHOWTIME pose fills ~35 % of the frame. Aim 0.1 s ahead along the dive so the pelican stays inside |NDC y| < 0.6 down to the impact."
+  },
+  {
+   "severity": "minor",
+   "title": "settings.slowmo 'short' does not shorten the SHOWTIME rise (src/fx/ko/rise.ts constants, director.ts onUltStart passes only lite)",
+   "detail": "ultshort.mjs: with 'short' the 'ult' layer is 0.5 from 150 to 950 ms and 0.25 from 1050 to 1400 ms, and the impact lands at 1717 ms: identical to 'full'. Only the impact window shrinks (release at 2300 vs 3183 ms). 'off' is respected (no slow-mo, chase camera, impact at 917 ms), as are short/off for KOs.",
+   "fix": "Pass the slowmo mode to UltRise.start. In 'short', use CUTIN_SCALE 0.75 and skip the apex hang (no APEX_SCALE step), so the rise takes ~1.1 s."
+  },
+  {
+   "severity": "minor",
+   "title": "No race-ended latch: a late ult:impact (or player KO) after race:end still opens a cinematic (src/fx/ko/director.ts race:end handler)",
+   "detail": "endmid.mjs. race:end mid-KO releases on the next frame (correct: chase mode, cine:ko end, the clock ramps back), and race:end mid-rise stops the rise (correct). But an impact landing 600 ms after race:end still starts an 'ult' window: a 0.12 s hit-stop, slow-mo and a camera override behind the results screen. combat/skills/ult.ts emits ult:impact from the dive whatever the race state, so this can happen in real play when a SHOWTIME is in flight as race:end fires (e.g. the 60 s DNF timeout).",
+   "fix": "Set an ended flag on race:end (cleared in attach()) and ignore combat:ko, ult:start and ult:impact while it is set."
+  },
+  {
+   "severity": "minor",
+   "title": "cross-unit: combat's SHOWTIME impact volume dominates the impact hit-stop frames",
+   "detail": "grid-ult-key.jpg at 1750 ms. The translucent red cylinder covers ~55 % of the frame during the 120 ms freeze and the following pink ramp. This round-1 note is still open.",
+   "fix": "combat: replace the translucent cylinder with an inked ground ring and a short flash. This matches fx's flat shock ring."
+  },
+  {
+   "severity": "minor",
+   "title": "cross-unit: the TRIPLE KNOCK OUT band lettering covers the SHOWTIME victims (src/ui/hud cut-ins)",
+   "detail": "grid-ui.jpg, ult at 2600 ms. The band and the 'TRIPLE' lettering sit across the screen centre, where the cluster is framed (2217-3250 ms). The KO and WRECKED splashes are now a lower band and close ~100-130 ms after cine:ko end, so the round-1 KO splash issue is fixed.",
+   "fix": "ui-hud: keep the band below NDC y -0.15, or offset it away from post.cine.focus. fx issue 1's reframe (victims on the upper third) makes this easier."
+  }
+ ]
+}

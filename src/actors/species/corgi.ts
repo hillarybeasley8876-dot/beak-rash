@@ -52,7 +52,7 @@ export const corgi: SpeciesDef = {
   joints: J,
   meta: {
     wings: false, shortLegs: true, hat: 'cap', eyeDir: spec.eye.dir, lid: { open: -0.85, closed: 1.45 }, sleepy: 0.24, lidTilt: 0.3,
-    neckReach: 0.05, tail: 'stub', armUp: ARM_UP, gripDrop: 0.03, ankleLift: [0, 0.05, 0.05],
+    neckReach: 0.05, tail: 'stub', earFlop: 0.2, armUp: ARM_UP, gripDrop: 0.03, ankleLift: [0, 0.05, 0.05],
     beak: [0, 0.52, -0.56], skin: FUR, skillPose: 'whistle',
   },
   build(b) {

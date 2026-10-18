@@ -1,6 +1,7 @@
 // Batches world props into chunked meshes (spatial cells) with matching outline hulls, so the
 // whole roadside costs a few draw calls and frustum culling still works.
 import { Mesh, type Material } from 'three';
+import { breathe } from '../breathe';
 import type { WorldCtx } from '../ctx';
 import { MeshBuf, makeHull } from '../geom';
 import { hullMat, OUTLINE, propsMat } from '../mats';
@@ -36,27 +37,47 @@ export class PropBatch {
 
   /** Build one mesh (+ hull) per non-empty cell and add them to the track group. */
   finish(): Mesh[] {
-    const { ctx, opts } = this;
-    const mat = opts.material ?? propsMat(ctx);
-    const width = opts.outline ?? OUTLINE.prop;
     const meshes: Mesh[] = [];
     for (const [key, buf] of this.cells) {
-      if (buf.idx.length === 0) continue;
-      const geo = ctx.own(buf.build());
-      const mesh = new Mesh(geo, mat);
-      mesh.name = `${this.name}:${key}`;
-      mesh.castShadow = opts.castShadow ?? true;
-      mesh.receiveShadow = opts.receiveShadow ?? true;
-      if (width > 0) {
-        const hull = new Mesh(ctx.own(makeHull(geo, width)), opts.hullMaterial ?? hullMat(ctx));
-        hull.name = `${mesh.name}:hull`;
-        hull.userData.isOutline = true;
-        mesh.add(hull);
-      }
-      ctx.group.add(mesh);
-      meshes.push(mesh);
+      const mesh = this.build(key, buf);
+      if (mesh) meshes.push(mesh);
     }
     this.cells.clear();
     return meshes;
+  }
+
+  /** finish(), yielding to the browser whenever a run of cells took longer than `sliceMs`. */
+  async finishYielding(sliceMs = 30): Promise<Mesh[]> {
+    const meshes: Mesh[] = [];
+    let t0 = performance.now();
+    for (const [key, buf] of this.cells) {
+      const mesh = this.build(key, buf);
+      if (mesh) meshes.push(mesh);
+      if (performance.now() - t0 > sliceMs) {
+        await breathe();
+        t0 = performance.now();
+      }
+    }
+    this.cells.clear();
+    return meshes;
+  }
+
+  private build(key: string, buf: MeshBuf): Mesh | null {
+    if (buf.idx.length === 0) return null;
+    const { ctx, opts } = this;
+    const geo = ctx.own(buf.build());
+    const mesh = new Mesh(geo, opts.material ?? propsMat(ctx));
+    mesh.name = `${this.name}:${key}`;
+    mesh.castShadow = opts.castShadow ?? true;
+    mesh.receiveShadow = opts.receiveShadow ?? true;
+    const width = opts.outline ?? OUTLINE.prop;
+    if (width > 0) {
+      const hull = new Mesh(ctx.own(makeHull(geo, width)), opts.hullMaterial ?? hullMat(ctx));
+      hull.name = `${mesh.name}:hull`;
+      hull.userData.isOutline = true;
+      mesh.add(hull);
+    }
+    ctx.group.add(mesh);
+    return mesh;
   }
 }

@@ -1,7 +1,7 @@
 // Species registry + per-(species, quality) geometry cache. Geometry is built once (SDF meshing is the
 // expensive part) and shared by every rider of that species; each rider gets its own bones.
 import { Matrix4, SkinnedMesh, type BufferGeometry } from 'three';
-import { toon } from '../../render/toon';
+import { riderMaterial } from '../kit/material';
 import type { CharacterId, Quality } from '../../core/types';
 import { CharacterBuilder } from '../kit/builder';
 import { hullFor } from '../kit/outline';
@@ -59,7 +59,7 @@ export interface CharacterInstance {
 export function instantiate(id: CharacterId, quality: Quality, outlineWidth = 0.024): CharacterInstance {
   const asset = speciesAsset(id, quality);
   const rig = createRig(asset.def.joints);
-  const mesh = new SkinnedMesh(asset.geometry, toon('#ffffff', { vertexColors: true }));
+  const mesh = new SkinnedMesh(asset.geometry, riderMaterial());
   mesh.name = `body:${asset.def.id}`;
   mesh.add(rig.bones[0] as SkinnedMesh['skeleton']['bones'][number]);
   mesh.bind(rig.skeleton, new Matrix4());

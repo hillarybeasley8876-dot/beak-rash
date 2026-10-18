@@ -1,0 +1,65 @@
+{
+  "unit": "bikes",
+  "round": 2,
+  "lens": "art",
+  "pass": false,
+  "score": 7,
+  "summary": "Big step up from round 1. All four r1 majors are fixed: tyres are round and the MTB has real tread blocks, wheels no longer strobe (blur disc), materials have a toon specular band, chrome banding and a cool rim (the erba reads now), and the bikes are chunkier with fillets, a flush fork crown, puffy saddles and toy pedals. Drivetrain, tints, streamers and the garage framing are fixed too. In the garage and sandbox the seven bikes look like a coherent, colourful designer-toy set with good colour harmony. Checks: 0 errors on coast, city and mountain; animation checks all pass; tsc clean for the bikes files. What keeps it below a polished commercial bar is the in-game view. The tandem's fish is a flat ~7 cm slab: from the chase camera it reads as a grey plank behind the sloth and covers the pelican's back when the player rides the tandem (major). The hero's default roadbike, and the fixie, are still a thin one-colour line from behind, while the erba, MTB and shared bike now read. Close-ups still show some low-poly blockout parts, mostly the kidbike front end, octagon grips and pedals, and 6-sided tandem tubes. Smaller polish points: the blur disc is near-opaque, there are no cable housings, and outlines are thinner than SPEC §5.",
+  "evidence_dir": "/Users/minimax/m/beak-rash/shots/review/bikes/r2-art/",
+  "r1_recheck": [
+    "M1 faceted tyres/rims + MTB knobs: FIXED (round tyres, 36-seg rims, MTB tread blocks read in close-up and in game; still round on low quality) - s3 'mtb front L', s5, s11 'mtb low quality'",
+    "M2 wagon-wheel strobing: FIXED (spokes dissolve into a turning blur disc, tread capped; no backwards wheels). Disc look raised as minor issue 3 - s5",
+    "M3 flat matte materials: FIXED (toon specular band, chrome banding, cool stepped rim; erba blue-black now shows tube volumes) - s3, s4 'erba rear/head'",
+    "M4 thin realistic construction: LARGELY FIXED (x1.4 tubes, ball fillets, flush fork crown, puffy saddles, capsule pedals); low-poly leftovers and the kidbike front are minor issues 4-5 - s1, s3",
+    "m5 drivetrain: FIXED (toothed ring with outline, 5-arm spider + bolts, link-pattern chain) - s11 'rb pedal'",
+    "m6 fish grumpy/strapped: FIXED in close-up (brow, half-lid, band + buckle + straps) but reads wrong in game: new major issue 1 - s11 'fish 3/4 rear'",
+    "m7 chase sliver: PARTLY FIXED (erba/MTB/shared now read from behind; roadbike/fixie still slivers): minor issue 2 - s13",
+    "m8 tint wipes signatures: FIXED (main tubes only, signature parts kept, dark tints lifted) - s2 tints",
+    "m9 rigid streamers: FIXED (3-link phase-lagged candy-striped ribbons) - s11",
+    "m10 cross-unit garage framing: FIXED by ui-screens (bike ~35-45 % height, swing around a 3/4 view) - s12"
+  ],
+  "issues": [
+    {
+      "severity": "major",
+      "title": "Tandem salted-fish passenger reads as a grey plank from the chase camera and covers the hero's back",
+      "detail": "defs/fish.ts makes the fish from a ~7 cm-thick extruded side profile (HALF_T 0.032 x k 1.15). It stands ~0.56 m tall on the stoker saddle and is turned only 34 deg (Euler(1.3,-0.6,0)). The game camera sees bikes from behind, so it gets the fish's thin edge. On the sloth's tandem (a rival in most races) the fish looks like a grey sword or surfboard sticking up behind the rider (s7-game-crops.jpg 'tandem 5.9m' / 'tandem intro'). When the player rides the tandem (the most expensive garage bike, 2500), the fish fills the middle of the pelican's back from the saddle to the shoulders and breaks the hero silhouette (s10-tandem-mtn.jpg 'tandem player day' / 'tandem stopped', s13-player-bikes.jpg 'tandem'). The grumpy face decals are on the flanks only, so the joke never shows in the main view (s11-extra.jpg 'fish from behind').",
+      "fix": "Give the fish real volume: a lofted or lathed elliptical body ~12-14 cm thick at the belly, keeping the profile and forked tail. Shrink and lower it so its head stays below the captain's shoulder line (<= 0.40 m above the stoker saddle), e.g. slumped back against a small backrest with the tail flopped over the back. Turn it 70-90 deg, or seat it backwards, so a face (eye on each flank plus a frown/mouth decal on the head end) faces the chase camera. Shift it 8-10 cm sideways so it peeks out beside the rider instead of directly behind. Verify with bike=tandem chase shots at 1920x1080 (player) and a sloth rival 6-8 m ahead."
+    },
+    {
+      "severity": "minor",
+      "title": "Hero roadbike (and fixie) are still a one-colour sliver from the chase camera (r1 m7 only partly fixed)",
+      "detail": "The rear signatures now work for the erba (chrome rack + red reflector), MTB (orange guard) and shared bike (yellow fender) (s13-player-bikes.jpg 'erba', s10 'shiba mtb' / 'goose erba'). The pelican's default roadbike still shows only a ~6 px red line between the pelican's legs at 5.7 m. The slim race fender and the tail light on its tip (down near the road) can't be read (s13 'roadbike', s11-extra.jpg 'game player rb zoom'). The fixie is a thin lime line (s13 'fixie').",
+      "fix": "Roadbike: move or add a chunky 8x5 cm tail light on the seatpost just under the saddle, where it shows between the rider's legs. Make it unlit/emissive red so it pops in shade and at night, and turn the white '01' race plate to face backwards under it. Fixie: a neon-pink seatpost light or a small rear fender / seat-stay card in the mint+pink rim colours. Optionally widen both rear tyres 10-15 %."
+    },
+    {
+      "severity": "minor",
+      "title": "Speed-blur disc reads as an opaque grey dotted plate",
+      "detail": "build/decals-wheel.ts 'blur' draws a halftone ring plus three swooshes, and wheel.ts puts it on two cards per wheel (+X and -X). Seen side-on, the near card's dots stack over the far card's, so the disc goes nearly opaque grey and the background stops showing through. At race speed every wire wheel looks like a solid disc wheel with marks on it (s5-wheels.jpg 'rb 2.2/6/20', 'shared 8/20'). Shimmer is fine: at game scale it changes fewer pixels per frame than slowly turning spokes.",
+      "fix": "Cut halftone coverage to ~15-20 % (smaller, sparser dots that fade out toward rim and hub), or keep the halftone on only one card per wheel. Let 3-4 thinner swoosh arcs in the rim/spoke colour carry the read, and keep >= 60 % of the disc see-through."
+    },
+    {
+      "severity": "minor",
+      "title": "Low segment counts still show on parts seen in garage and KO close-ups",
+      "detail": "Tyres and rims were fixed, but frame.ts frameTube uses seg(9,6), which drops to 6-sided tubes on the tandem (detail 0.7: hexagonal shading bands in s3-detail-a.jpg 'tandem mid'). Lug spheres are seg(7)xseg(4) and the head tube seg(10). Kidbike grips are octagonal prisms with octagon end caps (s11-extra.jpg 'kid streamers'), drop-bar bends show kinks in the outline (s3 'rb head'), and pedals are octagons. The fish extrude gets 2 curve/bevel segments on the tandem, and welding its flat flank to the bevel gives streaky triangle shading (s3 'fish L').",
+      "fix": "Exempt silhouette tubes from `detail` the same way tyres are (qseg). Use >= 12 sides for tubes, head tube, grips, pedals and bell, and >= 12x8 for lugs on high (long tubes cost little). Bend drop bars with >= 32 path segments. Fish: curveSegments >= 8 and bevelSegments >= 4, and don't weld the flat flank to the bevel ring (or add an inset loop) so the flank shades flat."
+    },
+    {
+      "severity": "minor",
+      "title": "Kidbike front end looks like blockout geometry",
+      "detail": "defs/kidbike.ts: the stem and head are stacked white box clamps, a flat grey plank sticks out beside the bell as a lever, the bell is a boxy yellow block with a white rectangle, and the pink tubes show flat facet patches (s4-detail-b.jpg 'kid front v6', s11-extra.jpg 'kid streamers'). Next to the polished erba and shared bike it is the weakest close-up of the seven, and the garage shows it at 66 coins as an early buy.",
+      "fix": "Replace the box clamps with rounded lathe collars or torus rings. Make the bell a lathe dome with a thumb lever like the other bikes, and the lever a capsule with a ball end, or remove it. Use rounder >= 12-sided tubes with ball fillets like TOY_MAIN diamond frames, and blend the saddle/seat cluster with a fillet."
+    },
+    {
+      "severity": "minor",
+      "title": "No brake/gear cable housings: cockpits look bare in close-ups",
+      "detail": "The roadbike hoods, MTB levers/disc caliper and shared bike levers have no housings at all (s3-detail-a.jpg 'rb head', 'mtb front L'; s12-garage-steer.jpg garage roadbike). One or two chunky cable loops are the cheapest 'real bike' detail in stylised bikes and add a lot of life in the garage turntable.",
+      "fix": "Add 1-2 toy cable loops per braked bike (tube r 5-6 mm, 6-8 radial segments, outline 0.004, black or accent colour). Run one from each hood/lever along the bar into the stem (steer bone) and one from the head-tube top along the top tube to the rear caliper (frame bone), so the housing reads continuous at normal steer angles. MTB: a hose from the left lever down the fork leg to the caliper."
+    },
+    {
+      "severity": "minor",
+      "title": "Bike outline weight is below the SPEC §5 range",
+      "detail": "Per-part hull widths: frame/fork 0.016 (frame.ts FRAME_OUTLINE), tyres 0.019, rims 0.005, chainring 0.008, small parts 0.004-0.006. SPEC §5 asks 0.02-0.03 m for characters/bikes. In the chase view the bike is visibly thinner-lined than its rider (s13-player-bikes.jpg), and on the blue-black erba and at night (s9-city-crops.jpg) small parts merge into the frame.",
+      "fix": "Frame/fork/head tube 0.02, tyres 0.024, bars/saddles/fenders/basket >= 0.012. Keep only spokes, chain and decals below 0.008."
+    }
+  ]
+}

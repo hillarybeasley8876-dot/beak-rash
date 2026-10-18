@@ -1,10 +1,24 @@
 // Geometry helpers for the city's civil structures: quads turned toward a facing direction (with
-// or without uvs), textured wall ribbons along the road, runs of track where a test holds.
-import { Color, Vector3 } from 'three';
+// or without uvs), textured wall ribbons along the road, runs of track where a test holds, and
+// single-mesh textured toon skins.
+import { Color, Mesh, MeshToonMaterial, Vector3, type Texture } from 'three';
+import { toonRamp } from '../../../render/toon';
 import type { WorldCtx } from '../../ctx';
 import { rowsBetween, type MeshBuf } from '../../geom';
+import { REFLECT_LAYER } from './batch';
 
 const N = new Vector3(), E = new Vector3();
+
+/** One textured toon mesh from a buffer (a single draw call); also drawn in the wet-road mirror, where it hides what stands behind it. */
+export function texMesh(ctx: WorldCtx, name: string, buf: MeshBuf, map: Texture): void {
+  if (!buf.idx.length) return;
+  const mat = ctx.own(new MeshToonMaterial({ map, vertexColors: true, gradientMap: toonRamp() }));
+  const mesh = new Mesh(ctx.own(buf.build()), mat);
+  mesh.name = name;
+  mesh.receiveShadow = true;
+  mesh.layers.enable(REFLECT_LAYER);
+  ctx.group.add(mesh);
+}
 
 /** Quad a-b-c-d with its normal turned toward `facing`. */
 export function quadToward(buf: MeshBuf, a: Vector3, b: Vector3, c: Vector3, d: Vector3, col: Color, facing: Vector3): void {

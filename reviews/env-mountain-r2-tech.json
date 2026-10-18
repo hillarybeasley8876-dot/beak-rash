@@ -1,0 +1,52 @@
+{
+ "unit": "env-mountain",
+ "round": 2,
+ "lens": "tech",
+ "pass": true,
+ "score": 8,
+ "summary": "Pass at 8/10: no blocker or major, 7 minor issues. Round 1 fixes I checked myself: #0 chevron direction is FIXED (all 10 chevron rows point into the bend they warn about, and the boards at hairpins 1, 2 and 3 and the cliff read correctly: sheet_chev.jpg). #1 is FIXED (boards over a rail or stone edge now sit 0.95 m up, clear of the barrier). #3 is FIXED (the new sandbox/mountain.perfgame.mjs measures through the real game camera, and its maximum of 206 calls / 708,406 tris exactly matches my own measurement). #5 is FIXED (pickLine, and content now documents ROAD_SIGNS positions). #6 is FIXED (one sagAt, part() in mountain-kit, lifeTime() shared by waterfall and mist, mountain-mist.ts). #8 is FIXED (flatSpot warns, lantern strings need both poles). #9 is FIXED (dead options removed). #2 is PARTLY fixed: quality=low now cuts the track share to 145 calls / 435k tris, but there is still no distance LOD. #4 (hard-coded sky-life and lake-peak positions) and #7 (patching the track unit's meshes after the build) are NOT fixed. #10 (AI rail hits) has improved to 2 wall hits in seed 5. Hard gates all pass. tsc reports 0 errors, there is no any, ts-ignore, Math.random or empty catch, and the largest file is 238 lines. I saw 0 runtime errors in Chromium (low, medium and high), WebKit (high) and the sandbox. track.test --track mountain: 0 fails, 8.5 mm round-trip error, rebuild leak test clean. NaN scan: 0 bad values out of 7.94M. Disposal: over 5 race→endSession cycles, geometries/textures/programs return to 12/10/29 every time and the heap returns to 109-111 MB after GC; consecutive starts hold at 305-308 / 39 / 58-61. Determinism: two stepped seed-5 races produced byte-identical logs, and the track geometry checksum is identical for seeds 3 and 7. Build: 0.67-1.22 s against a 4 s budget. Real-time lap at 1920x1080: 23,499 frames at the 120 fps vsync cap, 2 frames over 25 ms, none over 50 ms. Chase camera: 0 blocked sight lines in 2,804 samples. Whole scene at peak: 266 calls / 1.02M tris. The score stays at 8 because of the debt below: about 11 % triangle headroom with roughly 157k tris drawn 400 m or more away, a sign atlas 95 % full that overflows silently, the post-hoc material swaps (which grew this round), hard-coded placements, washed-out tunnel mouths, debug logging that is always on, and a copy-pasted helper. Evidence: shots/review/env-mountain/r2-tech/ (scripts plus logs; sheet_chev, sheet_g, sheet_gm, sheet_race).",
+ "issues": [
+  {
+   "severity": "minor",
+   "title": "Still no distance LOD: 11 % triangle headroom, about 157k tris drawn 400 m or more away (r1 #2 partly fixed)",
+   "detail": "In-game chase view, 1920x1080 high, stepped autopilot seed 3 (perfgame-high.log; unit gate agrees): the track's share peaks at 206/250 calls (s 1189) and 708k/800k tris (s 796). Per-category breakdown at s 796 (breakdown.log): props 31 calls / 204k, near terrain 37 / 135k, edges 25 / 80k, crowd 4 / 62k, shadow pass 46 / 266k. Banded by camera distance (distband.log), these batches sit 400 m or more from the camera at s 796 and again at s 1189: the start-stand crowds (62k tris including hulls; spectators about 2 px tall), 61k of props, 24k of edges and 9.5k of glow. Trees keep full tiers plus outline hulls out to the ~900 m fog cull. Low quality now helps (145 calls / 435k), but the next dressing addition at high quality will break the 800k budget.",
+   "fix": "Add a per-tile distance LOD: beyond ~200 m, swap pine/fir/birch tiers for farPine cones and drop the hull children (or build a hull-less far copy of each props tile). Give the crowd batches a maximum draw distance of ~250 m (track request for PropBatch maxDistance), or end the start stands where the hairpins can no longer see them. Re-run sandbox/mountain.perfgame.mjs and aim for ≤ 85 % of the budget."
+  },
+  {
+   "severity": "minor",
+   "title": "Sign atlas is 95 % full and overflow drops signs silently; two related partial-failure paths",
+   "detail": "The mountain SignAtlas(2048, 3072) has its last used row at 2907 (95 %, atlas.mjs). This round added the tunnel plaque, the tunnel meme sign, two scenic signs and a moved hot-spring board. When the atlas is full, SignAtlas.alloc returns null. dressing/mountain/signage.ts:105 `if (!rect) return;` then aborts billboards(), dropping every later billboard and the summary log. signAt (line 24) returns false, and the tunnel and scenic faces are skipped without a word. Two related paths: village.ts:39 `if (!claim(l) || !claim(r)) continue;` keeps the left disc claimed when the right claim fails (a phantom occupied spot), and landmarks.ts:105 warns that the hot-spring board overlaps another prop and then places it anyway.",
+   "fix": "Warn ('[mountain] sign atlas full: <key>') wherever d.face returns null, and use `continue` instead of `return` in billboards(). Log atlas usage per build, as coast does. Free room by sharing one poster cell per art image or by lowering the poster face resolution, or file a request for a 4096-high atlas. For lantern strings, test both pole discs before claiming either; this needs a non-claiming Placer.test(x, z, r), so file a track request. Skip or move the hot-spring board when its claim fails."
+  },
+  {
+   "severity": "minor",
+   "title": "The look still patches the track unit's meshes and materials after the build, and this round added a silent case (r1 #7 not fixed)",
+   "detail": "mountain-sky.ts swaps the 'sky' material and recolours 'clouds'. mountain-lake.ts swaps 'sea' and borrows its uniform objects. mountain-grade.ts repaints 129,575 vertex colours on 'near*' / 'far:*' / 'tunnelCap' and, new this round (line 70), swaps their material whenever `customProgramCacheKey().startsWith('track-terrain')`. If the track unit renames that key, the strata material is simply not applied, and unlike the sky and lake swaps it does not even warn. The core request is filed, but the pattern violates the global rule to fix the structure rather than wrap around it.",
+   "fix": "Integrator: apply the requested LayoutDef.env hook ({ sky(ctx), water(ctx), terrainMaterial(ctx), groundColor(h, ny, n) }) so the builders call it instead of the defaults, then delete the swaps. Meanwhile, count the terrain materials that were swapped and console.warn when the count is 0."
+  },
+  {
+   "severity": "minor",
+   "title": "Sky-life and lake-peak placements are still hard-coded s values and world coordinates (r1 #4 not fixed)",
+   "detail": "dressing/mountain/index.ts:54-56: turbines(d, -1, 2450, 3300), cableCar(d, 2560, 1), balloons(d, [[140,-1],[420,-1],[2480,1],...]). env/mountain-relief.ts:12-15: LAKE_PEAKS in absolute world x/z (radius 220-330 m, height 240-410 m). These are the only placements not driven by layout marks. If segment lengths or the heading change, the cable car moves over the chicane or the tunnel mouth, or a 400 m peak lands next to the road, and nothing fails.",
+   "fix": "Add 'cableCar' / 'turbines' / 'balloons' marks in layouts/mountain.ts and dispatch them in marks.ts. Express the lake peaks in track space (s, x, r, h) and convert them with q.frameVis, the way LayoutDef.bumps are converted. Warn when a peak radius comes within 60 m of any road sample."
+  },
+  {
+   "severity": "minor",
+   "title": "Tunnel-mouth light pools stack additively and wash out the road (dressing/mountain/tunnel.ts)",
+   "detail": "tunnelFitOut lays an additive SPILL pool (0.42/0.30/0.20, 9 m x halfW) at s0+7 and s1-7, directly on top of the first and last sodium pools (s0+6.2, 0.44/0.27/0.10), so the colours add up to about +0.86 red. In game, the mean luma of the road band jumps from 48 mid-tunnel and 57 at the portal to 129 at s 1697 and 103 at s 1925, and the lane and centre lines fade under a flat beige ellipse (gm_1697, gm_1925 in sheet_gm.jpg). Without post (sandbox), 46 % of the exit road band clips to white (g_1922 in sheet_g.jpg).",
+   "fix": "Start and stop the sodium pools at least 12 m from each mouth so they never overlap the spill, halve SPILL, or blend the pools with MaxEquation (or clamp in a small shader) so overlaps never add up past the brightest pool."
+  },
+  {
+   "severity": "minor",
+   "title": "Debug logging is always on: 14 console.info lines per build",
+   "detail": "Every mountain build prints [mountain] info lines from forest.ts, landmarks.ts (2), signage.ts, mountain-legs.ts, mountain-grade.ts, mountain-ropeway.ts, index.ts, gorge.ts, village.ts, mountain-balloons.ts, mountain-turbines.ts and farm.ts (2) into every player's console (buildtime.log). The track unit and coast send the same kind of message through ctx.log, which only prints with ?debug.",
+   "fix": "Route these lines through ctx.log / d.ctx.log. Keep console.warn for real problems (skipped landmarks, missing content lines, a full atlas)."
+  },
+  {
+   "severity": "minor",
+   "title": "Copy-pasted towardRiders and repeated frame maths; orphaned doc comment",
+   "detail": "dressing/mountain/signage.ts:12 towardRiders is a verbatim copy of coast/signage.ts:32 (private there) and city/util.ts:48, so there are three copies across dressing units. The `Math.hypot(fr.right.x, fr.right.z) || 1` normalisation repeats in util.ts:12, signage.ts:14 and mountain-legs.ts:66 and :123. signage.ts:38-39 stacks the old chevronRow doc ('Red/white chevron boards...') above sharpest(), so chevronRow has no doc and sharpest has two.",
+   "fix": "File a track request to export towardRiders from scenery/signs/boards.ts and import it, deleting the local copy. Add a small flatAxes(fr) helper in util.ts for the normalised tangent and right vectors. Move the chevron doc comment onto chevronRow."
+  }
+ ]
+}

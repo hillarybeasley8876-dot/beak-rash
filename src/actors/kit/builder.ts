@@ -7,6 +7,7 @@ import { decimate } from './decimate';
 import { meshField } from './mesher';
 import { crispBorders } from './crisp';
 import { Painter } from './paint';
+import { smoothNormals } from './smooth-normals';
 import { Field, type Prim } from './sdf';
 
 /** Up to four (bone, weight) influences. */
@@ -82,6 +83,7 @@ export class CharacterBuilder {
     chunk.hex = hex;
     if (budget !== undefined && chunk.idx.length / 3 > budget) this.reduce(chunk, budget * this.detail * this.detail);
     this.crisp(chunk, painter);
+    smoothNormals(chunk.pos, chunk.nrm, chunk.idx);
   }
 
   /** Decimate a chunk in place and drop the vertices it no longer uses. */

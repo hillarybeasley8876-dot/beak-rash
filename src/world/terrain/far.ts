@@ -1,13 +1,17 @@
 // Far terrain: a chunked world-space grid (16 m cells) around the whole road, held under the near
-// ribbons and the road. Chunks entirely below the sea are skipped; chunks past the fog are hidden.
-import { BufferAttribute, BufferGeometry, Color, Mesh, type PerspectiveCamera } from 'three';
+// ribbons and the road. Chunks entirely below the sea are skipped; chunks past the fog are hidden
+// by world/lod.ts (userData.cullMargin).
+import { BufferAttribute, BufferGeometry, Color, Mesh } from 'three';
 import { smoothstep } from '../../core/math';
 import type { WorldCtx } from '../ctx';
+import type { GroundDef } from '../layout/types';
 import { farmWeight } from './farmland';
 import { terrainMat } from './material';
 import type { TerrainField, WorldSample } from './field';
 import { NEAR_EXTENT, ribbonReach, type NearRibbon } from './near';
-import { groundColor, isShore, profileY } from './profile';
+import { groundColor, isShore, profileY, tintNoise } from './profile';
+
+type GroundMat = GroundDef['mat'];
 
 const CELL = 16;
 const CHUNK = 24;           // cells per chunk side
@@ -68,7 +72,7 @@ export function buildFarTerrain(ctx: WorldCtx, field: TerrainField, ribbons: Nea
   const vx = nx + 1, vz = nz + 1;
   const H = new Float32Array(vx * vz);
   const U = new Float32Array(vx * vz);
-  const M = new Array<string>(vx * vz);
+  const M = new Array<GroundMat>(vx * vz);
   const S = new Uint8Array(vx * vz);
   for (let j = 0; j < vz; j++) {
     for (let i = 0; i < vx; i++) {
@@ -95,7 +99,6 @@ export function buildFarTerrain(ctx: WorldCtx, field: TerrainField, ribbons: Nea
     }
   }
   const mat = terrainMat(ctx, true);
-  const chunks: Mesh[] = [];
   const color = new Color();
   for (let cj = 0; cj < nz; cj += CHUNK) {
     for (let ci = 0; ci < nx; ci += CHUNK) {
@@ -132,8 +135,9 @@ export function buildFarTerrain(ctx: WorldCtx, field: TerrainField, ribbons: Nea
         for (let i = 0; i < cols; i++) {
           const k = (cj + j) * vx + (ci + i), v = j * cols + i;
           const wx = pos[v * 3] ?? 0, wz = pos[v * 3 + 2] ?? 0;
-          const m = (M[k] ?? 'grass') as 'sand' | 'grass' | 'rock' | 'dirt' | 'stone';
-          groundColor(m, H[k] ?? 0, nrm[v * 3 + 1] ?? 1, Math.max(0, U[k] ?? 0), field.noise.get(wx / 23, wz / 23), S[k] === 1, color);
+          const m = M[k] ?? 'grass';
+          groundColor(m, H[k] ?? 0, nrm[v * 3 + 1] ?? 1, Math.max(0, U[k] ?? 0), field.noise.get(wx / 23, wz / 23), S[k] === 1, color,
+            tintNoise(field.noise, wx, wz));
           col[v * 3] = color.r; col[v * 3 + 1] = color.g; col[v * 3 + 2] = color.b;
           farm[v] = farmWeight(field.noise, wx, wz, U[k] ?? 0, nrm[v * 3 + 1] ?? 1, H[k] ?? 0, S[k] === 1);
         }
@@ -145,8 +149,8 @@ export function buildFarTerrain(ctx: WorldCtx, field: TerrainField, ribbons: Nea
       mesh.name = `far:${ci},${cj}`;
       mesh.receiveShadow = true;
       mesh.userData.heightmap = true;
+      mesh.userData.cullMargin = 60;   // world/lod.ts hides chunks past the fog
       ctx.group.add(mesh);
-      chunks.push(mesh);
     }
   }
   const heightAt: FarHeight = (wx, wz) => {
@@ -158,14 +162,5 @@ export function buildFarTerrain(ctx: WorldCtx, field: TerrainField, ribbons: Nea
     if (u + v <= 1) return h(i, j) + (h(i + 1, j) - h(i, j)) * u + (h(i, j + 1) - h(i, j)) * v;
     return h(i + 1, j + 1) + (h(i, j + 1) - h(i + 1, j + 1)) * (1 - u) + (h(i + 1, j) - h(i + 1, j + 1)) * (1 - v);
   };
-  // Hide chunks entirely past the fog (no fog → show everything, e.g. aerial views).
-  ctx.onUpdate((_dtSim, _dtReal, camera: PerspectiveCamera) => {
-    const fog = ctx.app.scene.fog;
-    const far = fog && 'far' in fog ? fog.far + 60 : Infinity;
-    for (const m of chunks) {
-      const bs = m.geometry.boundingSphere;
-      m.visible = !bs || bs.center.distanceTo(camera.position) - bs.radius < far;
-    }
-  });
   return heightAt;
 }

@@ -3,18 +3,20 @@
 // pelican-on-a-bicycle statue on a neon-ringed plinth in a flower bed).
 import { Color, Matrix4, Vector3 } from 'three';
 import { STREET } from '../../layouts/city';
-import { box, cylinder, trs } from '../../kit/shapes';
+import type { Rng } from '../../../core/rng';
+import { box, cylinder, sphere, trs } from '../../kit/shapes';
 import { convenienceStore, subwayEntrance } from '../../scenery/props/city-shops';
 import { faceQuad } from '../../scenery/signs/boards';
+import type { AuxBuf } from './batch';
 import type { City } from './city';
 import { metroFace, muralFace, storeFace } from './faces';
 import { MURAL } from './lines';
 import { sign } from './neon';
+import { p5Face } from './neon-faces';
 import { statue } from '../../scenery/props/city-statue';
-import { hdr } from './util';
+import { ahead, hdr } from './util';
 
 const m = new Matrix4();
-const ahead = (p: Vector3, yaw: number, d: number): Vector3 => new Vector3(p.x - Math.sin(yaw) * d, p.y, p.z - Math.cos(yaw) * d);
 
 /** Convenience store lot at (s, side): claims it so the street wall leaves the gap. */
 export function storeAt(c: City, s: number, side: -1 | 1): void {
@@ -72,17 +74,53 @@ export function roundaboutAt(c: City, s: number, x: number): void {
   const y = STREET;
   cylinder(b.props.at(p.x, p.z), trs(p.x, y, p.z, 0, R, 0.35, R, m), new Color('#9a98a6'), 40);
   cylinder(b.props.at(p.x, p.z), trs(p.x, y, p.z, 0, R - 0.5, 0.5, R - 0.5, m), new Color('#2f6b3a').multiplyScalar(1.3), 40);
-  const rng = c.d.rng.fork(0x40d);
-  for (let i = 0; i < 70; i++) {
-    const a = rng.range(0, Math.PI * 2), r = rng.range(5, R - 1.2);
-    const col = rng.pick([hdr('#ff5fa2', 1.6), hdr('#ffe600', 1.5), hdr('#f4f1ea', 1.5), hdr('#b46bff', 1.5)]);
-    box(b.props.at(p.x, p.z), trs(p.x + Math.cos(a) * r, y + 0.62, p.z + Math.sin(a) * r, a, 0.5, 0.25, 0.5, m), col);
+  // Low hedge ring and three rings of flower beds (unlit so they keep their colour at night).
+  for (let i = 0; i < 28; i++) {
+    const a = (i / 28) * Math.PI * 2;
+    box(b.props.at(p.x, p.z), trs(p.x + Math.cos(a) * (R - 1.3), y + 0.8, p.z + Math.sin(a) * (R - 1.3), -a, 0.9, 0.6, 3.3, m), new Color('#1f4a2a'));
   }
+  flowerBeds(c.cb.lit.at(p.x, p.z), p, y, c.d.rng.fork(0xf10));
   cylinder(b.props.at(p.x, p.z), trs(p.x, y, p.z, 0, 3.2, 4.2, 3.2, m), new Color('#c9c5bb'), 16);
   cylinder(b.props.at(p.x, p.z), trs(p.x, y + 4.2, p.z, 0, 3.6, 0.4, 3.6, m), new Color('#e5191c'), 16);
   for (let i = 0; i < 32; i++) {
     const a = (i / 32) * Math.PI * 2;
     box(b.glow.at(p.x, p.z), trs(p.x + Math.cos(a) * 3.66, y + 4.4, p.z + Math.sin(a) * 3.66, -a, 0.18, 0.12, 0.75, m), hdr(i % 2 ? '#22e8ff' : '#ff2d95', 2.6));
   }
-  statue(b.props, p.x, y + 4.6, p.z, ctx.q.frameVis(s).tangent, 3.3);
+  statue(c.cb.lit.at(p.x, p.z), p.x, y + 4.6, p.z, ctx.q.frameVis(s).tangent, 5);
+  // Three warm uplights on the plinth rim aimed at the statue.
+  for (let i = 0; i < 3; i++) {
+    const a = (i / 3) * Math.PI * 2 + 0.5, lx = p.x + Math.cos(a) * 2.9, lz = p.z + Math.sin(a) * 2.9;
+    box(b.props.at(lx, lz), trs(lx, y + 4.75, lz, -a, 0.5, 0.35, 0.5, m), new Color('#1a1b22'));
+    box(b.glow.at(lx, lz), trs(lx, y + 4.95, lz, -a, 0.4, 0.04, 0.4, m), hdr('#ffd9a0', 2.6));
+  }
+  plaque(c, s, p, y);
+}
+
+/** Flower beds: three rings of low toon mounds dotted with small self-lit blossoms. */
+function flowerBeds(lit: AuxBuf, p: Vector3, y: number, rng: Rng): void {
+  const GREEN = new Color('#2f7a3c'), FLOWERS = [new Color('#ff5fa2'), new Color('#ffe600'), new Color('#f4f1ea')];
+  for (let ring = 0; ring < 3; ring++) {
+    const r = 6 + ring * 2.4, n = 10 + ring * 3;
+    for (let i = 0; i < n; i++) {
+      const a = ((i + ring * 0.5) / n) * Math.PI * 2, mx = p.x + Math.cos(a) * r, mz = p.z + Math.sin(a) * r;
+      lit.setAux(5, 0.12);
+      sphere(lit, trs(mx, y + 0.42, mz, -a, 1.0, 0.32, 0.8, m), GREEN, 10, 5);
+      lit.setAux(5, 0.55);
+      for (let k = 0; k < 5; k++) {
+        const fa = rng.range(0, Math.PI * 2), fr = rng.range(0.1, 0.7);
+        box(lit, trs(mx + Math.cos(fa) * fr, y + 0.66 + rng.range(0, 0.06), mz + Math.sin(fa) * fr * 0.8, fa, 0.13, 0.08, 0.13, m), FLOWERS[ring] ?? GREEN);
+      }
+    }
+  }
+  lit.setAux(0);
+}
+
+/** P5 plaque on the drum, facing the road at s. */
+function plaque(c: City, s: number, p: Vector3, y: number): void {
+  const road = c.d.ctx.q.toWorld(s, 0, 0, new Vector3());
+  const dx = road.x - p.x, dz = road.z - p.z, l = Math.hypot(dx, dz) || 1;
+  const yaw = Math.atan2(-dx / l, -dz / l);
+  const rect = c.d.face('roof:暴力鹈鹕:true', () => p5Face(c.neonAtlas, c.d.rng.fork(0x9a1), '暴力鹈鹕'));
+  const at = new Vector3(p.x + (dx / l) * 3.3, y + 2.3, p.z + (dz / l) * 3.3);
+  if (rect) sign(c.cb.neon.at(at.x, at.z), at, yaw, 4.4, 4.4 * (160 / 512), rect, 1.3);
 }

@@ -9,7 +9,8 @@ import { AUDIO_RATE, Engine, type Volumes } from './engine';
 import { wireCombat } from './events-combat';
 import { wireRace } from './events-race';
 import { prepareDrumSamples } from './music/instruments/drum-samples';
-import { prepareKeySamples } from './music/instruments/keys-render';
+import { prepareSampleBanks } from './music/instruments/banks';
+import { prepareLoopBuffers } from './sfx/loop-buffers';
 import { Conductor } from './music/conductor';
 import { SONGS } from './music/songs';
 import { Pump } from './music/pump';
@@ -43,9 +44,12 @@ const VOLUME_KEYS = ['master', 'music', 'sfx', 'voice'] as const;
 const RESULTS_LOW = Math.max(0, SONGS.results?.form.indexOf('B') ?? 0);
 
 function createContext(): AudioContext {
+  if (typeof AudioContext === 'undefined') throw new Error('AudioContext is not available');
   try {
     return new AudioContext({ latencyHint: 'interactive', sampleRate: AUDIO_RATE });
   } catch (err) {
+    // Only an unsupported rate is worth a retry; anything else is the real failure (see prepare).
+    if (!(err instanceof DOMException && err.name === 'NotSupportedError')) throw err;
     console.warn('[audio] 32 kHz context unavailable, using the device rate', err);
     return new AudioContext({ latencyHint: 'interactive' });
   }
@@ -144,7 +148,8 @@ export class AudioRuntime implements AudioSystem, Host {
       hold();
       const engine = new Engine(c, this.volumes);
       prepareDrumSamples(c);
-      void prepareKeySamples(c.sampleRate);
+      prepareLoopBuffers(c);
+      void prepareSampleBanks(c.sampleRate);
       const conductor = new Conductor(engine);
       const voices = new VoicePlayer(engine, new URL(import.meta.env.BASE_URL, window.location.href),
         (id, channel, gain) => this.trace.note(channel === 'bark' ? 'bark' : 'voice', id, gain));
@@ -308,8 +313,8 @@ export class AudioRuntime implements AudioSystem, Host {
     if (this.live) this.rt?.voices.play(id, { channel: 'announcer', priority });
   }
 
-  bark(riderId: RiderId, kind: BarkKind, text?: string): void {
-    if (this.live) this.rt?.barks.say(riderId, kind, text);
+  bark(riderId: RiderId, kind: BarkKind, text?: string, wait?: number): void {
+    if (this.live) this.rt?.barks.say(riderId, kind, text, wait);
   }
 
   stinger(id: StingerId): void {

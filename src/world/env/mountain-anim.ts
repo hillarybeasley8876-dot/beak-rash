@@ -32,7 +32,6 @@ export interface AnimSpec {
   outline: number;
   /** World-space sphere covering every animated position (frustum + fog culling). */
   bounds: Sphere;
-  castShadow?: boolean;
 }
 
 function patch(m: Material, spec: AnimSpec, time: IUniform<number>, key: string): void {
@@ -55,7 +54,7 @@ export function animatedMesh(ctx: WorldCtx, geo: BufferGeometry, spec: AnimSpec)
   geo.boundingSphere = spec.bounds.clone();
   const mesh = new Mesh(geo, mat);
   mesh.name = spec.name;
-  mesh.castShadow = spec.castShadow ?? false;
+  mesh.castShadow = false;
   mesh.receiveShadow = false;
   if (spec.outline > 0) {
     const hullGeo = ctx.own(makeHull(geo, spec.outline));

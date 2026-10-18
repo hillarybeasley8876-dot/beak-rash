@@ -1,6 +1,6 @@
 // Ears, tails and mouths for the rider kit. Ears are bevelled flat shapes (inner colour by shape-space
 // position) on the ear bones; tails are skinned tubes on tail1/tail2; mouths are thin dark tubes.
-import { Matrix4, Quaternion, Shape, Vector3, Euler } from 'three';
+import { Euler, Matrix4, Quaternion, Shape, SphereGeometry, Vector3 } from 'three';
 import type { CharacterBuilder } from './builder';
 import { extrudeSmooth, positionsOf } from './shapes';
 import { addTube, type TubeNode } from './tube';
@@ -74,5 +74,15 @@ export function addTail(b: CharacterBuilder, J: Joints, o: TailOpts): void {
 
 /** Mouth line through points (left corner → right corner), bound to the head. */
 export function addMouth(b: CharacterBuilder, pts: readonly V3[], r: number, color = 0x2a1416): void {
-  addTube(b, pts.map((p) => ({ p, r, bone: B.head })), { sides: 5, seg: 2, color, outline: 0 });
+  addTube(b, pts.map((p) => ({ p, r, bone: B.head })), { sides: 5, seg: 1, color, outline: 0 });
+}
+
+/** Two dark nostril dots on a nose pad: `p` = left-right mirrored position (x > 0), r = dot radius. */
+export function addNostrils(b: CharacterBuilder, p: V3, r: number, color = 0x1c100a): void {
+  const g = new SphereGeometry(1, 8, 6);
+  for (const s of [-1, 1]) {
+    const m = new Matrix4().compose(new Vector3(s * p[0], p[1], p[2]), new Quaternion(), new Vector3(r, r * 0.7, r * 0.5));
+    b.part({ geometry: g, matrix: m, color, bone: B.head, outline: 0 });
+  }
+  g.dispose();
 }

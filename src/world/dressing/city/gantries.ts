@@ -7,11 +7,10 @@ import { gantryFace } from '../../scenery/signs/faces';
 import type { City } from './city';
 import { finishScreenFace } from './faces';
 import { board, sign } from './neon';
-import { hdr } from './util';
+import { ahead, hdr } from './util';
 
 const m = new Matrix4();
 const DARK = new Color('#16171c');
-const ahead = (p: Vector3, yaw: number, d: number): Vector3 => new Vector3(p.x - Math.sin(yaw) * d, p.y, p.z - Math.cos(yaw) * d);
 
 /** Neon gantry over the road at s; header words toward the riders and on the back. */
 export function neonGantry(c: City, s: number, word: string, sub: string, back: string, backSub: string): void {

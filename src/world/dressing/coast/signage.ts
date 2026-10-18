@@ -1,6 +1,5 @@
 // Coast signage: meme billboards (BILLBOARD_LINES + generated art when available), road signs,
 // warnings, curve chevrons, distance markers, banners along the barriers.
-import { BILLBOARDS, assetUrl } from '../../../data/assets';
 import { BILLBOARD_LINES, ROAD_SIGNS } from '../../../data/memes';
 import type { Dress } from '../dress';
 import { billboard, panel, postSign, yawFor } from '../../scenery/signs/boards';
@@ -9,24 +8,8 @@ import {
 } from '../../scenery/signs/faces';
 import type { AtlasRect } from '../../scenery/signs/atlas';
 
-/** Load billboard art listed in the asset manifest (bounded wait; missing files are skipped). */
-export async function loadBillboardArt(id: string, timeoutMs = 2500): Promise<HTMLImageElement[]> {
-  const files = (BILLBOARDS as Record<string, string[] | undefined>)[id] ?? [];
-  const load = (rel: string): Promise<HTMLImageElement | null> => new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => {
-      console.warn('[track] billboard art missing:', rel);
-      resolve(null);
-    };
-    img.src = assetUrl(rel);
-  });
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const timeout = new Promise<null[]>((resolve) => { timer = setTimeout(() => resolve([]), timeoutMs); });
-  const imgs: Array<HTMLImageElement | null> = await Promise.race([Promise.all(files.map(load)), timeout]);
-  if (timer) clearTimeout(timer);
-  return imgs.filter((i): i is HTMLImageElement => i !== null);
-}
+/** Billboard art loader (moved to scenery/signs/art.ts; re-exported for city / mountain imports). */
+export { loadBillboardArt } from '../../scenery/signs/art';
 
 /** Yaw for a face looking back down the road at riders on `side`, turned `turn` rad toward the road. */
 function towardRiders(d: Dress, s: number, side: -1 | 1, turn = 0.3): number {
@@ -37,6 +20,20 @@ function towardRiders(d: Dress, s: number, side: -1 | 1, turn = 0.3): number {
   return yawFor(nx, nz);
 }
 
+/**
+ * Smallest u (beyond the drivable edge) for a panel of width w at yaw so its inner end stays
+ * `gap` m outside the bound: the half-width's reach across the road plus the gap.
+ */
+function clearU(d: Dress, s: number, side: -1 | 1, yaw: number, w: number, gap = 0.3): number {
+  const fr = d.ctx.q.frameVis(s);
+  const rl = Math.hypot(fr.right.x, fr.right.z) || 1;
+  const across = Math.abs(Math.cos(yaw) * (fr.right.x / rl) - Math.sin(yaw) * (fr.right.z / rl));
+  return (w / 2) * across + gap;
+}
+
+/** Billboard size (m) and how far the face turns from facing straight down the road toward riders. */
+const BB = { w: 10, h: 5.6, hNoArt: 5, lift: 3, turn: 0.75 } as const;
+
 /** Find room for a billboard near s: tries both sides and a few offsets along the road. */
 function billboardSpot(d: Dress, s: number): ReturnType<Dress['place']['spot']> | null {
   const { ctx, place, rng } = d;
@@ -44,16 +41,18 @@ function billboardSpot(d: Dress, s: number): ReturnType<Dress['place']['spot']> 
     for (const side of rng.shuffle([-1, 1] as const)) {
       const ss = s + ds;
       if (ctx.q.edgeKindAt(ss, side) === 'tunnel' || d.field.ground(ss, side).detached) continue;
-      const sp = place.spot(ss, side, rng.range(3, 7));
+      const u = clearU(d, ss, side, towardRiders(d, ss, side, BB.turn), BB.w + 0.5) + rng.range(0, 2.5);
+      const sp = place.spot(ss, side, u);
       const edge = d.field.edgeY(ss, side);
       if (sp.pos.y < 0.3 || Math.abs(sp.pos.y - edge) > 3 || place.slopeRange(sp, 1, 6) > 5) continue;
-      if (place.free(sp.pos.x, sp.pos.z, 4.2, 2.5)) return sp;
+      if (place.free(sp.pos.x, sp.pos.z, BB.w / 2 + 0.4, 2.5)) return sp;
     }
   }
   return null;
 }
 
-export function billboards(d: Dress, art: HTMLImageElement[], every = 230): void {
+/** Meme billboards every ~`every` m, face-on enough to read at speed (BB). */
+export function billboards(d: Dress, art: HTMLImageElement[], every = 150): void {
   const { ctx, b, atlas } = d;
   const lines = ctx.raceRng.shuffle(BILLBOARD_LINES);
   const at: string[] = [];
@@ -67,10 +66,12 @@ export function billboards(d: Dress, art: HTMLImageElement[], every = 230): void
     const rect = d.face(`bb:${line}:${img?.src ?? ''}`, () => billboardFace(atlas, d.rng.fork(k + 1), line, img));
     k++;
     if (!rect) return;
-    billboard(b.props.at(sp.pos.x, sp.pos.z), b.faces.at(sp.pos.x, sp.pos.z), sp.pos.x, sp.pos.y, sp.pos.z, towardRiders(d, sp.s, sp.side, 0.42), 8, img ? 4.5 : 4, 2.6, rect);
+    const yaw = towardRiders(d, sp.s, sp.side, BB.turn);
+    const { x, y, z } = sp.pos;
+    billboard(b.props.at(x, z), b.faces.at(x, z), x, y, z, yaw, BB.w, img ? BB.h : BB.hNoArt, BB.lift, rect);
     at.push(`${Math.round(sp.s)}${sp.side < 0 ? 'L' : 'R'}`);
   }
-  console.info(`[track] billboards: ${k} at s=${at.join(',')}`);
+  d.ctx.log(`billboards: ${k} at s=${at.join(',')}`);
 }
 
 /**
@@ -85,16 +86,18 @@ export function mountY(d: Dress, s: number, side: -1 | 1, groundY: number): numb
 
 function signAt(d: Dress, s: number, side: -1 | 1, rect: AtlasRect | null, w: number, h: number, u = 0.9, lift = 1.6, mirror = false): void {
   if (!rect) return;
-  let sp = d.place.spot(s, side, u);
+  const spotFor = (sd: -1 | 1) => d.place.spot(s, sd, Math.max(u, clearU(d, s, sd, towardRiders(d, s, sd, 0.25), w + 0.1)));
+  let sp = spotFor(side);
   let y = mountY(d, s, side, sp.pos.y);
   if (y === null) {
     // On top of a wall: use the other side of the road instead.
-    sp = d.place.spot(s, side < 0 ? 1 : -1, u);
+    sp = spotFor(side < 0 ? 1 : -1);
     y = mountY(d, s, sp.side, sp.pos.y);
     if (y === null) return;
   }
   if (!d.place.claim(sp.pos.x, sp.pos.z, 0.6)) return;
-  postSign(d.b.props.at(sp.pos.x, sp.pos.z), d.b.faces.at(sp.pos.x, sp.pos.z), sp.pos.x, y, sp.pos.z, towardRiders(d, s, sp.side, 0.25), w, h, lift, rect, mirror);
+  const { x, z } = sp.pos;
+  postSign(d.b.props.at(x, z), d.b.faces.at(x, z), x, y, z, towardRiders(d, s, sp.side, 0.25), w, h, lift, rect, mirror);
 }
 
 /** Sharp-bend caption (content's ROAD_SIGNS has one; the first six entries are positional). */
@@ -149,7 +152,8 @@ export function banners(d: Dress, side: -1 | 1, s0: number, s1: number, texts: s
   for (let s = s0 + 4; s < s1 - 4; s += 16) {
     const i = k % texts.length;
     const text = texts[i] ?? '';
-    const rect = d.face(`banner:${text}`, () => bannerFace(d.atlas, d.rng, text, (['red', 'black', 'white'] as const)[i % 3] ?? 'red'));
+    const tone = (['red', 'black', 'white'] as const)[i % 3] ?? 'red';
+    const rect = d.face(`banner:${text}`, () => bannerFace(d.atlas, d.rng.fork(0xba00 + i), text, tone));
     k++;
     if (!rect) return;
     const sp = d.place.spot(s, side, 0.75);

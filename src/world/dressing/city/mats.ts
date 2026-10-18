@@ -6,6 +6,7 @@
 import { MeshBasicMaterial, MeshToonMaterial, type Texture, type WebGLProgramParametersWithUniforms } from 'three';
 import { toonRamp } from '../../../render/toon';
 import type { WorldCtx } from '../../ctx';
+import { STREET } from '../../layouts/city';
 import { BUILDING_FRAG, BUILDING_FRAG_HEAD, CYCLE_FRAG, HASH_GLSL, NEON_FRAG } from './glsl';
 
 interface TimeUniform { value: number }
@@ -30,14 +31,19 @@ function withAux(shader: WebGLProgramParametersWithUniforms, fragHead: string): 
   );
 }
 
-/** Toon walls with lit windows (uv = facade coordinates in window bays × floors). */
+/** Toon walls with lit windows (uv = facade coordinates in window bays × floors) and a street-glow wash. */
 export function buildingMat(ctx: WorldCtx): MeshToonMaterial {
   const time = cityTime(ctx);
   return ctx.shared('city:mat:building', () => {
     const m = new MeshToonMaterial({ vertexColors: true, gradientMap: toonRamp() });
     m.onBeforeCompile = (shader) => {
       shader.uniforms.uCityTime = time;
+      shader.uniforms.uStreetY = { value: STREET };
       withAux(shader, BUILDING_FRAG_HEAD);
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nvarying float vWorldY;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWorldY = (modelMatrix * vec4(transformed, 1.0)).y;');
+      shader.fragmentShader = shader.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uStreetY;\nvarying float vWorldY;');
       shader.fragmentShader = shader.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\n${BUILDING_FRAG}`);
     };
     m.customProgramCacheKey = () => 'city-building';

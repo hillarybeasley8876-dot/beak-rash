@@ -14,6 +14,9 @@ export interface KoTestOpts {
   stage?: boolean;
   /** Also knock out a second rival this many real seconds later (DOUBLE KNOCK OUT). */
   chainAfter?: number;
+  /** Staging: metres ahead of the player (default 4.5) and side (+1 right / −1 left, default toward the centre). */
+  ahead?: number;
+  side?: 1 | -1;
 }
 
 interface Pending { at: number; run: () => void }
@@ -57,9 +60,10 @@ export class KoTester implements FxPart {
     const v = victim === undefined ? undefined : s.rider(victim);
     if (!v || v.mode !== 'racing') return null;
     const attacker = o.attacker === undefined ? (v.isPlayer ? this.pickRival() ?? null : p.id) : o.attacker;
+    const side = o.side ?? (p.x > 0 ? -1 : 1);
     if (o.stage !== false && !v.isPlayer) {
-      v.s = p.s + 4.5;
-      v.x = clamp(p.x + (p.x > 0 ? -1.7 : 1.7), -5, 5);
+      v.s = p.s + (o.ahead ?? 4.5);
+      v.x = clamp(p.x + side * 1.7, -5, 5);
       v.speed = p.speed;
     }
     const pos = s.track.toWorld(v.s, v.x, 1.3, new Vector3());
@@ -73,7 +77,9 @@ export class KoTester implements FxPart {
     }
     if (o.chainAfter !== undefined) {
       const second = this.pickRival([v.id]);
-      if (second !== undefined) this.later(o.chainAfter, () => this.ko({ ...o, victim: second, chainAfter: undefined }));
+      // The chained victim stands on the other side, a few metres further on, so the re-target reads.
+      const next = { ...o, victim: second, chainAfter: undefined, ahead: (o.ahead ?? 4.5) + 3.5, side: -side as 1 | -1 };
+      if (second !== undefined) this.later(o.chainAfter, () => this.ko(next));
     }
     return v.id;
   }

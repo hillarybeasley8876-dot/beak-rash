@@ -5,6 +5,7 @@ import type { Session } from '../../core/contracts';
 import type { Cluster } from './cluster';
 import type { CutinLayer } from './cutins/layer';
 import type { PlaceBlock } from './place';
+import type { Quip } from './quip';
 import type { Speedo } from './speedo';
 import type { WorldOverlay } from './world/overlay';
 
@@ -18,6 +19,8 @@ export interface HudParts {
   cluster(): Cluster | null;
   world: WorldOverlay;
   cutins: CutinLayer;
+  /** The player's own lines (KO / skill / respawn) from the cluster portrait. */
+  quip: Quip;
   /** The player was BUSTED (starts the ticket-stop countdown next to the timer). */
   busted(): void;
 }
@@ -44,16 +47,23 @@ export function wireHudEvents(bus: EventBus<GameEvents>, p: HudParts): () => voi
     bus.on('rider:nearMiss', (e) => p.cutins.nearMiss(e)),
     bus.on('rider:boost', (e) => p.cutins.boost(e)),
     bus.on('rider:crash', (e) => p.cutins.crash(e)),
+    bus.on('rider:respawn', (e) => {
+      if (me(e.riderId)) p.quip.say('hurt');
+    }),
     bus.on('combat:hit', (e) => {
       if (me(e.victim) && !e.blocked) p.cluster()?.hurt();
       p.world.onHit(e);
     }),
     bus.on('combat:ko', (e) => {
-      if (me(e.attacker)) p.cluster()?.scored();
+      if (me(e.attacker)) {
+        p.cluster()?.scored();
+        p.quip.say('ko');
+      }
       p.cutins.combatKo(e);
     }),
     bus.on('combat:combo', (e) => p.cutins.combo(e)),
     bus.on('skill:cast', (e) => {
+      if (me(e.riderId)) p.quip.say('skill', e.slot);
       p.cutins.skillCast(e);
       p.world.onSkillCast(e);
     }),
@@ -65,8 +75,12 @@ export function wireHudEvents(bus: EventBus<GameEvents>, p: HudParts): () => voi
     bus.on('cine:ko', (e) => p.cutins.cineKo(e)),
     bus.on('pickup:take', (e) => p.cutins.pickup(e)),
     bus.on('achievement:unlock', (e) => p.cutins.achievement(e.id)),
-    bus.on('taunt', (e) => p.world.onTaunt(e)),
-    bus.on('projectile:spawn', (e) => p.world.onProjectile(e)),
+    // The player's own lines (bell, gulp swallow) go to the cluster quip, not over the road.
+    bus.on('taunt', (e) => (me(e.riderId) ? p.quip.line(e.text) : p.world.onTaunt(e))),
+    bus.on('projectile:spawn', (e) => {
+      p.cutins.projectile(e);
+      p.world.onProjectile(e);
+    }),
     bus.on('projectile:end', (e) => p.world.incoming.end(e.id)),
     bus.on('police:alert', (e) => {
       if (me(e.riderId)) p.world.edges.policeAlert(e.level);

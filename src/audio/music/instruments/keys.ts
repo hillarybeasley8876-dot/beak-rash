@@ -146,9 +146,28 @@ export class Clav {
   }
 }
 
+/** Pad voices' detune (cents): alternate saws flat / sharp. */
+export const PAD_DETUNE = (i: number): number => (i % 2 ? 9 : -11);
+export const PAD_RELEASE = 0.7;
+
+/** The pad's slowly opening low-pass: 700 Hz → 1500 Hz over min(1.2 s, the chord). */
+export function padFilter(fr: AudioParam, t: number, dur: number): void {
+  const open = t + Math.max(0.06, Math.min(1.2, dur));
+  anchor(fr, t);
+  fr.linearRampToValueAtTime(700, t + 0.05);
+  fr.linearRampToValueAtTime(1500, open);
+  settle(fr, open, 1500);
+}
+
+/** The pad's swell; returns when the chord has died away. */
+export function padAmp(g: AudioParam, t: number, dur: number, vel: number): number {
+  return adsr(g, t, dur, 0.085 * vel, 0.35, 0.5, 0.8, PAD_RELEASE, true);
+}
+
 /**
  * Warm legato pad: four persistent detuned saws through one slowly opening low-pass. Chord
  * changes glide the voices (40 ms) and re-swell the VCA from its current level, so no new nodes.
+ * (pad-sampler.ts plays pre-rendered chords; this voice covers the time before its bank exists.)
  */
 export class Pad {
   private saws: OscillatorNode[] = [];
@@ -163,7 +182,7 @@ export class Pad {
     this.lp.connect(this.amp);
     this.gate = b.gate(this.amp, b.input('pad'));
     for (let i = 0; i < 4; i++) {
-      const o = osc(b, 'sawtooth', 220, i % 2 ? 9 : -11);
+      const o = osc(b, 'sawtooth', 220, PAD_DETUNE(i));
       o.connect(this.lp);
       this.saws.push(o);
     }
@@ -181,13 +200,8 @@ export class Pad {
       else o.frequency.setValueAtTime(f, t);
       settle(o.frequency, legato ? t + 0.04 : t, f);
     });
-    const fr = this.lp.frequency;
-    const open = t + Math.max(0.06, Math.min(1.2, dur));
-    anchor(fr, t);
-    fr.linearRampToValueAtTime(700, t + 0.05);
-    fr.linearRampToValueAtTime(1500, open);
-    settle(fr, open, 1500);
-    this.busyUntil = adsr(this.amp.gain, t, dur, 0.085 * vel, 0.35, 0.5, 0.8, 0.7, true);
+    padFilter(this.lp.frequency, t, dur);
+    this.busyUntil = padAmp(this.amp.gain, t, dur, vel);
     this.gate.open(this.busyUntil);
   }
 }

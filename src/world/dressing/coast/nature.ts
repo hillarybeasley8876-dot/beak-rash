@@ -1,7 +1,8 @@
 // Coast vegetation and rocks: palms (marks + beaches), umbrella pines / cypresses / bushes on the
-// grassy hills, boulders on cliff slopes and half-sunk rocks along the rocky shore, island dressing.
+// grassy hills, limestone rocks on cliff slopes and half-sunk along the rocky shore, island dressing.
 import type { Rng } from '../../../core/rng';
-import { boulder, bush, cypress, palm, umbrellaPine } from '../../scenery/props/nature';
+import { bush, cypress, palm, umbrellaPine } from '../../scenery/props/nature';
+import { cragCluster } from '../../scenery/props/rocks';
 import type { Dress } from '../dress';
 
 /** Walk s0..s1 with a jittered spacing. */
@@ -25,11 +26,24 @@ export function palms(d: Dress, side: -1 | 1, s0: number, s1: number, u0 = 2.5, 
   });
 }
 
+/** Flowering hedge bushes just behind the edge (bougainvillea-pink and yellow broom). */
+export function hedges(d: Dress, side: -1 | 1, s0: number, s1: number): void {
+  const { place, rng, b } = d;
+  walk(rng, s0, s1, 6, (s) => {
+    if (!isGrass(d, s, side)) return;
+    // Bush spheres reach ~1.85 × scale from the centre: keep every leaf ≥ 0.2 m beyond the bound.
+    const scale = rng.range(0.75, 1.0);
+    const sp = place.spot(s, side, 1.85 * scale + 0.2 + rng.range(0, 1.2));
+    if (sp.pos.y < 0.6 || place.slopeRange(sp, 1.5, 1.5) > 1.2 || !place.free(sp.pos.x, sp.pos.z, 1.1, 0.9)) return;
+    bush(b.props.at(sp.pos.x, sp.pos.z), sp.pos.x, sp.pos.y, sp.pos.z, rng, scale, rng.chance(0.75));
+  });
+}
+
 /** Trees and bushes on grassy hillsides (both sides wherever the ground is grass). */
 export function hillsides(d: Dress, s0: number, s1: number): void {
   const { place, rng, b } = d;
   for (const side of [-1, 1] as const) {
-    walk(rng, s0, s1, 7, (s) => {
+    walk(rng, s0, s1, 5, (s) => {
       if (!isGrass(d, s, side)) return;
       const u = 4 + Math.pow(rng.next(), 1.6) * 42;
       const sp = place.spot(s, side, u);
@@ -55,7 +69,7 @@ export function rocks(d: Dress, side: -1 | 1, s0: number, s1: number): void {
     if (sp.pos.y > 12 && rng.chance(0.5)) return;
     if (!place.free(sp.pos.x, sp.pos.z, 1.8)) return;
     const size = sp.pos.y < 0.5 ? rng.range(1.2, 2.6) : rng.range(0.6, 1.6);
-    boulder(b.props.at(sp.pos.x, sp.pos.z), sp.pos.x, sp.pos.y - size * 0.3, sp.pos.z, rng, size);
+    cragCluster(b.props.at(sp.pos.x, sp.pos.z), sp.pos.x, sp.pos.y - size * 0.3, sp.pos.z, size, rng);
   });
 }
 
@@ -69,7 +83,7 @@ export function islands(d: Dress): void {
       const x = bump.x + Math.cos(a) * r, z = bump.z + Math.sin(a) * r;
       const p = place.world(x, z);
       if (p.y < 0.6 || !place.claim(x, z, 2)) continue;
-      if (bump.mat === 'rock') boulder(b.props.at(x, z), x, p.y - 0.5, z, rng, rng.range(1.5, 3.5));
+      if (bump.mat === 'rock') cragCluster(b.props.at(x, z), x, p.y - 0.5, z, rng.range(1.5, 3.5), rng);
       else if (bump.mat === 'grass' && rng.chance(0.75)) palm(b.thin.at(x, z), x, p.y, z, rng, rng.range(1, 1.3));
       else bush(b.props.at(x, z), x, p.y, z, rng, 1.3);
     }
@@ -100,5 +114,33 @@ export function farForest(d: Dress, s0: number, s1: number): void {
         else cypress(buf, x, y, z, rng, rng.range(1, 1.4));
       }
     }
+  }
+}
+
+/** Mid-ground (45–150 m out): bush clumps, limestone outcrops and cypress lines on the hills, so the
+ *  slopes between the roadside cover and the far groves are not bare gradients (far batch, no outline). */
+export function midGround(d: Dress, s0: number, s1: number): void {
+  const { place, rng, b, field } = d;
+  for (const side of [-1, 1] as const) {
+    walk(rng, s0, s1, 9, (s) => {
+      const sp = place.spot(s, side, rng.range(45, 150));
+      const { x, y, z } = sp.pos;
+      if (y < 2.5 || field.noise.get(x / 90, z / 90) < -0.3) return;
+      const roll = rng.next(), steep = place.slopeRange(sp, 3, 3) > 2.4;
+      if (steep || roll < 0.22) {
+        if (place.free(x, z, 3)) cragCluster(b.far.at(x, z), x, y - 0.6, z, rng.range(2, 4), rng);
+        return;
+      }
+      const line = roll > 0.7, yaw = rng.range(0, Math.PI * 2);
+      for (let i = 0, n = rng.int(2, line ? 5 : 4); i < n; i++) {
+        const px = line ? x + Math.cos(yaw) * i * 3.2 : x + rng.range(-4, 4);
+        const pz = line ? z + Math.sin(yaw) * i * 3.2 : z + rng.range(-4, 4);
+        if (!place.free(px, pz, 1.6)) continue;
+        const py = d.ctx.groundWorld(px, pz);
+        if (py < 2.5) continue;
+        if (line) cypress(b.far.at(px, pz), px, py, pz, rng, rng.range(0.9, 1.25));
+        else bush(b.far.at(px, pz), px, py, pz, rng, rng.range(1.3, 2.1), rng.chance(0.25));
+      }
+    });
   }
 }

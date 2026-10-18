@@ -53,9 +53,14 @@ export function towardRiders(ctx: WorldCtx, s: number, side: -1 | 1, turn = 0.3)
   return yawFor(nx, nz);
 }
 
-/** World point at track (s, x) on the road surface + y. */
-export function roadPoint(ctx: WorldCtx, s: number, x: number, y = 0): Vector3 {
-  return ctx.q.toWorld(s, x, y, new Vector3());
+/** Post distance beyond the drivable edge so a board of width w, turned `turn` toward the road, keeps 0.3 m clear. */
+export function signInset(w: number, turn: number): number {
+  return 0.3 + 0.5 * w * Math.cos(turn);
+}
+
+/** Point d metres in front of p for a face with this yaw (faces look along local −Z). */
+export function ahead(p: { x: number; y: number; z: number }, yaw: number, d: number): Vector3 {
+  return new Vector3(p.x - Math.sin(yaw) * d, p.y, p.z - Math.cos(yaw) * d);
 }
 
 /** Colour × k (HDR values for unlit glow so bloom picks them up). */

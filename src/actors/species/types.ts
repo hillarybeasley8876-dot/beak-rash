@@ -27,6 +27,14 @@ export interface SpeciesMeta {
   lookBias?: number;
   /** Pigeon-style head bob while pedalling. */
   headBob?: boolean;
+  /** Head yaw sway (rad amplitude) once per crank turn while pedalling (the hero's beak swings into view). */
+  headSway?: number;
+  /** Idle micro-motions (rig/idle.ts): ear flop amplitude (rad), loose-hat wobble (rad); blink length (s). */
+  earFlop?: number;
+  hatWobble?: number;
+  blinkTime?: number;
+  /** Uniform head scale applied by the rig (chibi head size without re-authoring the face), default 1. */
+  headScale?: number;
   /** How far the head can stretch forward on attacks (m; pelican S-neck). */
   neckReach: number;
   tail: 'feather' | 'stub' | 'long' | 'curl' | 'none';

@@ -1,16 +1,19 @@
 // Lateral dynamics. Riding: the lateral velocity chases
-//   steer · handling · lerp(4.5, 7.5, v/top)  −  curvature·v²·curvePush  (+ wobble, oil fishtail)
+//   steer · handling · lerp(4.5, 7.5, v/top)  −  curvature·min(v, top)²·curvePush  (+ wobble, oil fishtail)
 // with time constant gripTau/grip, so input shows on screen the next frame, never overshoots, and fast
-// corners need ~60–80 % steer. Drifting: the bike follows the bend (the curve push is cancelled up to
-// ×1.35 of the grip authority, so very tight bends still run wide) and steering sets how fast it moves
-// across the road; a release hands over to grip steering over 0.2 s. Knocks, hard bumps, wall bounces and
-// side swipes open a short carry window: steering that points back at the hazard is weak and the grip
-// pulling that way is slow, so the shove reads on screen, while steering away keeps full authority.
+// corners need ~60–80 % steer. The push sees at most the bike's own top speed, so a boost (mini-turbo,
+// pad, skill) never shrinks the radius full lock can hold (≈ R43). Drifting: the bike follows the bend
+// (the curve push is cancelled up to ×1.35 of the grip authority, so very tight bends still run wide) and
+// steering sets how fast it moves across the road; a release hands over to grip steering over 0.35 s and
+// keeps |vx| ≤ v·tan 20° for 0.5 s, so a mini-turbo leaves along the drift line and never wrecks. Knocks,
+// hard bumps, wall bounces and side swipes open a short carry window: steering that points back at the
+// hazard is weak and the grip pulling that way is slow, so the shove reads on screen, while steering away
+// keeps full authority.
 import { clamp, clamp01, lerp, smoothstep } from '../core/math';
 import { TUNING as T } from './tuning';
 import { hasStatus, statusStrength, type SimRider } from './state';
 import type { Controls } from '../core/types';
-import type { SurfaceMods } from './forces';
+import { bikeTop, type SurfaceMods } from './forces';
 
 /** Combined grip: the lowest of statuses (combat mods), surface, oil and puddle. Never multiplied twice. */
 export function gripOf(sr: SimRider, surf: SurfaceMods): number {
@@ -55,9 +58,10 @@ export function driftTarget(sr: SimRider, steer: number): number {
   return d * lerp(T.driftLatOut, T.driftLatIn, u) * clamp01(sr.r.speed / sr.tune.top) * steerCtl(sr);
 }
 
-/** Outward curve push; a drift cancels it up to ×1.35 of the grip authority (tight bends still run wide). */
+/** Outward curve push at min(v, bike top); a drift cancels it up to ×1.35 of the grip authority. */
 function curvePush(sr: SimRider, drifting: boolean): number {
-  const push = sr.frame.curvature * sr.r.speed * sr.r.speed * T.curvePush;
+  const v = Math.min(sr.r.speed, bikeTop(sr));
+  const push = sr.frame.curvature * v * v * T.curvePush;
   if (!drifting) return push;
   const cancel = T.driftCurveCancel * T.steerAuthHigh * sr.tune.handling * clamp01(sr.r.speed / sr.tune.top);
   return push - clamp(push, -cancel, cancel);
@@ -90,10 +94,10 @@ export function lateral(sr: SimRider, c: Controls, surf: SurfaceMods, dt: number
   const push = curvePush(sr, drifting);
   let target = cmd - push;
   sr.vxWant = (r.airborne ? want * T.airControl : want) - push;
-  if (!drifting && sr.driftExit > 0) {
+  const exiting = !drifting && sr.driftExit > 0;
+  if (exiting) {
     // Release ramp: hand over from the drift's lateral speed to grip steering instead of darting inward.
-    const a = smoothstep(0, 1, 1 - sr.driftExit / T.driftExitTime);
-    target = lerp(sr.driftExitVx, target, a);
+    target = lerp(sr.driftExitVx, target, smoothstep(0, T.driftExitTime, T.driftExitGuard - sr.driftExit));
     sr.driftExit = Math.max(0, sr.driftExit - dt);
   }
   const wob = statusStrength(r, 'wobble') * T.wobbleAmp + (r.airborne ? 0 : surf.wobble);
@@ -111,7 +115,7 @@ export function lateral(sr: SimRider, c: Controls, surf: SurfaceMods, dt: number
   // The carry's slow grip only holds back motion toward the hazard; pulling away from it stays crisp.
   if (carry && (sr.carryDir === 0 || (target - r.vx) * sr.carryDir > 0)) tau = Math.max(tau, sr.carryTau);
   r.vx += (target - r.vx) * (1 - Math.exp(-dt / tau));
-  if (drifting) {
+  if (drifting || exiting) {
     const lim = v * Math.tan(T.driftMaxAngle);
     r.vx = clamp(r.vx, -lim, lim);
   }

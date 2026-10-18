@@ -6,7 +6,8 @@ import { box, cone, cylinder, sphere, trs } from '../../kit/shapes';
 
 const C = (h: string): Color => new Color(h);
 const STRIPES: Array<[Color, Color]> = [
-  [C('#e5191c'), C('#f6f3ec')], [C('#2f7fc1'), C('#f6f3ec')], [C('#ffcf1f'), C('#f6f3ec')], [C('#2a9d8f'), C('#ffe9c7')], [C('#ff5fa2'), C('#f6f3ec')],
+  [C('#e5191c'), C('#f6f3ec')], [C('#2f7fc1'), C('#f6f3ec')], [C('#ffcf1f'), C('#f6f3ec')], [C('#2a9d8f'), C('#ffe9c7')],
+  [C('#ff5fa2'), C('#f6f3ec')],
 ];
 const TOWELS = [C('#e5191c'), C('#2f7fc1'), C('#ffcf1f'), C('#2a9d8f'), C('#ff8a3d'), C('#9b5de5')];
 const POLE = C('#f3efe6'), DARK = C('#23252b'), WOOD = C('#a8744a'), LAMP = C('#fff1b8'), GREEN = C('#4f9a3a');
@@ -86,5 +87,7 @@ export function bench(buf: MeshBuf, x: number, y: number, z: number, ry: number)
 export function flowerPot(buf: MeshBuf, x: number, y: number, z: number, rng: Rng): void {
   cylinder(buf, trs(x, y - 0.1, z, 0, 0.35, 0.55, 0.35, m), C('#c96a3f'), 8, 1, 1.15);
   sphere(buf, trs(x, y + 0.65, z, 0, 0.42, 0.32, 0.42, m), GREEN, 7, 4);
-  for (let i = 0; i < 3; i++) sphere(buf, trs(x + rng.range(-0.25, 0.25), y + 0.85, z + rng.range(-0.25, 0.25), 0, 0.1, 0.1, 0.1, m), rng.pick(TOWELS), 5, 3);
+  for (let i = 0; i < 3; i++) {
+    sphere(buf, trs(x + rng.range(-0.25, 0.25), y + 0.85, z + rng.range(-0.25, 0.25), 0, 0.1, 0.1, 0.1, m), rng.pick(TOWELS), 5, 3);
+  }
 }

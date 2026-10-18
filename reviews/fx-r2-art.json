@@ -1,0 +1,93 @@
+{
+ "unit": "fx",
+ "round": 2,
+ "lens": "art",
+ "pass": false,
+ "score": 7,
+ "summary": "Re-review (round 2) of fx at 1920x1080. Chase cam on coast/city/mountain: cruise, plain top speed, boost, slipstream, drift L1-L3, drift boost, hop/landing, light and heavy hits, post ON vs OFF. Real-combat KO strips on all three tracks, plus cat and shiba victims, a city wall edge case, a DOUBLE chain and 6 KOs in one race (variety + short variant). WRECKED on coast and city, a real SHOWTIME TRIPLE KO, sandbox particle close-ups, and the real game with HUD on autopilot. 0 __br.errors in every run; 200-234 draw calls in game. The fix round is real. The KO hold now reads as a manga panel on every track for white, grey, brown and dark victims: luma-centred B/W subject, paper rim, red rays, halftone floor, slanted bars. The victim visibly leaves the bike and the bike cartwheels inside the hold. WRECKED has a committed ink-on-deep-red look with a crisp pelican. The grade keeps whites near-neutral and the mountain sky purple. Hits are crisp, with no soft glow. Plain top speed no longer smears outlines, the boost hoop is gone, and framings vary between KOs. Against a polished commercial bar, three majors remain. (1) Orange/tan victims (cat, shiba) become flat red-orange silhouettes on the red rays through the 'redness' keep rule, and the white attacker steals the frame. (2) The KO fit ignores the head and reaches under the letterbox, so long-necked or big-headed victims lose their face behind the top bar in about 1 of 3 holds. (3) The SHOWTIME hold frames a small, cluttered clump at 12-13 m, and the farthest victim melts into the red band because the 'behind' mask ignores the ult margin. Minors: stacked white-cored ray cones bury the KO hit-stop; the new ring, hex and glint sprites read as decals or blobs; wind lines are thick pale-blue planks; a dark victim merges with a black wall in the city edge case; the SHOWTIME rise is a 0.25 half-blend; debris and smoke clutter the hand-back; plain top speed has almost no post cue. Plus cross-unit notes. Evidence: /Users/minimax/m/beak-rash/shots/review/fx/r2-art/ (scripts *.mjs, frames ride/ cine/ repeat/ close/ ingame/, sheets s1-s15).",
+ "evidence_dir": "/Users/minimax/m/beak-rash/shots/review/fx/r2-art/",
+ "r1_recheck": [
+  "A0 KO subject (major): FIXED for white/grey/brown/dark victims on coast, city and mountain (B/W manga subject, paper rim, red rays) - s5, s6, s12 top. NOT fixed for orange/tan victims: re-raised as major issue 1 - s10, s11, s14.",
+  "A1 WRECKED muddy pink (major): FIXED (ink rays on deep red, crisp B/W pelican with orange accents, red only at the edges) - s7.",
+  "A2 grade (major): FIXED. Post OFF -> ON: coast pelican (207,204,194)->(213,209,196), coast sky (111,167,237)->(106,170,246), mountain sky (121,78,155)->(125,73,158) stays purple, mountain pelican (205,149,131)->(217,149,126) - s1.",
+  "A3 SHOWTIME no subject (major): PARTLY FIXED. All 3 victims stay in frame and the puffs vary, but the clump is small and cluttered and the far victim melts into the red band: re-raised as major issue 3 - s8, s12.",
+  "A4 one annulus for all rings: PARTLY FIXED (torso hoop gone; hexagon block, plus-glyph heal, glints), but the new sprites read as decals or blobs: minor issue 5 - s13, s15.",
+  "A5 landing wreath: PARTLY FIXED (crescent of varied puffs), but the ring is now a thin dashed ellipse marker: part of minor issue 5 - s3.",
+  "A6 wind lines through rivals: FIXED (side corridor), but they now render as thick pale-blue planks: minor issue 6 - s15.",
+  "A7 edge blur at plain top speed: FIXED (ON = OFF at 75 km/h; blur and chroma only in boost) - s2. Side effect: almost no post cue at top speed: minor issue 10.",
+  "A8 thin drift sparks: FIXED enough (3/4/5 streaks, inked sparks grow, the L3 pink spray is clearly bigger); the front-wheel emitter is still missing, not re-raised - s3.",
+  "A9 light-hit glow / KO white wash: FIXED (crisp inked burst; the frozen hit frames stay high-contrast) - s4, s5 'coast-ko-0040'.",
+  "A10 cross-unit: the HUD KNOCK OUT is now a lower band; the combat impact slab and the city reflections are unchanged: minor issue 11.",
+  "Timing T0 hold: FIXED. The victim leaves the bike, flips and the bike cartwheels inside the hold (750-1250 ms) - s5, s6. T1 ult camera: FIXED (victims at |NDC x| < 0.35); composition in issue 3.",
+  "Timing T2 bounds: FIXED (city edge picks rear34, eye inside the bounds); art leftover in issue 7 - s11. T3 rise: FIXED (apex hang visible, dive stays in frame); look in issue 8 - s8.",
+  "Timing T4 wash, T6 chain (window 1.48 s, clean re-target at 500-700 ms), T7 variety (front34/rear34/side/high/worm over 6 KOs, never repeated back to back): FIXED - s9, s10, s11. Framings still crop heads: issue 2."
+ ],
+ "issues": [
+  {
+   "severity": "major",
+   "title": "KO hold: orange/tan victims (cat, shiba, corgi) render as flat red-orange silhouettes on the red rays; the r1 red-on-red problem survives through the 'redness' keep rule (src/fx/post/composite-glsl.ts fxKoLook)",
+   "detail": "Real heavy-swing KOs, fx only (?stub=ui&rivals=cat / shiba): s11-species.jpg rows 1-2 (cine/coast-cat-0300/0900, cine/mtn-shiba-0300/0900), s10-frames.jpg top-right (repeat/coast-k3-560, shiba side shot), and in the real game with HUD s14-ingame.jpg 'coast-ko-0500'. fxKoLook keeps every pixel with sat > 0.6-0.78, r > 0.55-0.75 and r - max(g,b) > 0-0.08 as `reds` = (r*1.12+0.05, g*0.45, b*0.45). Orange tabby fur (about 230,120,40) passes all three gates, so the whole body turns into one orange-red mass on FX_RED/FX_RED_DEEP rays. Fur volume and limbs disappear, the face is a small white patch, and only the paper rim separates the victim from the backdrop. The white pelican beside it (paper, with kept orange/red accents) becomes the strongest shape, so the eye lands on the attacker. The cat and shiba are 2 of the 8 rival species (plus the corgi officer), so a large share of KOs miss the brief's 'clear subject' bar.",
+   "fix": "Keep red as an accent only. (1) Gate redness by hue: true reds only (hue < 12 deg or > 345 deg), not oranges (15-45 deg). (2) Gate it by area: in the vertex stage, next to vKoMid, measure the subject's warm-pixel ratio from the same 15 taps and fade redness to 0 above ~25 %, so warm fur goes through the ink/halftone/paper map. Alternatively, for warm subjects switch the backdrop to the ink-ray variant (uBurstInk = 1, as in WRECKED). Check cat, shiba and corgi KO holds on coast and mountain: face and limbs in ink/paper, clearly distinct from the rays."
+  },
+  {
+   "severity": "major",
+   "title": "KO framing crops or touches the victim's head on the top letterbox: the fit covers body + bike only and extends under the bars (src/fx/ko/cine.ts subject()/fitRadius, src/fx/ko/camera.ts createShot fit)",
+   "detail": "Over 10 KO holds (3 tracks, plus 6 KOs in one race at seed 5), the head anchor sat at NDC y 0.72 for the pigeon in front34, with the head hidden behind the top bar (s10-frames.jpg top-left 'coast-k0-560'). It sat at 0.60-0.61 for the pigeon in front34 ('coast-k7-560') and the sloth in front34 (cine/coast-ko-0150/0300), where the top of the head touches the bar, and at 0.58 for the sloth side shot ('coast-k6-560'). The cat's ears are clipped at 300 ms (s11 'coast-cat-0300'). The letterbox hides |NDC y| > 0.76. subject() frames the body-bike midpoint with fitRadius = 0.6 + sep*w and no head term. createShot fits that radius to 0.8*tan(fov/2), which already lies under the 12 % bars. Long-necked or big-headed species (pigeon, goose, seagull, cat) therefore lose the face, the most expressive part of the KO (art bible: expressive eyes), while the bottom third of the frame is empty halftone floor. The attacker's head is often fully visible beside the cut-off victim.",
+   "fix": "Fit the bounding sphere of head (+0.3 m), body and bike. Use 0.6*tan(fov/2) so the fit stays inside the bars, and aim the look point so the head sits near NDC y +0.35 (upper third): crop the wheels at the bottom, never the face. Add a fx.cine.mjs assertion: head NDC y + head radius < 0.70 in every hold frame, for every framing and for pigeon, goose and cat victims."
+  },
+  {
+   "severity": "major",
+   "title": "SHOWTIME impact hold: the victims are a small, cluttered clump and the farthest one melts into the red backdrop band (composite-glsl.ts main 'behind' mask, src/fx/ko/cluster.ts ultDefs)",
+   "detail": "Real SHOWTIME with 3 low-HP rivals pinned 8/14/20 m ahead: s8-ult.jpg rows 3-4, and s12-hud-ult.jpg bottom row (native crops of cine/coast-ult-2300/2600). All three victims are now in frame (the r1 fix works). At 11.6-13.0 m with FOV 43-38, though, they fill only ~15-20 % of the frame height, mixed with puffs, a black helmet blob and debris specks. About 40 % of the frame is empty halftone floor, and the bottom bar cuts the pelican. The dolly-out and the zoom-in cancel, so the subject never grows during the 1.3 s hold. The rightmost victim renders as a deep-red/ink silhouette on the red rays. main() sets behind = smoothstep(uSubjectDepth + 2.0, uSubjectDepth + 3.5, depth) and ignores uBgMargin (14 m for ult); uSubjectDepth is the centroid pulled toward the nearest victim, so any victim more than 2 m behind it takes the backdrop palette. The game's signature move still has the weakest finishing frame of the cinematics.",
+   "fix": "For ult, start 'behind' at uSubjectDepth + uBgMargin (or set uSubjectDepth to the farthest victim's depth), so every victim gets the B/W subject treatment. Frame the cluster by its angular extent: victims span >= 50 % of the frame width and the nearest victim fills >= 30 % of the frame height. Then push in toward the nearest victim during the hold (distance d -> 0.7 d) instead of holding the scale. A raised 3/4 angle would spread the victims across the frame instead of stacking them along the lens axis."
+  },
+  {
+   "severity": "minor",
+   "title": "KO / heavy-hit impact rays bury the hit-stop frames: two stacked ray sprites (hitHeavy 1.8 m x1.35, koPow 3.0 m x1.3) of glossy, white-cored black cones (src/fx/presets/impacts.ts hitHeavy/koPow, FRAME.rays)",
+   "detail": "s15-zoom.jpg bottom-left (repeat/coast-k1-300, the frozen hit before the cut): a sea-urchin ball of thick black cones with white gradient cores covers ~40 % of the frame and hides both riders. The same happens in cine/coast-ko-0150 and city-ko-0150 (s5, s6) under the start zoom blur, and in every chase-cam heavy hit (s4-hits.jpg 'coast-14-hit-heavy': the cones cover the victim's whole upper body). Manga impact lines are thin, flat, hard ink strokes; these read as 3D spikes, and the first beat of every KO shows no victim face.",
+   "fix": "Redraw FRAME.rays as thin, tapering, flat ink strokes with no white core gradient. Cap the size at ~1.2 m (1.6 m for KO) with life <= 0.08 s. Skip hitHeavy's rays when the hit is a KO (koPow already adds them), and leave a clear hole over the victim's head (strokes start at 40 % of the radius)."
+  },
+  {
+   "severity": "minor",
+   "title": "New ring/glint sprites read as UI decals or blobs: the flat shock ring starts as a thin dashed ellipse and grows into white torn-paper blotches; block is a thin floating hexagon outline; sparkle glints look like yellow splats (particles/atlas-shapes3.ts shock/hex/glint, presets/ground.ts landing, presets/speed.ts boost/driftPop)",
+   "detail": "s15-zoom.jpg bottom-right (close/g1-0, 3 frames): the boost ring is a thin dashed yellow ellipse on the road, like a selection marker. Five frames later (s13-close.jpg row 2, g1-1) the boost and driftPop segments are big white jagged blobs with heavy ink lying flat on the asphalt. In game the landing ring is the same small dashed ellipse round the rear wheel (s3-ride.jpg 'coast-11-land-a', 'city-11-land-a'), and the drift-boost ring is scattered magenta blotches ('coast-08-dboost-a'). Block is a thin cyan hexagon outline hanging in the air (s13 row 1, right). Sparkle glints read as eight yellow splats in a ring (s13 row 4). The r1 torso hoop is gone, but these still look like debug decals, not comic shock effects.",
+   "fix": "Make the shock ring thick-to-thin segments that fly outward and shorten, rather than one sprite scaling up. Give ground rings a soft dust fill underneath and fade them out before they pass ~1.6 m. Make the block flash a filled pale hex face with crack lines that shatters in 0.12 s. Make glints thin, long 4-point needles that live <= 0.15 s with a twinkle scale."
+  },
+  {
+   "severity": "minor",
+   "title": "Slipstream/boost world wind lines render as thick translucent pale-blue planks lying across the road (src/fx/presets/speed.ts streaks, particle mode 5)",
+   "detail": "s15-zoom.jpg top row (ingame/coast-1500 drafting, ingame/coast-ko-1560 slingshot). The #cfe8ff lines sit 2.5-3.6 m to the side, 0.3-2.4 m high and within a few metres of the camera, so they project as 30-60 px wide soft bars beside the rider, like hovering glass planks. They no longer cross rivals (the r1 fix), but they still do not read as wind or speed lines.",
+   "fix": "Give mode 5 a constant screen-space width (1.5-3 px at 1080p) with alpha tapering to both ends; use white at 0.5-0.7 alpha; spawn >= 4 m to the side or >= 2 m up; cap the live count at ~12."
+  },
+  {
+   "severity": "minor",
+   "title": "City wall edge case: a dark victim merges with the black wall slab, because the sticker rim and backdrop exist only beyond the subject depth band (composite-glsl.ts fxRim/fxBgMask)",
+   "detail": "s11-species.jpg row 3 (cine/city-edge-0300/0900; victim 0.5 m inside the right wall, rear34 framing). The brown sloth maps to ink and flips in front of the wall face. The wall lies inside the subject depth band, so it also maps to ink. The two white smoke puffs are the brightest shapes, and the victim's silhouette disappears into the wall. The camera placement itself is now correct (the eye stays inside the bounds).",
+   "fix": "Put the paper rim on any depth discontinuity > ~0.6 m around the subject, not only at the backdrop edge, or treat non-rider surfaces > 0.8 m behind the subject depth as 'behind'. The most robust fix: write riders to a stencil/ID bit so only rider pixels take the subject palette."
+  },
+  {
+   "severity": "minor",
+   "title": "SHOWTIME rise uses a quarter-strength comic blend (muddy lavender frame) and frames the hero small (src/fx/ko/look.ts applyRiseLook c.ko = 0.25, rise camera in ko/rise.ts)",
+   "detail": "s8-ult.jpg rows 1-2 (cine/coast-ult-1000/1300/1500): the coast's saturated sky turns lavender-grey, the clouds pink and the grass dull. This is the same half-blend look r1 rejected for WRECKED. At the apex the pelican is only ~12 % of the frame height (6.2-6.7 m, FOV 63-64), a small figure against the sky behind the track gantry.",
+   "fix": "Either keep the rise in full colour (bars, white speed lines toward the pelican, vignette, no ko blend) or commit to the full look; never use 0.25. Frame the apex at 3.5-4.5 m with FOV ~50, so the pelican fills ~30 % of the frame height."
+  },
+  {
+   "severity": "minor",
+   "title": "Hand-back clutter: slow-mo KO debris and crash smoke hang in front of the chase camera after the cut (src/fx/react/bus-combat.ts KO bursts, src/fx/presets/bodies.ts)",
+   "detail": "s5-ko-coast 'coast-ko-1450': a hex nut and fur tufts 40-60 px big float beside the pelican after the release. s6 'mountain-ko-1450': a large brown crown-shaped fur tuft next to the hero. s7-wrecked 'coast-wrecked-1000': a big dark-grey two-tone smoke puff fills the lower centre of the first chase frames. The victim has already left the frame (body NDC x 1.14 at 1450 ms), so these read as stray garbage, against the brief's 'clean return to gameplay'.",
+   "fix": "On the first handed-back frame, fade (0.1 s) the KO-spawned particles within ~4 m of the camera or outside a 2 m radius of the victim. Spawn WRECKED smoke behind the rider relative to the chase camera, or at half size."
+  },
+  {
+   "severity": "minor",
+   "title": "Plain top speed has almost no post speed cue: at amount 0.15 the speed lines start outside the frame (src/fx/post/composite-glsl.ts fxSpeedLines inner radius, src/fx/grade.ts SpeedFeel)",
+   "detail": "s2-speed.jpg top row (ride/coast-01-top vs -OFF at 75 km/h) looks identical. Measured: only ~1 % of the outer 15 % bands differ from post OFF, and the centre differs as much from the grade alone. At amount 0.15 the line inner radius is mix(0.95, 0.42, 0.15) + 0.22*h2 = 0.87-1.09 (aspect units; the half-width is 0.89), so lines appear only in the corners under the vignette. The r1 blur fix is right, but cruise and top speed now differ only by FOV, while the brief wants speed sensation to clearly increase with speed.",
+   "fix": "Map the inner radius by amount with a lower floor (e.g. 0.74 at 0.15, 0.6 at 0.4), so plain top speed shows ~8-12 thin lines in the outer 12-15 % of the frame, fading out below 0.9x top speed."
+  },
+  {
+   "severity": "minor",
+   "title": "cross-unit: HUD KNOCK OUT band, combat SHOWTIME impact slab and city wet-road reflections still crowd the fx work",
+   "detail": "ui-hud: in the real game the KNOCK OUT band now sits in the lower ~45 % (better than r1) but still covers the victim's bike and lower body at the peak (s14-ingame.jpg 'coast-ko-0500'). combat: at the SHOWTIME impact a translucent pink slab with a hard vertical edge covers two thirds of the hit-stop frame (s8 'coast-ult-1800'). env-city: wet-road reflections are vertical high-frequency colour stripes that dominate everything behind the rider at night (s3-ride 'city-07-drift-l3', s4 'city-14-hit-heavy').",
+   "fix": "ui-hud: keep the band <= 30 % of the frame height, or move it to the top edge while fx keeps the victim in the upper-middle (coordinate with issue 2). combat: replace the impact cylinder with an inked ground ring plus a 2-frame flash, or hide it while cine:ult runs. env-city: lower the reflection distortion frequency and clamp its brightness so bloom does not amplify it."
+  }
+ ]
+}

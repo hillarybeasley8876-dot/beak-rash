@@ -18,6 +18,9 @@ export function fmtTime(sec: number): string {
   return `${m}:${String(s).padStart(2, '0')}.${String(cs).padStart(2, '0')}`;
 }
 
+/** s the place-change slash takes to wipe across the shard. */
+const FLASH = 0.16;
+
 export class PlaceBlock {
   readonly root: HTMLDivElement;
   private block: W;
@@ -35,13 +38,15 @@ export class PlaceBlock {
   private tkShown = 0;
   private tkT = 9;
 
-  constructor(parent: HTMLElement) {
+  /** `onTick(n)` runs as the BUSTED ticket counts down to n (3, 2, 1): its sound cue. */
+  constructor(parent: HTMLElement, private onTick: (n: number) => void = () => {}) {
     this.root = el('div', 'plw', parent);
     const pl = el('div', 'pl', this.root);
-    el('div', 'pl-star', pl);
     el('div', 'pl-shadow', pl);
     el('div', 'pl-shard', pl);
-    this.flashW = w(el('div', 'pl-flash', pl));
+    // Place change: a white slash wipes across the shard (clipped to it); 1ST: a spinning star pokes out right.
+    this.flashW = w(el('div', 'pl-slash', el('div', 'pl-flash', pl)));
+    el('div', 'pl-star', pl);
     this.num = w(el('div', 'pl-num', pl, '1'));
     this.suf = w(el('div', 'pl-suf', pl, 'ST'));
     this.of = w(el('div', 'pl-of', pl, '/8'));
@@ -81,7 +86,9 @@ export class PlaceBlock {
     this.flashT += dt;
     const t = this.flashT;
     this.num.tf(t < 0.3 ? `scale(${slam(t, 0.2, 1.55).toFixed(3)})` : 'none');
-    this.flashW.op(t < 0.14 ? 1 - t / 0.14 : 0);
+    const wipe = t / FLASH;
+    this.flashW.show(wipe < 1);
+    if (wipe < 1) this.flashW.tf(`translateX(${(-160 + wipe * 520).toFixed(0)}px) skewX(-24deg)`);
     const a = envelope(t, 0, 0.08, 0.9, 1.2);
     this.arrow.op(a);
     this.arrow.tf(a > 0 ? `translateY(${((1 - a) * (this.up ? 18 : -18)).toFixed(1)}px)` : 'none');
@@ -90,6 +97,7 @@ export class PlaceBlock {
   private updateTicket(ticket: number, dt: number): void {
     const n = ticket > 0 ? Math.ceil(ticket) : 0;
     if (n !== this.tkShown) {
+      if (n > 0 && n < this.tkShown) this.onTick(n);
       this.tkShown = n;
       this.tkT = 0;
       if (n > 0) this.tkN.text(String(n));

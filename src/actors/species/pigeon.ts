@@ -3,10 +3,17 @@
 // bars, dark tail, pink toes, head-bob in time with the pedals. Signature: NO SHOW.
 import { ARM_UP, buildBird, birdJoints, type BirdSpec } from '../kit/bird';
 import { addHelmet } from '../kit/gear';
+import type { Prim } from '../kit/sdf';
 import { B } from '../rig/skeleton';
 import type { SpeciesDef } from './types';
 
 const GREY = 0x96a0b0, HEAD = 0x7f899a, PINK = 0xec8c9e, BAR = 0x2d3038, LIGHT = 0xb0b8c6;
+
+/** [y, half-height, z, half-width, colour] of the neck sheen bands, top → bottom (later bands win overlaps). */
+const NECK_BANDS: ReadonlyArray<readonly [number, number, number, number, number]> = [
+  [0.505, 0.03, -0.365, 0.15, 0x5e9e88], [0.472, 0.022, -0.36, 0.15, 0x3fbf8f], [0.443, 0.02, -0.35, 0.16, 0x3fb3a6],
+  [0.417, 0.02, -0.34, 0.17, 0x5b8cc4], [0.391, 0.022, -0.335, 0.17, 0x9b59c6], [0.362, 0.02, -0.33, 0.17, 0x8a76b0],
+];
 
 const spec: BirdSpec = {
   color: GREY,
@@ -19,6 +26,7 @@ const spec: BirdSpec = {
   wing: {
     kind: 'fold', arm: [0.064, 0.056, 0.048], color: GREY, feather: LIGHT, edge: 0x4a4f5a, chord: [0.05, 0.12, 0.08],
     trail: [-0.8, -0.5, 0.3], primaries: { n: 0, len: 0, w: 0, color: GREY, tip: BAR, tipFrac: 0 },
+    fan: { n: 5, len: 0.2, w: 0.045, color: GREY, tip: BAR, tipFrac: 0.4, droop: 0.2, spread: 0.32, seg: 2 },
     fist: { r: [0.05, 0.04, 0.055], color: LIGHT, toes: 3, curl: true, toeR: 0.019, budget: 170 },
   },
   flank: {
@@ -31,9 +39,8 @@ const spec: BirdSpec = {
   tail: { c: [0, 0.22, 0.27], r: [0.1, 0.03, 0.12], color: 0x4d5868, up: 0.2 },
   extra: [
     { shape: { kind: 'ellipsoid', c: [0, 0.6, -0.38], r: [0.12, 0.1, 0.12] }, op: 'paint', color: HEAD, bone: B.head },
-    { shape: { kind: 'ellipsoid', c: [0, 0.47, -0.36], r: [0.14, 0.06, 0.13] }, op: 'paint', color: 0x3fbf8f, bone: B.neck1 },
-    { shape: { kind: 'ellipsoid', c: [0, 0.405, -0.33], r: [0.17, 0.05, 0.15] }, op: 'paint', color: 0x9b59c6, bone: B.chest },
-    { shape: { kind: 'ellipsoid', c: [0, 0.36, -0.33], r: [0.17, 0.035, 0.15] }, op: 'paint', color: 0x6fa8a0, bone: B.chest },
+    // Iridescent neck: thin stepped bands grey-green → green → teal → blue-violet → purple → grey (a sheen, not a scarf).
+    ...NECK_BANDS.map(([y, ry, z, rx, color]): Prim => ({ shape: { kind: 'ellipsoid', c: [0, y, z], r: [rx, ry, rx - 0.01] }, op: 'paint', color, bone: y > 0.43 ? B.neck1 : B.chest })),
   ],
   budget: 2000,
 };

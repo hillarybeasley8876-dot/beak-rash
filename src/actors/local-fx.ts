@@ -1,8 +1,7 @@
 // View-local effects that belong to the rider's animation (fx unit owns particles/post): dizzy stars
-// that orbit a stunned rider's head, and a swing smear ribbon that trails the weapon/wing tip.
-import {
-  BufferAttribute, BufferGeometry, DoubleSide, Group, Mesh, MeshBasicMaterial, Shape, Vector3,
-} from 'three';
+// that orbit a stunned rider's head and the shades/eye glint beat of a pose (doge shield, sloth flash).
+// The swing smear lives in smear.ts, the zen steam in steam.ts.
+import { AdditiveBlending, BufferGeometry, CanvasTexture, Group, Mesh, Shape, Sprite, SpriteMaterial, Vector3 } from 'three';
 import { toon } from '../render/toon';
 import { CharacterBuilder } from './kit/builder';
 import { hullFor } from './kit/outline';
@@ -54,58 +53,53 @@ export class DizzyStars {
   }
 }
 
-const N = 12;
+let glintTex: CanvasTexture | null = null;
 
-export class SwingSmear {
-  readonly mesh: Mesh;
-  private readonly base: Vector3[] = [];
-  private readonly tip: Vector3[] = [];
-  private readonly age: number[] = [];
-  private readonly geo = new BufferGeometry();
+/** 4-point sparkle drawn once into a small canvas texture. */
+function glintTexture(): CanvasTexture {
+  if (glintTex) return glintTex;
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d');
+  if (g) {
+    const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grad.addColorStop(0, 'rgba(255,255,255,1)');
+    grad.addColorStop(0.25, 'rgba(255,250,200,0.9)');
+    grad.addColorStop(1, 'rgba(255,240,150,0)');
+    g.fillStyle = grad;
+    g.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2, r = i % 2 === 0 ? 31 : 5;
+      g.lineTo(32 + Math.cos(a) * r, 32 + Math.sin(a) * r);
+    }
+    g.closePath();
+    g.fill();
+  }
+  glintTex = new CanvasTexture(c);
+  return glintTex;
+}
 
-  constructor(color = 0xffffff) {
-    this.geo.setAttribute('position', new BufferAttribute(new Float32Array(N * 2 * 3), 3));
-    this.geo.setAttribute('color', new BufferAttribute(new Float32Array(N * 2 * 4), 4));
-    const idx: number[] = [];
-    for (let i = 0; i < N - 1; i++) idx.push(i * 2, i * 2 + 1, i * 2 + 2, i * 2 + 1, i * 2 + 3, i * 2 + 2);
-    this.geo.setIndex(idx);
-    this.mesh = new Mesh(this.geo, new MeshBasicMaterial({ color, vertexColors: true, transparent: true, side: DoubleSide, depthWrite: false }));
-    this.mesh.frustumCulled = false;
-    this.mesh.renderOrder = 2;
-    this.mesh.visible = false;
-    this.mesh.userData.noOutline = true;
+export class Glint {
+  readonly sprite = new Sprite(new SpriteMaterial({ map: glintTexture(), blending: AdditiveBlending, depthTest: false, transparent: true }));
+  private spin = 0;
+
+  constructor() {
+    this.sprite.visible = false;
+    this.sprite.renderOrder = 3;
+    this.sprite.userData.noOutline = true;
   }
 
-  /** Feed the current blade (base → tip, parent space) while `active`; history fades over ~0.12 s. */
-  update(base: Vector3, tip: Vector3, active: boolean, dt: number): void {
-    for (let i = 0; i < this.age.length; i++) this.age[i] = (this.age[i] ?? 0) + dt;
-    if (active) {
-      this.base.unshift(base.clone());
-      this.tip.unshift(tip.clone());
-      this.age.unshift(0);
-    }
-    while (this.age.length > N || (this.age.length && (this.age[this.age.length - 1] ?? 0) > 0.12)) {
-      this.age.pop(); this.base.pop(); this.tip.pop();
-    }
-    const n = this.age.length;
-    this.mesh.visible = n >= 2;
-    if (!this.mesh.visible) return;
-    const pos = this.geo.getAttribute('position') as BufferAttribute, col = this.geo.getAttribute('color') as BufferAttribute;
-    for (let i = 0; i < N; i++) {
-      const j = Math.min(i, n - 1);
-      const b = this.base[j] as Vector3, t = this.tip[j] as Vector3;
-      const a = Math.max(0, 1 - (this.age[j] ?? 1) / 0.12) * (1 - j / N) * 0.8;
-      pos.setXYZ(i * 2, b.x, b.y, b.z);
-      pos.setXYZ(i * 2 + 1, t.x, t.y, t.z);
-      col.setXYZW(i * 2, 1, 1, 1, a * 0.15);
-      col.setXYZW(i * 2 + 1, 1, 1, 1, a);
-    }
-    pos.needsUpdate = true;
-    col.needsUpdate = true;
+  /** `at` in the parent's space; k = 0..1 strength of the beat. */
+  update(at: Vector3, k: number, dt: number): void {
+    this.sprite.visible = k > 0.02;
+    if (!this.sprite.visible) return;
+    this.spin += dt * 3;
+    this.sprite.position.copy(at);
+    this.sprite.scale.setScalar(0.16 * k);
+    (this.sprite.material as SpriteMaterial).rotation = this.spin;
   }
 
   dispose(): void {
-    this.geo.dispose();
-    (this.mesh.material as MeshBasicMaterial).dispose();
+    (this.sprite.material as SpriteMaterial).dispose();
   }
 }

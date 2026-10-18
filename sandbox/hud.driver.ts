@@ -26,7 +26,7 @@ export interface HudHooks {
 }
 
 declare global {
-  interface Window { __hud?: HudDriver }
+  interface Window { __hud?: HudDriver; __hudSfx?: string[] }
 }
 
 type Pose = (p: RiderState) => void;
@@ -71,19 +71,33 @@ export function installDriver(game: Game, hooks: HudHooks): void {
   const cuts: Record<string, (o: Record<string, number | string | boolean>) => void> = {
     countdown: (o) => bus.emit('race:countdown', { n: Number(o.n ?? 3) }),
     skill: (o) => bus.emit('skill:cast', { riderId: sess().player.id, skillId: String(o.id ?? 'pelican.torpedo'), slot: Number(o.slot ?? 1) }),
+    /** The player's FISH TORPEDO as combat emits it: skill:cast, then projectile:spawn in the same tick. */
+    torpedo: () => {
+      const s = sess();
+      const r = nearestRival();
+      bus.emit('skill:cast', { riderId: s.player.id, skillId: 'pelican.torpedo', slot: 1 });
+      bus.emit('projectile:spawn', { id: 90, owner: s.player.id, target: r.id, kind: 'pelican.torpedo', pos: posOf(s.player) });
+    },
     angry: (o) => {
       const s = sess();
       const r = s.rider(Number(o.id ?? 1));
       if (r) r.statuses.push({ id: 'angry', time: 5, strength: 1, source: s.player.id });
     },
-    rivalSkill: () => {
-      const r = nearestRival();
+    rivalSkill: (o) => {
+      const r = o.id !== undefined ? sess().rider(Number(o.id)) ?? nearestRival() : nearestRival();
       bus.emit('skill:cast', { riderId: r.id, skillId: sigOf(r), slot: 1 });
     },
     showtime: () => bus.emit('ult:start', { riderId: sess().player.id, skillId: 'pelican.ult' }),
     koStart: (o) => bus.emit('cine:ko', { phase: 'start', attacker: sess().player.id, victim: nearestRival().id, chain: Number(o.chain ?? 1) }),
     koPeak: (o) => bus.emit('cine:ko', { phase: 'peak', attacker: sess().player.id, victim: nearestRival().id, chain: Number(o.chain ?? 1) }),
     koEnd: (o) => bus.emit('cine:ko', { phase: 'end', attacker: sess().player.id, victim: nearestRival().id, chain: Number(o.chain ?? 1) }),
+    /** combat:ko with no fx cinematic (slow-mo off): the HUD shows the KO splash itself after 0.55 s. */
+    koNoCine: () => {
+      const s = sess();
+      const v = nearestRival();
+      bus.emit('combat:ko', { attacker: s.player.id, victim: v.id, cause: 'ko', pos: posOf(v), skillId: null, weapon: s.player.weapon });
+    },
+    respawn: () => bus.emit('rider:respawn', { riderId: sess().player.id }),
     wreckedPeak: () => bus.emit('cine:ko', { phase: 'peak', attacker: nearestRival().id, victim: sess().player.id, chain: 1 }),
     crash: (o) => {
       const p = sess().player;

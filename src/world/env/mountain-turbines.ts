@@ -71,5 +71,5 @@ export function buildTurbines(ctx: WorldCtx, far: (x: number, z: number) => Mesh
   bounds.setFromPoints(pts);
   bounds.radius += BLADE + 4;
   animatedMesh(ctx, geo, { name: 'turbineRotors', decl: DECL, motion: MOTION, attributes: ['aHub', 'aAxis'], outline: 0.18, bounds });
-  console.info(`[mountain] wind turbines: ${sites.length}`);
+  ctx.log(`wind turbines: ${sites.length}`);
 }

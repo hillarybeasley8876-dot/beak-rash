@@ -5,7 +5,7 @@ import type { BikeId } from '../../core/types';
 import { ART } from '../../data/assets';
 import { BIKES, BIKE_ORDER } from '../../data/bikes';
 import { Nav } from '../nav';
-import { HINT_BACK, HINT_NAV, HINT_OK, artImage, backdrop, coinBadge, h, jagged, ransom, riderIconSvg, statBar, svg } from '../p5';
+import { HINT_BACK, HINT_NAV, HINT_OK, artImage, backdrop, coinBadge, h, jagged, keyGlyph, ransom, riderIconSvg, statBar, svg } from '../p5';
 import { frame, type ScreenFactory } from '../screen';
 import { Turntable } from './garage-turntable';
 import { recall, remember } from './memory';
@@ -16,15 +16,15 @@ const STATS: Array<[keyof typeof BIKES.roadbike.bars, string]> = [
 
 export const garageScreen: ScreenFactory = (ctx) => {
   const { save } = ctx.app;
-  const bg = backdrop({ tone: 'red', seed: 'garage', star: { x: '30%', y: '52%', size: 1400, color: '#0b0b0f', spin: 60 } });
-  const art = artImage(ART.garage, 'br-gar-art');
-  if (art) bg.append(art);
-  bg.append(h('div', { class: 'br-gar-slab' }));
+  // The workshop art lives in the stage (not the full-bleed bg) so the drawn repair stand stays aligned
+  // with the turntable's clamp at 16:10 too; the dark backdrop fills any letterbox.
+  const bg = backdrop({ tone: 'black', seed: 'garage', star: { x: '30%', y: '52%', size: 1400, color: '#15151b', spin: 60 } });
   const f = frame({ id: 'garage', bg, title: { cn: '车库', en: 'GARAGE' }, hints: [HINT_NAV, HINT_OK, HINT_BACK] });
+  const art = artImage(ART.garage, 'br-gar-art');
   const coins = coinBadge(save.data.coins);
   coins.el.classList.add('br-gar-coins');
-  const show = h('div', { class: 'br-gar-show' }, h('div', { class: 'br-gar-floor' }));
-  const table = new Turntable(ctx.app, 1000, 620, () => {
+  const show = h('div', { class: 'br-gar-show' }, h('div', { class: 'br-gar-glow' }));
+  const table = new Turntable(ctx.app, () => {
     show.classList.add('is-flat');
     if (!show.querySelector('.br-gar-flat')) show.append(svg(riderIconSvg(), 'br-gar-flat'));
   });
@@ -33,8 +33,9 @@ export const garageScreen: ScreenFactory = (ctx) => {
   const blurb = h('div', { class: 'br-gar-blurb', vars: { '--clip': jagged('garblurb', { jx: 1.5, jy: 7, notches: 2 }) } });
   const list = h('div', { class: 'br-gar-list' });
   const stats = h('div', { class: 'br-gar-stats' });
-  const action = h('div', { class: 'br-gar-action' });
-  f.stage.append(show, nameBox, blurb, list, stats, action, coins.el);
+  const action = h('div', { class: 'br-gar-action', attrs: { role: 'button' } });
+  f.stage.prepend(...(art ? [art] : []), h('div', { class: 'br-gar-slab' }), show);
+  f.stage.append(nameBox, blurb, list, stats, action, coins.el);
 
   const rows = BIKE_ORDER.map((id, i) => {
     const row = h('div', { class: 'br-gar-row', vars: { '--i': i } }, h('b', { text: BIKES[id].name }), h('span', { class: 'br-gar-tag' }));
@@ -60,7 +61,8 @@ export const garageScreen: ScreenFactory = (ctx) => {
     const st = state(id);
     const afford = save.data.coins >= b.price;
     action.className = `br-gar-action is-${st}${st === 'shop' && !afford ? ' is-poor' : ''}`;
-    action.replaceChildren(h('b', { text: st === 'equipped' ? '装备中' : st === 'owned' ? 'ENTER 装备' : 'ENTER 购买' }));
+    if (st === 'equipped') action.replaceChildren(h('b', { text: '装备中' }));
+    else action.replaceChildren(...keyGlyph('ENTER', 'A'), h('b', { text: st === 'owned' ? '装备' : '购买' }));
     if (st === 'shop') action.append(h('span', { text: `${b.price} 小鱼干${afford ? '' : '（不够）'}` }));
   };
   const buy = async (id: BikeId): Promise<void> => {
@@ -95,6 +97,9 @@ export const garageScreen: ScreenFactory = (ctx) => {
     },
   })), { layout: 'vertical', start: recall('garage', Math.max(0, BIKE_ORDER.indexOf(save.data.bike))), sfx: ctx.sfx }));
   refreshRows();
+  action.addEventListener('click', () => {
+    if (!action.classList.contains('is-equipped')) nav.pointerActivate();
+  });
   const offSave = save.onChange((d) => {
     coins.set(d.coins);
     refreshRows();

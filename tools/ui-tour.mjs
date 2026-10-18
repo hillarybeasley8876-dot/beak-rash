@@ -125,12 +125,14 @@ async function fullTour(size) {
     await press(page, h, 'ArrowLeft', 'ArrowLeft');
     await page.keyboard.press('Enter'); // no idle wait: catch the loading card while it is up
     await shot('loading', 520);
-    await page.waitForFunction(() => window.__br.app.ui.screen === 'race', null, { timeout: 30000 });
+    await page.waitForFunction(() => window.__br.app.ui.screen === 'race' && !window.__br.app.ui.busy, null, { timeout: 30000 });
     await shot('race', 1500);
     await press(page, h, 'Escape');
     await shot('pause', 500);
+    await expectScreen(page, label('pause'), 'pause');
     await press(page, h, 'ArrowDown', 'ArrowDown', 'Enter');
     await shot('pause-settings');
+    await expectScreen(page, label('pause-settings'), 'settings');
     await press(page, h, 'Escape');
     await expectScreen(page, label('pause-settings-back'), 'pause');
     await press(page, h, 'Escape');

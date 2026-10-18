@@ -56,14 +56,19 @@ export const MOUNTAIN: LayoutDef = {
   left: startL,
   right: startR,
   terrainMod: (field) => new MountainTerrain(field),
+  // Rising rock faces (cliff, cutting, portal) get ledges and a jagged lip; dressing/mountain/crags.ts adds the rock masses.
+  crags: true,
   segments: [
     {
       len: 160, name: 'start', rise: 0.4,
       marks: [
-        { kind: 'startGantry', at: 46, x: 0 },
+        { kind: 'balloon', at: 140, x: -1 },
+        // Gantry ~32 m ahead of the grid so its banner frames the road mid-screen during the countdown;
+        // lantern strings only beyond it, so none hangs in front of the banner text.
+        { kind: 'startGantry', at: 64, x: 0 },
         { kind: 'stands', at: 8, x: -1, data: { len: 110 } },
         { kind: 'stands', at: 8, x: 1, data: { len: 110 } },
-        { kind: 'lanterns', at: 20, x: 0, data: { len: 130, every: 22 } },
+        { kind: 'lanterns', at: 80, x: 0, data: { len: 70, every: 22 } },
         { kind: 'signLimit', at: 150, x: 1 },
       ],
     },
@@ -79,7 +84,7 @@ export const MOUNTAIN: LayoutDef = {
     {
       len: 200, name: 'pines', radius: -300, rise: 14, bank: -3, ease: 60, left: forestDown, right: forestUp,
       features: [{ kind: 'pickupRow', at: 110, len: 12, x0: 3, x1: 3, data: { kind: 'crate' } }],
-      marks: [{ kind: 'teaTerraces', at: 20, x: 1, data: { len: 170 } }],
+      marks: [{ kind: 'balloon', at: 120, x: -1 }, { kind: 'teaTerraces', at: 20, x: 1, data: { len: 170 } }],
     },
     {
       len: 130, name: 'pines', rise: 9, ease: 50,
@@ -88,7 +93,7 @@ export const MOUNTAIN: LayoutDef = {
     // ---- switchbacks: three hairpins, legs stacked up the face (uphill = right of the first leg)
     {
       len: pin(27), name: 'hairpin', radius: 27, rise: 5, bank: 7, ease: 26, left: pinOut, right: pinIn,
-      marks: [{ kind: 'chevrons', at: 0, x: -1, data: { len: pin(27) } }],
+      marks: [{ kind: 'chevrons', at: 0, x: -1, data: { len: pin(27) } }, { kind: 'shrine', at: 30, x: 1 }],
     },
     {
       len: 140, name: 'leg', rise: 11, ease: 26, left: legUp, right: legDown,
@@ -97,7 +102,7 @@ export const MOUNTAIN: LayoutDef = {
     },
     {
       len: pin(30), name: 'hairpin', radius: -30, rise: 6, bank: -7, ease: 28, left: pinIn, right: pinOut,
-      marks: [{ kind: 'chevrons', at: 0, x: 1, data: { len: pin(30) } }],
+      marks: [{ kind: 'chevrons', at: 0, x: 1, data: { len: pin(30) } }, { kind: 'viewpoint', at: 34, x: -1 }],
     },
     {
       len: 140, name: 'leg', rise: 11, ease: 28, left: legDown, right: legUp,
@@ -109,7 +114,7 @@ export const MOUNTAIN: LayoutDef = {
     },
     {
       len: pin(26), name: 'hairpin', radius: 26, rise: 5, bank: 7, ease: 26, left: pinOut, right: pinIn,
-      marks: [{ kind: 'chevrons', at: 0, x: -1, data: { len: pin(26) } }],
+      marks: [{ kind: 'chevrons', at: 0, x: -1, data: { len: pin(26) } }, { kind: 'outcrop', at: 30, x: 1 }],
     },
     // ---- cliff road high on the face: rock wall uphill (left), rail + drop (right) over the switchbacks
     {
@@ -177,7 +182,10 @@ export const MOUNTAIN: LayoutDef = {
         { kind: 'pickupRow', at: 120, len: 12, x0: -3, x1: -3, data: { kind: 'crate' } },
         { kind: 'oil', at: 200, len: 8, x0: -4.6, x1: -1.4 },
       ],
-      marks: [{ kind: 'signDownhill', at: 30, x: 1 }, { kind: 'signChicane', at: 200, x: 1 }],
+      marks: [
+        { kind: 'cableCar', at: 157, x: 1 }, { kind: 'turbines', at: 47, x: -1, data: { len: 850 } }, { kind: 'balloon', at: 77, x: 1 },
+        { kind: 'signDownhill', at: 30, x: 1 }, { kind: 'signChicane', at: 200, x: 1 },
+      ],
     },
     {
       len: 50, name: 'chicane', radius: -45, rise: -7, bank: -6, ease: 30,
@@ -185,7 +193,7 @@ export const MOUNTAIN: LayoutDef = {
     },
     {
       len: 55, name: 'chicane', radius: 50, rise: -8, bank: 6, ease: 30,
-      marks: [{ kind: 'chevrons', at: 0, x: -1, data: { len: 55 } }],
+      marks: [{ kind: 'balloon', at: 47, x: 1 }, { kind: 'chevrons', at: 0, x: -1, data: { len: 55 } }],
       features: [{ kind: 'pickupRow', at: 30, len: 12, x0: 1, x1: 4, data: { kind: 'coin' } }],
     },
     {
@@ -199,7 +207,7 @@ export const MOUNTAIN: LayoutDef = {
     {
       len: 180, name: 'lake', radius: 500, rise: -20, ease: 60, left: meadowL, right: shoreR, sideEase: 60,
       features: [{ kind: 'pickupRow', at: 90, len: 15, x0: 2, x1: -3, data: { kind: 'coin' } }],
-      marks: [{ kind: 'cows', at: 20, x: -1, data: { len: 150 } }],
+      marks: [{ kind: 'balloon', at: 12, x: 1 }, { kind: 'cows', at: 20, x: -1, data: { len: 150 } }],
     },
     {
       len: 240, name: 'lakeside', rise: -0.6, ease: 50,
@@ -209,6 +217,7 @@ export const MOUNTAIN: LayoutDef = {
         { kind: 'pickupRow', at: 190, len: 15, x0: -3, x1: -3, data: { kind: 'crate' } },
       ],
       marks: [
+        { kind: 'balloon', at: 72, x: 1 },
         { kind: 'hotSpring', at: 70, x: -1 },
         { kind: 'lanterns', at: 120, x: 0, data: { len: 120, every: 40, style: 'posts' } },
       ],
@@ -216,6 +225,7 @@ export const MOUNTAIN: LayoutDef = {
     {
       len: 160, name: 'finish', left: finishL, right: finishR,
       marks: [
+        { kind: 'balloon', at: 52, x: 1 },
         { kind: 'stands', at: 40, x: -1, data: { len: 110 } },
         { kind: 'stands', at: 40, x: 1, data: { len: 110 } },
         { kind: 'lanterns', at: 10, x: 0, data: { len: 150, every: 18 } },

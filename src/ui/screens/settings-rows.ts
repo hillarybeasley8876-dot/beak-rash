@@ -37,47 +37,52 @@ export function applySettings(app: AppContext): void {
   app.input.autoPedal = s.autoPedal;
 }
 
-export function rowWidget(app: AppContext, def: RowDef, onPick: (dir: -1 | 1) => void): RowWidget {
+export interface RowHooks {
+  /** ◀ ▶ arrow clicked: step the value. */
+  step(dir: -1 | 1): void;
+  /** A pill or meter tick was picked with the mouse (the value is already saved). */
+  picked(): void;
+}
+
+export function rowWidget(app: AppContext, def: RowDef, hooks: RowHooks): RowWidget {
   const el = h('div', { class: `br-set-row is-${def.kind}` },
     h('div', { class: 'br-set-label' }, h('b', { text: def.cn }), h('span', { text: def.en })));
   const arrow = (dir: -1 | 1): HTMLElement => {
     const a = h('i', { class: `br-set-arrow is-${dir < 0 ? 'l' : 'r'}`, text: dir < 0 ? '◀' : '▶' });
     a.addEventListener('click', (e) => {
       e.stopPropagation();
-      onPick(dir);
+      hooks.step(dir);
     });
     return a;
   };
   if (def.kind === 'meter') {
-    const m = meter(10);
-    el.append(h('div', { class: 'br-set-ctl' }, arrow(-1), m.el, arrow(1)));
     const get = (): number => app.save.data.settings[def.key];
-    return {
-      el,
-      sync: () => m.set(get()),
-      step: (dir) => {
-        const v = Math.round(Math.min(1, Math.max(0, get() + dir * 0.1)) * 10) / 10;
-        if (v === get()) return false;
-        app.save.update((d) => (d.settings[def.key] = v));
-        return true;
-      },
+    const setTo = (raw: number): boolean => {
+      const v = Math.round(Math.min(1, Math.max(0, raw)) * 10) / 10;
+      if (v === get()) return false;
+      app.save.update((d) => (d.settings[def.key] = v));
+      return true;
     };
+    const m = meter(10, (i) => {
+      if (setTo((i + 1) / 10)) hooks.picked();
+    });
+    el.append(h('div', { class: 'br-set-ctl' }, arrow(-1), m.el, arrow(1)));
+    return { el, sync: () => m.set(get()), step: (dir) => setTo(get() + dir * 0.1) };
   }
   if (def.kind === 'choice') {
-    const c = choice(def.options.map(([label]) => label));
-    el.append(h('div', { class: 'br-set-ctl' }, arrow(-1), c.el, arrow(1)));
     const index = (): number => Math.max(0, def.options.findIndex(([, v]) => v === app.save.data.settings[def.key]));
-    return {
-      el,
-      sync: () => c.set(index()),
-      step: (dir) => {
-        const n = def.options.length;
-        const next = def.options[(index() + dir + n) % n];
-        if (!next) return false;
-        app.save.update((d) => Object.assign(d.settings, { [def.key]: next[1] }));
-        return true;
-      },
+    const setIndex = (j: number): boolean => {
+      const opt = def.options[j];
+      if (!opt || j === index()) return false;
+      app.save.update((d) => Object.assign(d.settings, { [def.key]: opt[1] }));
+      return true;
     };
+    const c = choice(def.options.map(([label]) => label), (j) => {
+      if (setIndex(j)) hooks.picked();
+    });
+    el.append(h('div', { class: 'br-set-ctl' }, arrow(-1), c.el, arrow(1)));
+    const n = def.options.length;
+    return { el, sync: () => c.set(index()), step: (dir) => setIndex((index() + dir + n) % n) };
   }
   el.append(h('div', { class: 'br-set-ctl' }, h('span', { class: 'br-set-danger', text: '按确定清空' })));
   return { el, sync: () => undefined, step: () => false };

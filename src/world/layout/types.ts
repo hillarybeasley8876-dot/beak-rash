@@ -120,4 +120,9 @@ export interface LayoutDef {
   terrainMod?: (field: TerrainField) => TerrainMod;
   /** Far terrain grid margin beyond the road's bounding box (m, default 1000 ≈ fog far; layouts/city.ts). */
   farMargin?: number;
+  /** Rough up rising rock faces in the near terrain: ledges above 1.5 m and a jagged lip (terrain/crag.ts). */
+  crags?: boolean;
+  /** Automatic red / white racing curbs on curves tighter than R 430 (default true; false = none drawn and
+   *  surfaceAt never reports 'curb', so a dressing can paint its own edge). */
+  curbs?: boolean;
 }

@@ -7,7 +7,7 @@
 //   node tools/gen-tts.mjs [--force] [--only ann_ko,goose_taunt_0] [--dry]
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const OUT = path.join(ROOT, 'public/assets/voice');
@@ -26,10 +26,10 @@ const SPEAKERS = {
   capybara: { voice: 'Chinese (Mandarin)_Gentleman', fallback: 'audiobook_male_1', speed: 0.8, emotion: 'neutral' },
   cat: { voice: 'qiaopi_mengmei', fallback: 'lovely_girl', speed: 1.1, emotion: 'happy' },
   shiba: { voice: 'clever_boy', fallback: 'cute_boy', speed: 0.95, emotion: 'neutral' },
-  pigeon: { voice: 'cute_boy', fallback: 'clever_boy', speed: 1.0, emotion: 'neutral' },
+  pigeon: { voice: 'cute_boy', fallback: 'clever_boy', speed: 1.15, emotion: 'neutral' },
   penguin: { voice: 'male-qn-jingying', fallback: 'male-qn-qingse', speed: 1.0, emotion: 'neutral' },
   seagull: { voice: 'Chinese (Mandarin)_Southern_Young_Man', fallback: 'male-qn-qingse', speed: 1.15, emotion: 'happy' },
-  sloth: { voice: 'Chinese (Mandarin)_Humorous_Elder', fallback: 'audiobook_male_1', speed: 0.5, emotion: 'neutral' },
+  sloth: { voice: 'Chinese (Mandarin)_Humorous_Elder', fallback: 'audiobook_male_1', speed: 1.0, emotion: 'neutral' },
   corgi: { voice: 'Chinese (Mandarin)_Straightforward_Boy', fallback: 'clever_boy', speed: 1.1, emotion: 'angry' },
 };
 
@@ -103,6 +103,35 @@ const LINES = [
   ['corgi_hurt_0', 'corgi', 'hurt', '袭警？！'],
 ];
 
+/** Roster lines voiced per character (first N of each list in src/data/roster.ts; bubbles match by text):
+ *  every taunt (a voiced bubble next to a honk-only one sounds broken), the first KO / hurt lines. */
+const ROSTER_CAP = { taunts: Infinity, koLines: 3, hurtLines: 3 };
+const KIND_OF = { taunts: 'taunt', koLines: 'ko', hurtLines: 'hurt' };
+
+/** Stage directions (（不屑）) are not spoken; ~ reads as a drawn-out ～; all-caps words are words, not letters. */
+const spoken = (text) => text.replace(/（[^）]*）|\([^)]*\)/g, '').replace(/~/g, '～')
+  .replace(/\b[A-Z]{2,}\b/g, (w) => w[0] + w.slice(1).toLowerCase()).replace(/!+/g, '！').trim();
+
+/** Add the roster's first lines that have no clip yet (ids <character>_<kind>_<index in the list>). */
+function addRosterLines() {
+  const src = fs.readFileSync(path.join(ROOT, 'src/data/roster.ts'), 'utf8');
+  const texts = new Set(LINES.map((l) => l[3]));
+  const ids = new Set(LINES.map((l) => l[0]));
+  for (const speaker of Object.keys(SPEAKERS)) {
+    const block = src.split(new RegExp(`\\bid: '${speaker}'`))[1]?.split(/\bid: '/)[0] ?? '';
+    for (const [list, cap] of Object.entries(ROSTER_CAP)) {
+      const body = (block.match(new RegExp(`${list}: \\[([\\s\\S]*?)\\]`)) ?? [])[1] ?? '';
+      const items = [...body.matchAll(/'((?:[^'\\]|\\.)*)'/g)].map((m) => m[1]);
+      items.slice(0, cap).forEach((text, i) => {
+        const id = `${speaker}_${KIND_OF[list]}_${i}`;
+        if (texts.has(text) || ids.has(id) || !/\p{L}/u.test(spoken(text))) return;
+        LINES.push([id, speaker, KIND_OF[list], text, spoken(text) === text ? undefined : spoken(text)]);
+      });
+    }
+  }
+}
+addRosterLines();
+
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function post(body, timeoutMs = 30000) {
@@ -136,18 +165,60 @@ function hasFfmpeg() {
   try { execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' }); return true; } catch { return false; }
 }
 
-/** Trim leading/trailing silence, normalise loudness, mono 32 kHz, 80 kbps. */
+/** Frames (20 ms) quieter than this are pauses / tails, not speech. */
+const ACTIVE_DB = -50;
+
+/**
+ * Active-speech RMS (dB over the 20 ms frames above ACTIVE_DB, so tails and pauses do not pull a
+ * short word's level down) and duration (s) of an audio file, from its decoded 32 kHz mono PCM.
+ */
+function measure(file) {
+  const pcm = spawnSync('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-i', file, '-f', 'f32le', '-ac', '1', '-ar', '32000', '-'], { maxBuffer: 64 << 20 }).stdout;
+  const x = new Float32Array(pcm.buffer, pcm.byteOffset, Math.floor(pcm.byteLength / 4));
+  const frame = 640;
+  let sum = 0;
+  let n = 0;
+  for (let i = 0; i + frame <= x.length; i += frame) {
+    let e = 0;
+    for (let j = i; j < i + frame; j++) e += x[j] * x[j];
+    if (10 * Math.log10(e / frame + 1e-20) > ACTIVE_DB) { sum += e; n += frame; }
+  }
+  return { rms: n ? 10 * Math.log10(sum / n) : NaN, seconds: x.length / 32000 };
+}
+
+/** Clips shorter than this skip loudnorm's short-input mode: their active-speech RMS is matched to the set's. */
+const SHORT_S = 0.6;
+const TARGET_RMS = -16;
+/** Longest clip (s): a bark blocks the others while it plays; longer takes are time-compressed (pitch kept). */
+const MAX_S = 2.4;
+
+/**
+ * Trim leading / trailing silence and squeeze long inner pauses to 0.15 s (barks stay short),
+ * normalise loudness (loudnorm; takes over MAX_S time-compressed, short ones without loudnorm's
+ * short-input mode), then match every clip's active-speech RMS to TARGET_RMS (limited at −2 dBFS):
+ * one-word lines no longer jump out of the set. WAV in between, one MP3 encode (mono 32 kHz, 80 kbps).
+ */
 function polish(src, dst) {
-  const filter = 'silenceremove=start_periods=1:start_threshold=-48dB,areverse,silenceremove=start_periods=1:start_threshold=-48dB,areverse,'
-    + 'loudnorm=I=-16:TP=-2:LRA=9,afade=t=in:d=0.005';
-  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', src, '-af', filter, '-ar', '32000', '-ac', '1', '-b:a', '80k', dst]);
+  const trim = 'silenceremove=start_periods=1:start_threshold=-48dB:stop_periods=-1:stop_threshold=-48dB:stop_duration=0.25:stop_silence=0.15';
+  const wav = `${dst}.tmp.wav`;
+  const render = (af) => execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', src, '-af', af, '-ar', '32000', '-ac', '1', wav]);
+  render(`${trim},loudnorm=I=-16:TP=-2:LRA=9`);
+  let m = measure(wav);
+  if (m.seconds > MAX_S) render(`${trim},atempo=${Math.min(2, m.seconds / MAX_S).toFixed(3)},loudnorm=I=-16:TP=-2:LRA=9`);
+  else if (m.seconds < SHORT_S) render(trim);
+  m = measure(wav);
+  const gain = Number.isFinite(m.rms) ? (TARGET_RMS - m.rms).toFixed(1) : '0';
+  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', wav, '-af', `volume=${gain}dB,alimiter=limit=0.79:level=disabled,afade=t=in:d=0.005`,
+    '-ar', '32000', '-ac', '1', '-b:a', '80k', dst]);
+  fs.rmSync(wav, { force: true });
 }
 
 async function makeLine([id, speaker, , text, say], tmpDir, ffmpeg) {
   const file = path.join(OUT, `${id}.mp3`);
   if (!FORCE && fs.existsSync(file)) return 'kept';
   const sp = SPEAKERS[speaker];
-  const { url, voice } = await synth(say ?? text, sp);
+  // A spoken ellipsis is a short pause, not a drawl (……  → …).
+  const { url, voice } = await synth((say ?? text).replace(/……/g, '…'), sp);
   const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
   if (!res.ok) throw new Error(`download HTTP ${res.status}`);
   const raw = path.join(tmpDir, `${id}.raw.mp3`);

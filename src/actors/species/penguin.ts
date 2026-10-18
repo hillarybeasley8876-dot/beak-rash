@@ -1,6 +1,6 @@
 // 滑总 the penguin: a big round black-and-white egg (no neck), white face mask around big eyes, small
-// yellow bill, short black flippers on the grips, yellow helmet and feet; rides the kid bike. Cool, laid-
-// back lids. Signature: BELLY SLIDE (lies flat on the bike).
+// yellow bill, short black flippers on the grips, yellow helmet and feet; rides the kid bike with stubby legs
+// tucked under the egg (feet on toy pedal extenders). Cool, laid-back lids. Signature: BELLY SLIDE.
 import { ARM_UP, buildBird, birdJoints, type BirdSpec } from '../kit/bird';
 import { addHelmet } from '../kit/gear';
 import { B } from '../rig/skeleton';
@@ -18,9 +18,9 @@ const spec: BirdSpec = {
   eye: { at: [-0.068, 0.79, -0.255], r: 0.045, dir: [-0.4, 0.06, -0.92], pupil: 0.022 },
   wing: {
     kind: 'flipper', r: [0.075, 0.06, 0.045], flat: 0.42, color: BLACK,
-    fist: { r: [0.05, 0.022, 0.06], color: BLACK, budget: 120 },
+    fist: { r: [0.054, 0.036, 0.062], color: BLACK, budget: 140 },
   },
-  leg: { r: [0.09, 0.06, 0.05, 0.045], thigh: BLACK, shin: FEET },
+  leg: { r: [0.09, 0.065, 0.055, 0.045], thigh: BLACK, shin: BLACK },
   foot: { kind: 'web', len: 0.15, width: 0.14, color: FEET },
   tail: { c: [0, 0.12, 0.24], r: [0.08, 0.03, 0.07], color: BLACK, up: 0.1 },
   extra: [
@@ -36,7 +36,7 @@ const J = birdJoints(spec, {
   chest: [0, 0.44, -0.05], neck: [[0, 0.56, -0.08], [0, 0.6, -0.09], [0, 0.64, -0.1]], head: [0, 0.66, -0.1],
   hat: [0, 0.855, -0.11],
   clav: [-0.1, 0.5, -0.08], shoulder: [-0.22, 0.5, -0.1], elbow: [-0.27, 0.36, -0.17], wrist: [-0.2, 0.18, -0.2],
-  hip: [-0.11, 0.08, -0.02], knee: [-0.13, 0.0, -0.17], ankle: [-0.13, -0.2, -0.12], toe: [-0.13, -0.24, -0.24],
+  hip: [-0.11, 0.1, -0.03], knee: [-0.13, 0.05, -0.12], ankle: [-0.13, -0.05, -0.1], toe: [-0.13, -0.09, -0.22],
   tail: [[0, 0.12, 0.2], [0, 0.12, 0.28]],
 });
 
@@ -44,7 +44,7 @@ export const penguin: SpeciesDef = {
   id: 'penguin',
   joints: J,
   meta: {
-    wings: true, hat: 'helmet', eyeDir: spec.eye.dir, lid: { open: -0.85, closed: 1.45 }, sleepy: 0.28, lidTilt: 0.1,
+    wings: true, shortLegs: true, hat: 'helmet', eyeDir: spec.eye.dir, lid: { open: -0.85, closed: 1.45 }, sleepy: 0.28, lidTilt: 0.1,
     neckReach: 0.03, tail: 'stub', armUp: ARM_UP, gripDrop: 0.03, ankleLift: [0, 0.05, 0.05],
     beak: [0, 0.72, -0.35], skin: BLACK, skillPose: 'slide',
   },

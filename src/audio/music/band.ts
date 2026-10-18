@@ -8,10 +8,11 @@ import { driveCurve } from '../dsp/curves';
 import { anchor, filter, holdAt, settle, steer } from '../dsp/env';
 import { noise } from '../dsp/noise';
 import { FilterSwitch } from '../dsp/switch';
-import { Brass } from './instruments/brass';
+import { SampledBrass } from './instruments/brass-sampler';
 import { DrumKit } from './instruments/drums';
 import { SlapBass } from './instruments/bass';
-import { Clav, Pad } from './instruments/keys';
+import { Clav } from './instruments/keys';
+import { SampledPad } from './instruments/pad-sampler';
 import { SampledKeys } from './instruments/keys-sampler';
 import { Lead } from './instruments/lead';
 import { Gate, osc } from './instruments/voice';
@@ -20,25 +21,36 @@ import type { Channel, LeadVoice } from './types';
 
 // Melody on top: lead hooks ≈ −5 LU under the full mix, bass ≈ −8, drums ≈ −4 (audio-check stems).
 const DEFAULT_MIX: Record<Channel, number> = {
-  drums: 0.8, bass: 0.6, keys: 0.8, clav: 2.4, brass: 0.84, lead: 0.85, pad: 0.45, fx: 0.6,
+  drums: 0.8, bass: 0.6, keys: 0.8, clav: 2.4, brass: 0.84, lead: 0.45, pad: 0.45, fx: 0.6,
 };
 // Send levels come in a few shared values: channels with the same level feed one send gain.
-const VERB: Record<Channel, number> = { drums: 0.11, bass: 0, keys: 0.29, clav: 0.11, brass: 0.29, lead: 0.29, pad: 0.4, fx: 0.29 };
+const VERB: Record<Channel, number> = { drums: 0.15, bass: 0, keys: 0.29, clav: 0.15, brass: 0.29, lead: 0.5, pad: 0.4, fx: 0.29 };
 const DELAY: Record<Channel, number> = { drums: 0, bass: 0, keys: 0.09, clav: 0.09, brass: 0.09, lead: 0.22, pad: 0, fx: 0.09 };
 const DUCKED = new Set<Channel>(['bass', 'keys', 'pad', 'clav']);
-/** Comping parts that step back (−3.5 dB) while the lead plays, so the hook sits on top. */
-const UNDER_LEAD = new Set<Channel>(['keys', 'pad', 'clav']);
-const UNDER_LEAD_GAIN = 0.67;
+/** Comping parts and horns step back (−7.5 dB) while the lead plays, so the hook sits on top. */
+const UNDER_LEAD = new Set<Channel>(['keys', 'pad', 'clav', 'brass']);
+const UNDER_LEAD_GAIN = 0.42;
+/** Stereo image: brass and pad bake their spread into their pre-mixed chords, the keys auto-pan,
+ *  the clav sits left, the drums are stereo samples, the reverb is decorrelated (the lead sends more). */
+const PAN: Partial<Record<Channel, number>> = { clav: -0.5 };
+/** Breakdown: bars 1–4 this far down (dB) behind a low-pass at BREAK_LP; the build climbs to BUILD_TOP dB. */
+const BREAK_DB = -6;
+const BUILD_TOP_DB = 2;
+const BREAK_LP = 900;
 
 export class Band {
   readonly ctx: BaseAudioContext;
   readonly out: GainNode;
   private strips = new Map<Channel, GainNode>();
   private sc: GainNode;          // side-chain gain shared by bass / keys / pad / clav
-  private under: GainNode;       // lead side-chain for keys / pad / clav
+  private under: GainNode;       // lead side-chain for keys / pad / clav (then the kick side-chain)
+  private underFree: GainNode;   // lead side-chain for the horns (no kick duck)
   private hp: BiquadFilterNode;  // bass drop
   private bassDrop: FilterSwitch; // the high-pass is only in the path during a KO drop
   private dropClear = Infinity;
+  private shape: GainNode;       // section dynamics (levels, breakdowns)
+  private sweep: FilterSwitch;   // the breakdown low-pass, only in the path during a breakdown
+  private sweepEnd = Infinity;
   private sends: GainNode;       // reverb send bus, post-fader (follows fade())
   private delayIn: GainNode | null = null;
   private delayLine: DelayNode | null = null;
@@ -51,8 +63,8 @@ export class Band {
   private slap: SlapBass | null = null;
   private ep: SampledKeys | null = null;
   private clavi: Clav | null = null;
-  private horns: Brass | null = null;
-  private strings: Pad | null = null;
+  private horns: SampledBrass | null = null;
+  private strings: SampledPad | null = null;
   private leads = new Map<string, Lead>();
   private lfos = new Map<number, OscillatorNode>();
   private sendGains = new Map<string, GainNode>();
@@ -65,12 +77,16 @@ export class Band {
     this.ctx = ctx;
     this.tempo = bpm;
     this.out = new GainNode(ctx, { gain: 0 });
+    this.shape = new GainNode(ctx, { gain: 1 });
+    this.sweep = new FilterSwitch(this.out, filter(ctx, { type: 'lowpass', frequency: BREAK_LP, Q: 1.2 }), this.shape);
     this.hp = filter(ctx, { type: 'highpass', frequency: 18, Q: 0.7 });
-    this.bassDrop = new FilterSwitch(this.out, this.hp, dest);
+    this.bassDrop = new FilterSwitch(this.shape, this.hp, dest);
     this.sc = new GainNode(ctx, { gain: 1 });
     this.sc.connect(this.out);
     this.under = new GainNode(ctx, { gain: 1 });
     this.under.connect(this.sc);
+    this.underFree = new GainNode(ctx, { gain: 1 });
+    this.underFree.connect(this.out);
     this.sends = new GainNode(ctx, { gain: 0 });
     this.sends.connect(engine.musicVerb);
   }
@@ -107,13 +123,16 @@ export class Band {
       const pan = new StereoPannerNode(ctx, { pan: 0 });
       pan.pan.automationRate = 'k-rate';
       const lfo = new OscillatorNode(ctx, { type: 'sine', frequency: this.tempo / 30 });
-      lfo.connect(new GainNode(ctx, { gain: 0.32 })).connect(pan.pan);
+      lfo.connect(new GainNode(ctx, { gain: 0.85 })).connect(pan.pan);
       lfo.start(ctx.currentTime);
       this.own(lfo);
       this.tremolo = lfo;
       head = head.connect(pan);
     }
-    head.connect(UNDER_LEAD.has(ch) ? this.under : DUCKED.has(ch) ? this.sc : this.out);
+    const dest = UNDER_LEAD.has(ch) ? (DUCKED.has(ch) ? this.under : this.underFree) : DUCKED.has(ch) ? this.sc : this.out;
+    const pan = (x: number): StereoPannerNode => new StereoPannerNode(ctx, { pan: x });
+    const side = PAN[ch];
+    (side === undefined ? head : head.connect(pan(side))).connect(dest);
     if (VERB[ch] > 0) head.connect(this.send('verb', VERB[ch]));
     if (DELAY[ch] > 0) head.connect(this.send('delay', DELAY[ch]));
     this.strips.set(ch, input);
@@ -163,12 +182,12 @@ export class Band {
     return (this.clavi ??= new Clav(this));
   }
 
-  get brass(): Brass {
-    return (this.horns ??= new Brass(this));
+  get brass(): SampledBrass {
+    return (this.horns ??= new SampledBrass(this));
   }
 
-  get pad(): Pad {
-    return (this.strings ??= new Pad(this));
+  get pad(): SampledPad {
+    return (this.strings ??= new SampledPad(this));
   }
 
   lead(voice: LeadVoice, slot = 0): Lead {
@@ -198,9 +217,41 @@ export class Band {
     return g;
   }
 
+  /** Section dynamics from `t` (bars of `bar` s): the section's level, and the breakdown filter sweep. */
+  section(t: number, bar: number, gainDb: number, shape: 'breakdown' | undefined): void {
+    const g = this.shape.gain;
+    const level = Math.pow(10, gainDb / 20);
+    anchor(g, t);
+    if (shape !== 'breakdown') {
+      g.linearRampToValueAtTime(level, t + 0.12);
+      settle(g, t + 0.12, level);
+      if (this.sweep.engaged) this.sweep.set(false, t);
+      this.sweepEnd = Infinity;
+      return;
+    }
+    // Bars 1–4 down and filtered; bars 5–8 climb back bar by bar (even steps in dB) as the filter opens.
+    const at = (k: number): number => t + k * bar;
+    g.linearRampToValueAtTime(level * Math.pow(10, BREAK_DB / 20), t + 0.12);
+    g.setValueAtTime(level * Math.pow(10, BREAK_DB / 20), at(4));
+    for (let k = 1; k <= 4; k++) g.linearRampToValueAtTime(level * Math.pow(10, (BREAK_DB + ((BUILD_TOP_DB - BREAK_DB) * k) / 4) / 20), at(4 + k));
+    settle(g, at(8), level * Math.pow(10, BUILD_TOP_DB / 20));
+    const f = this.sweep.filter.frequency;
+    holdAt(f, t);
+    f.setValueAtTime(BREAK_LP, t);
+    f.setValueAtTime(BREAK_LP, at(4));
+    f.exponentialRampToValueAtTime(Math.min(14000, this.ctx.sampleRate * 0.45), at(8));
+    this.sweep.set(true, t);
+    this.sweepEnd = at(8);
+  }
+
   /** Unplug voices that have finished sounding (called from the scheduler). */
   tick(now: number): void {
     for (const g of this.gates) g.sleep(now);
+    if (now >= this.sweepEnd) {
+      this.sweep.set(false, now);
+      this.sweepEnd = Infinity;
+    }
+    this.sweep.tick(now);
     if (now >= this.dropClear) {
       this.bassDrop.set(false, now);
       this.dropClear = Infinity;
@@ -224,10 +275,11 @@ export class Band {
 
   /** A lead note from `t` for `dur` s: the comping parts dip under it, then come back. */
   underLead(t: number, dur: number): void {
-    const g = this.under.gain;
-    holdAt(g, t);
-    g.setTargetAtTime(UNDER_LEAD_GAIN, t, 0.01);
-    g.setTargetAtTime(1, t + Math.max(0.03, dur), 0.18);
+    for (const g of [this.under.gain, this.underFree.gain]) {
+      holdAt(g, t);
+      g.setTargetAtTime(UNDER_LEAD_GAIN, t, 0.01);
+      g.setTargetAtTime(1, t + Math.max(0.03, dur), 0.18);
+    }
   }
 
   /** Linear fade from the level the band has at `at` (not from the previous fade's end time). */

@@ -1,5 +1,5 @@
 // Edge warnings: chevrons at the bottom/side edges for rivals closing in from behind (angry ones and
-// skill casts flash hot with the skill glyph), plus the police siren glow and chip. A caster the camera
+// skill casts flash hot with the skill glyph), plus the police siren light bars and chip. A caster the camera
 // can see gets no side chevron: its name tag flashes instead (tags.ts castFlash).
 import { Vector3 } from 'three';
 import { approach, clamp, clamp01 } from '../../../core/math';
@@ -9,16 +9,28 @@ import type { RiderId, RiderState } from '../../../core/types';
 import { SPECIES_GLYPH } from '../badge';
 import { el, px, w, type W } from '../dom';
 import { newPoint, type Projector } from './project';
+import type { TagBox } from './tags';
+import type { HudZones } from './zones';
 import '../css/edges.css';
 
 const REAR = 14;
 const HOT_TIME = 1.1;
 
-interface Chev { r: RiderState; root: W; inner: W; glyph: W; bang: W; vis: number; hot: number; hotGlyph: string }
+interface Chev {
+  r: RiderState; root: W; inner: W; glyph: W; bang: W; vis: number; hot: number; hotGlyph: string;
+  /** This frame: shown, bottom (rear) or side placement, wanted x, and the drawn position / rotation. */
+  on: boolean; rear: boolean; want: number; x: number; y: number; rot: number;
+}
+
+/** Rear chevrons sit this far apart (px at 1080p): never on top of each other. */
+const SPACING = 110;
+/** Half the drawn chevron's box (px at 1080p): full size, tilted, pulsing. */
+const HALF = 74;
 
 export class EdgeWarnings {
   private chevHost: HTMLDivElement;
   private chevs: Chev[] = [];
+  private boxList: TagBox[] = [];
   private police: W;
   private chip: W;
   /** police:alert is state-based (race unit): 0 = gone, 1 = chasing, 2 = alongside / closing in. */
@@ -27,9 +39,12 @@ export class EdgeWarnings {
   private pt = newPoint();
   private v = new Vector3();
 
-  constructor(parent: HTMLElement) {
+  /** `under`: a layer below the static HUD for the siren light bars (they must not tint the HUD). */
+  constructor(parent: HTMLElement, under: HTMLElement) {
     const root = el('div', 'brh-edges', parent);
-    this.police = w(el('div', 'eg-police', root));
+    const police = el('div', 'eg-police');
+    under.prepend(police);
+    this.police = w(police);
     const chip = el('div', 'eg-chip', root);
     el('span', 'eg-lamp', chip);
     el('b', '', chip, 'POLICE');
@@ -49,7 +64,10 @@ export class EdgeWarnings {
       el('div', 'eg-chev-a', inner);
       const glyph = el('span', 'eg-chev-g', inner, SPECIES_GLYPH[r.character]);
       const bang = el('span', 'eg-chev-x', root, '!');
-      this.chevs.push({ r, root: w(root), inner: w(inner), glyph: w(glyph), bang: w(bang), vis: 0, hot: 0, hotGlyph: '' });
+      this.chevs.push({
+        r, root: w(root), inner: w(inner), glyph: w(glyph), bang: w(bang), vis: 0, hot: 0, hotGlyph: '',
+        on: false, rear: false, want: 0, x: 0, y: 0, rot: 0,
+      });
     }
   }
 
@@ -77,12 +95,54 @@ export class EdgeWarnings {
     }
   }
 
-  update(session: Session, proj: Projector, k: number, dt: number): void {
+  update(session: Session, proj: Projector, zones: HudZones, k: number, dt: number): void {
     // Only the race's police:alert says an officer is actually on the road (heat alone is not a chase).
     this.policeVis = approach(this.policeVis, this.alertLevel, dt * 2.5);
     this.police.op(this.policeVis * 0.85);
     this.chip.op(clamp01((this.policeVis - 0.25) * 3));
     for (const c of this.chevs) this.updateChev(c, session, proj, k, dt);
+    this.spreadRear(zones, k);
+    this.spreadSide(k);
+    this.boxList.length = 0;
+    for (const c of this.chevs) {
+      if (!c.on) continue;
+      this.draw(c, k);
+      // Side chevrons share the screen edges with docked taunt bubbles: report them as obstacles.
+      if (!c.rear) this.boxList.push({ id: -1, cx: c.x, l: c.x - HALF * k, r: c.x + HALF * k, t: c.y - HALF * k, b: c.y + HALF * k });
+    }
+  }
+
+  /** Screen boxes of the side chevrons drawn this frame (call after update). */
+  boxes(): readonly TagBox[] {
+    return this.boxList;
+  }
+
+  /** Rear chevrons in the free bottom band between the speedometer and the cluster's gauges, sorted by
+   *  their wanted x and at least SPACING apart (squeezed evenly if the band is too narrow). */
+  private spreadRear(zones: HudZones, k: number): void {
+    const rear = this.chevs.filter((c) => c.on && c.rear).sort((a, b) => a.want - b.want);
+    if (!rear.length) return;
+    const lo = zones.speedo.r + HALF * k;
+    const hi = zones.gauges.l - HALF * k;
+    const gap = Math.min(SPACING * k, rear.length > 1 ? (hi - lo) / (rear.length - 1) : SPACING * k);
+    let x = -Infinity;
+    for (const c of rear) {
+      x = Math.max(clamp(c.want, lo, hi), x + gap);
+      c.x = x;
+    }
+    // Overflow past the right end: slide the row back left.
+    const over = x - hi;
+    if (over > 0) for (const c of rear) c.x = Math.max(lo, c.x - over);
+  }
+
+  /** Side chevrons (off-screen casters) stack upward per screen edge (below them sit the quip and cluster). */
+  private spreadSide(k: number): void {
+    let left = 0;
+    let right = 0;
+    for (const c of this.chevs) {
+      if (!c.on || c.rear) continue;
+      c.y -= (c.rot < 0 ? left++ : right++) * SPACING * k;
+    }
   }
 
   /** True when r's head projects inside the screen (the rider and its tag are in plain view). */
@@ -109,33 +169,35 @@ export class EdgeWarnings {
     if (alive && behind && (angry || closing || swinging)) threat = (angry || swinging ? 1 : 0.7) * clamp01(1.15 + ds / REAR);
     if (alive && c.hot > 0 && ds < 4 && (ds < -0.8 || !this.inView(session, proj, r))) threat = 1;
     c.vis = approach(c.vis, threat, dt * 6);
-    c.root.show(c.vis > 0.02);
-    if (c.vis <= 0.02) return;
+    c.on = c.vis > 0.02;
+    c.root.show(c.on);
+    if (!c.on) return;
     const side = clamp(dx / 5, -1, 1);
-    let x: number;
-    let y: number;
-    let rot: number;
-    if (ds < -0.8) {
-      // Bottom band between the speedometer (left ~17 %) and the battle cluster (right from ~62 %).
-      x = clamp(width / 2 + side * width * 0.3, width * 0.2, width * 0.6);
-      y = height - 92 * k;
-      rot = side * 22;
+    c.rear = ds < -0.8;
+    if (c.rear) {
+      c.want = width / 2 + side * width * 0.3;
+      c.y = height - 92 * k;
+      c.rot = side * 22;
     } else {
-      x = dx < 0 ? 70 * k : width - 70 * k;
-      y = height * 0.56;
-      rot = dx < 0 ? -90 : 90;
+      c.x = dx < 0 ? 70 * k : width - 70 * k;
+      c.y = height * 0.48; // above the quip / cluster corner
+      c.rot = dx < 0 ? -90 : 90;
     }
+  }
+
+  private draw(c: Chev, k: number): void {
     const hot = c.hot > 0;
+    const rot = c.rot;
     c.root.cls('is-hot', hot);
-    c.glyph.text(hot ? c.hotGlyph : SPECIES_GLYPH[r.character]);
+    c.glyph.text(hot ? c.hotGlyph : SPECIES_GLYPH[c.r.character]);
     c.glyph.tf(`rotate(${(-rot).toFixed(1)}deg)`);
     const pulse = hot ? 1 + 0.12 * Math.sin(c.hot * 30) : 1;
     const sc = k * (0.7 + 0.35 * c.vis) * pulse;
-    c.root.tf(`translate(${px(x)}, ${px(y)})`);
+    c.root.tf(`translate(${px(c.x)}, ${px(c.y)})`);
     c.inner.tf(`rotate(${rot.toFixed(1)}deg) scale(${sc.toFixed(3)})`);
     // The "!" badge stays upright: above bottom chevrons, inward of side chevrons.
-    const bx = ds < -0.8 ? 0 : (dx < 0 ? 62 : -62) * sc;
-    const by = ds < -0.8 ? -78 * sc : -44 * sc;
+    const bx = c.rear ? 0 : (rot < 0 ? 62 : -62) * sc;
+    const by = c.rear ? -78 * sc : -44 * sc;
     c.bang.tf(`translate(${px(bx)}, ${px(by)}) scale(${sc.toFixed(3)})`);
     c.root.op(c.vis);
   }

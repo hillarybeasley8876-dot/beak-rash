@@ -1,0 +1,15 @@
+/* Confirm modal (ui/confirm.ts): red burst behind a jagged ink panel, ransom title, halftone, big
+   slanted YES/NO buttons, pelican sticker. Lives inside the screen's 1920×1080 stage. */
+.br-modal { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(11, 11, 15, 0.74); z-index: 20; }
+.br-modal::before { content: ''; position: absolute; inset: 0; background: repeating-linear-gradient(104deg, transparent 0 60px, rgba(229, 25, 28, 0.08) 60px 66px); }
+.br-modal-box { position: relative; width: 980px; rotate: -3deg; animation: br-pop 0.24s var(--ease-slam) both; }
+.br-modal-burst { position: absolute; left: -150px; top: -190px; width: 620px; height: 620px; z-index: -3; animation: br-spin 30s linear infinite; }
+.br-modal-panel { padding: 46px 64px 44px 250px; overflow: visible; }
+.br-modal-panel > .br-halftone { inset: 0; clip-path: var(--clip); --dot-mask: linear-gradient(200deg, transparent 35%, #000 95%); }
+.br-modal-head { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.br-modal-ask { padding: 2px 14px 0; background: var(--white); color: var(--red); font-family: var(--f-display); font-size: 30px; letter-spacing: 0.08em; transform: skewX(var(--skew)); }
+.br-modal-title { font-size: 76px; }
+.br-modal-text { position: relative; margin: 22px 0 34px; font-size: 30px; line-height: 1.4; color: var(--white); text-wrap: balance; word-break: keep-all; overflow-wrap: anywhere; }
+.br-modal-row { position: relative; display: flex; gap: 40px; font-size: 54px; }
+.br-modal-btn .br-btn-sub { font-size: 0.42em; }
+.br-modal-pelican { position: absolute; left: -96px; bottom: -40px; width: 330px; height: 330px; rotate: -8deg; filter: drop-shadow(8px 8px 0 var(--ink)); }

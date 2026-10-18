@@ -1,14 +1,15 @@
-// Shared decal atlas: one 512² canvas texture for every bike (number plate, QR code, stickers, badges).
-// The top-left quadrant is opaque white: untextured geometry samples WHITE_UV, so one material
-// (vertex colours × atlas) covers whole bikes and decals cost no extra draw calls.
+// Shared decal atlas: one 1024² canvas texture for every bike (number plate, QR code, stickers, badges,
+// alpha-tested spoke / speed-blur wheel cards, chain links). The 256² square at the top-left is opaque
+// white: untextured geometry samples WHITE_UV, so one material (vertex colours × atlas) covers whole
+// bikes and decals cost no extra draw calls.
 import { CanvasTexture, SRGBColorSpace } from 'three';
 import { DECAL_DRAW } from './decals';
 
 export interface UvRect { u0: number; v0: number; u1: number; v1: number }
 export type DecalId = keyof typeof LAYOUT;
 
-const SIZE = 512;
-export const WHITE_UV: readonly [number, number] = [0.25, 0.75];
+const SIZE = 1024;
+export const WHITE_UV: readonly [number, number] = [128 / SIZE, 1 - 128 / SIZE];
 
 /** Canvas pixel rects [x, y, w, h] (y down). */
 const LAYOUT = {
@@ -25,7 +26,11 @@ const LAYOUT = {
   heart: [96, 416, 96, 96],
   tandem: [384, 288, 128, 64],
   grid: [384, 192, 128, 96],
-  fishface: [384, 352, 128, 64],
+  spokes: [512, 0, 256, 256],
+  blur: [768, 0, 256, 256],
+  chain: [512, 256, 256, 32],
+  taillight: [768, 256, 128, 64],
+  spider: [896, 256, 128, 128],
 } as const satisfies Record<string, readonly [number, number, number, number]>;
 
 export function decalUv(id: DecalId): UvRect {

@@ -7,11 +7,11 @@ import { hashString } from '../../core/rng';
 import type { TrackFrame } from '../../core/types';
 import type { BuiltLayout } from '../layout/build';
 import type { TrackQuery } from '../layout/query';
+import { SampleIndex } from '../layout/sample-index';
 import type { GroundDef } from '../layout/types';
 import { Noise2 } from './noise';
 import { isShore, profileY } from './profile';
 
-const CELL = 32;
 const BURY = 4;            // terrain under the road sits this far below it
 
 export interface Bump { x: number; z: number; r: number; h: number; mat: 'sand' | 'grass' | 'rock' }
@@ -28,27 +28,19 @@ export interface TerrainMod {
 export class TerrainField {
   readonly noise: Noise2;
   readonly bumps: Bump[];
-  private readonly hash = new Map<number, number[]>();
+  private readonly index: SampleIndex;
   private readonly fr: TrackFrame;
   readonly mod: TerrainMod | null;
 
   constructor(readonly L: BuiltLayout, readonly q: TrackQuery) {
     this.noise = new Noise2(hashString(`terrain:${L.def.id}`));
     this.fr = q.frameVis(0);
-    for (let i = 0; i < L.n; i++) {
-      const key = this.key(Math.floor((L.px[i] ?? 0) / CELL), Math.floor((L.pz[i] ?? 0) / CELL));
-      const list = this.hash.get(key);
-      if (list) list.push(i); else this.hash.set(key, [i]);
-    }
+    this.index = new SampleIndex(L, 0, L.n - 1);
     this.bumps = (L.def.bumps ?? []).map((b) => {
       const f = q.frameVis(b.s);
       return { x: f.pos.x + f.right.x * b.x, z: f.pos.z + f.right.z * b.x, r: b.r, h: b.h, mat: b.mat ?? 'rock' };
     });
     this.mod = L.def.terrainMod ? L.def.terrainMod(this) : null;
-  }
-
-  private key(cx: number, cz: number): number {
-    return (cx + 4096) * 8192 + (cz + 4096);
   }
 
   /** Drivable half-extent on one side at visual s (asphalt + shoulder). */
@@ -121,43 +113,9 @@ export class TerrainField {
     return { h, bump };
   }
 
-  /** Nearest sample index to a world point (horizontal), over the whole visual road. */
-  nearestSample(wx: number, wz: number): number {
-    const L = this.L;
-    let best = -1, bestD = Infinity;
-    const cx = Math.floor(wx / CELL), cz = Math.floor(wz / CELL);
-    for (let r = 0; r < 200; r++) {
-      for (let gx = cx - r; gx <= cx + r; gx++) {
-        const edgeRow = gx === cx - r || gx === cx + r;
-        for (let gz = cz - r; gz <= cz + r; gz += edgeRow ? 1 : 2 * r) {
-          const list = this.hash.get(this.key(gx, gz));
-          if (!list) continue;
-          for (const i of list) {
-            const d = ((L.px[i] ?? 0) - wx) ** 2 + ((L.pz[i] ?? 0) - wz) ** 2;
-            if (d < bestD) { bestD = d; best = i; }
-          }
-        }
-      }
-      if (best >= 0 && Math.sqrt(bestD) < r * CELL) break;
-    }
-    return Math.max(0, best);
-  }
-
   /** Full sample at a world point: nearest s, lateral x (end rays extend straight), height. */
   sampleWorld(wx: number, wz: number): WorldSample {
-    const L = this.L;
-    const i = this.nearestSample(wx, wz);
-    // Refine s on the neighbouring chords.
-    let s = L.sMin + i, bestD = Infinity;
-    for (const a of [i - 1, i]) {
-      const b = a + 1;
-      if (a < 0 || b >= L.n) continue;
-      const ax = L.px[a] ?? 0, az = L.pz[a] ?? 0;
-      const ex = (L.px[b] ?? 0) - ax, ez = (L.pz[b] ?? 0) - az;
-      const t = Math.min(1, Math.max(0, ((wx - ax) * ex + (wz - az) * ez) / (ex * ex + ez * ez || 1)));
-      const d = (ax + ex * t - wx) ** 2 + (az + ez * t - wz) ** 2;
-      if (d < bestD) { bestD = d; s = L.sMin + a + t; }
-    }
+    const s = this.index.refine(Math.max(0, this.index.nearest(wx, wz)), wx, wz);
     const fr = this.q.frameVis(s, this.fr);
     const rl = Math.hypot(fr.right.x, fr.right.z) || 1;
     const x = ((wx - fr.pos.x) * fr.right.x + (wz - fr.pos.z) * fr.right.z) / rl;

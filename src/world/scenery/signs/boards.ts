@@ -35,7 +35,9 @@ function ahead(c: Vector3, yaw: number, d: number, out = new Vector3()): Vector3
 }
 
 /** Billboard: face w × h with its bottom at `lift` above ground (x, y, z) on two posts. */
-export function billboard(props: MeshBuf, faces: MeshBuf, x: number, y: number, z: number, yaw: number, w: number, h: number, lift: number, rect: AtlasRect): void {
+export function billboard(
+  props: MeshBuf, faces: MeshBuf, x: number, y: number, z: number, yaw: number, w: number, h: number, lift: number, rect: AtlasRect,
+): void {
   const cy = y + lift + h / 2;
   box(props, trs(x, cy, z, yaw, w + 0.36, h + 0.36, 0.3, m), FRAME);
   const back = ahead(new Vector3(x, cy, z), yaw, -0.17);
@@ -53,7 +55,10 @@ export function billboard(props: MeshBuf, faces: MeshBuf, x: number, y: number, 
 }
 
 /** Road sign plate on one post. */
-export function postSign(props: MeshBuf, faces: MeshBuf, x: number, y: number, z: number, yaw: number, w: number, h: number, lift: number, rect: AtlasRect, mirror = false): void {
+export function postSign(
+  props: MeshBuf, faces: MeshBuf, x: number, y: number, z: number, yaw: number, w: number, h: number, lift: number, rect: AtlasRect,
+  mirror = false,
+): void {
   const cy = y + lift + h / 2;
   box(props, trs(x, cy, z, yaw, w + 0.08, h + 0.08, 0.06, m), FRAME);
   faceQuad(faces, ahead(new Vector3(x, cy, z), yaw, 0.04), yaw, w, h, rect, mirror);
@@ -62,7 +67,9 @@ export function postSign(props: MeshBuf, faces: MeshBuf, x: number, y: number, z
 }
 
 /** Free-standing panel (banners on frames along barriers): two short legs. */
-export function panel(props: MeshBuf, faces: MeshBuf, x: number, y: number, z: number, yaw: number, w: number, h: number, lift: number, rect: AtlasRect): void {
+export function panel(
+  props: MeshBuf, faces: MeshBuf, x: number, y: number, z: number, yaw: number, w: number, h: number, lift: number, rect: AtlasRect,
+): void {
   const cy = y + lift + h / 2;
   box(props, trs(x, cy, z, yaw, w + 0.12, h + 0.12, 0.08, m), FRAME);
   faceQuad(faces, ahead(new Vector3(x, cy, z), yaw, 0.05), yaw, w, h, rect);

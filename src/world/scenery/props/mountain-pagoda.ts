@@ -5,6 +5,7 @@ import { Color, Matrix4 } from 'three';
 import type { Rng } from '../../../core/rng';
 import type { MeshBuf } from '../../geom';
 import { box, cone, cylinder, sphere, trs } from '../../kit/shapes';
+import { part } from './mountain-kit';
 import { poly } from './building';
 import { lantern } from './mountain-deco';
 
@@ -14,11 +15,6 @@ const PAL = {
   roof: C('#2f3a4a'), roofUnder: C('#4b2a22'), trim: C('#e8b23a'), rail: C('#8a3a22'), gold: C('#ffcf4a'),
 };
 const lm = new Matrix4(), wm = new Matrix4();
-
-function part(buf: MeshBuf, base: Matrix4, cx: number, cy: number, cz: number, sx: number, sy: number, sz: number, col: Color, ry = 0): void {
-  wm.multiplyMatrices(base, trs(cx, cy, cz, ry, sx, sy, sz, lm));
-  box(buf, wm, col);
-}
 
 /** Square pyramid-ish eave roof: steep upper slope over a flared lower skirt, horns at the corners. */
 function eave(buf: MeshBuf, base: Matrix4, y: number, half: number, rise: number, flare: number): void {

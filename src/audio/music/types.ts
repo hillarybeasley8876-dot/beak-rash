@@ -47,6 +47,10 @@ export interface Section extends Lanes {
   fill?: Lanes | Lanes[];
   /** Adaptive layers: lanes that replace/add to the base while intensity ≥ the key (1 top-3, 2 final stretch). */
   layers?: { 1?: Lanes; 2?: Lanes };
+  /** Section level (dB, default 0): macro-dynamics — a lighter opening, a louder climax. */
+  gainDb?: number;
+  /** 'breakdown' (8 bars): bars 1–4 sit 6 dB down behind a 900 Hz low-pass, bars 5–8 climb back as it opens. */
+  shape?: 'breakdown';
 }
 
 export interface Song {

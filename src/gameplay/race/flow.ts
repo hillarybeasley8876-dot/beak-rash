@@ -49,8 +49,6 @@ export function createFlow(ctx: RaceCtx, onEnd: (timedOut: boolean) => void): Fl
       r.boostTime = Math.max(r.boostTime, time);
       r.boostPower = Math.max(r.boostPower, power);
       bus.emit('rider:boost', { riderId: r.id, kind: 'launch', power, time });
-      // Until the HUD has a 'launch' callout (status/race.md core request 1) a toast marks the perfect start.
-      if (r.isPlayer && perfect) app.ui.toast('PERFECT START!  起步完美', 'meme');
     }
   };
 

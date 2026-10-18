@@ -18,6 +18,8 @@ export interface ScreenCtx {
   go(screen: ScreenId, props?: ScreenProps): void;
   toast(text: string, kind?: 'info' | 'warn' | 'meme'): void;
   confirm(title: string, text: string, yes?: string, no?: string): Promise<boolean>;
+  /** Milliseconds since the latest key / pad press of any action on any screen (mash detection). */
+  sincePress(): number;
   /** Make a Nav that the shell routes actions to while this screen is active. */
   nav<T extends Nav>(nav: T): T;
 }
@@ -65,12 +67,12 @@ export function frame(o: FrameOpts): Frame {
   return { root, bg, stage };
 }
 
-/** Top-left screen header: black jagged band, ransom-note Chinese title, outlined English word. */
+/** Top-left screen header: black jagged band, ransom-note Chinese title, and the English word as a ghost
+ * fill inside the band, starting right after the Chinese glyphs (clipped by the band, never the screen). */
 export function header(cn: string, en: string): HTMLDivElement {
-  const el = h('div', { class: 'br-header' });
+  const el = h('div', { class: 'br-header', vars: { '--cn-n': [...cn].length, '--en-n': en.length } });
   el.append(
-    h('div', { class: 'br-header-band br-anim-left' }),
-    h('div', { class: 'br-header-en', text: en }),
+    h('div', { class: 'br-header-band br-anim-left' }, h('span', { class: 'br-header-en', text: en })),
     ransom(cn, { seed: cn, slam: true, className: 'br-header-cn', fonts: 'block', first: 'wr' }),
   );
   return el;

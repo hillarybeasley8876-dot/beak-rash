@@ -9,7 +9,10 @@ export const RECORD = `(() => {
   const T = ['race:intro','race:countdown','race:start','race:placeChange','race:finishLine','race:end','race:finalStretch',
     'police:alert','police:busted','traffic:honk','taunt','rider:boost','rider:crash','rider:respawn','combat:hit','combat:ko',
     'skill:cast','combat:bell','combat:swing'];
-  for (const t of T) bus.on(t, (p) => log.push({ t, p: JSON.parse(JSON.stringify(p)), time: +(br.session()?.time ?? 0).toFixed(3) }));
+  // combat:hit also logs ds = victim.s − attacker.s at the hit (melee-range fights vs torpedo/ult hits).
+  const gap = (p) => { const s = br.session(); const v = s?.rider(p.victim), a = s?.rider(p.attacker); return v && a ? +(v.s - a.s).toFixed(1) : null; };
+  for (const t of T) bus.on(t, (p) => log.push({ t, p: JSON.parse(JSON.stringify(p)), time: +(br.session()?.time ?? 0).toFixed(3),
+    ...(t === 'combat:hit' ? { ds: gap(p) } : {}) }));
   bus.on('race:end', (p) => { window.__rl.end = p.results; });
 })()`;
 

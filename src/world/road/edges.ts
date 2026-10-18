@@ -6,6 +6,7 @@ import type { WorldCtx } from '../ctx';
 import { PropBatch } from '../kit/batch';
 import { edgeRow, extrudeEdge, type Profile } from '../kit/extrude';
 import { box, cylinder, trs } from '../kit/shapes';
+import { pile } from '../scenery/props/marine';
 import { EDGE_KINDS } from '../layout/sides';
 import type { EdgeKind } from '../layout/types';
 import type { TerrainField } from '../terrain/field';
@@ -85,8 +86,10 @@ export function buildEdges(ctx: WorldCtx, field: TerrainField): void {
           });
           break;
         case 'quay':
+          // Bollards stand on mooring piles 0.7 m off the coping, clear of the drop line.
           ex(COPING, () => PAL.kerb);
-          along(side, s0 + 3, s1 - 3, 11, 0.22, (x, y, z) => {
+          along(side, s0 + 3, s1 - 3, 11, 0.7, (x, y, z) => {
+            pile(batch.at(x, z), x, y, z);
             cylinder(batch.at(x, z), trs(x, y, z, 0, 0.16, 0.42, 0.16, m), PAL.black, 10, 1, 0.8);
             cylinder(batch.at(x, z), trs(x, y + 0.42, z, 0, 0.2, 0.08, 0.2, m), PAL.black, 10);
           });

@@ -4,7 +4,7 @@
 //   &view=high&s=1500                                45° view from 60 m up near s
 //   &fly=1                                           animated fly-through at 20 m/s
 //   &sheet=0,400,800,…                               contact sheet of chase views (tiles)
-// window.__trk = { ready, track, view(s, x, mode), stats() }
+// window.__trk = { ready, track, view(s, x, mode), stats(), rebuild(), pick(), rayX(), three, dispose() }
 import { PerspectiveCamera, Raycaster, Scene, Vector2, Vector3, WebGLRenderer } from 'three';
 import { Rng } from '../src/core/rng';
 import type { AppContext, Track } from '../src/core/contracts';
@@ -134,6 +134,8 @@ async function main(): Promise<void> {
       const hit = new Raycaster(o, dir, 0, 40).intersectObject(api.track.group, true)[0];
       return hit ? { x: +(xv + side * hit.distance).toFixed(3), name: hit.object.name } : null;
     },
+    /** three classes for page-side audits (sandbox/track.audit.mjs). */
+    three: { Raycaster, Vector3 },
     /** Dispose only, then render once (memory should drop to the baseline). */
     dispose: (): void => {
       api.track.dispose();

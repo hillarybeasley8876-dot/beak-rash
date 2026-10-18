@@ -1,10 +1,11 @@
 // Sampled electric piano. The Rhodes voice (keys.ts) is rendered once per page into note samples
-// (keys-render.ts: every 4 semitones, two velocities), and each note then plays as one buffer
-// source (playbackRate covers the pitches in between) + one gain carrying velocity and the note-off
-// release: a fraction of the audio-thread cost of four always-running two-oscillator voices.
-// Notes longer than a sample, and anything before the samples exist, play on the live voices.
-import { FLOOR, fall } from '../../dsp/env';
+// (keys-render.ts: every 4 semitones, two velocities), and every chord up to KEY_HELD then plays as
+// ONE pre-mixed buffer (premix.ts: notes rolled low to high, resampled to pitch, velocity-scaled and
+// released at the note-off in JS) at playbackRate 1: no per-note sources, no release automation, no
+// realtime resampling (a resampling source costs the audio thread ≈ 3× a unity-rate one). Chords
+// longer than a sample, and anything before the samples exist, play on the live voices.
 import { Rhodes } from './keys';
+import { premix, type MixNote } from './premix';
 import type { Band } from '../band';
 
 export const KEY_LOW = 47;
@@ -30,6 +31,15 @@ export function hasKeyBank(sampleRate: number): boolean {
 /** ±0.5 timing / velocity jitter from the band's Rng (reproducible per band). */
 const jitter = (b: Band): number => b.rng.next() - 0.5;
 
+/** Low-to-high roll between a chord's notes (s). */
+const ROLL = 0.006;
+
+/** Nearest sample pitch for `midi` and the playback rate that bends it there. */
+function slot(midi: number): [number, number] {
+  const k = Math.min(KEY_COUNT - 1, Math.max(0, Math.round((midi - KEY_LOW) / KEY_STEP)));
+  return [k, Math.pow(2, (midi - KEY_LOW - k * KEY_STEP) / 12)];
+}
+
 export class SampledKeys {
   private live: Rhodes | null = null;
 
@@ -38,30 +48,27 @@ export class SampledKeys {
   /** Chord with a slight low-to-high roll. */
   chord(t: number, midis: number[], dur: number, vel: number): void {
     const bank = banks.get(this.b.ctx.sampleRate);
+    if (bank && dur <= KEY_HELD) {
+      const notes: MixNote[] = [];
+      midis.forEach((m, i) => {
+        const v = vel * (1 + 0.12 * jitter(this.b));
+        const layer = v < 0.72 ? 0 : 1;
+        const [k, rate] = slot(m);
+        const buf = bank[layer]?.[k];
+        // The live voice's level follows 0.55 + 0.45 · velocity: scale the layer to the note.
+        const gain = (0.55 + 0.45 * v) / (0.55 + 0.45 * (KEY_VELS[layer] ?? 1));
+        if (buf) notes.push({ buf, rate, gain, pan: 0, at: i * ROLL });
+      });
+      if (!notes.length) return;
+      const ctx = this.b.ctx;
+      const src = new AudioBufferSourceNode(ctx, { buffer: premix(notes, { off: Math.max(0.01, dur), release: KEY_RELEASE }, ctx.sampleRate) });
+      src.connect(this.b.input('keys'));
+      src.start(t + Math.abs(jitter(this.b)) * 0.004);
+      return;
+    }
     midis.forEach((m, i) => {
-      const at = t + i * 0.006 + Math.abs(jitter(this.b)) * 0.004;
-      const v = vel * (1 + 0.12 * jitter(this.b));
-      if (bank && dur <= KEY_HELD) this.sampled(bank, at, m, dur, v);
-      else (this.live ??= new Rhodes(this.b)).note(at, m, dur, v);
+      const at = t + i * ROLL + Math.abs(jitter(this.b)) * 0.004;
+      (this.live ??= new Rhodes(this.b)).note(at, m, dur, vel * (1 + 0.12 * jitter(this.b)));
     });
-  }
-
-  private sampled(bank: AudioBuffer[][], t: number, midi: number, dur: number, vel: number): void {
-    const k = Math.min(KEY_COUNT - 1, Math.max(0, Math.round((midi - KEY_LOW) / KEY_STEP)));
-    const layer = vel < 0.72 ? 0 : 1;
-    const buffer = bank[layer]?.[k];
-    if (!buffer) return;
-    const ctx = this.b.ctx;
-    const src = new AudioBufferSourceNode(ctx, { buffer, playbackRate: Math.pow(2, (midi - KEY_LOW - k * KEY_STEP) / 12) });
-    // The live voice's level follows 0.55 + 0.45 · velocity: scale the layer to the note.
-    const level = (0.55 + 0.45 * vel) / (0.55 + 0.45 * (KEY_VELS[layer] ?? 1));
-    const g = new GainNode(ctx, { gain: level });
-    const off = t + Math.max(0.01, dur);
-    g.gain.setValueAtTime(level, off);
-    fall(g.gain, off, off + KEY_RELEASE, level, level * FLOOR);
-    g.gain.linearRampToValueAtTime(0, off + KEY_RELEASE + 0.004);
-    src.connect(g).connect(this.b.input('keys'));
-    src.start(t);
-    src.stop(off + KEY_RELEASE + 0.01);
   }
 }

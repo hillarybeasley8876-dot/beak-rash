@@ -1,20 +1,13 @@
 // Canvas textures for the city's civil structures: retaining-wall concrete panels (joints, tone
 // variation, rain stains, bolt heads) and the tunnel's glazed wall tiles.
-import { CanvasTexture, LinearMipmapLinearFilter, RepeatWrapping, SRGBColorSpace, type WebGLRenderer } from 'three';
+import { RepeatWrapping, type CanvasTexture, type WebGLRenderer } from 'three';
 import { Rng } from '../../../core/rng';
+import { canvasTex } from './paint-tex';
 
+/** Repeating canvas texture (concrete panels and tiles run along the walls). */
 function tex(renderer: WebGLRenderer, w: number, h: number, draw: (g: CanvasRenderingContext2D) => void): CanvasTexture {
-  const c = document.createElement('canvas');
-  c.width = w;
-  c.height = h;
-  const g = c.getContext('2d');
-  if (!g) throw new Error('[track] 2D canvas unavailable');
-  draw(g);
-  const t = new CanvasTexture(c);
-  t.colorSpace = SRGBColorSpace;
-  t.minFilter = LinearMipmapLinearFilter;
+  const t = canvasTex(renderer, w, h, draw);
   t.wrapS = t.wrapT = RepeatWrapping;
-  t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   return t;
 }
 

@@ -26,7 +26,12 @@
 .br-pz-head { width: 46px; height: 46px; }
 .br-pz-empty { padding: 20px 0; font-family: var(--f-cn-play); font-size: 34px; color: rgba(255, 255, 255, 0.7); }
 
-.br-pz-keys { position: absolute; left: 1110px; top: 760px; width: 760px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 18px; animation: br-rise 0.3s var(--ease-out) 0.1s both; }
-.br-pz-key { display: flex; align-items: center; gap: 10px; }
-.br-pz-key kbd { padding: 3px 10px 0; background: var(--white); color: var(--ink); font-family: var(--f-display); font-size: 24px; box-shadow: 4px 4px 0 var(--red); transform: skewX(var(--skew)); white-space: nowrap; }
-.br-pz-key span { font-family: var(--f-cn-block); font-size: 27px; white-space: nowrap; }
+/* Controls sheet on its own skewed ink plate (readable over bright sand / sky / neon). */
+.br-pz-keys { position: absolute; left: 1110px; top: 722px; width: 720px; padding: 14px 28px 16px; animation: br-rise 0.3s var(--ease-out) 0.1s both; }
+.br-pz-keys-title { display: flex; align-items: baseline; gap: 14px; margin-bottom: 6px; }
+.br-pz-keys-title b { font-family: var(--f-display); font-size: 34px; letter-spacing: 0.05em; color: var(--red); }
+.br-pz-keys-title span { font-family: var(--f-cn-block); font-size: 24px; color: rgba(255, 255, 255, 0.7); }
+.br-pz-keys-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px 16px; }
+.br-pz-key { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.br-pz-key kbd { padding: 3px 10px 0; background: var(--white); color: var(--ink); font-family: var(--f-display); font-size: 22px; box-shadow: 4px 4px 0 var(--red); transform: skewX(var(--skew)); white-space: nowrap; }
+.br-pz-key span { font-family: var(--f-cn-block); font-size: 25px; white-space: nowrap; }

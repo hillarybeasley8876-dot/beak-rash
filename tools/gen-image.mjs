@@ -4,8 +4,11 @@
 // Pipeline per job: submit → poll every 10 s (8 min cap) → download raw PNG to shots/assets/raw/
 // → tools/cutout.py writes the shipped files under public/assets/. Up to 4 tries per job.
 // Usage: node tools/gen-image.mjs [--only a,b|prefix*] [--force] [--recut] [--jobs 4] [--list]
-//          [--variants N]  generate N candidates per job (raw/<out>.cand<i>.png, no cutout)
-//          [--pick out=i,...]  promote candidate i to the raw (old raw archived) and cut it out
+//          [--variants N]  generate N candidates per job (raw/<out>.cand<i>.png, no cutout; existing
+//                        candidates are kept unless --force)
+//          [--edit [--variants N]]  apply each selected file's `> edit:` instruction to its current raw
+//                        (uploaded, or its `> canvas:` outpaint canvas) -> raw/<out>.edit<i>.png, no cutout
+//          [--pick out=i,...]  promote candidate i (or edit candidate eI) to the raw (old raw archived), cut it out
 //          [--prompts FILE --dest DIR]   (experiments: alternate prompt file + output dir)
 //          [--manifest]  only rewrite src/data/assets.ts from the shipped files (also done after every
 //                        run that writes into public/assets)
@@ -24,11 +27,14 @@ const TRIES = 4;
 const POLL_MS = 10_000;
 const CAP_MS = 8 * 60_000;
 const ASPECTS = new Set(['3:4', '16:9', '1:1']);
+/** nano_banana: ~1 MP PNG. nano_banana_2: 2K (2752x1536 for 16:9), usually JPEG bytes (kept in the .png raw). */
+const MODEL = 'nano_banana';
+const MODELS = new Set([MODEL, 'nano_banana_2']);
 /** cutout.py arguments per mode (see tools/cutout.py --help). PNGs are 256-colour (flat comic art). */
 const MODES = {
   cut: ['--cut', '--max-h', '900', '--png', '--webp', '--colors', '256'],
   full: ['--max-h', '900', '--png', '--webp', '--colors', '256'],
-  strip: ['--max-h', '720', '--png', '--webp', '--colors', '256'],
+  strip: ['--max-h', '900', '--png', '--webp', '--colors', '256'],
   bill: ['--max-h', '576', '--webp'],
 };
 
@@ -41,7 +47,7 @@ function log(msg) {
 }
 
 function parseArgs(argv) {
-  const a = { only: null, force: false, recut: false, jobs: 4, list: false, prompts: PROMPTS, dest: DEST, variants: 0, pick: null, manifest: false };
+  const a = { only: null, force: false, recut: false, jobs: 4, list: false, prompts: PROMPTS, dest: DEST, variants: 0, pick: null, manifest: false, edit: false };
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
     if (k === '--only') a.only = argv[++i].split(',').map((s) => s.trim()).filter(Boolean);
@@ -53,13 +59,21 @@ function parseArgs(argv) {
     else if (k === '--prompts') a.prompts = path.resolve(argv[++i]);
     else if (k === '--dest') a.dest = path.resolve(argv[++i]);
     else if (k === '--variants') a.variants = Math.max(1, Math.min(8, Number(argv[++i]) || 1));
-    else if (k === '--pick') a.pick = new Map(argv[++i].split(',').map((p) => p.split('=')).map(([o, n]) => [o, Number(n)]));
+    else if (k === '--edit') a.edit = true;
+    else if (k === '--pick') a.pick = new Map(argv[++i].split(',').map((p) => p.split('=')).map(([o, n]) => {
+      if (!/^e?[1-9]\d*$/.test(n ?? '')) throw new Error(`--pick ${o}=${n}: want a candidate number or eN`);
+      return [o, n];
+    }));
     else throw new Error(`unknown argument ${k}`);
   }
   return a;
 }
 
-/** Parse PROMPTS.md into [{out, aspect, mode, cut, prompt}] with tokens expanded (mode may end in +flip). */
+/** Parse PROMPTS.md into [{out, aspect, mode, cut, prompt, model, edit, canvas}] with tokens expanded
+ *  (mode may end in +flip). Per-section `>` directives: `cutout:` extra cutout.py args, `model:` image
+ *  model, `edit:` instruction applied to the current raw by --edit, `canvas:` cutout.py args that build the
+ *  outpaint canvas the edit starts from (must include --canvas S[,DY]; may --frame first), `ref:` a reference
+ *  image (repo-relative path) sent with fresh rolls of that file. */
 export function parsePrompts(md) {
   const tokens = new Map();
   for (const m of md.matchAll(/^- `\{([A-Z0-9_]+)\}` (.+)$/gm)) tokens.set(m[1], m[2].trim());
@@ -71,21 +85,28 @@ export function parsePrompts(md) {
   let cur = null;
   for (const line of md.split('\n')) {
     const h = /^### (\S+) · (\S+) · (\S+)\s*$/.exec(line);
-    const extra = /^> cutout: (.+)$/.exec(line);
+    const dir = /^> (cutout|model|edit|canvas|ref): (.+)$/.exec(line);
     if (h) {
-      cur = { out: h[1], aspect: h[2], mode: h[3], body: [], extra: [] };
+      cur = { out: h[1], aspect: h[2], mode: h[3], body: [], extra: [], edit: [], refs: [], model: MODEL, canvas: null };
       sections.push(cur);
     } else if (/^#{1,3} /.test(line)) cur = null;
-    else if (cur && extra) cur.extra.push(...extra[1].trim().split(/\s+/));
+    else if (cur && dir?.[1] === 'cutout') cur.extra.push(...dir[2].trim().split(/\s+/));
+    else if (cur && dir?.[1] === 'edit') cur.edit.push(dir[2].trim());
+    else if (cur && dir?.[1] === 'model') cur.model = dir[2].trim();
+    else if (cur && dir?.[1] === 'ref') cur.refs.push(dir[2].trim());
+    else if (cur && dir?.[1] === 'canvas') cur.canvas = dir[2].trim().split(/\s+/);
     else if (cur && line.trim() && !line.startsWith('>')) cur.body.push(line.trim());
   }
-  return sections.map(({ out, aspect, mode, body, extra }) => {
+  return sections.map(({ out, aspect, mode, body, extra, edit, refs, model, canvas }) => {
     if (!ASPECTS.has(aspect)) throw new Error(`PROMPTS.md: ${out}: bad aspect ${aspect}`);
     const [base, ...flags] = mode.split('+');
     if (!MODES[base] || flags.some((f) => f !== 'flip')) throw new Error(`PROMPTS.md: ${out}: bad mode ${mode}`);
     if (!body.length) throw new Error(`PROMPTS.md: ${out}: empty prompt`);
+    if (!MODELS.has(model)) throw new Error(`PROMPTS.md: ${out}: unknown model ${model}`);
+    if (canvas && !canvas.includes('--canvas')) throw new Error(`PROMPTS.md: ${out}: canvas args need --canvas S[,DY]`);
     const cut = [...MODES[base], ...(flags.includes('flip') ? ['--flip'] : []), ...extra];
-    return { out, aspect, mode, cut, prompt: expand(body.join(' ')).replace(/\s+/g, ' ') };
+    const clean = (s) => expand(s).replace(/\s+/g, ' ');
+    return { out, aspect, mode, cut, model, canvas, refs, prompt: clean(body.join(' ')), edit: edit.length ? clean(edit.join(' ')) : null };
   });
 }
 
@@ -102,12 +123,25 @@ async function postJson(endpoint, body, timeoutMs) {
   return res.json();
 }
 
-async function submit(job) {
-  const r = await postJson('nano_banana_image', { model_name: 'nano_banana', prompt: job.prompt, aspect_ratio: job.aspect }, 60_000);
+async function submit(job, prompt, images) {
+  const body = { model_name: job.model, prompt, aspect_ratio: job.aspect };
+  if (images.length) body.image_urls = images;
+  const r = await postJson('nano_banana_image', body, 60_000);
   if (!r.success || typeof r.data !== 'string') throw new Error(`submit rejected: ${r.message ?? JSON.stringify(r).slice(0, 200)}`);
   const id = JSON.parse(r.data).task_id;
   if (typeof id !== 'string' || !id) throw new Error(`submit: no task_id in ${r.data}`);
   return id;
+}
+
+/** Upload a local image (multipart `file`) to the internal CDN; returns its https URL. */
+async function upload(file) {
+  const form = new FormData();
+  form.append('file', new Blob([fs.readFileSync(file)], { type: 'image/png' }), path.basename(file));
+  const res = await fetch(`${API}/fileupload`, { method: 'POST', body: form, signal: AbortSignal.timeout(120_000) });
+  if (!res.ok) throw new Error(`fileupload: HTTP ${res.status}`);
+  const r = await res.json();
+  if (!r.success || typeof r.data !== 'string' || !r.data.startsWith('https://')) throw new Error(`fileupload rejected: ${JSON.stringify(r).slice(0, 200)}`);
+  return r.data;
 }
 
 /** Poll until the task yields an https URL; throws on failure or after CAP_MS. */
@@ -142,12 +176,14 @@ async function download(url, file) {
   fs.renameSync(file + '.part', file);
 }
 
-async function generate(job, rawFile) {
+/** Roll one image into rawFile: an edit of `editFrom` (uploaded URL) or a fresh roll with the job's refs. */
+async function generate(job, rawFile, editFrom = null) {
   const label = job.cand ? `${job.out}#${job.cand}` : job.out;
+  const images = editFrom ? [editFrom] : await Promise.all(job.refs.map(uploadOnce));
   for (let attempt = 1; attempt <= TRIES; attempt++) {
     try {
-      const id = await submit(job);
-      log(`${label}: submitted ${id} (try ${attempt})`);
+      const id = await submit(job, editFrom ? job.edit : job.prompt, images);
+      log(`${label}: submitted ${id} (try ${attempt}, ${job.model}${editFrom ? ', edit' : ''}${images.length ? `, ${images.length} image(s)` : ''})`);
       const url = await poll(id);
       await download(url, rawFile);
       log(`${label}: saved ${path.relative(ROOT, rawFile)} from ${url}`);
@@ -160,10 +196,10 @@ async function generate(job, rawFile) {
   throw new Error(`${label}: gave up after ${TRIES} tries`);
 }
 
-function cutout(job, rawFile, dest) {
-  const args = [path.join(ROOT, 'tools/cutout.py'), rawFile, path.join(dest, job.out), ...job.cut];
+/** Run tools/cutout.py with args; resolves with its summary line. */
+function py(args) {
   return new Promise((resolve, reject) => {
-    const p = spawn('python3', ['-E', ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
+    const p = spawn('python3', ['-E', path.join(ROOT, 'tools/cutout.py'), ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
     let out = '';
     p.stdout.on('data', (d) => { out += d; });
     p.stderr.on('data', (d) => { out += d; });
@@ -171,6 +207,8 @@ function cutout(job, rawFile, dest) {
     p.on('close', (code) => (code === 0 ? resolve(out.trim()) : reject(new Error(`cutout exit ${code}: ${out.trim()}`))));
   });
 }
+
+const cutout = (job, rawFile, dest) => py([rawFile, path.join(dest, job.out), ...job.cut]);
 
 /** Keep the previous raw as history before re-rolling, so a worse re-roll can be undone. */
 function archive(rawFile) {
@@ -181,12 +219,41 @@ function archive(rawFile) {
   fs.renameSync(rawFile, path.join(dir, `${path.basename(rawFile, '.png')}.${t}.png`));
 }
 
-const candFile = (out, i) => path.join(RAW, `${out}.cand${i}.png`);
+/** Candidate file: '3' = fresh roll raw/<out>.cand3.png, 'e2' = edit raw/<out>.edit2.png. */
+const candFile = (out, c) => path.join(RAW, `${out}.${String(c).startsWith('e') ? `edit${String(c).slice(1)}` : `cand${c}`}.png`);
+
+const uploads = new Map();
+/** Upload a repo-relative reference image once per run. */
+function uploadOnce(rel) {
+  const file = path.resolve(ROOT, rel);
+  if (!uploads.has(file)) {
+    if (!fs.existsSync(file)) throw new Error(`missing reference image ${rel}`);
+    uploads.set(file, upload(file));
+  }
+  return uploads.get(file);
+}
+
+const editInputs = new Map();
+/** Upload the image an edit job starts from (its current raw, or the outpaint canvas built from it), once per run. */
+function editInput(job) {
+  if (!editInputs.has(job.out)) {
+    editInputs.set(job.out, (async () => {
+      const rawFile = path.join(RAW, `${job.out}.png`);
+      if (!fs.existsSync(rawFile)) throw new Error(`--edit needs an existing raw ${path.relative(ROOT, rawFile)}`);
+      if (!job.canvas) return upload(rawFile);
+      const base = path.join(RAW, `${job.out}.canvas`);
+      log(`${job.out}: canvas ${await py([rawFile, base, ...job.canvas, '--max-h', '4096', '--png'])}`);
+      return upload(`${base}.png`);
+    })());
+  }
+  return editInputs.get(job.out);
+}
 
 async function runJob(job, args) {
   if (job.cand) {
     const file = candFile(job.out, job.cand);
-    if (args.force || !fs.existsSync(file)) await generate(job, file);
+    if (!args.force && fs.existsSync(file)) return;
+    await generate(job, file, String(job.cand).startsWith('e') ? await editInput(job) : null);
     return;
   }
   const rawFile = path.join(RAW, `${job.out}.png`);
@@ -287,7 +354,11 @@ async function main() {
   let jobs = parsePrompts(fs.readFileSync(args.prompts, 'utf8'));
   if (args.only) jobs = jobs.filter((j) => matches(j.out, args.only));
   if (args.pick) jobs = jobs.filter((j) => args.pick.has(j.out)).map((j) => ({ ...j, pick: args.pick.get(j.out) }));
-  else if (args.variants) jobs = jobs.flatMap((j) => Array.from({ length: args.variants }, (_, i) => ({ ...j, cand: i + 1 })));
+  else if (args.edit) {
+    const missing = jobs.filter((j) => !j.edit).map((j) => j.out);
+    if (missing.length) throw new Error(`--edit: no \`> edit:\` instruction for ${missing.join(', ')}`);
+    jobs = jobs.flatMap((j) => Array.from({ length: args.variants || 1 }, (_, i) => ({ ...j, cand: `e${i + 1}` })));
+  } else if (args.variants) jobs = jobs.flatMap((j) => Array.from({ length: args.variants }, (_, i) => ({ ...j, cand: i + 1 })));
   if (args.list) {
     for (const j of jobs) console.log(`${j.out}  ${j.aspect}  ${j.mode}  ${fs.existsSync(path.join(RAW, j.out + '.png')) ? 'raw' : '-'}`);
     return;
@@ -307,7 +378,7 @@ async function main() {
     }
   };
   await Promise.all(Array.from({ length: Math.min(args.jobs, jobs.length) }, worker));
-  if (!args.variants && args.dest === DEST) writeManifest();
+  if (!args.variants && !args.edit && args.dest === DEST) writeManifest();
   log(`done: ${jobs.length - failed.length} ok, ${failed.length} failed${failed.length ? ` (${failed.join(', ')})` : ''}`);
   if (failed.length) process.exitCode = 1;
 }

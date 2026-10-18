@@ -23,6 +23,10 @@ export function profileY(g: GroundDef, edgeY: number, roadY: number, u: number):
   return stepY + span * smoothstep(0, run, d);
 }
 
+/** Large-scale tint noise for groundColor's n2 (≈ 110 m features). */
+export const tintNoise = (noise: { get(x: number, y: number): number }, wx: number, wz: number): number =>
+  noise.get(wx / 110 + 31.7, wz / 110 - 12.3);
+
 /** True when this side's terrain ends up below sea level (beach, cliff to sea, quay, bridge). */
 export const isShore = (g: GroundDef): boolean => (g.abs ? g.target : 1) < 0;
 
@@ -33,8 +37,10 @@ export const GROUND = {
   grass: new Color('#7cc04f'),
   grassDark: new Color('#5ea641'),
   grassDry: new Color('#b2c85e'),
-  rock: new Color('#b49474'),
-  rockDark: new Color('#8b6e56'),
+  grassOchre: new Color('#c8bd6a'),   // sun-bleached slopes (large-scale tint)
+  grassLush: new Color('#55a84a'),
+  rock: new Color('#e6d7b9'),      // pale calanque limestone
+  rockDark: new Color('#c8b08a'),  // ochre bands
   dirt: new Color('#b98d5a'),
   stone: new Color('#cfc2aa'),
   snowless: new Color('#9aa88a'),
@@ -47,9 +53,10 @@ const tmp = new Color();
 
 /**
  * Ground colour from material, absolute height, steepness (normal.y), distance from the edge, a
- * noise value in [-1, 1] (patchiness) and whether the side runs down to the sea. Writes into `out`.
+ * noise value in [-1, 1] (patchiness), whether the side runs down to the sea and an optional
+ * low-frequency noise n2 in [-1, 1] (large lush / sun-bleached areas on grass). Writes into `out`.
  */
-export function groundColor(mat: GroundDef['mat'], h: number, ny: number, u: number, n: number, shore: boolean, out: Color): Color {
+export function groundColor(mat: GroundDef['mat'], h: number, ny: number, u: number, n: number, shore: boolean, out: Color, n2 = 0): Color {
   const steep = ny < 0.72;
   // City ground (env-city): paving on the flat, concrete on quay / retaining walls, seabed under water.
   if (mat === 'paved') {
@@ -70,6 +77,8 @@ export function groundColor(mat: GroundDef['mat'], h: number, ny: number, u: num
   out.copy(GROUND.grass);
   if (n > 0.25) out.lerp(GROUND.grassDark, 0.7);
   else if (n < -0.35) out.lerp(GROUND.grassDry, 0.6);
+  if (n2 > 0.02) out.lerp(GROUND.grassOchre, smoothstep(0.02, 0.5, n2) * 0.65);
+  else if (n2 < -0.08) out.lerp(GROUND.grassLush, smoothstep(0.08, 0.5, -n2) * 0.55);
   // High ground turns drier and greyer.
   if (h > 70) out.lerp(tmp.copy(GROUND.snowless), smoothstep(70, 140, h) * 0.6);
   return out;

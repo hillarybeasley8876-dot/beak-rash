@@ -28,6 +28,9 @@ export interface SimRider {
   // lateral / visuals
   wobblePhase: number;
   pitch: number;                     // visual pitch (rad, + nose up)
+  landPitch: number;                 // landing compression offset of the pitch target (rad, decays)
+  scrape: number;                    // wall scrape pressure this step, signed by the wall's side (−1 … 1)
+  scrapePose: number;                // smoothed scrape pressure for the visual pose (nose and lean into the wall)
   vxTarget: number;                  // lateral velocity the grip is pulling toward this step (after carry clamps)
   vxWant: number;                    // the rider's own intent (no carry clamp): wall pressure, latch release
   carryTime: number;                 // s left of a carry window (knock / bump / wall bounce): weak steer, slow grip
@@ -66,6 +69,7 @@ export interface SimRider {
   hopPressAt: number;                // air time of the last hop press while airborne (−1 none)
   // crash
   crashBack: number;                 // m/s the crashed body slides back along the road (bounced off a vehicle)
+  pushOff: number;                   // s left of the respawn push-off (eases from 0 up to respawnSpeed)
   prevS: number;
   accel: number;                     // last forward acceleration (m/s²), camera surge
 }
@@ -75,14 +79,14 @@ export function createSimRider(r: RiderState): SimRider {
     r, tune: bikeTune(r.bike, r.character), frame: emptyFrame(),
     driftDir: 0, driftLevel: 0, driftLock: 0, driftExit: 0, driftExitVx: 0, slip: 0,
     airKind: 'hop', airPeak: 0, airOwn: false,
-    wobblePhase: r.id * 1.7, pitch: 0, vxTarget: 0, vxWant: 0,
+    wobblePhase: r.id * 1.7, pitch: 0, landPitch: 0, scrape: 0, scrapePose: 0, vxTarget: 0, vxWant: 0,
     carryTime: 0, carrySteer: 1, carryTau: 0, carryDir: 0, yawEase: 0, slidePhase: 0,
     oilTime: 0, wetTime: 0, wobbleTime: 0, wobbleStrength: 0, lastSurface: 'road', offroadCooldown: 0, onRamp: false, rampSlope: 0,
     inPad: false, inOil: false, inPuddle: false,
     draftLeader: -1,
     nearMiss: new Map(), nearMissCooldown: 0, touching: new Set(), wallCooldown: 0, wallHitCooldown: 0,
     wallSide: 0, wallFree: 0, swipeCooldown: 0, swipeLatch: -1, swipeFree: 0, airCalm: 0, hopPressAt: -1,
-    crashBack: 0, prevS: r.s, accel: 0,
+    crashBack: 0, pushOff: 0, prevS: r.s, accel: 0,
   };
 }
 

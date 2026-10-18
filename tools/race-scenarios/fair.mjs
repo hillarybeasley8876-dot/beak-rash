@@ -101,11 +101,17 @@ export const fairScenarios = {
       window.__br.ko(r.id, 0); return r.id; })()`);
     const t0 = await h.eval('window.__br.session().time');
     const gaps = [];
+    // The passive player's own KO would hand the field the gap back: keep its HP topped up while measuring.
+    const topUp = 'window.__br.session().player.hp = window.__br.session().player.maxHp';
     for (const dt of [15, 30, 45]) {
-      await rideUntil(h, t0 + dt);
+      while ((await h.eval('window.__br.session().time')) < t0 + dt) {
+        await h.eval(topUp);
+        await h.eval(`window.__runHuman(15, ${DT}, 1000, 'passive')`);
+      }
       gaps.push(await h.eval(`+(window.__br.session().rider(${id}).s - window.__br.session().player.s).toFixed(1)`));
     }
-    check("KO'd rival still ≥ 25 m behind 30 s after the KO", gaps[1] <= -25, { id, gaps });
+    const playerDown = (await events(h, 'rider:crash')).filter((e) => e.p.riderId === 0 && e.time > t0).length;
+    check("KO'd rival still ≥ 25 m behind 30 s after the KO", gaps[1] <= -25, { id, gaps, playerDown });
   },
 
   /** Passive player, level 1, seeds 1–6: ≤ 2 hits in the first 6 s and no KO in the first 30 s. */

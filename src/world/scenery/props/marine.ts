@@ -88,3 +88,9 @@ export function buoy(buf: MeshBuf, x: number, z: number, rng: Rng): void {
   cone(buf, trs(x, 0.65, z, 0, 0.3, 0.7, 0.3, m), red ? STRIPE : C('#ffcf1f'), 8);
   buf.stamp(0, 0);
 }
+
+/** Timber mooring pile standing in the harbour, from below the seabed up to yTop (quay furniture
+ *  stands on these, clear of the quay's drop line). */
+export function pile(buf: MeshBuf, x: number, yTop: number, z: number): void {
+  cylinder(buf, trs(x, -4, z, 0, 0.21, yTop + 4, 0.21, m), MAST, 8, 1, 1, true, DECK);
+}

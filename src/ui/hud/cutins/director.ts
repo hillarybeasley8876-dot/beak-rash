@@ -5,6 +5,8 @@ import { PRIORITY, type CutIn, type SplashKind } from './types';
 
 const OUT = 0.1;
 const QUEUE_TTL = 1.2;
+/** s a hurried splash still plays (its exit motion). */
+const HURRY = 0.15;
 /** Splashes from WRECKED up own the screen: the player's skill band leaves and stays out meanwhile. */
 const BAND_BLOCK = PRIORITY.wrecked;
 
@@ -27,6 +29,11 @@ export class Director {
     return this.splash?.kind ?? null;
   }
 
+  /** The player's skill band is on stage. */
+  get bandUp(): boolean {
+    return this.band !== null;
+  }
+
   /** Show a splash now if it outranks the current one, else queue it briefly (deduped by key).
    *  The same key arriving twice (e.g. rider:crash + cine:ko for one wreck) never restarts it. */
   splashIn(kind: SplashKind, make: () => CutIn, key: string = kind): void {
@@ -47,6 +54,14 @@ export class Director {
     if (this.splash && PRIORITY[this.splash.kind] >= BAND_BLOCK) return;
     this.retire(this.band);
     this.band = this.mount('skill', make(), 'band');
+  }
+
+  /** The moment this splash belongs to is over (e.g. the KO cinematic ended): if one of `kinds` is up,
+   *  skip to its exit so it leaves within ~0.15 s instead of playing over the restored HUD. */
+  hurry(kinds: readonly SplashKind[]): void {
+    const cur = this.splash;
+    if (cur && kinds.includes(cur.kind)) cur.t = Math.max(cur.t, cur.cut.dur - HURRY);
+    this.queue = this.queue.filter((q) => !kinds.includes(q.kind));
   }
 
   /** Drop everything immediately (detach, race restart). */
