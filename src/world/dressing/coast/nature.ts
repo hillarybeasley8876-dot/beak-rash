@@ -91,7 +91,8 @@ export function farForest(d: Dress, s0: number, s1: number): void {
       const n = rng.int(2, 5);
       for (let i = 0; i < n; i++) {
         const x = sp.pos.x + rng.range(-9, 9), z = sp.pos.z + rng.range(-9, 9);
-        if (!place.claim(x, z, 2.6)) continue;
+        // free() also keeps groves off other road parts (hairpins, the calanque's far leg).
+        if (!place.free(x, z, 2.6)) continue;
         const y = d.ctx.groundWorld(x, z);
         if (y < 3) continue;
         const buf = b.far.at(x, z);

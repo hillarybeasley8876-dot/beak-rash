@@ -16,14 +16,14 @@ const m = new Matrix4();
 const ahead = (p: Vector3, yaw: number, d: number): Vector3 => new Vector3(p.x - Math.sin(yaw) * d, p.y, p.z - Math.cos(yaw) * d);
 
 /** Sign quad with HDR intensity and optional flicker. */
-function sign(buf: AuxBuf, c: Vector3, yaw: number, w: number, h: number, rect: AtlasRect, glow: number, flicker = 0, phase = 0): void {
+export function sign(buf: AuxBuf, c: Vector3, yaw: number, w: number, h: number, rect: AtlasRect, glow: number, flicker = 0, phase = 0): void {
   buf.setAux(glow, phase, flicker);
   faceQuad(buf, c, yaw, w, h, rect);
   buf.setAux(0);
 }
 
 /** Thin board behind a face (outlined body geometry). */
-function board(c: City, p: Vector3, yaw: number, w: number, h: number, t: number): void {
+export function board(c: City, p: Vector3, yaw: number, w: number, h: number, t: number): void {
   const buf = c.cb.body.at(p.x, p.z);
   buf.setAux(0);
   box(buf, trs(p.x, p.y, p.z, yaw, w, h, t, m), CPAL.trim);

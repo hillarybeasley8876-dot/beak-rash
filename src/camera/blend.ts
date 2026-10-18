@@ -64,6 +64,12 @@ export class Blend {
     this.fresh = false;
   }
 
+  /** A deliberate hard cut decided outside the blend (e.g. a respawn glide that would lose the rider). */
+  cut(): void {
+    this.stop();
+    this.cuts++;
+  }
+
   /** Mixes `pose` (the live chase target) in place; `anchor` is the rider frame this frame. */
   apply(pose: CamPose, anchor: Anchor, dtReal: number): void {
     if (!this.active) return;

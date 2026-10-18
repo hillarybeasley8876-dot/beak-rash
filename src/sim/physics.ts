@@ -5,7 +5,7 @@ import { clamp } from '../core/math';
 import { emptyControls } from '../core/types';
 import type { PhysicsSystem, Session } from '../core/contracts';
 import type { RiderState } from '../core/types';
-import { createSimRider, emptyFrame, hasStatus, type SimCtx, type SimRider } from './state';
+import { createSimRider, emptyFrame, hasStatus, trackEnd, type SimCtx, type SimRider } from './state';
 import { longitudinal, tickBoost } from './forces';
 import { lateral, startCarry } from './steering';
 import { attitude } from './attitude';
@@ -47,7 +47,7 @@ export function createPhysics(session: Session): PhysicsSystem {
     if (hasStatus(r, 'gulped')) return; // combat carries the rider while it is in the pouch
     const c = session.controls.get(r.id) ?? idle;
     const tr = session.track;
-    tr.frameAt(Math.min(r.s, tr.length), sr.frame);
+    tr.frameAt(Math.min(r.s, trackEnd(tr)), sr.frame);
     groundEffects(ctx, sr);
     sr.prevS = r.s;
     const surf = surfaceMods(ctx, sr, dt);

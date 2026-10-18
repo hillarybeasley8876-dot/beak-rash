@@ -230,10 +230,19 @@ scenario('showtime-triple', (expect) => {
 
 scenario('gulp-torpedo-wing', (expect) => {
   const w = makeWorld();
-  w.emit('skill:hit', { riderId: 0, skillId: 'pelican.gulp', victim: ID.goose, pos: P });
+  // Real order (combat/skills/gulp.ts): cast → [bite: skill:hit at once | swallow: 'gulped' 0.8 s, status removed,
+  // then the spit's skill:hit] → skill:end. Nothing about the status is visible at skill:hit.
+  w.emit('skill:cast', { riderId: 0, skillId: 'pelican.gulp', slot: 2 });
+  w.emit('skill:hit', { riderId: 0, skillId: 'pelican.gulp', victim: ID.goose, pos: P });   // goose 0.92: bite
+  w.emit('skill:hit', { riderId: 0, skillId: 'pelican.gulp', victim: ID.capybara, pos: P }); // 1.05: bite
+  w.emit('skill:end', { riderId: 0, skillId: 'pelican.gulp' });
   expect(!w.has('gulp'), 'a bite is not a swallow');
-  w.riders[ID.pigeon].statuses.push({ id: 'gulped', time: 1, strength: 1, source: 0 });
-  w.emit('skill:hit', { riderId: 0, skillId: 'pelican.gulp', victim: ID.pigeon, pos: P });
+  w.emit('skill:hit', { riderId: ID.cat, skillId: 'cat.spin', victim: ID.pigeon, pos: P });
+  expect(!w.has('gulp'), 'a rival skill hit is not a gulp');
+  w.emit('skill:cast', { riderId: 0, skillId: 'pelican.gulp', slot: 2 });
+  w.emit('skill:hit', { riderId: 0, skillId: 'pelican.gulp', victim: ID.cat, pos: P });     // cat 0.85: spit
+  w.emit('skill:end', { riderId: 0, skillId: 'pelican.gulp' });
+  expect(w.has('gulp'), 'swallowing the cat (scale 0.85) and spitting it out is a gulp');
   for (let i = 0; i < 3; i++) w.emit('skill:hit', { riderId: 0, skillId: 'pelican.torpedo', victim: ID.cat, pos: P });
   w.emit('skill:hit', { riderId: 0, skillId: 'pelican.wing', victim: ID.cat, pos: P });   // wing not active
   w.emit('skill:cast', { riderId: 0, skillId: 'pelican.wing', slot: 3 });
@@ -274,9 +283,24 @@ scenario('riding', (expect) => {
   expect(!w.has('perfect3'), 'two perfect landings');
   w.emit('rider:land', { riderId: 0, airTime: 0.8, perfect: true });
   for (let i = 0; i < 5; i++) w.emit('rider:nearMiss', { riderId: 0, kind: 'traffic' });
-  w.emit('rider:boost', { riderId: 0, kind: 'draft', power: 0.15, time: 0.8 });
   w.emit('rider:crash', { riderId: 0, cause: 'water', speed: 12, pos: P, attacker: null });
-  for (const id of ['drift3', 'perfect3', 'near_miss', 'slingshot', 'water']) expect(w.has(id), `missing ${id}`);
+  for (const id of ['drift3', 'perfect3', 'near_miss', 'water']) expect(w.has(id), `missing ${id}`);
+  // 蹭饭达人: three slingshots that each turn into an overtake within 2 s (pulling out of the grid pack is not one).
+  const sling = (t, passAfter, from = 5, to = from - 1) => {
+    w.at(t).emit('rider:boost', { riderId: 0, kind: 'draft', power: 0.15, time: 0.8 });
+    if (passAfter !== null) w.at(t + passAfter).emit('race:placeChange', { riderId: 0, from, to });
+  };
+  sling(1, null);
+  sling(10, 3);                // passed someone, but 3 s later
+  sling(20, 1, 4, 5);          // lost a place
+  w.at(30).emit('race:placeChange', { riderId: 0, from: 5, to: 4 });   // an overtake with no slingshot
+  expect(!w.has('slingshot'), 'slingshots without a quick overtake do not count');
+  sling(40, 0.5);
+  w.at(40.8).emit('race:placeChange', { riderId: 0, from: 4, to: 3 });  // same slingshot, 2nd rider: one credit
+  sling(50, 1.5);
+  expect(!w.has('slingshot'), 'two slingshot passes');
+  sling(60, 2);
+  expect(w.has('slingshot'), 'three slingshot passes');
   const p = makeWorld();
   p.emit('rider:boost', { riderId: 0, kind: 'pad', power: 0.3, time: 1.1 });
   const l = makeWorld();
@@ -289,8 +313,11 @@ scenario('police', (expect) => {
   const a = makeWorld();
   a.emit('police:alert', { riderId: 0, level: 1 });
   a.emit('police:alert', { riderId: 0, level: 2 });
-  a.emit('police:alert', { riderId: 0, level: 0 });                                // gave up, no reason field
-  expect(a.has('corgi') && !a.has('busted'), 'outrun (legacy payload)');
+  a.emit('police:alert', { riderId: 0, level: 0 });          // race/police.ts giveUp(false): lets a calm rider go
+  expect(!a.has('corgi') && !a.has('busted'), 'being let go (no reason) is not outrunning');
+  a.emit('police:alert', { riderId: 0, level: 1, reason: 'spawn' });
+  a.emit('police:alert', { riderId: 0, level: 0 });
+  expect(!a.has('corgi'), 'a spawn-started chase let go without a reason is not outrunning');
   const b = makeWorld();
   b.emit('police:alert', { riderId: 0, level: 1, reason: 'spawn' });
   b.emit('police:busted', { riderId: 0, fine: 100 });

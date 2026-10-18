@@ -171,6 +171,19 @@ const air = {
     const strip = strips ? await stripEnd(page) : null;
     const rampEv = await events(page);
     const rampLand = rampEv.find((e) => e.type === 'rider:land');
+    // The same ramp steering full lock through the flight (not PERFECT), and again with Space pressed just
+    // before touchdown ("stick the landing": PERFECT while the bike is still within 12°).
+    const rampWith = async (segs) => {
+      await prep(page, { v: 20 });
+      await page.evaluate(() => window.__feel.addFeature({ kind: 'ramp', s0: 80, s1: 86, x0: -3, x1: 3, data: { height: 1.2 } }));
+      await run(page, segs);
+      return (await events(page)).find((e) => e.type === 'rider:land');
+    };
+    const steerLand = await rampWith([{ time: 1.25, controls: { throttle: 1 } }, { time: 1.2, controls: { throttle: 1, steer: 1 } }]);
+    const stickLand = await rampWith([
+      { time: 1.25, controls: { throttle: 1 } }, { time: 0.6, controls: { throttle: 1, steer: 1 } },
+      { time: 0.6, controls: { throttle: 1, steer: 1 }, edge: 'hop' },
+    ]);
     // Sharp natural crest (launches by itself) and a gentle one with a jumpCrest kick.
     await prep(page, { v: 20 });
     await page.evaluate(() => window.__feel.patch({ kappa: 0, crestAt: 100, crestSlope: 0.2, crestWidth: 2 }));
@@ -188,6 +201,8 @@ const air = {
         hopAir: r3(hopLand?.airTime), hopPeak: r3(maxOf(hop, 'y')), hopPerfect: hopLand?.perfect ?? null,
         rampAir: r3(rampLand?.airTime), rampPeak: r3(maxOf(ramp, 'y')), rampPerfect: rampLand?.perfect ?? null,
         rampBoost: rampEv.some((e) => e.type === 'rider:boost' && e.kind === 'land'),
+        rampSteerAir: r3(steerLand?.airTime), rampSteerPerfect: steerLand?.perfect ?? null,
+        rampStickAir: r3(stickLand?.airTime), rampStickPerfect: stickLand?.perfect ?? null,
         rampPitchMaxDeg: r3(maxOf(ramp, 'pitch') * DEG), rampPitchMinDeg: r3(minOf(ramp, 'pitch') * DEG),
         sharpCrestAir: r3(sharpLand?.airTime ?? 0), sharpCrestPeak: r3(maxOf(sharp, 'y')),
         kickCrestAir: r3(kickLand?.airTime ?? 0),

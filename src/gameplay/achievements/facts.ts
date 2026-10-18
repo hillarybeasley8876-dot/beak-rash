@@ -22,6 +22,8 @@ export interface RaceFacts {
   torpedoHits: number;
   perfectLandings: number;
   nearMisses: number;
+  slingshotAt: number;           // sim time of the player's last slingshot (draft) boost
+  slingshotPasses: number;       // slingshots the player turned into a place gained within the window
   wing: { active: boolean; hits: Set<RiderId> };
   ult: { at: number; victims: Set<RiderId>; kos: number };
   robbedBy: Map<RiderId, number>; // seagull id → sim time it robbed the player
@@ -33,6 +35,7 @@ export function newFacts(): RaceFacts {
   return {
     started: false, attacked: false, hurt: false, hp: Infinity, wasLast: false, placeAtStretch: null,
     wrecks: 0, kos: 0, koTimes: [], koSpecies: new Set(), torpedoHits: 0, perfectLandings: 0, nearMisses: 0,
+    slingshotAt: -Infinity, slingshotPasses: 0,
     wing: { active: false, hits: new Set() },
     ult: { at: -Infinity, victims: new Set(), kos: 0 },
     robbedBy: new Map(), passes: [], chase: { active: false, busted: false },

@@ -4,7 +4,7 @@
 - system.ts (createCombat: step order) · ctx.ts (context, per-rider private data, queries) · tuning.ts (numbers)
 - statuses.ts (status → mods) · feedback.ts (hit-stop/shake/rumble by player involvement) · damage.ts (one hit path)
 - melee.ts · armory.ts (loadouts/uses/steal/drop/break) · ko.ts · sp.ts · bell.ts · debug.ts (`__br.combat`)
-- pickups/{items,render,pickups}.ts · meshes/{build,library,pickup-props,weapon-props}.ts · projectiles/projectiles.ts
+- pickups/{items,render,pickups}.ts · meshes/{build,catalog,library,pickup-props,weapon-props}.ts · projectiles/projectiles.ts
 - skills/{types,common,runner,registry}.ts + one file per skill (13) · visuals/{visuals,frame,ribbon,trail,waves,auras,bolts}.ts
 - data/weapons.ts (+weight, block, ARMORY) · data/skills.ts (unchanged) · tools/combat-check.mjs + tools/combat-check/*.mjs
   · tools/combat-shots.mjs
@@ -57,23 +57,34 @@
 - Rivals accumulate SP with nothing to spend it on (only the pelican has an ult) — harmless; AI decides ult use.
 - Track rows off the asphalt are clamped ≥ 1 m inside it; coast rows are sparse (51 coins, 1 crate, 2 cans, 2 fish
   over 3.3 km) — track's data (cross-unit note below).
-- Ribbons are re-faced per sim substep, so during hit-stop (0 substeps) they don't follow a camera kick (needs the
-  per-frame hook below). others() still builds a small array per query (measured cost negligible).
+- Wing Dash still mirrors sim's rider-contact box to hand back the speed a ram takes (core request pushImmune).
+- A skill's very first cast still costs ~0.5–1 ms more combat CPU than a repeat (JIT of its code path; geometry
+  is prebuilt, shaders are warmed up).
 
 ## Core requests
 - (applied by core, now emitted) combat:weaponBreak, combat:bell, projectile:spawn / projectile:end.
-- Optional per-frame hook `CombatSystem.frame?(dtReal)` after views.update: sync visuals/pickups once per rendered
-  frame and re-face ribbons during hit-stop.
+- (applied by core, now used) `CombatSystem.frame?(dtReal)`: visuals + pickup instances sync once per rendered frame.
+- NEW (fix round 2, tech critic r2 #8): `RiderMods.pushImmune: boolean` (default false), honoured by sim's rider
+  contacts: a pushImmune rider loses no speed in a rear-end / side contact (the other rider still gets pushed and
+  the rider:bump still fires). Combat would set it while Wing Dash is out and delete the copy of sim's contact box,
+  solid-rider rule and pre-physics speed restore in skills/wing.ts (it already reads the bike's own brake from
+  BIKES instead of a hardcoded 12 m/s²). Alternative: a per-substep `rider:contact {a, b, speedLossA, speedLossB}`.
 - Optional stacked boost API in sim (combat now keeps skill boosts in mods.speedMul to avoid merging durations).
 
 ## Requests to other units
-- actors: hide 'gulped' riders completely (now they flicker 1/7 frames like 'invisible'; combat parks them grounded
-  0.4 m behind the pelican).
-- ui-hud: thin / corner player cut-ins while a projectile is in flight (the band hides the torpedo).
-- track: a crate or can row about every 400 m on coast; keep rows inside halfWidth − 1 m.
+- species (owns src/actors/** now): hide 'gulped' riders completely. actors/view.ts visibleFor() flickers them 1/7
+  frames like 'invisible' (combat maps gulped → mods.invisible and parks them grounded 0.4 m behind the pelican);
+  return false while `state.statuses` has a live 'gulped' entry. (Both critics, r1 + r2.)
+- ui-hud (their fix plan #13): thin / corner cut-in for player projectile skills while a projectile is in flight
+  (projectile:spawn / projectile:end are emitted), or delay the band until projectile:end; the FISH TORPEDO band
+  also shows a blank white portrait panel (use the pelican eyes portrait or the vector fallback).
+- fx: a bigger burst + stun stars on skill:hit for pelican.torpedo (the 14 dmg hit 16 m ahead reads small); pre-warm
+  the non-combat ShaderMaterial (USE_FOG + USE_SHADOWMAP) that links 3 frames after the first torpedo cast (0 links
+  with fx/ui/audio/actors stubbed; combat's own materials are warmed up).
+- track: (done, track.md) a crate or can row about every 400 m on coast; rows inside halfWidth − 1 m.
 
 ## How to test
-- `node tools/combat-check.mjs` (41 scenarios, isolated; last group finishes + restarts races) · `--full` (all real
+- `node tools/combat-check.mjs` (54 scenarios + error gate, isolated; finish group restarts races) · `--full` (all real
   units) · `--stub fx,audio,ui,actors,camera` if another unit is broken · `--only torpedo`
 - `node tools/combat-shots.mjs --stub audio [--only gallery]` → shots/combat/fx-*.png (props gallery, every skill)
 - In game: `/?race=coast&seed=3&traffic=0` — J/L/K swing, U/I/O skills, P ult (needs 100 SP), B bell.
@@ -121,7 +132,12 @@ Plan (critic issues r2 → fix; [x] = done + verified in the browser). Resume: s
 - [x] 11 finish '3-race loop…' now compares combat-owned state during each race (objects, unique geometries/materials under the combat root + counts()) and global GPU memory / programs / bus listeners only after each race. Passes isolated and --full
 - [x] 12 projectile ids live in ProjectileSystem, item ids in PickupSystem (makeItem/layRow take the id), so a same-seed restart repeats every event payload
 - [x] 13 SHIELD_BLOCK_ONCE + the unreachable block-once branch removed (shield ≥ 1 blocks); stray blank lines in bolts.ts / waves.ts; ctx.ts comment says system.ts; checkKos emits combat:ko before physics.crash (SPEC §7 order; fx/hud/audio/achievements/race handlers only read ids, positions and the tracker)
-- [ ] 14 per-substep render work → core landed `CombatSystem.frame?(dtReal)` (core.md 11:40): visuals.update + pickup instances once per rendered frame in frame() (update(0) re-faces ribbons in hit-stop), PropLibrary prebuilt at session start, others() scratch; delete the unused visuals/frame-gate.ts
-- [ ] 15 wing.ts sim-contact copy → core request (pushImmune) filed; copy stays until core lands it
-- [ ] 16 cross-unit notes (ui-hud cut-in, fx torpedo burst, actors gulped flicker)
+- [x] 14 per-substep render work → system.ts implements core's `CombatSystem.frame(dtReal)`: visuals.update(sim dt summed over the frame's substeps) and PickupSystem.sync() (instance matrices) run once per rendered frame after the rider views, on final poses; a hit-stop frame runs update(0), so ribbons re-face the camera. meshes/catalog.ts lists every prop geometry (PropKey) and PropLibrary.prebuild() builds them all at session start (lib.get(key) no longer takes a maker). ctx.nearest() (no allocation) for single-target queries (torpedo, gulp, heavy auto-side); others() insertion-sorts without scratch objects. Trail samples at ≥ 0.75/60 s so 60 fps frame jitter never skips one. Deleted the unused visuals/frame-gate.ts. Check fixes4 'render sync…' (2 wing ribbons + coin instances: +1 version per frame, +1 in a hit-stop frame with 0 substeps). First casts (shots/combat/r2fix/firstcast.json, all real units, combat incl. frame): torpedo 2.4 → 1.6 ms, ult 1.9 → 1.5, spin 1.4 → 0.9, wing 1.3 → 0.9 (repeat 0.2–0.7). combat-check 55/55 isolated and --full; combat-shots r2fix/sheet-a/b.png all visuals render
+- [~] 15 wing.ts sim-contact copy → core request `RiderMods.pushImmune` now actually filed under Core requests (it was missing); rider:bump can't replace the copy (fires only above 1 m/s and once per 0.25 s per pair). Meanwhile the restore allows the rider's own bike brake (BIKES[r.bike].brake, was a hardcoded 12 m/s², wrong on every bike but the road bike) and the header says the copy goes once core lands the flag. fixes 'wing dash…' still passes
+- [x] 16 cross-unit notes → "Requests to other units" rewritten: species (gulped riders fully hidden; actors/view.ts is theirs now), ui-hud (thin band while a projectile flies: already their plan #13; blank portrait panel), fx (torpedo hit burst + stun stars; pre-warm the fog/shadow ShaderMaterial that links after the first torpedo); track rows marked done. No combat-side workaround (would mean overriding another unit's view.root.visible)
 - [x] 17 core round-2 request → armory.equip / consumeUse / takeWeapon read and write `rider.weaponUses` (Infinity for 'none'); the private RiderCombat.uses is gone (one source of truth for the HUD). Debug spawn of a road weapon now carries the weapon's full uses (was 0: broke on the first hit). Check fixes4 'rider.weaponUses follows the weapon…' (stolen worn baguette keeps 2, a hit → 1, break → Infinity + one weaponBreak, dropped pan with 2 → picked up with 2)
+- Verified (resumed fixer, 10-18 15:15): tsc clean; combat-check 55/55 isolated and 55/55 --full
+  (shots/combat/r2fix/check-iso.txt, check-full.txt); combat-shots → shots/combat/r2fix/frame/ (sheet-a/b.png).
+  Real-time perf copy (shots/combat/r2fix/perf.json) ran at load average 21 (other agents' browsers): 0 errors,
+  47 combat draw calls / 40k tris at the skill-heavy A/B, the 9-first-casts frame 8.3 ms combat (critic: 10.8);
+  fps/hitch numbers are machine-load noise there, not comparable with the critic's run.

@@ -7,7 +7,7 @@ import path from 'node:path';
 import { parseArgs, withPage } from '../tools/lib.mjs';
 
 const a = parseArgs(process.argv.slice(2));
-const list = String(a.s ?? '60,420,640,900,1110,1300,1500,1640,1815,1990,2200,2450,2700,2850,3080,3290').split(',').map(Number);
+const list = String(a.s ?? '60,420,640,900,1030,1370,1500,1640,1815,1990,2200,2450,2700,2850,3080,3290').split(',').map(Number);
 const out = a.out ?? 'shots/track/game-sheet.png';
 await withPage(async (page, h) => {
   await h.goto(`/?race=coast&seed=${a.seed ?? 1}&traffic=0&police=0${a.q ?? ''}`);

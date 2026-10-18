@@ -190,3 +190,8 @@ export class Field {
     return { min, max };
   }
 }
+
+/** Point factory relative to an origin (e.g. the head centre), so a whole feature group moves together. */
+export function offset(o: V3): (x: number, y: number, z: number) => V3 {
+  return (x, y, z) => [o[0] + x, o[1] + y, o[2] + z];
+}

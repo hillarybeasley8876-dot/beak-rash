@@ -51,6 +51,11 @@ export class Lots {
     }
   }
 
+  /** True when a lot covers the world point. */
+  has(x: number, z: number): boolean {
+    return this.taken.has(this.key(x, z));
+  }
+
   /** Claim a disc (landmarks placed before the buildings). */
   claimDisc(x: number, z: number, r: number): void {
     for (let dx = -r; dx <= r; dx += CELL) {

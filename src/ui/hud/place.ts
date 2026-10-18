@@ -27,10 +27,13 @@ export class PlaceBlock {
   private arrow: W;
   private flashW: W;
   private time: W;
-  private pen: W;
+  private tk: W;
+  private tkN: W;
   private place = 0;
   private flashT = 9;
   private up = true;
+  private tkShown = 0;
+  private tkT = 9;
 
   constructor(parent: HTMLElement) {
     this.root = el('div', 'plw', parent);
@@ -47,7 +50,11 @@ export class PlaceBlock {
     const tm = el('div', 'tm', this.root);
     el('span', 'tm-lbl', tm, 'TIME');
     this.time = w(el('span', 'tm-val', tm, '0:00.00'));
-    this.pen = w(el('span', 'tm-pen', tm, '+4S'));
+    // BUSTED ticket stop: 罚停 4·3·2·1 while race holds the player (the stop is the whole penalty).
+    const tk = el('span', 'tm-tk', tm);
+    el('i', '', tk, '罚停');
+    this.tkN = w(el('b', '', tk, '4'));
+    this.tk = w(tk);
   }
 
   /** Place changed during the race: slam the number and flash an arrow. */
@@ -60,7 +67,8 @@ export class PlaceBlock {
     this.arrow.cls('down', !up);
   }
 
-  update(place: number, total: number, time: number, penalty: number, dt: number): void {
+  /** `ticket` = seconds of BUSTED hold left (0 = none). */
+  update(place: number, total: number, time: number, ticket: number, dt: number): void {
     if (place !== this.place) {
       this.place = place;
       this.num.text(String(place));
@@ -69,8 +77,7 @@ export class PlaceBlock {
     }
     this.of.text(`/${total}`);
     this.time.text(fmtTime(time));
-    this.pen.show(penalty > 0);
-    if (penalty > 0) this.pen.text(`+${Math.round(penalty)}S`);
+    this.updateTicket(ticket, dt);
     this.flashT += dt;
     const t = this.flashT;
     this.num.tf(t < 0.3 ? `scale(${slam(t, 0.2, 1.55).toFixed(3)})` : 'none');
@@ -78,6 +85,18 @@ export class PlaceBlock {
     const a = envelope(t, 0, 0.08, 0.9, 1.2);
     this.arrow.op(a);
     this.arrow.tf(a > 0 ? `translateY(${((1 - a) * (this.up ? 18 : -18)).toFixed(1)}px)` : 'none');
+  }
+
+  private updateTicket(ticket: number, dt: number): void {
+    const n = ticket > 0 ? Math.ceil(ticket) : 0;
+    if (n !== this.tkShown) {
+      this.tkShown = n;
+      this.tkT = 0;
+      if (n > 0) this.tkN.text(String(n));
+    }
+    this.tkT += dt;
+    this.tk.show(n > 0);
+    this.tk.tf(n > 0 && this.tkT < 0.3 ? `scale(${slam(this.tkT, 0.2, 1.5).toFixed(3)})` : 'none');
   }
 }
 

@@ -26,6 +26,8 @@
 .nt-chip.stun { background: var(--sp); color: var(--ink); }
 .nt-chip.shield { background: #2FA8FF; }
 .nt-chip.weapon { background: var(--paper); color: var(--ink); }
+.nt-chip.cast { background: var(--sp); color: var(--ink); font-size: 24px; box-shadow: 0 0 0 3px var(--ink); }
+.nt.is-cast .nt-plate { box-shadow: 3px 3px 0 var(--sp), 0 0 0 3px var(--hot); }
 .nt-tip { width: 14px; height: 9px; margin-top: 2px; background: var(--paper); clip-path: polygon(0 0, 100% 0, 50% 100%); }
 
 /* Taunt bubble: jagged white speech shape with a tail pointing at the speaker. */

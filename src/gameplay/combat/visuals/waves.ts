@@ -1,9 +1,6 @@
 // Expanding ring visuals: cone sound waves (honk / whistle), puff rings (ghost, spit) and the SHOWTIME
 // shockwave. Rings face along the track (cone waves) or lie flat on the road (puffs, shockwave).
-import {
-  CylinderGeometry, DoubleSide, Mesh, MeshBasicMaterial, Quaternion, TorusGeometry, Vector3,
-  type BufferGeometry, type ColorRepresentation,
-} from 'three';
+import { DoubleSide, Mesh, MeshBasicMaterial, Quaternion, Vector3, type BufferGeometry, type ColorRepresentation } from 'three';
 import type { RiderState } from '../../../core/types';
 import { frameQuat } from './frame';
 import type { Visual, VisualSystem } from './visuals';
@@ -11,9 +8,8 @@ import type { Visual, VisualSystem } from './visuals';
 const FLAT = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), Math.PI / 2);
 
 /** Unit ring / open cylinder shared through the session prop library. */
-const ringGeo = (vs: VisualSystem): BufferGeometry => vs.ctx.lib.get('wave:ring', () => new TorusGeometry(1, 0.07, 6, 48));
-const wallGeo = (vs: VisualSystem): BufferGeometry =>
-  vs.ctx.lib.get('wave:wall', () => new CylinderGeometry(1, 1, 1, 48, 1, true).translate(0, 0.5, 0));
+const ringGeo = (vs: VisualSystem): BufferGeometry => vs.ctx.lib.get('wave:ring');
+const wallGeo = (vs: VisualSystem): BufferGeometry => vs.ctx.lib.get('wave:wall');
 
 export interface ConeWaveOpts { color: ColorRepresentation; count: number; interval: number; speed: number; range: number; halfAngle: number; height: number }
 

@@ -1,6 +1,6 @@
 // Per-frame, session-driven audio: the player's bike loops, the police siren, rival / traffic
 // pass-bys (whoosh when something crosses the player's position close by), tunnel reverb and the
-// adaptive music intensity (top-3 → 1, final stretch → 2).
+// adaptive music intensity (top-3 → 1 after a 2 s hold, final stretch → 2, frozen once finished).
 import { Vector3 } from 'three';
 import { BikeLoops } from './sfx/loops';
 import { Siren } from './sfx/siren';
@@ -11,6 +11,8 @@ import type { Engine } from './engine';
 import type { Host } from './host';
 
 const VEHICLES = new Set(['car', 'van', 'truck', 'bus', 'police']);
+/** s a new place must hold before the top-3 music layers follow it. */
+const TOP3_HOLD = 2;
 
 export class SessionWatcher {
   private session: Session | null = null;
@@ -21,6 +23,8 @@ export class SessionWatcher {
   private tunnels: TrackFeature[] = [];
   private prev = new Map<string, number>();
   private intensity = -1;
+  private want = -1;
+  private wantSince = 0;
   private space = -1;
   private v = new Vector3();
 
@@ -53,8 +57,20 @@ export class SessionWatcher {
       this.space = inTunnel;
       this.engine.setSfxSpace(inTunnel);
     }
-    const target = session.phase !== 'racing' ? 0 : p.progress >= 0.85 ? 2 : p.place <= 3 ? 1 : 0;
-    if (target !== this.intensity) {
+    // Once the player has finished, the music holds where it is until the results crossfade.
+    if (session.phase !== 'finished' && p.mode !== 'finished') {
+      this.steer(session.phase !== 'racing' ? 0 : p.progress >= 0.85 ? 2 : p.place <= 3 ? 1 : 0, now);
+    }
+  }
+
+  /** The final stretch applies at once; a top-3 change needs the new place held for 2 s (pack battles). */
+  private steer(target: number, now: number): void {
+    if (target !== this.want) {
+      this.want = target;
+      this.wantSince = now;
+    }
+    const settled = target === 2 || this.intensity === 2 || this.intensity < 0 || now - this.wantSince >= TOP3_HOLD;
+    if (target !== this.intensity && settled) {
       this.intensity = target;
       this.setIntensity(target);
     }
@@ -74,6 +90,7 @@ export class SessionWatcher {
     this.siren = null;
     this.prev.clear();
     this.intensity = -1;
+    this.want = -1;
     this.alertUntil = 0;
     this.session = session;
     // A race that ends mid-cinematic must not leave the mix muffled or the bass dropped.

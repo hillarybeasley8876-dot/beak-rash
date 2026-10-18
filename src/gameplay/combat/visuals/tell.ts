@@ -1,23 +1,11 @@
 // Heavy-swing tell: a yellow-white glint flashes over a rival's raised weapon for the (telegraphed) windup,
 // so a heavy coming at the player reads at a glance and can be answered with a counter hit.
-import { Mesh, Quaternion, Shape, ShapeGeometry, Vector3, type MeshBasicMaterial } from 'three';
+import { Mesh, Quaternion, Vector3, type MeshBasicMaterial } from 'three';
 import type { RiderState, Side } from '../../../core/types';
 import type { Visual, VisualSystem } from './visuals';
 
 const SPIN_AXIS = new Vector3(0, 0, 1);
 const SPIN = new Quaternion();
-
-/** Unit four-point star in the XY plane (shared through the session prop library). */
-function starGeometry(): ShapeGeometry {
-  const s = new Shape();
-  for (let i = 0; i < 8; i++) {
-    const a = (i * Math.PI) / 4 + Math.PI / 2, rad = i % 2 === 0 ? 1 : 0.22;
-    if (i === 0) s.moveTo(Math.cos(a) * rad, Math.sin(a) * rad);
-    else s.lineTo(Math.cos(a) * rad, Math.sin(a) * rad);
-  }
-  s.closePath();
-  return new ShapeGeometry(s);
-}
 
 export class HeavyTell implements Visual {
   private t = 0;
@@ -26,7 +14,7 @@ export class HeavyTell implements Visual {
   private at = new Vector3();
 
   constructor(private vs: VisualSystem, private r: RiderState, private side: Side, private dur: number) {
-    const geo = vs.ctx.lib.get('tell:star', starGeometry);
+    const geo = vs.ctx.lib.get('tell:star');
     this.outer = new Mesh(geo, vs.materials.glow('#ffe600', 1, { additive: true }));
     this.core = new Mesh(geo, vs.materials.glow('#ffffff', 1, { additive: true }));
     for (const m of [this.outer, this.core]) {

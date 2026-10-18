@@ -12,7 +12,8 @@ import { PAVE_L, PAVE_W, pavingTexture, poolTexture, scrambleTexture, zebraTextu
 export function sidewalks(ctx: WorldCtx): void {
   const { L, q, app } = ctx;
   const mat = ctx.own(new MeshToonMaterial({
-    map: ctx.own(pavingTexture(app.renderer)), gradientMap: toonRamp(), polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1,
+    // Brighter than the asphalt (lamp-lit paving) so the road edge reads at night.
+    map: ctx.own(pavingTexture(app.renderer)), color: new Color(1.55, 1.5, 1.6), gradientMap: toonRamp(), polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1,
   }));
   const rows = Math.floor((L.n - 1) / 2) + 1;
   const fr: TrackFrame = q.frameVis(L.sMin);

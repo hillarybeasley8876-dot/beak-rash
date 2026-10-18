@@ -5,6 +5,8 @@ import {
 } from 'three';
 import { decimate } from './decimate';
 import { meshField } from './mesher';
+import { crispBorders } from './crisp';
+import { Painter } from './paint';
 import { Field, type Prim } from './sdf';
 
 /** Up to four (bone, weight) influences. */
@@ -29,6 +31,8 @@ interface Chunk {
   skinW: Float32Array;
   outl: Float32Array;
   idx: Uint32Array;
+  /** Paint colour per vertex (0xRRGGBB) while an SDF piece is being processed. */
+  hex?: Float32Array;
 }
 
 const tmpColor = new Color();
@@ -66,47 +70,27 @@ export class CharacterBuilder {
     const chunk = this.alloc(n, raw.indices);
     chunk.pos.set(raw.positions);
     chunk.nrm.set(raw.normals);
-    const adds = field.prims.filter((p) => p.op === 'add');
-    const paints = field.prims.filter((p) => p.op === 'paint');
-    const byBone = new Map<number, number>();
+    const painter = new Painter(field);
+    const hex = new Float32Array(n);
     for (let v = 0; v < n; v++) {
       const x = raw.positions[v * 3] ?? 0, y = raw.positions[v * 3 + 1] ?? 0, z = raw.positions[v * 3 + 2] ?? 0;
-      const ds = adds.map((p) => (x < p.min[0] || y < p.min[1] || z < p.min[2] || x > p.max[0] || y > p.max[1] || z > p.max[2]) ? Infinity : p.dist(x, y, z));
-      let dmin = Infinity, owner = adds[0], best = Infinity;
-      ds.forEach((d, i) => {
-        const p = adds[i];
-        if (!p) return;
-        dmin = Math.min(dmin, d);
-        const score = d - (p.src.priority ?? 0);
-        if (score < best) { best = score; owner = p; }
-      });
-      byBone.clear();
-      ds.forEach((d, i) => {
-        const p = adds[i];
-        if (!p || !Number.isFinite(d)) return;
-        const w = Math.exp(-(d - dmin) / (p.src.sigma ?? 0.025));
-        if (w > 0.004) byBone.set(p.src.bone, (byBone.get(p.src.bone) ?? 0) + w);
-      });
-      writeInfluences([...byBone.entries()], chunk.skinI, chunk.skinW, v * 4);
-      let color = owner?.src.color ?? 0xff00ff;
-      let outl = owner?.src.outline ?? 1;
-      for (const p of paints) {
-        if (x < p.min[0] || y < p.min[1] || z < p.min[2] || x > p.max[0] || y > p.max[1] || z > p.max[2]) continue;
-        if (p.dist(x, y, z) < 0) { color = p.src.color; outl = p.src.outline ?? outl; }
-      }
-      linear(color, chunk.col, v * 3);
-      chunk.outl[v] = outl;
+      writeInfluences(painter.weightsAt(x, y, z), chunk.skinI, chunk.skinW, v * 4);
+      const paint = painter.colorAt(x, y, z);
+      hex[v] = paint.color;
+      chunk.outl[v] = paint.outline;
     }
+    chunk.hex = hex;
     if (budget !== undefined && chunk.idx.length / 3 > budget) this.reduce(chunk, budget * this.detail * this.detail);
+    this.crisp(chunk, painter);
   }
 
   /** Decimate a chunk in place and drop the vertices it no longer uses. */
   private reduce(c: Chunk, budget: number): void {
-    const col = c.col, sw = c.skinW, si = c.skinI;
+    const hex = c.hex, sw = c.skinW, si = c.skinI;
+    // Keep some vertex density along colour borders (crisp() then splits them exactly) and bone seams.
     const penalty = (u: number, v: number): number => {
-      const dr = (col[u * 3] ?? 0) - (col[v * 3] ?? 0), dg = (col[u * 3 + 1] ?? 0) - (col[v * 3 + 1] ?? 0), db = (col[u * 3 + 2] ?? 0) - (col[v * 3 + 2] ?? 0);
       const bone = si[u * 4] !== si[v * 4] || Math.abs((sw[u * 4] ?? 0) - (sw[v * 4] ?? 0)) > 0.25 ? 2e-6 : 0;
-      return (dr * dr + dg * dg + db * db) * 1e-4 + bone;
+      return (hex && hex[u] !== hex[v] ? 5e-5 : 0) + bone;
     };
     const idx = decimate(c.pos, c.idx, Math.round(budget), penalty);
     const remap = new Int32Array(c.pos.length / 3).fill(-1);
@@ -122,10 +106,23 @@ export class CharacterBuilder {
     c.pos = pick(c.pos, 3, new Float32Array(n * 3));
     c.nrm = pick(c.nrm, 3, new Float32Array(n * 3));
     c.col = pick(c.col, 3, new Float32Array(n * 3));
+    if (c.hex) c.hex = pick(c.hex, 1, new Float32Array(n));
     c.skinI = pick(c.skinI, 4, new Uint16Array(n * 4));
     c.skinW = pick(c.skinW, 4, new Float32Array(n * 4));
     c.outl = pick(c.outl, 1, new Float32Array(n));
     c.idx = idx.map((i) => remap[i] ?? 0);
+  }
+
+  /** Split colour borders exactly (no smeared paint), then bake the hex colours to linear vertex colours. */
+  private crisp(c: Chunk, painter: Painter): void {
+    const hex = c.hex;
+    if (!hex) return;
+    const m = crispBorders({ pos: c.pos, nrm: c.nrm, hex, outl: c.outl, skinI: c.skinI, skinW: c.skinW, idx: c.idx }, painter);
+    const n = m.pos.length / 3;
+    c.pos = m.pos; c.nrm = m.nrm; c.outl = m.outl; c.skinI = m.skinI; c.skinW = m.skinW; c.idx = m.idx;
+    c.col = new Float32Array(n * 3);
+    for (let v = 0; v < n; v++) linear(m.hex[v] ?? 0xff00ff, c.col, v * 3);
+    delete c.hex;
   }
 
   /** Add an arbitrary geometry (eyes, beak plates, gear, extrusions) rigidly or with a weight function. */

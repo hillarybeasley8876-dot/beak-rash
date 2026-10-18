@@ -1,5 +1,5 @@
-// Coast dressing (鹈鹕湾): turns layout marks + zones into scenery. Order matters: big landmarks
-// claim their footprint first, then towns, signage, nature, the sea and the sky life.
+// Coast dressing (鹈鹕湾): turns layout marks + zones into scenery. Order matters: landmarks and
+// mark-placed road signs claim their footprint first, then towns, signage, nature, the sea and the sky life.
 import { BILLBOARD_LINES, ROAD_SIGNS } from '../../../data/memes';
 import type { WorldCtx } from '../../ctx';
 import { ensureFonts } from '../../fonts';
@@ -9,7 +9,7 @@ import { finishDress, makeDress, type Dress } from '../dress';
 import { atSea, flags, gantryAt, gulls, lighthouseAt, pierAt, stands } from './event';
 import { farForest, hillsides, islands, palms, rocks } from './nature';
 import { hillVillages } from './hamlets';
-import { banners, billboards, chevrons, distanceMarkers, loadBillboardArt, roadSigns, warning } from './signage';
+import { banners, billboards, chevrons, distanceMarkers, loadBillboardArt, roadSign, warning } from './signage';
 import { beachLife, lamps, market, sandShoulder, villas } from './town';
 
 const BANNERS = ['暴力鹈鹕 BEAK RASH', '鹈鹕湾 欢迎你', '今日宜：撞人', '珍爱生命 远离大鹅', 'V我50 小鱼干', 'SHOWTIME!'];
@@ -20,9 +20,11 @@ function zone(ctx: WorldCtx, name: string): { s0: number; s1: number } | null {
   return { s0: Math.min(...zs.map((z) => z.s0)), s1: Math.max(...zs.map((z) => z.s1)) };
 }
 
-function marks(d: Dress): void {
+/** Layout marks → landmarks and signs; returns the hill-village sites and gull flocks they list. */
+function marks(d: Dress): { villages: number[]; flocks: Array<[number, number]> } {
   const { ctx } = d;
   const L = ctx.L;
+  const villages: number[] = [], flocks: Array<[number, number]> = [];
   for (const m of L.marks) {
     const side: -1 | 1 = m.x < 0 ? -1 : 1;
     const len = typeof m.data.len === 'number' ? m.data.len : 100;
@@ -41,10 +43,14 @@ function marks(d: Dress): void {
       case 'warnCrest': warning(d, m.s, side, '飞', '前方起飞'); break;
       case 'warnRamp': warning(d, m.s, side, '跳', '跳台 · 别怂'); break;
       case 'sailboats': atSea(d, side, m.s - 60, m.s + 60, 18, 52, 22); break;
+      case 'sign': roadSign(d, m.s, side, String(m.data.sign ?? '')); break;
+      case 'village': villages.push(m.s); break;
+      case 'gulls': flocks.push([m.s, m.x]); break;
       case 'boats': break; // moored boats come with the market
       default: console.warn('[track] unknown mark', m.kind);
     }
   }
+  return { villages, flocks };
 }
 
 export async function dressCoast(ctx: WorldCtx, field: TerrainField): Promise<void> {
@@ -52,7 +58,7 @@ export async function dressCoast(ctx: WorldCtx, field: TerrainField): Promise<vo
   await ensureFonts([...BILLBOARD_LINES, ...ROAD_SIGNS, ...BANNERS, '鹈鹕湾灯塔 ←限速随缘鱼鹕飞跳台别怂终点别急会有的欢迎再来本路段已被画过请谨慎骑行海滨公路']);
   const d = makeDress(ctx, field, new SignAtlas(2048, 2560), ctx.rng.fork(0xd5e5));
   const L = ctx.L;
-  marks(d);
+  const { villages, flocks } = marks(d);
   // Festive start / finish: flags and banners behind the barriers.
   for (const name of ['start', 'finish']) {
     const z = zone(ctx, name);
@@ -73,20 +79,20 @@ export async function dressCoast(ctx: WorldCtx, field: TerrainField): Promise<vo
   }
   const quay = zone(ctx, 'market');
   if (quay) lamps(d, -1, quay.s0, quay.s1, 0.12, 30, true);
-  roadSigns(d);
   distanceMarkers(d);
   billboards(d, art);
   hillsides(d, L.sMin, L.sMin + L.n - 1);
-  hillVillages(d, [330, 880, 1480, 2460, 3060]);
+  hillVillages(d, villages);
   farForest(d, L.sMin, L.sMin + L.n - 1);
-  for (const name of ['bay', 'hillside', 'cliff', 'crest', 'descent']) {
+  // zone() spans all zones of a name: 'cliff' covers both cliff runs and the calanque hairpin between them.
+  for (const name of ['bay', 'hillside', 'cliff', 'crest', 'descent', 'chicane']) {
     const z = zone(ctx, name);
     if (z) rocks(d, -1, z.s0, z.s1);
   }
   islands(d);
   atSea(d, -1, L.sMin, L.sMin + L.n - 1, 70, 320, 130);
   atSea(d, -1, L.sMin, L.sMin + L.n - 1, 25, 60, 260);
-  gulls(d, [[300, -40], [1450, -70], [2240, 30], [2850, -45], [3220, -20]], d.rng);
+  gulls(d, flocks, d.rng);
   const meshes = finishDress(d);
   console.info(`[track] coast dressing: ${meshes.length} batched meshes`);
 }

@@ -8,7 +8,7 @@ import { riderRating } from '../grid';
 import { Brain, type AiWorld } from './brain';
 import type { HuntToken } from './fight';
 import { buildRacingLine } from './line';
-import { easeRubber, paceCap, unseenBehind } from './pace';
+import { basePace, easeRubber, paceCap, unseenBehind } from './pace';
 import { makePersonality } from './personality';
 import { Senses } from './sense';
 import { Taunts } from './taunts';
@@ -69,15 +69,17 @@ export function createAi(session: Session): AiDirector {
   const rubberBand = (b: Brain, dt: number): void => {
     const r = b.r, p = session.player;
     if (r.isPlayer || session.phase !== 'racing') {
-      b.paceTop = Infinity;
+      b.paceTop = b.basePace = Infinity;
       if (!r.isPlayer) r.rubber = 1;
       return;
     }
     const chaseCam = app.rig.mode === 'chase';
     const huntingPlayer = b.fighter.hunt === p;
     const recovering = session.time - (respawnAt.get(r.id) ?? -Infinity) < RECOVER;
-    b.paceTop = paceCap({ rider: r, player: p, level: config.level, offset: offsets.get(r.id) ?? 0, huntingPlayer, chaseCam, recovering });
-    easeRubber(r, b.paceTop, unseenBehind(r, p, chaseCam, huntingPlayer), dt);
+    const offset = offsets.get(r.id) ?? 0;
+    b.basePace = basePace(config.level, offset);
+    b.paceTop = paceCap({ rider: r, player: p, level: config.level, offset, huntingPlayer, chaseCam, recovering });
+    easeRubber(r, b.paceTop, b.basePace, unseenBehind(r, p, chaseCam, huntingPlayer), dt);
   };
 
   const bellCheck = (b: Brain): void => {

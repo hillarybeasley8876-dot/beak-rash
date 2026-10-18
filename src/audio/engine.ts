@@ -1,15 +1,16 @@
 // The mixing graph shared by music, sfx and voice:
-//   musicIn ─(+musicVerb return, delay-line reverb)→ muffle LP → duck → hit duck → music vol ┐
+//   musicIn ─(+musicVerb return, convolution plate)→ [muffle LP] → duck → hit duck → music vol ┐
 //   stingIn ────────────────────────────────────────────────→ music vol ┤
-//   sfxIn   ─(+tunnel verb return)→ muffle LP ──────→ sfx vol         ├→ master vol → glue comp → ×0.5 → soft clip → out
+//   sfxIn   ─(+tunnel verb return)→ [muffle LP] ────→ sfx vol         ├→ master vol → glue comp → ×0.5 → soft clip → out
 //   voiceIn ───────────────────────────────────────────────→ voice vol ┘
 //   impactIn (KO booms) → sfx × master vol ─────────────────────────────────────────→ ×0.5 → soft clip
-// "duck" follows the slow-mo / pause muffle and announcer lines; "hit duck" is scheduled with
-// 5 ms attacks for stingers and KO impacts. Works on a realtime AudioContext or an
-// OfflineAudioContext (audio-check renders).
+// [muffle LP] is switched into the path only while muffled (dsp/switch.ts: an open biquad still
+// costs audio-thread time). "duck" follows the slow-mo / pause muffle and announcer lines; "hit
+// duck" is scheduled with 5 ms attacks for stingers and KO impacts. Works on a realtime
+// AudioContext or an OfflineAudioContext (audio-check renders).
 import { softClipCurve, impulseResponse } from './dsp/curves';
 import { filter, holdAt, steer } from './dsp/env';
-import { createReverb } from './dsp/reverb';
+import { FilterSwitch } from './dsp/switch';
 
 export interface Volumes { master: number; music: number; sfx: number; voice: number }
 
@@ -40,6 +41,10 @@ export class Engine {
   readonly output: AudioNode;
   private musicLP: BiquadFilterNode;
   private sfxLP: BiquadFilterNode;
+  /** The muffle low-passes run only while muffled (and until they are open again). */
+  private musicMuffle: FilterSwitch;
+  private sfxMuffle: FilterSwitch;
+  private clearAt = -Infinity;
   private musicDuck: GainNode;
   private hitDuck: GainNode;
   private sfxDuck: GainNode;
@@ -72,17 +77,20 @@ export class Engine {
     this.sfxDuck = g();
     this.vol = { master: g(), music: g(), sfx: g(), voice: g() };
 
-    // Stereo delay-line reverb, RT60 ≈ 1.1 s (decay and level matched to the former convolution
-    // plate, at a fraction of its audio-thread cost; left / right decorrelated).
-    const verb = createReverb(ctx, 1.1, { preDelay: 0.018, damp: 4200, level: 0.07 });
-    this.musicVerb.connect(verb.input);
-    verb.output.connect(this.musicLP);
+    // Music reverb: a 1.1 s stereo convolution plate fed in mono. Chromium runs most of a
+    // ConvolverNode's FFT work on a background thread, so the audio thread pays ≈ 0.1 % for it
+    // (a delay-line network measured 0.8 %); the left / right IRs are decorrelated (width).
+    const verbIn = new GainNode(ctx, { gain: 1, channelCount: 1, channelCountMode: 'explicit' });
+    const plate = new ConvolverNode(ctx, { buffer: impulseResponse(ctx, 1.1, 1.1, { preDelay: 0.018, bright: 0.6, seed: 7 }) });
+    this.musicVerb.connect(verbIn).connect(plate).connect(new GainNode(ctx, { gain: 0.39 })).connect(this.musicIn);
     // Open road = dry sfx; the tunnel reverb is built on first use (setSfxSpace).
     this.sfxSpace = g(0);
     this.sfxVerb.connect(this.sfxSpace);
 
-    this.musicIn.connect(this.musicLP).connect(this.musicDuck).connect(this.hitDuck).connect(this.vol.music).connect(this.vol.master);
-    this.sfxIn.connect(this.sfxLP).connect(this.sfxDuck).connect(this.vol.sfx).connect(this.vol.master);
+    this.musicMuffle = new FilterSwitch(this.musicIn, this.musicLP, this.musicDuck);
+    this.musicDuck.connect(this.hitDuck).connect(this.vol.music).connect(this.vol.master);
+    this.sfxMuffle = new FilterSwitch(this.sfxIn, this.sfxLP, this.sfxDuck);
+    this.sfxDuck.connect(this.vol.sfx).connect(this.vol.master);
     this.voiceIn.connect(this.vol.voice).connect(this.vol.master);
     this.stingIn.connect(this.vol.music);
 
@@ -116,6 +124,13 @@ export class Engine {
   /** 0 = clear, 1 = slow-mo / pause: music low-passed hard and ducked, sfx dulled a little. */
   setMuffle(amount: number): void {
     const m = Math.min(1, Math.max(0, amount));
+    const now = this.now;
+    if (m > 0) this.clearAt = Infinity;
+    else if (this.clearAt === Infinity) this.clearAt = now + 0.4;
+    for (const s of [this.musicMuffle, this.sfxMuffle]) {
+      s.set(m > 0 || now < this.clearAt, now);
+      s.tick(now);
+    }
     if (Math.abs(m - this.muffle) < 0.004) return;
     this.muffle = m;
     const shaped = Math.pow(m, 0.75);
@@ -159,7 +174,7 @@ export class Engine {
     const a = Math.min(1, Math.max(0, amount));
     if (a > 0 && !this.sfxConv) {
       this.sfxConv = new ConvolverNode(this.ctx, { buffer: impulseResponse(this.ctx, 1.4, 1.1, { preDelay: 0.008, bright: 0.7, seed: 23 }) });
-      this.sfxSpace.connect(this.sfxConv).connect(new GainNode(this.ctx, { gain: 0.9 })).connect(this.sfxLP);
+      this.sfxSpace.connect(this.sfxConv).connect(new GainNode(this.ctx, { gain: 0.9 })).connect(this.sfxIn);
     }
     steer(this.sfxSpace.gain, this.now, a, 0.15);
   }

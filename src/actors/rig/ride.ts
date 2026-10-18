@@ -26,6 +26,8 @@ const e = new Euler(0, 0, 0, 'YXZ');
 const q = new Quaternion(), q2 = new Quaternion();
 const v = new Vector3(), w = new Vector3(), target = new Vector3(), pole = new Vector3(), bindPole = new Vector3();
 const UP = new Vector3(0, 1, 0);
+/** The wrist rides this far behind the grip marker (the mitten then covers the grip and its end). */
+export const GRIP_BACK = 0.012;
 
 function rot(out: Quaternion, x: number, y: number, z: number): Quaternion {
   return out.setFromEuler(e.set(x, y, z, 'YXZ'));
@@ -52,12 +54,12 @@ export class RidePose {
     const hip = ps.rest(B.thighL);
     const reach = Math.hypot(hip.y - c.y, hip.z - c.z) + R;
     const [l1, l2] = chainLengths(ps, LEG.L);
-    this.legScale = this.def.meta.shortLegs ? 1 : clamp(reach / (0.985 * (l1 + l2)), 1, 1.35);
+    this.legScale = this.def.meta.shortLegs ? 1 : clamp(reach / (0.985 * (l1 + l2)), 1, 1.45);
     const [a1, a2] = chainLengths(ps, ARM.L);
     const sh = ps.rest(B.armL);
     const grip = inp.gripL;
-    const d = Math.hypot(sh.x - grip.x, sh.y - (grip.y + this.def.meta.gripDrop), sh.z - grip.z);
-    this.armScale = clamp(d / (0.95 * (a1 + a2)), 1, 1.3);
+    const d = Math.hypot(sh.x - grip.x, sh.y - (grip.y + this.def.meta.gripDrop), sh.z - grip.z - GRIP_BACK);
+    this.armScale = clamp(d / (0.95 * (a1 + a2)), 1, 1.55);
   }
 
   update(inp: RideInput, cue: CueOut, dt: number): void {
@@ -126,7 +128,7 @@ export class RidePose {
   private arm(c: Chain, grip: Vector3, ac: ArmCue, cue: CueOut, tuck: number): void {
     const ps = this.ps, m = this.def.meta, s = c.side;
     // Grip pose: wrist just above/behind the grip, elbows out (more when tucked), feathers trailing down-back.
-    target.set(grip.x, grip.y + m.gripDrop, grip.z + 0.035);
+    target.set(grip.x, grip.y + m.gripDrop, grip.z + GRIP_BACK);
     pole.set(s * (0.9 + tuck * 0.5), 0.05, 0.45);
     w.set(0, -0.8, 0.6);
     const spread = cue.wings;

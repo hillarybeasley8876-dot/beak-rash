@@ -45,7 +45,7 @@ export function wireRace(bus: EventBus<GameEvents>, h: Host): void {
   });
   bus.on('race:finishLine', ({ riderId, place }) => {
     if (!isPlayer(riderId)) return;
-    h.stinger('finish');
+    h.stinger(place <= 3 ? 'finish' : 'finishLow');
     h.announce(place <= 3 ? `ann_place${place}` : 'ann_finish', 3);
   });
   bus.on('rider:bump', ({ a, b, strength, pos }) => {

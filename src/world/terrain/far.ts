@@ -5,9 +5,9 @@ import { smoothstep } from '../../core/math';
 import type { WorldCtx } from '../ctx';
 import { farmWeight } from './farmland';
 import { terrainMat } from './material';
-import type { TerrainField } from './field';
-import { NEAR_EXTENT } from './near';
-import { groundColor, isShore } from './profile';
+import type { TerrainField, WorldSample } from './field';
+import { NEAR_EXTENT, ribbonReach, type NearRibbon } from './near';
+import { groundColor, isShore, profileY } from './profile';
 
 const CELL = 16;
 const CHUNK = 24;           // cells per chunk side
@@ -24,10 +24,37 @@ function holdDown(h: number, u: number, edgeY: number): number {
   return Math.min(held, cone);
 }
 
+/**
+ * Deep hold well inside the near ribbon: the grid's 16 m chords must not cut through concave
+ * profiles (cliff feet, coves), so a vertex the ribbon covers on all sides sinks below the lowest
+ * profile point within one cell; towards the ribbon's outer edge the regular hold takes over.
+ */
+function deepHold(field: TerrainField, smp: WorldSample, edgeY: number, reach: number, held: number): number {
+  const w = smoothstep(reach - 26, reach - 14, smp.u);
+  if (w >= 1) return held;
+  const roadY = field.q.frameVis(smp.s).pos.y;
+  let lo = Infinity;
+  for (let du = -CELL; du <= CELL; du += 4) lo = Math.min(lo, profileY(smp.g, edgeY, roadY, Math.max(0, smp.u + du)));
+  return Math.min(held, held + (lo - 3 - smp.g.rough - held) * (1 - w));
+}
+
+/** Vertices under the road sink below the lowest ground within one cell beyond either edge. */
+function roadHold(field: TerrainField, smp: WorldSample): number {
+  const gl = field.ground(smp.s, -1), gr = field.ground(smp.s, 1);
+  if (gl.detached || gr.detached) return smp.h;
+  const roadY = field.q.frameVis(smp.s).pos.y;
+  let lo = smp.h;
+  for (const side of [-1, 1] as const) {
+    const g = side < 0 ? gl : gr, edgeY = field.edgeY(smp.s, side);
+    for (let u = 0; u <= CELL; u += 4) lo = Math.min(lo, profileY(g, edgeY, roadY, u) - 3 - g.rough);
+  }
+  return lo;
+}
+
 /** Exact height of the far grid's rendered triangles at a world point (NaN outside the grid). */
 export type FarHeight = (wx: number, wz: number) => number;
 
-export function buildFarTerrain(ctx: WorldCtx, field: TerrainField): FarHeight {
+export function buildFarTerrain(ctx: WorldCtx, field: TerrainField, ribbons: NearRibbon[] = []): FarHeight {
   const { L } = ctx;
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
   for (let i = 0; i < L.n; i += 4) {
@@ -48,7 +75,16 @@ export function buildFarTerrain(ctx: WorldCtx, field: TerrainField): FarHeight {
       const wx = x0 + i * CELL, wz = z0 + j * CELL;
       const smp = field.sampleWorld(wx, wz);
       const k = j * vx + i;
-      const h = smp.u < 0 ? smp.h : holdDown(smp.h, smp.u, field.edgeY(smp.s, smp.side));
+      // Beyond the ends of the visual road the ribbons stop: keep the regular hold there.
+      const inside = smp.s > L.sMin + 2 && smp.s < L.sMin + L.n - 3;
+      const rb = inside ? ribbons.find((r) => r.side === smp.side) : undefined;
+      let h: number;
+      if (smp.u < 0) h = rb ? roadHold(field, smp) : smp.h;
+      else {
+        const edgeY = field.edgeY(smp.s, smp.side);
+        const held = holdDown(smp.h, smp.u, edgeY);
+        h = rb ? deepHold(field, smp, edgeY, ribbonReach(rb, smp.s), held) : held;
+      }
       // Far beyond the fog the land sinks into the sea along a ragged coastline, so the world
       // reads as a headland rather than a rectangle from the air.
       const edge = Math.min(i, j, vx - 1 - i, vz - 1 - j) * CELL + field.noise.fbm(wx / 300, wz / 300, 2) * 160;

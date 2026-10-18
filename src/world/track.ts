@@ -40,7 +40,7 @@ export async function createTrack(app: AppContext, id: TrackId, rng: Rng): Promi
   buildRoad(ctx);
   const field = new TerrainField(L, q);
   const ribbons = buildNearTerrain(ctx, field);
-  const far = buildFarTerrain(ctx, field);
+  const far = buildFarTerrain(ctx, field, ribbons);
   Object.assign(ctx, makeGround(ctx, field, ribbons, far));
   buildSea(ctx, renderHeightMap(ctx, group));
   buildEdges(ctx, field);

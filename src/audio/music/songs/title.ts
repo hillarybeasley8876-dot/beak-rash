@@ -22,7 +22,7 @@ const HOOK = bars(
   'A4 . D5 . F5 - E5 D5 . F5 - G5 A5 - C6 -',
   'A5 G5 F5 - E5 - D5 - . . . . . . . .',
   'F5 - A5 - D6 - C6 A5 - - . F5 G5 A5 - .',
-  'E5 - G5 - F5 - E5 - C5 - - . A4 - - .',
+  'E5 - G5 - E5 - C#5 - C5 - - . A4 - - .',
   'D5 - - - - . F5 E5 D5 - - . A4 C5 D5 -',
   '. . . . G5 F5 Eb5 Db5 C5 . A4 - - - . .',
 );
@@ -33,7 +33,7 @@ const BRIDGE = bars(
   'E5 - - - - - G5 - A5 - - - C6 - - -',
   'D6 - - - C6 - A5 - F5 - - - . . . .',
   'G5 - - - Bb5 - - - D6 - - - C6 - Bb5 -',
-  'A5 - - - G5 - - - F5 - E5 - C#5 - Bb4 -',
+  'A5 - - - G5 - - - E5 - - - C#5 - Bb4 -',
   'D5 - - - - - - - E5 - F5 - A5 - - -',
   'G5 - F5 - D5 - - - C#5 - - - C5 - A4 -',
 );
@@ -52,6 +52,8 @@ export const TITLE: Song = {
   swing: 0.1,
   key: 'D Dorian',
   lead: 'wah',
+  // Hook ≈ −4.5 LU under the full mix; a little less sub (low end ≤ 40 %).
+  mix: { lead: 0.88, bass: 0.85 },
   crackle: 0.12,
   sections: {
     intro: {

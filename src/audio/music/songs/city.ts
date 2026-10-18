@@ -73,7 +73,7 @@ const HOOK = bars(
   'F5 - Ab5 - C6 - Ab5 - B5 - - - Ab5 - F5 -',
   'Eb5 - - - D5 - C5 - F5 - - - G5 - Ab5 -',
 );
-const HOOK_A4 = HOOK.split(' | ').slice(0, 7).join(' | ') + ' | Eb5 - - - G5 - C6 - B5 - - - C6 - - -';
+const HOOK_A4 = HOOK.split(' | ').slice(0, 7).join(' | ') + ' | Eb5 - - - G5 - C6 - B5 - - - Ab5 - - -';
 const BRIDGE = bars(
   'C6 - - - Eb6 - G6 - F6 - Eb6 - C6 - - -',
   'D6 - - - Bb5 - - - F5 - G5 - Bb5 - - -',
@@ -119,6 +119,8 @@ export const CITY: Song = {
   swing: 0.14,
   key: 'C minor',
   lead: 'flute',
+  // The flute carries further than the wah: ≈ −4.5 LU under the full mix.
+  mix: { lead: 0.81 },
   crackle: 0.08,
   sections: {
     vamp: { bars: 2, chords: 'Cm9 | Cm9', kick: K1, hat: H2, bass: rep('1> . 8^ . . 1 b7 8^ . 1> . 5 . b7 8^ x', 2), keys: COMP_A, pad: 'X---------------' },
@@ -164,6 +166,6 @@ export const CITY: Song = {
     'B (bridge): Abmaj9–Gm7–Fm9–Bbm9/Eb13–Abmaj9–Dbmaj7#11–Dm7b5–G7alt, ride, walking slap line, pad, brass swells. A3: busier ' +
     'kick / ghosts, 16th dead-note bass, new comp + clav, brass answers, hook an octave down too. S: wah solo over a C dorian ' +
     'vamp (Cm9 | F9) into Abmaj7#11–G7#9. D: half-time breakdown then a 4-bar build. B2: four-on-the-floor drive, brass riff, ' +
-    'doubled bridge melody. A4: hook resolving up to C. Top-3: brass answers, octave-doubled lead, shaker + cowbell, clav 16ths. ' +
+    'doubled bridge melody. A4: hook ending B–Ab over the Db7#11 tritone sub, resolving into Cm9 at the loop. Top-3: brass answers, octave-doubled lead, shaker + cowbell, clav 16ths. ' +
     'Final stretch: riser + snare roll, then B2–A4 a whole step up (D minor) at +4 % tempo, four-on-the-floor, 8th bass, claps.',
 };

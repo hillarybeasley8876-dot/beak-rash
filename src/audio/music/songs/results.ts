@@ -48,6 +48,8 @@ export const RESULTS: Song = {
   swing: 0.16,
   key: 'F major',
   lead: 'synth',
+  // The bright synth-brass melody reads louder than its level: ≈ −4.5 LU under the full mix.
+  mix: { lead: 0.78 },
   sections: {
     intro: {
       bars: 2, chords: 'Fmaj9 | C13', cym: 'C...............' + REST, brass: 'r-------........' + REST,

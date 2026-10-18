@@ -29,14 +29,17 @@
   (roadside trees, boulders, far forest), dressing/mountain/index.ts, util.ts.
 - sandbox/mountain.race.mjs (autopilot soak) written 03:53 (not yet run/recorded).
 
-## In progress (resumed 10-18 ~11:20 after outage) — M4 module plan
-- [ ] dressing/mountain/marks.ts: mark dispatcher (all kinds in layouts/mountain.ts).
-- [ ] dressing/mountain/signage.ts: chevrons/km markers (coast helpers), road signs (ROAD_SIGNS[5],
-      TRACK_SIGNS.mountain), billboards (TRACK_BILLBOARDS.mountain + BILLBOARD_LINES, BILLBOARDS.mountain art).
-- [ ] dressing/mountain/village.ts + props/mountain-house.ts + props/mountain-deco.ts: chalets, stands,
-      lantern strings/poles, gantries (+lanterns), flags/banners.
-- [ ] props/mountain-bridge.ts + dressing/mountain/gorge.ts + env/mountain-waterfall.ts: suspension
-      bridge (towers, cables, hangers, deck slab), waterfall shader + mist, river rocks.
+## In progress (resumed again 10-18 ~14:30; props/mountain-house.ts + mountain-deco.ts are complete) — M4 module plan
+Zone s (approx): start 0-160 · village 160-300 · pines 300-630 · hairpins 630/855/1089 (legs between) ·
+cliff 1171-1651 · cutting 1651-1691 · tunnel 1691-1931 · portal -1957 · bridge 1957-2087 · summit 2123-2283 ·
+crest top 2343 · descent 2403-2663 · chicane 2663-2768 · descent -3008 · lake 3008-3188 · lakeside -3428 · finish -3588
+- [x] dressing/mountain/marks.ts: mark dispatcher (sorted: landmarks first).
+- [x] dressing/mountain/signage.ts + faces.ts: chevron rows, SUNSET PASS road signs, scenic signs, billboards
+      (TRACK_BILLBOARDS.mountain first, BILLBOARDS.mountain art); km markers/banners/flags/stands via coast helpers.
+- [x] dressing/mountain/village.ts + props/mountain-house.ts + props/mountain-deco.ts: houses, lantern strings/posts,
+      lantern gantries.
+- [x] props/mountain-bridge.ts + dressing/mountain/gorge.ts + env/mountain-waterfall.ts: vermilion suspension
+      bridge (pagoda-capped towers, prayer flags on the cables, truss girder), waterfall + mist + river rocks.
 - [ ] props/mountain-pagoda.ts: pagoda viewpoint at the crest.
 - [ ] dressing/mountain/farm.ts + props/mountain-animals.ts: tea terraces, cows + fences, hot spring
       + capybaras + sign.

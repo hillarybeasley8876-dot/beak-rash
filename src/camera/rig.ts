@@ -29,6 +29,7 @@ export function createCameraRig(app: AppContext): CameraRig {
   const euler = new Euler();
   const q = new Quaternion();
   const anchor: Anchor = { pos: new Vector3(), quat: new Quaternion() };
+  const pure = { pos: new Vector3(), quat: new Quaternion(), fov: camera.fov }; // chase pose before blend / shake
   const watch = { power: 0, time: 0, mul: 1 };
   const reducedMotion = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null;
 
@@ -49,7 +50,9 @@ export function createCameraRig(app: AppContext): CameraRig {
       if (rig.mode !== 'free') rig.mode = st.cine ? 'cinematic' : 'chase';
     },
     update(dtReal, dtSim) {
-      fx.update(dtReal);
+      // Paused: shakes, kicks and buzz hold still behind the menu (hit-stop and slow-mo keep real time).
+      const live = app.clock.getScale('pause') > 0;
+      if (live) fx.update(dtReal);
       fx.strength = clamp01(app.save.data.settings.shake) * (reducedMotion?.matches ? 0.35 : 1);
       if (rig.mode === 'free') return;
       const session = st.session;
@@ -62,10 +65,15 @@ export function createCameraRig(app: AppContext): CameraRig {
       const p = session.player;
       chase.lookBack = session.controls.get(p.id)?.lookBack === true;
       watchBoost(p, true);
-      const pose = chase.update(session, dtReal, dtSim, fx.fov);
+      // Behind a cinematic the chase springs run on real time, so the hand-back (cut or blend) lands on a settled
+      // pose even after a long slow-mo (SHOWTIME's 8 m leap) instead of sinking into place afterwards.
+      const pose = chase.update(session, dtReal, st.cine ? dtReal : dtSim, fx.fov);
+      pure.pos.copy(pose.pos);
+      pure.quat.copy(pose.quat);
+      pure.fov = pose.fov;
       if (st.cine && runCine(dtReal)) return;
       blend.apply(pose, chase.anchor(anchor), dtReal);
-      fx.buzz = buzzOf(p);
+      if (live) fx.buzz = buzzOf(p);
       fx.offsets(move, rot);
       camera.position.copy(pose.pos).add(move.applyQuaternion(pose.quat));
       camera.quaternion.copy(pose.quat).multiply(q.setFromEuler(euler.set(rot.x, rot.y, rot.z)));
@@ -88,6 +96,12 @@ export function createCameraRig(app: AppContext): CameraRig {
       } else if (st.cine) {
         endCine(out);
       }
+    },
+    chasePose(outPos, outQuat) {
+      const live = st.session !== null;
+      outPos.copy(live ? pure.pos : camera.position);
+      outQuat.copy(live ? pure.quat : camera.quaternion);
+      return live ? pure.fov : camera.fov;
     },
     resize(width, height) {
       camera.aspect = width / Math.max(1, height);

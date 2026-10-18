@@ -2,8 +2,7 @@
 // rider speed + 22 m/s, 14 dmg + 0.6 s stun. With no target it flies straight and poofs.
 import { DEG } from '../../../core/math';
 import type { RiderState } from '../../../core/types';
-import { others, targetable, type CombatCtx } from '../ctx';
-import { saltfishGeometry } from '../meshes/weapon-props';
+import { nearest, targetable, type CombatCtx } from '../ctx';
 import { skillHit } from './common';
 import { aheadAngle, TimedSkill, type SkillImpl } from './types';
 
@@ -11,7 +10,7 @@ const ID = 'pelican.torpedo';
 export const TORPEDO = { range: 60, cone: 25 * DEG, speedBonus: 22, damage: 14, stun: 0.6, knock: 3, life: 3.2 } as const;
 
 export function torpedoTarget(ctx: CombatCtx, r: RiderState): RiderState | null {
-  return others(ctx, r, (o, ds, dx) => targetable(ctx, o) && ds > 1 && ds <= TORPEDO.range && aheadAngle(ds, dx) <= TORPEDO.cone)[0] ?? null;
+  return nearest(ctx, r, (o, ds, dx) => targetable(ctx, o) && ds > 1 && ds <= TORPEDO.range && aheadAngle(ds, dx) <= TORPEDO.cone) ?? null;
 }
 
 class Torpedo extends TimedSkill {
@@ -21,7 +20,7 @@ class Torpedo extends TimedSkill {
     const p = ctx.projectiles.spawn({
       skillId: ID, owner: r, target, s: r.s + 1.1, x: r.x, y: r.y + 1.55,
       speed: r.speed + TORPEDO.speedBonus, turn: 7, life: TORPEDO.life, radius: 0.45,
-      geometry: ctx.lib.get('torpedo', () => saltfishGeometry(1.7)), trail: '#ffffff',
+      geometry: ctx.lib.get('torpedo'), trail: '#ffffff',
       onHit: (victim) => {
         skillHit(ctx, r, victim, ID, { damage: TORPEDO.damage, stun: TORPEDO.stun, knock: TORPEDO.knock, speedLoss: 0.12 });
       },

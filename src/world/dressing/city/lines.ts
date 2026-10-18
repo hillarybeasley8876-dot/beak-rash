@@ -41,5 +41,5 @@ export const GANTRY = {
 /** Every string the city draws (font preload). */
 export const ALL_CITY_TEXT: string[] = [
   ...SHOPS, ...BLADES, ...ROOF_LINES, ...P5_LINES, ...CITY_SIGNS, MURAL.title, MURAL.body, MURAL.sign,
-  ...Object.values(GANTRY).flatMap((g) => [g.word, g.sub, g.back, g.backSub]), '地铁 METRO 出口 公交站 鹈鹕大道 霓虹 环岛 河滨',
+  ...Object.values(GANTRY).flatMap((g) => [g.word, g.sub, g.back, g.backSub]), '地铁 METRO 出口 公交站 鹈鹕大道 霓虹 环岛 河滨 便利店 24H 鹈鹕夜市 NIGHT MARKET SEE YOU TONIGHT 烧烤 奶茶 鹕',
 ];

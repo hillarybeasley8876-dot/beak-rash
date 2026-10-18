@@ -19,6 +19,7 @@ const driftWall = {
         const lv = ev.filter((e) => e.type === 'rider:drift' && e.phase === 'level').map((e) => e.level);
         m[`${where}_${how}_clearSec`] = hit ? r3(hit.t) : 2.6;
         m[`${where}_${how}_level`] = lv.length ? Math.max(...lv) : 0;
+        m[`${where}_${how}_crashed`] = ev.some((e) => e.type === 'rider:crash');
       }
     }
     return { metrics: m };
@@ -29,21 +30,23 @@ const knock = {
   name: 'knock',
   async run({ page }) {
     const m = {};
-    for (const [tag, lat] of [['light', 3.2], ['heavy', 9]]) {
+    // lightSteer: the victim keeps steering full lock back toward the hitter (an AI pressing in) and must still
+    // be shoved visibly (review r2: 0.29 m before the direction-aware knock clamp)
+    for (const [tag, lat, steer] of [['light', 3.2, 0], ['heavy', 9, 0], ['lightSteer', 3.2, -1]]) {
       await prep(page, { v: 20, x: 0, wall: 20 });
       await run(page, [{ time: 0.2, controls: { throttle: 1 } }]);
-      m[`${tag}Disp`] = r3(await page.evaluate((L) => {
+      m[`${tag}Disp`] = r3(await page.evaluate(([L, st]) => {
         const ses = window.__br.session();
         const f = window.__feel;
         ses.physics.applyImpulse(ses.player, { lateral: L });
         const x0 = ses.player.x;
         let best = 0;
         for (let i = 0; i < 60; i++) {
-          f.run([{ time: 1 / 60, controls: { throttle: 1 } }], 1 / 60, false);
+          f.run([{ time: 1 / 60, controls: { throttle: 1, steer: st } }], 1 / 60, false);
           best = Math.max(best, ses.player.x - x0);
         }
         return best;
-      }, lat));
+      }, [lat, steer]));
     }
     return { metrics: m };
   },

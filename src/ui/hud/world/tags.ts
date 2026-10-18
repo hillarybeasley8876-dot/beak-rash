@@ -1,13 +1,16 @@
-// Rival name tags: species dot, name, current place, HP bar and one status chip (angry / stunned /
-// shield / weapon), anchored above the head for riders up to 25 m ahead, fading with distance.
+// Rival name tags: species dot, name, current place, HP bar and one status chip (skill cast / angry /
+// stunned / shield / weapon), anchored above the head for riders up to 25 m ahead, fading with distance.
+// A rival casting a skill in view flashes its tag (hot outline + skill glyph) instead of an edge chevron.
 import { Vector3 } from 'three';
 import { approach, clamp, clamp01, damp } from '../../../core/math';
 import { ROSTER } from '../../../data/roster';
 import { WEAPONS } from '../../../data/weapons';
 import type { Session } from '../../../core/contracts';
-import type { RiderState } from '../../../core/types';
+import type { RiderId, RiderState } from '../../../core/types';
+import { reducedMotion } from '../anim';
 import { SPECIES_GLYPH } from '../badge';
 import { el, px, w, type W } from '../dom';
+import type { Rect } from './avoid';
 import { newPoint, type Projector } from './project';
 
 const AHEAD = 25;
@@ -27,12 +30,26 @@ interface Tag {
   depth: number;
   /** Smoothed upward offset that keeps overlapping tags readable (px). */
   lift: number;
+  /** Unscaled size of the drawn tag (measured once it is laid out; 0 = not yet). */
+  w: number;
+  h: number;
+  box: TagBox;
+  /** Seconds left of the skill-cast flash, and the skill's glyph. */
+  cast: number;
+  castGlyph: string;
 }
+
+/** A drawn tag's screen rectangle (chip overhang included), for overlays that must not cover it. */
+export interface TagBox extends Rect { id: RiderId; cx: number }
 
 const TAG_W = 160;
 const TAG_H = 54;
+/** The status chip pokes out above and to the right of the plate (world.css .nt-chip). */
+const CHIP_OUT = 16;
+const CAST_TIME = 1.1;
+const CHIP_KINDS = ['cast', 'angry', 'stun', 'shield', 'weapon'] as const;
 
-type ChipKind = 'angry' | 'stun' | 'shield' | 'weapon' | '';
+type ChipKind = (typeof CHIP_KINDS)[number] | '';
 
 function chipFor(r: RiderState, playerId: number): { kind: ChipKind; text: string } {
   const has = (id: string, src?: number): boolean => r.statuses.some((s) => s.id === id && (src === undefined || s.source === src));
@@ -48,6 +65,7 @@ export class NameTags {
   private tags: Tag[] = [];
   private pt = newPoint();
   private v = new Vector3();
+  private boxList: TagBox[] = [];
 
   constructor(parent: HTMLElement) {
     this.host = el('div', 'brh-layer nt-host', parent);
@@ -71,14 +89,27 @@ export class NameTags {
       const hp = el('div', 'nt-hp-f', hpBox);
       const chip = el('span', 'nt-chip', inner);
       el('div', 'nt-tip', inner);
-      this.tags.push({ r, root: w(root), inner: w(inner), hp: w(hp), pl: w(pl), chip: w(chip), vis: 0, x: 0, y: 0, scale: 1, depth: 0, lift: 0 });
+      this.tags.push({
+        r, root: w(root), inner: w(inner), hp: w(hp), pl: w(pl), chip: w(chip),
+        vis: 0, x: 0, y: 0, scale: 1, depth: 0, lift: 0, w: 0, h: 0, box: { id: r.id, cx: 0, l: 0, r: 0, t: 0, b: 0 },
+        cast: 0, castGlyph: '',
+      });
     }
+  }
+
+  /** A rival in view cast a skill: flash its tag with the skill glyph. */
+  castFlash(rider: RiderId, glyph: string): void {
+    const t = this.tags.find((x) => x.r.id === rider);
+    if (!t) return;
+    t.cast = CAST_TIME;
+    t.castGlyph = glyph;
   }
 
   update(session: Session, proj: Projector, k: number, dt: number): void {
     const me = session.player;
     const shown: Tag[] = [];
     for (const t of this.tags) {
+      t.cast = Math.max(0, t.cast - dt);
       if (this.place(t, session, proj, k, dt)) shown.push(t);
     }
     // Nearest tags keep their spot; farther ones that overlap are pushed up above them.
@@ -95,6 +126,29 @@ export class NameTags {
       t.lift = damp(t.lift, t.y - y, 14, dt);
       this.draw(t, me.id);
     });
+    this.boxList.length = 0;
+    for (const t of shown) if (t.vis > 0.2) this.boxList.push(this.boxOf(t));
+  }
+
+  /** Screen rectangles of the tags drawn this frame (call after update). */
+  boxes(): readonly TagBox[] {
+    return this.boxList;
+  }
+
+  private boxOf(t: Tag): TagBox {
+    if (t.w === 0) {
+      t.w = (t.inner.node as HTMLElement).offsetWidth;
+      t.h = (t.inner.node as HTMLElement).offsetHeight;
+    }
+    const s = t.scale;
+    const half = ((t.w || TAG_W) / 2 + CHIP_OUT) * s;
+    const box = t.box;
+    box.cx = t.x;
+    box.l = t.x - half;
+    box.r = t.x + half;
+    box.b = t.y - t.lift;
+    box.t = box.b - ((t.h || TAG_H) + CHIP_OUT) * s;
+    return box;
   }
 
   /** Position, scale (k included) and visibility for one tag; true when it is drawn this frame. */
@@ -121,16 +175,19 @@ export class NameTags {
 
   private draw(t: Tag, playerId: number): void {
     const r = t.r;
+    const casting = t.cast > 0;
+    const pulse = casting && !reducedMotion() ? 1 + 0.08 * Math.sin(t.cast * 30) : 1;
     t.root.tf(`translate(${px(t.x)}, ${px(t.y - t.lift)})`);
-    t.inner.tf(`scale(${t.scale.toFixed(3)})`);
+    t.inner.tf(`scale(${(t.scale * pulse).toFixed(3)})`);
     t.root.op(t.vis);
+    t.root.cls('is-cast', casting);
     const f = clamp01(r.hp / Math.max(1, r.maxHp));
     t.hp.tf(`scaleX(${f.toFixed(3)})`);
     t.hp.cls('low', f < 0.3);
     t.pl.text(String(r.place));
-    const chip = chipFor(r, playerId);
+    const chip = casting ? { kind: 'cast' as const, text: `${t.castGlyph}!` } : chipFor(r, playerId);
     t.chip.cls('on', chip.kind !== '');
-    for (const kind of ['angry', 'stun', 'shield', 'weapon'] as const) t.chip.cls(kind, chip.kind === kind);
+    for (const kind of CHIP_KINDS) t.chip.cls(kind, chip.kind === kind);
     if (chip.text) t.chip.text(chip.text);
   }
 }

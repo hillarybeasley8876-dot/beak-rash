@@ -74,5 +74,5 @@ export function addTail(b: CharacterBuilder, J: Joints, o: TailOpts): void {
 
 /** Mouth line through points (left corner → right corner), bound to the head. */
 export function addMouth(b: CharacterBuilder, pts: readonly V3[], r: number, color = 0x2a1416): void {
-  addTube(b, pts.map((p) => ({ p, r, bone: B.head })), { sides: 6, seg: 3, color, outline: 0 });
+  addTube(b, pts.map((p) => ({ p, r, bone: B.head })), { sides: 5, seg: 2, color, outline: 0 });
 }

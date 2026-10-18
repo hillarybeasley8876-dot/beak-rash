@@ -37,6 +37,22 @@
 }
 .eg-chev.is-hot .eg-chev-x { visibility: inherit; }
 .eg-chev.is-hot .eg-chev-a { background: var(--hot); }
+/* Incoming projectile aimed at the player: hazard chip above the bottom edge (world/incoming.ts). */
+.eg-inc { position: absolute; left: 0; top: 0; width: 0; height: 0; visibility: hidden; }
+.eg-inc-in {
+  position: absolute; left: 0; top: 0; translate: -50% -50%; display: flex; align-items: center; gap: 10px;
+  padding: 6px 16px 4px 10px; background: var(--ink); color: var(--paper); white-space: nowrap;
+  box-shadow: 0 0 0 3px var(--hot), 6px 6px 0 3px var(--ink);
+}
+.eg-inc-arrow { font: 400 30px/1 "Anton", sans-serif; color: var(--hot); }
+.eg-inc-g {
+  width: 38px; height: 38px; display: grid; place-items: center; background: var(--sp); color: var(--ink);
+  font: 400 28px/1 "ZCOOL QingKe HuangYou", sans-serif; box-shadow: 0 0 0 3px var(--ink);
+}
+.eg-inc-t { display: flex; flex-direction: column; gap: 3px; }
+.eg-inc-t b { font: 400 30px/1 "Bangers", sans-serif; letter-spacing: 2px; color: var(--hot); }
+.eg-inc-t i { font: 400 18px/1 "ZCOOL QingKe HuangYou", sans-serif; font-style: normal; }
+.eg-inc-eta { min-width: 64px; text-align: right; font: 400 36px/1 "Anton", sans-serif; color: var(--sp); font-variant-numeric: tabular-nums; }
 @media (prefers-reduced-motion: reduce) {
   .eg-police::before, .eg-police::after, .eg-chip .eg-lamp { animation: none; }
 }

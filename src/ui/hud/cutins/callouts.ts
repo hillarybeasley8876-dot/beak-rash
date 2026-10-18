@@ -24,10 +24,12 @@ export interface CalloutSpec {
   count?: boolean;
 }
 
-interface Item { spec: CalloutSpec; root: HTMLDivElement; en: HTMLSpanElement; x: HTMLSpanElement; t: number; life: number; n: number; y: number; bumpT: number }
+interface Item { spec: CalloutSpec | null; root: HTMLDivElement; en: HTMLSpanElement; cn: HTMLSpanElement; x: HTMLSpanElement; t: number; life: number; n: number; y: number; bumpT: number }
 
 const MAX = 3;
 const GAP = 96;
+
+const keyOf = (spec: CalloutSpec | null): string => (spec ? spec.key ?? spec.kind : '');
 
 export class Callouts {
   readonly root: HTMLDivElement;
@@ -39,33 +41,42 @@ export class Callouts {
 
   push(spec: CalloutSpec): void {
     const key = spec.key ?? spec.kind;
-    const same = this.items.find((i) => (i.spec.key ?? i.spec.kind) === key);
+    const same = this.items.find((i) => keyOf(i.spec) === key);
     if (same) {
       same.n++;
       same.t = Math.min(same.t, 0.15);
       same.bumpT = 0;
-      if (spec.en !== same.spec.en) this.fill(same, spec);
-      same.spec = spec;
-      if (spec.count) same.x.textContent = `×${same.n}`;
+      this.fill(same, spec);
       return;
     }
-    const root = el('div', `co co-${spec.kind}${spec.mod ? ` ${spec.mod}` : ''}`, this.root);
+    const root = el('div', 'co', this.root);
     el('div', 'co-sh', root);
     el('div', 'co-bg', root);
     const en = el('span', 'co-en', root);
-    const cn = el('span', 'co-cn', root, spec.cn ?? '');
-    cn.style.display = spec.cn ? '' : 'none';
+    const cn = el('span', 'co-cn', root);
     const x = el('span', 'co-x', root);
-    const item: Item = { spec, root, en, x, t: 0, life: spec.life ?? 1.15, n: 1, y: -GAP, bumpT: 9 };
+    const item: Item = { spec: null, root, en, cn, x, t: 0, life: spec.life ?? 1.15, n: 1, y: -GAP, bumpT: 9 };
     this.fill(item, spec);
     this.items.unshift(item);
     while (this.items.length > MAX) this.items.pop()?.root.remove();
   }
 
+  /** Write every per-spec part (title, Chinese line, style modifier, colour, ×N), so a merge never keeps
+   *  the previous callout's text or up/down style. */
   private fill(item: Item, spec: CalloutSpec): void {
-    if (spec.ransom) setRansom(item.en, spec.en, { seed: item.n + 3, scheme: 'mono', tilt: 9 });
-    else item.en.textContent = spec.en;
+    const old = item.spec;
+    if (!old || old.en !== spec.en || old.ransom !== spec.ransom) {
+      if (spec.ransom) setRansom(item.en, spec.en, { seed: item.n + 3, scheme: 'mono', tilt: 9 });
+      else item.en.textContent = spec.en;
+    }
+    item.cn.textContent = spec.cn ?? '';
+    item.cn.style.display = spec.cn ? '' : 'none';
+    for (const c of [old?.mod, old && `co-${old.kind}`]) if (c) item.root.classList.remove(c);
+    for (const c of [spec.mod, `co-${spec.kind}`]) if (c) item.root.classList.add(c);
     if (spec.color) item.root.style.setProperty('--dc', spec.color);
+    else item.root.style.removeProperty('--dc');
+    item.x.textContent = spec.count && item.n > 1 ? `×${item.n}` : '';
+    item.spec = spec;
   }
 
   clear(): void {
@@ -73,12 +84,14 @@ export class Callouts {
     this.items = [];
   }
 
-  /** `alpha` dims the whole stack (0 while a cinematic plays). */
+  /** `alpha` dims the whole stack (0 while a cinematic plays). Lifetimes freeze while dimmed, so a callout
+   *  raised during a KO / SHOWTIME cinematic (ONE MORE!, a place change) plays once the HUD is back. */
   update(dt: number, alpha: number): void {
     this.root.style.opacity = alpha >= 0.999 ? '' : alpha.toFixed(3);
+    const live = alpha >= 0.999 ? dt : 0;
     this.items = this.items.filter((it, idx) => {
-      it.t += dt;
-      it.bumpT += dt;
+      it.t += live;
+      it.bumpT += live;
       if (it.t >= it.life) {
         it.root.remove();
         return false;

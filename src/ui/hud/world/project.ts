@@ -28,6 +28,12 @@ export class Projector {
     this.inv.copy(this.camera.matrixWorld).invert();
   }
 
+  /** Camera world position and unit view direction (valid after begin()). */
+  viewRay(origin: Vector3, dir: Vector3): void {
+    origin.setFromMatrixPosition(this.camera.matrixWorld);
+    this.camera.getWorldDirection(dir);
+  }
+
   project(p: Vec3Like, out: ScreenPoint, margin = 0): ScreenPoint {
     const v = this.v.set(p.x, p.y, p.z).applyMatrix4(this.inv);
     out.depth = -v.z;

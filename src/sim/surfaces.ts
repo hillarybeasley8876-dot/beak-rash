@@ -9,7 +9,7 @@ import { TUNING as T } from './tuning';
 import { endDrift } from './drift';
 import { startCarry } from './steering';
 import { crashRider } from './crash';
-import { isRiding, worldPos, type SimCtx, type SimRider } from './state';
+import { isRiding, trackEnd, worldPos, type SimCtx, type SimRider } from './state';
 import { NEUTRAL_SURFACE, type SurfaceMods } from './forces';
 import type { Surface } from '../core/types';
 
@@ -21,7 +21,7 @@ export function surfaceMods(ctx: SimCtx, sr: SimRider, dt: number): SurfaceMods 
   sr.offroadCooldown = Math.max(0, sr.offroadCooldown - dt);
   if (r.airborne) return NEUTRAL_SURFACE;
   const tr = ctx.session.track;
-  const surface = tr.surfaceAt(Math.min(r.s, tr.length), r.x);
+  const surface = tr.surfaceAt(Math.min(r.s, trackEnd(tr)), r.x);
   r.surface = surface;
   if (OFFROAD.has(surface) && !OFFROAD.has(sr.lastSurface as Surface) && sr.offroadCooldown <= 0) {
     ctx.bus.emit('rider:offroad', { riderId: r.id, surface });
@@ -48,7 +48,7 @@ export function resolveBounds(ctx: SimCtx, sr: SimRider, dt: number): void {
   sr.wallCooldown = Math.max(0, sr.wallCooldown - dt);
   sr.wallHitCooldown = Math.max(0, sr.wallHitCooldown - dt);
   const tr = ctx.session.track;
-  const b = tr.bounds(Math.min(r.s, tr.length));
+  const b = tr.bounds(Math.min(r.s, trackEnd(tr)));
   const right = b.right - T.riderHalfWidth;
   const left = -b.left + T.riderHalfWidth;
   updateLatch(sr, sr.wallSide > 0 ? right : left, dt);

@@ -44,6 +44,7 @@ function onCrash(ctx: CombatCtx, r: RiderState): void {
 export function createCombat(session: Session): CombatSystem {
   const ctx = new CombatCtx(session, session.rng.fork(0xc0b4));
   ctx.lib = new PropLibrary();
+  ctx.lib.prebuild();
   ctx.visuals = new VisualSystem(ctx);
   ctx.skills = new SkillRunner(ctx);
   ctx.projectiles = new ProjectileSystem(ctx);
@@ -51,6 +52,7 @@ export function createCombat(session: Session): CombatSystem {
   armRivals(ctx);
   const offs = [listenSp(ctx), listenKo(ctx, (r) => onCrash(ctx, r)), installCombatDebug(ctx)];
   let disposed = false;
+  let visualDt = 0; // sim seconds stepped since the last rendered frame (visuals live in sim time)
 
   return {
     preStep(dt) {
@@ -79,9 +81,16 @@ export function createCombat(session: Session): CombatSystem {
       ctx.skills.post(dt);
       ctx.projectiles.update(dt);
       ctx.pickups.update(dt, ctx.racing);
-      ctx.visuals.update(dt);
+      visualDt += dt;
       checkKos(ctx);
       flushImpacts(ctx);
+    },
+    /** Render-only work, once per rendered frame on final poses (update(0) re-faces ribbons in hit-stop). */
+    frame() {
+      if (disposed) return;
+      ctx.visuals.update(visualDt);
+      visualDt = 0;
+      ctx.pickups.sync();
     },
     dispose() {
       if (disposed) return;

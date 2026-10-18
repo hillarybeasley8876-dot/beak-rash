@@ -7,6 +7,8 @@ import { SFX } from '../src/audio/sfx/bank';
 import { mountLab } from '../src/audio/lab/panel';
 import { SONGS } from '../src/audio/music/songs';
 import { STINGERS } from '../src/audio/music/stingers';
+import { AUDIO_RATE } from '../src/audio/engine';
+import { prepareKeySamples } from '../src/audio/music/instruments/keys-render';
 
 declare global {
   interface Window {
@@ -31,7 +33,7 @@ declare global {
 }
 
 window.__audioCheck = {
-  ready: true,
+  ready: false,
   songs: Object.keys(SONGS),
   stingers: Object.keys(STINGERS),
   renderSong,
@@ -47,6 +49,11 @@ window.__audioCheck = {
   stingerIdleChecks,
   fadeOutCheck,
 };
+
+// Renders use the game's sampled keys: ready once the note samples exist.
+void prepareKeySamples(AUDIO_RATE).then(() => {
+  if (window.__audioCheck) window.__audioCheck.ready = true;
+});
 
 const root = document.getElementById('app');
 if (root) mountLab(root);

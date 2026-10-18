@@ -176,12 +176,42 @@ t2 voice pause → t3 trace → t4 WebKit → m2 hysteresis → m1 finish → m5
 - [x] t3 trace: VoicePlayer.play() → 'started' | 'queued' | 'dropped' | 'none'; the trace entry is written by an onStart
   hook when the line really sounds (barks too). Check (audio-check-robust.mjs): ann_ko + queued ann_final → logged at
   0 / +415 ms; paused 150 ms in → ann_final never plays (paused or after resume).
-- [ ] C1 audio-thread CPU ~2× budget + realtime gate (major, both lenses)
+- [~] C1 audio-thread CPU (major, both lenses). Resumed (fixer 2b, 10-18 14:20) from the interrupted fixer's
+  tools/audio-check-cpu.mjs (CDP renderCapacity gate, `--cpu`). Profiling (scratch probes in shots/audio/fix2/:
+  offline per-node / per-instrument renders, realtime A/B rotations): a running biquad costs ≈ 2 oscillators, a glide
+  ≈ 3.5×, nodes that run all the time dominate. Done (each verified offline + in the realtime gate):
+  · sfx/cache.ts: every one-shot is rendered once (OfflineAudioContext, 2 takes if < 0.9 s) after its first live play /
+    prewarm (UI sounds at unlock, 31 race sounds at attach) → 1 buffer source + gain (pitch = playbackRate, vol = gain:
+    identical sound); sounds share pan buses (0.1 steps); MAX_ACTIVE 32 → 24. Rival-burst A/B −22 %.
+  · Drums: every hit (kick, snare, rim, toms, clap, hats, shaker, tambourine, ride, crash, cowbell) is a sample built
+    once per page (music/instruments/drum-samples.ts + dsp/render.ts: JS biquads / glides, 67 ms at boot) → 1 source +
+    gain, no oscillator glides or filter chains; hats / ride / crash gained an 808-style metallic layer, panned hits
+    are stereo (m6). Slap-bass string clicks and clav mutes are samples too.
+  · Keys: music/instruments/keys-sampler.ts + keys-render.ts — the Rhodes voice is rendered once (10 pitches × 2
+    velocities, OfflineAudioContext at boot, async) and each note is 1 source + gain (release at note-off); long notes /
+    before the bank exists use the live voices (4 now, bark gated apart). Sampled vs live: ≤ 0.3 dB in every band.
+  · Bass 3 oscillators → 1 mixed wave (dsp/curves.ts mixWave), gated, strip EQ folded into the filter settle; brass 4
+    saws / voice, no panners; clav double-stops (guide tones), no high-pass; undriven strips use the input as fader;
+    one shared vibrato LFO per band; muffle LPs and the KO bass-drop HP are switched in only while active
+    (dsp/switch.ts, 20 ms crossfade); bike-loop rates k-rate, chain high-pass dropped.
+  · Reverb: the interrupted fixer's delay-line network cost 0.8 % of the audio thread (rotation A/B: delay 1.30 %,
+    convolver 0.53 %, none 0.47 %) — Chromium runs a ConvolverNode's FFT work on a background thread. Back to a
+    1.1 s stereo convolution plate fed in mono (level matched), dsp/reverb.ts removed.
+  · Mix re-balanced (the B1 fix had removed the persistent voices' pre-onset energy, mostly hats, so the offline gate
+    failed): noise hits +3.5 dB (cymbals +5.5) over the old voices, kick 0.95 → 0.76, lead 0.85, bass 0.6, clav 2.4,
+    pad 0.45, per-song trims (title / coast / city / mountain / results `mix`), coast intro chords sustained. Offline gate
+    green: lead −3.5…−4.2 LU, bass −7…−9.7, low 31–39 %, hooks +3.1…+6.2 dB (mountain sits near every edge).
+  Realtime gate (load ≈ 7–12, before the convolver): menu 3.7–4.2 / 5.1–8.1 %, race 5.0 / 7.8–8.0, pack 6.3 / 8.4,
+  stretch 6.1–6.6 / 9.2 (critic r2 at load 7: race 8.0 / 10.5, stretch 10.1 / 14.8). Next: re-measure with the plate.
 - [x] t1 mute check: audio-check mutes through app.save.update (as the settings screen does), adds an unrelated save, and
   restores the saved master afterwards; system side re-applies volumes only on volume edits → −180 dBFS, check green.
 - [x] t4 WebKit: prepare() sets ctx.onstatechange → suspend() whenever the context starts running before unlock (removed on
   unlock). audio-check-robust.mjs (WebKit): 'suspended' before the gesture, live after; without the handler: 'running'.
   In-game suite after the refactor: all 31 game checks green (mute −180 dBFS across an unrelated save).
 - [ ] m2 top-3 layers: bar-line switching + 2 s hold · m1 finish: freeze form, place-based FINISH, results variant
-- [ ] m5 harmony nits · m6 cymbals · m4 menu songs ≥ 2 min · m3 voice clips (needs IOA VPN)
+- [x] m5 harmony nits: menu A2 bar 6 / B bar 5 Ab5 → A5 (the 9th the Gm7b5 voicing holds); city A4 bar 8 ends B5–Ab5 over
+  Db7#11 (no C6 = maj7 over the dominant); title A2/A3 bar 6 G–E–C#–C–A (no F5 over A7#9) and B bar 6 G–E–C#–Bb (no F5
+  over A7b9). Reviewer harmony.mjs (copy: shots/audio/fix2/harmony.mjs): those flags are gone; what remains are
+  intended 13ths / lydian #11s and passing 16ths.
+- [ ] m6 cymbals · m4 menu songs ≥ 2 min · m3 voice clips (needs IOA VPN)
 - [ ] m7 / t6 cross-unit (ui stamp/count/pause sounds; police whistle event) → core requests

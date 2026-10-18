@@ -4,7 +4,7 @@ import { voiceChord, type Chord, type Mode, type Tonality } from './theory';
 import { filter, perc } from '../dsp/env';
 import type { Band } from './band';
 
-export type StingerId = 'count' | 'go' | 'ko' | 'showtime' | 'busted' | 'finish' | 'wrecked' | 'onemore';
+export type StingerId = 'count' | 'go' | 'ko' | 'showtime' | 'busted' | 'finish' | 'finishLow' | 'wrecked' | 'onemore';
 
 export interface StingCtx {
   key: Tonality;
@@ -18,7 +18,8 @@ type Sting = (b: Band, t: number, c: StingCtx) => number;
 export const STING_TIMING: Record<StingerId, { grid: number; duck: boolean }> = {
   count: { grid: 0, duck: false }, go: { grid: 0, duck: false },
   ko: { grid: 2, duck: true }, wrecked: { grid: 2, duck: true }, onemore: { grid: 2, duck: true },
-  showtime: { grid: 4, duck: true }, finish: { grid: 4, duck: true }, busted: { grid: 4, duck: true },
+  showtime: { grid: 4, duck: true }, finish: { grid: 4, duck: true }, finishLow: { grid: 4, duck: true },
+  busted: { grid: 4, duck: true },
 };
 
 export const isStinger = (id: string): id is StingerId => id in STING_TIMING;
@@ -132,6 +133,7 @@ export const STINGERS: Record<StingerId, Sting> = {
     return 2.3;
   },
   finish(b, t, { key }) {
+    // Podium (places 1–3): the full victory fanfare.
     const beat = 0.24;
     [1, 1, 2, 3].forEach((which, i) => b.drums.tom(t + i * beat * 0.25, 0.85, which as 1 | 2 | 3));
     // bVI – bVII – I: the victory cadence works in every mode.
@@ -144,6 +146,18 @@ export const STINGERS: Record<StingerId, Sting> = {
     b.drums.kick(big, 1);
     b.drums.swell(t, beat * 3, 0.6);
     return big - t + 1.8;
+  },
+  finishLow(b, t, { key }) {
+    // Places 4–8, a shrug: bVI → V → a quiet minor tonic with a sagging wah on its minor third.
+    const beat = 0.24;
+    b.drums.tom(t, 0.6, 2);
+    b.brass.stab(t, triad(key, 8, false, 58), 0.18, 1);
+    b.drums.tom(t + beat, 0.7, 3);
+    b.brass.stab(t + beat, triad(key, 7, false, 58), 0.3, 0.9, 'fall');
+    const last = t + beat * 2.5;
+    b.brass.stab(last, triad(key, 0, true, 58), 0.9, 0.7, 'fall');
+    b.lead('wah').note(last, pc(key, 3, 64), 0.7, LOUD * 0.6, true);
+    return last - t + 1.2;
   },
   wrecked(b, t, { key }) {
     b.brass.stab(t, power(key, 46), 0.12, 0.9, 'fall');

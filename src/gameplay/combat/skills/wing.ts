@@ -1,8 +1,11 @@
 // pelican.wing — wings out for 2.2 s: +40 % top speed; ramming knocks riders aside (8 dmg) without slowing
 // the pelican down. Only the speed a rear-end contact takes is handed back; brakes, grass, slopes and walls
-// still slow you as usual.
+// still slow you as usual. The contact test mirrors sim's rule until core adds RiderMods.pushImmune
+// (status/combat.md, core requests); then this copy goes.
 import { Vector3 } from 'three';
+import { clamp01 } from '../../../core/math';
 import type { RiderState } from '../../../core/types';
+import { BIKES } from '../../../data/bikes';
 import { others, targetable, type CombatCtx } from '../ctx';
 import { Trail } from '../visuals/trail';
 import { skillBoost, skillHit } from './common';
@@ -12,8 +15,6 @@ const ID = 'pelican.wing';
 export const WING = { dur: 2.2, boost: 0.4, damage: 8, knock: 7, ramAhead: 2.1, ramBack: -0.5, ramDx: 1.7 } as const;
 /** Sim's rider contact box (|ds| < 1.7, |dx| < 0.75) plus one substep of closing distance. */
 const CONTACT = { ds: 1.85, dx: 0.85, dy: 1 } as const;
-/** Brake deceleration (m/s², SPEC §6) still allowed on a contact substep. */
-const BRAKE = 12;
 
 /** Would sim resolve a rear-end contact with `r` behind `o` this substep? (mirrors sim's solid-rider rule) */
 function rearEnding(r: RiderState, o: RiderState): boolean {
@@ -49,8 +50,8 @@ class WingDash extends TimedSkill {
   protected tick(dt: number): void {
     const { ctx, caster: r } = this;
     if (this.contact) {
-      const brake = ctx.session.controls.get(r.id)?.brake ?? 0;
-      r.speed = Math.max(r.speed, this.preSpeed - BRAKE * brake * dt);
+      const brake = clamp01(ctx.session.controls.get(r.id)?.brake ?? 0);
+      r.speed = Math.max(r.speed, this.preSpeed - BIKES[r.bike].brake * brake * dt); // the bike's own brakes still bite
     }
     const hits = others(ctx, r, (o, ds, dx) => targetable(ctx, o) && !this.rammed.has(o.id) &&
       ds > WING.ramBack && ds < WING.ramAhead && Math.abs(dx) < WING.ramDx);

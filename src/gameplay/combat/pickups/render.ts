@@ -1,22 +1,15 @@
 // Draws pickups: one instanced toon mesh (+ outline) per row kind, one shared instanced shadow blob,
 // and a toon mesh per dropped weapon. Only items near the player are written each update.
-import {
-  InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, Quaternion, Vector3, type BufferGeometry,
-} from 'three';
+import { InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, Quaternion, Vector3 } from 'three';
 import { easeOutBack, smoothstep } from '../../../core/math';
 import type { TrackFrame, WeaponId } from '../../../core/types';
 import type { CombatCtx } from '../ctx';
 import { instancedToon, toonMesh } from '../meshes/build';
 import type { PropLibrary } from '../meshes/library';
-import { canGeometry, coinGeometry, crateGeometry, fishGeometry, shadowGeometry } from '../meshes/pickup-props';
-import { weaponGeometry } from '../meshes/weapon-props';
 import { PICKUP } from '../tuning';
 import type { Item, PickupKind } from './items';
 
 type RowKind = Exclude<PickupKind, 'weapon'>;
-const MAKERS: Record<RowKind, () => BufferGeometry> = {
-  coin: coinGeometry, fish: fishGeometry, crate: crateGeometry, can: canGeometry,
-};
 const SCALE: Record<RowKind, number> = { coin: 1.75, fish: 1.45, crate: 1.3, can: 1.45 };
 /** Items shrink away between these distances (m) from the camera, so a passed coin never fills the screen. */
 const NEAR_CAMERA = { hide: 1.6, full: 4 } as const;
@@ -41,16 +34,16 @@ export class PickupRenderer {
   private axisX = new Vector3(1, 0, 0);
 
   constructor(private ctx: CombatCtx, private lib: PropLibrary, counts: Record<RowKind, number>) {
-    for (const kind of Object.keys(MAKERS) as RowKind[]) {
+    for (const kind of Object.keys(SCALE) as RowKind[]) {
       const cap = counts[kind] + 12;
-      const { fill, hull } = instancedToon(lib.get(`pickup:${kind}`, MAKERS[kind]), cap, 0.035);
+      const { fill, hull } = instancedToon(lib.get(`pickup:${kind}`), cap, 0.035);
       fill.name = `pickups:${kind}`;
       ctx.root.add(fill);
       this.batches.set(kind, { fill, hull, n: 0, cap });
     }
     const total = Object.values(counts).reduce((a, b) => a + b, 0) + 64;
     const mat = new MeshBasicMaterial({ color: '#000000', transparent: true, opacity: 0.26, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
-    this.shadow = new InstancedMesh(lib.get('pickup:shadow', shadowGeometry), mat, total);
+    this.shadow = new InstancedMesh(lib.get('pickup:shadow'), mat, total);
     this.shadow.count = 0;
     this.shadow.frustumCulled = false;
     this.shadow.name = 'pickups:shadow';
@@ -98,7 +91,7 @@ export class PickupRenderer {
     let mesh = this.drops.get(item.id);
     if (!mesh) {
       const w = item.weapon as Exclude<WeaponId, 'none'>;
-      mesh = toonMesh(this.lib.get(`weapon:${w}`, () => weaponGeometry(w)), 0.03);
+      mesh = toonMesh(this.lib.get(`weapon:${w}`), 0.03);
       mesh.name = `pickup:weapon:${w}`;
       this.ctx.root.add(mesh);
       this.drops.set(item.id, mesh);

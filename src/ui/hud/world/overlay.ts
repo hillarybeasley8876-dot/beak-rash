@@ -2,12 +2,13 @@
 // bus events into overlay spawns. Pure presentation: reads session state, never writes it.
 import '../css/world.css';
 import { SKILLS } from '../../../data/skills';
-import type { AppContext, Session } from '../../../core/contracts';
+import type { Session } from '../../../core/contracts';
 import type { GameEvents } from '../../../core/events-map';
 import { el } from '../dom';
 import { Bubbles } from './bubbles';
 import { DamageNumbers } from './damage';
 import { EdgeWarnings } from './edges';
+import { IncomingWarning } from './incoming';
 import type { Projector } from './project';
 import { NameTags } from './tags';
 
@@ -19,14 +20,16 @@ export class WorldOverlay {
   private bubbles: Bubbles;
   private damage: DamageNumbers;
   readonly edges: EdgeWarnings;
+  readonly incoming: IncomingWarning;
   private session: Session | null = null;
 
-  constructor(private app: AppContext, private proj: Projector, parent: HTMLElement, edgesParent: HTMLElement) {
+  constructor(private proj: Projector, parent: HTMLElement, edgesParent: HTMLElement) {
     this.root = el('div', 'brh-world', parent);
     this.tags = new NameTags(this.root);
     this.damage = new DamageNumbers(this.root);
     this.bubbles = new Bubbles(this.root);
     this.edges = new EdgeWarnings(edgesParent);
+    this.incoming = new IncomingWarning(edgesParent);
   }
 
   attach(session: Session | null): void {
@@ -34,9 +37,14 @@ export class WorldOverlay {
     this.bubbles.clear();
     this.damage.clear();
     this.edges.clear();
+    this.incoming.clear();
     const riders = session?.riders ?? [];
     this.tags.setRiders(riders);
     this.edges.setRiders(riders);
+  }
+
+  onProjectile(e: GameEvents['projectile:spawn']): void {
+    if (this.session) this.incoming.spawn(this.session, e);
   }
 
   onTaunt(e: GameEvents['taunt']): void {
@@ -58,17 +66,19 @@ export class WorldOverlay {
     const r = s?.rider(e.riderId);
     if (!s || !r || r.isPlayer) return;
     if (Math.abs(r.s - s.player.s) > WARN_RANGE) return;
-    this.edges.skillWarn(r.id, SKILLS[e.skillId]?.glyph ?? '!');
+    const glyph = SKILLS[e.skillId]?.glyph ?? '!';
+    this.edges.skillWarn(r.id, glyph);
+    this.tags.castFlash(r.id, glyph);
   }
 
   /** Call after proj.begin() for this frame. */
   update(dt: number, k: number): void {
     const s = this.session;
     if (!s) return;
-    const { width, height } = this.app.size;
     this.tags.update(s, this.proj, k, dt);
-    this.bubbles.update(s, this.proj, k, dt);
+    this.bubbles.update(s, this.proj, k, dt, this.tags.boxes());
     this.damage.update(this.proj, k, dt);
-    this.edges.update(s, width, height, k, dt);
+    this.edges.update(s, this.proj, k, dt);
+    this.incoming.update(s, this.proj, k, dt);
   }
 }

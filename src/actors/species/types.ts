@@ -21,6 +21,8 @@ export interface SpeciesMeta {
   lid: { open: number; closed: number };
   /** Resting lid closure 0..1 (capybara/sloth are sleepy). */
   sleepy: number;
+  /** Lid slant (rad): + drops the inner corners (angry/smug), − lifts them (worried). */
+  lidTilt?: number;
   /** Constant pupil yaw offset (rad, + = toward the rider's left): doge side-eye. */
   lookBias?: number;
   /** Pigeon-style head bob while pedalling. */

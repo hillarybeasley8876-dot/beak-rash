@@ -53,3 +53,10 @@
 .chip-en { font: 400 34px/0.9 "Anton", sans-serif; letter-spacing: 1px; white-space: nowrap; }
 .chip-cn { font: 400 20px/1 "ZCOOL QingKe HuangYou", sans-serif; color: var(--sp); white-space: nowrap; }
 .chip-who { font: 900 16px/1 "Noto Sans SC", sans-serif; color: #bbb; white-space: nowrap; }
+.chip-ach .chip-card { box-shadow: 0 0 0 3px var(--sp), 6px 6px 0 3px var(--red); }
+.chip-ico {
+  flex: none; width: 46px; height: 46px; display: grid; place-items: center; background: var(--sp); color: var(--ink);
+  font: 400 32px/1 "ZCOOL QingKe HuangYou", sans-serif; box-shadow: 0 0 0 3px var(--paper);
+}
+.chip-kick { font: 400 15px/1 "Bebas Neue", "ZCOOL QingKe HuangYou", sans-serif; letter-spacing: 1px; color: var(--sp); white-space: nowrap; }
+.chip-ach .chip-en { font: 400 30px/1 "ZCOOL QingKe HuangYou", sans-serif; letter-spacing: 0; }

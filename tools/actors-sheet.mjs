@@ -15,6 +15,9 @@ const TW = Number(process.env.TW ?? 300), TH = Number(process.env.TH ?? 360);
 const tiles = [];
 await withPage(async (page, h) => {
   await h.goto(`/sandbox/actors.html?panel=0&speed=0&c=${ids[0]}&${extra}`);
+  // Warm-up: compile shaders and present a first frame so the first tile is never blank.
+  await page.evaluate(() => window.__actors.step(30));
+  await page.screenshot({ type: 'png' });
   for (const id of ids) {
     await page.evaluate((c) => window.__actors.set({ character: c }), id);
     if (js) await page.evaluate(js);

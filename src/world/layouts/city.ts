@@ -1,6 +1,7 @@
 // 霓虹夜城 Neon Night — 3.38 km point-to-point night city. Streets lie flat at STREET (9 m above the
 // harbour, so the underpass floor stays above the water plane); the expressway climbs 9 m on a
-// viaduct and ends in a crest jump, the underpass dips 8 m.
+// viaduct and ends in a crest jump back down to street level, the underpass dips 8 m. Net rise of
+// every grade sequence is 0, so the road always rejoins the street at STREET.
 // The ground is absolute and flat ('paved', no relief) and runs out into the harbour ~200 m from the
 // road, so blocks never sit on hills; the river lies on the LEFT of the riverside road.
 // start plaza → boulevard → corner R35 → street → corner R30 → scramble crossing → neon arcade →
@@ -60,6 +61,7 @@ export const CITY: LayoutDef = {
       ],
       marks: [
         { kind: 'busStop', at: 60, x: 1 }, { kind: 'subway', at: 150, x: 1 }, { kind: 'busStop', at: 240, x: -1 },
+        { kind: 'crossing', at: 125, x: 0 }, { kind: 'crossing', at: 282, x: 0 },
       ],
     },
     { len: 55, name: 'corner', radius: 35, ease: 18 },
@@ -69,7 +71,7 @@ export const CITY: LayoutDef = {
         { kind: 'pickupRow', at: 50, len: 12, x0: 3.5, x1: 3.5, data: { kind: 'crate' } },
         { kind: 'oil', at: 100, len: 8, x0: -4.2, x1: -1.0 },
       ],
-      marks: [{ kind: 'mural', at: 70, x: -1 }],
+      marks: [{ kind: 'mural', at: 70, x: -1 }, { kind: 'crossing', at: 128, x: 0 }],
     },
     { len: 47, name: 'corner', radius: -30, ease: 16 },
     {
@@ -93,7 +95,7 @@ export const CITY: LayoutDef = {
       features: [{ kind: 'pickupRow', at: 70, len: 12, x0: 2.5, x1: 2.5, data: { kind: 'coin' } }],
     },
     {
-      len: 200, name: 'expressway', radius: 320, rise: 1, ease: 50,
+      len: 200, name: 'expressway', radius: 320, ease: 50,
       features: [
         { kind: 'boostPad', at: 60, len: 6, x0: -5.2, x1: -1.8, data: { power: 0.3, time: 1 } },
         { kind: 'pickupRow', at: 130, len: 15, x0: 3.5, x1: 3.5, data: { kind: 'can' } },
@@ -111,7 +113,7 @@ export const CITY: LayoutDef = {
         { kind: 'pickupRow', at: 100, len: 15, x0: -3.5, x1: -3.5, data: { kind: 'fish' } },
         { kind: 'puddle', at: 210, len: 7, x0: -5.0, x1: -2.0 },
       ],
-      marks: [{ kind: 'skyline', at: 150, x: -1 }, { kind: 'busStop', at: 160, x: 1 }],
+      marks: [{ kind: 'skyline', at: 150, x: -1 }, { kind: 'busStop', at: 160, x: 1 }, { kind: 'crossing', at: 190, x: 0 }],
     },
     {
       len: 140, name: 'bridge', sideEase: 2, left: span, right: span,
@@ -136,12 +138,13 @@ export const CITY: LayoutDef = {
     {
       len: 160, name: 'avenue', left: walk, right: walk,
       features: [{ kind: 'pickupRow', at: 70, len: 12, x0: -3.5, x1: -3.5, data: { kind: 'can' } }],
-      marks: [{ kind: 'subway', at: 100, x: -1 }],
+      marks: [{ kind: 'subway', at: 100, x: -1 }, { kind: 'crossing', at: 30, x: 0 }, { kind: 'crossing', at: 148, x: 0 }],
     },
     { len: 88, name: 'hairpin', radius: 28, ease: 20, marks: [{ kind: 'roundabout', at: 44, x: 28 }] },
     {
       len: 100, name: 'avenue', ease: 20,
       features: [{ kind: 'oil', at: 50, len: 8, x0: 0.8, x1: 4.2 }],
+      marks: [{ kind: 'crossing', at: 16, x: 0 }],
     },
     {
       len: 300, name: 'sprint',
@@ -149,7 +152,7 @@ export const CITY: LayoutDef = {
         { kind: 'boostPad', at: 110, len: 6, x0: 1.6, x1: 5.0, data: { power: 0.3, time: 1 } },
         { kind: 'pickupRow', at: 200, len: 15, x0: -2, x1: -2, data: { kind: 'coin' } },
       ],
-      marks: [{ kind: 'busStop', at: 60, x: 1 }],
+      marks: [{ kind: 'busStop', at: 60, x: 1 }, { kind: 'crossing', at: 160, x: 0 }],
     },
     {
       len: 160, name: 'finish', left: plaza, right: plaza,

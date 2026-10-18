@@ -53,30 +53,48 @@
 - [x] final contact sheets: shots/track/final-sheet.png (12 chase views), shots/track/game-sheet.png (16 in-game),
   shots/track/aerial.png; perf after all changes ≤ 141 calls / ≤ 456k tris per chase view
 - [x] poster billboards: text band 0.30 → 0.38 of the face (2-line memes ≈ 25 % larger glyphs)
-- deferred (not small; core integration TODO for wave 2): coast tight corners R 45–70 m / hairpin / chicane.
-  Note: wave-2 units env-city / env-mountain now own the city / mountain layouts + dressings.
+- [x] coast tight corners (integrator note) — see below. Wave-2 units env-city / env-mountain own the city /
+  mountain layouts + dressings.
 
-## Tight corners (integrator note, resume 10-18 #2) — plan / progress
-- [ ] sandbox/track.plan.mjs: node layout checker (game's own buildLayout via tools/content-ts.mjs hook):
-      corners list (R, turn), self-proximity, sea/land side conflicts, pickup rows |x| ≤ hw − 1, plan PNG.
-- [ ] coast.wip.ts → coast.ts: S-chicane R 55–70 (replaces the R150 sbend), near-hairpin R 40–55 around the
-      lighthouse promontory (lighthouse on the outside of the bend), 1 more tighter corner; length ≈ 3.3 km;
-      features/pickups on asphalt; marks/bumps/sign positions follow the new s values.
-- [ ] content request 6: curves sign = ROAD_SIGNS[5] 「连续弯道 弯弯有鹅」 placed before the new corners.
-- [ ] verify: track.test, track.shots (chase + aerial), track.perf, feel-tour, race-soak --seeds 1.
+## Tight corners (integrator note, resume 10-18 #2) — DONE
+- [x] sandbox/track.plan.mjs (+ track.plan-png.mjs): node layout checker on the game's own buildLayout:
+      corners (R, turn), self-proximity, sea/land side conflicts, rows |x| ≤ hw − 1, dome clearance, plan PNG.
+- [x] coast.ts (3300 m, same s for everything before 980 and after 1580): S-chicane 998–1116 (L R60 −48°,
+      R R60 +48°; run-off: grass verge right, 3 m asphalt shoulder left) replaces the R150 sbend; calanque
+      1209–1535: R90 +57° into a narrow cove, near-hairpin L R46 −118° round its head (1324–1427; rail +
+      drop inside, 3.6 m asphalt run-off before the rock wall outside), R90 +58° out past the lighthouse
+      islet (bump s1514 x−86). Crest (peak 1640), ramp 1812, tunnel, bridge unchanged.
+- [x] signs / villages / gulls are layout marks now ({kind:'sign', data:{sign}} · 'village' · 'gulls'), so they
+      follow the corners: curves sign = ROAD_SIGNS[5] 「连续弯道 弯弯有鹅」 at 930 (content request 6),
+      sharp-bend warning 「急弯 别急」 at 1236, lighthouse sign 1452, fish 1135; far groves / hill villages use
+      place.free() (never on another road part).
+- [x] far grid: vertices covered by the near ribbon (and under the road) sink below the lowest profile
+      point within one cell (terrain/far.ts deepHold/roadHold) — removed far-grid spikes poking through
+      cliff feet (coast 989 → 100 poke samples, the rest at the bridge abutment; mountain 665 → 408,
+      city 146 → 48; 0 new holes on coast / city).
+- [x] verified: track.test OK · plan check 0 fails · perf ≤ 142 calls / 455k tris · track.race OK · in-game
+      sheet (shots/track/game-sheet.png) · calanque shots (calanque-top/-in/-sea, hairpin-sheet,
+      corners-sheet, signs-sheet) · feel-tour: chicane needs 69 % steer at 20 m/s (was 28 %), drift L2 +
+      boost in the chicane · race-soak --seeds 1: SOAK OK (all 8 finish, 171 s, maxStuck 2 s, 80 drift events).
 
 ## Feature data (for sim / race / combat)
 - ramp: wedge 0 → data.height (1.2) from s0 to s1 across x0..x1 · jumpCrest: data.peak = crest s
 - boostPad: data.power/time (0.3 / 1.0) · oil, puddle: boxes · tunnel / bridge: s range, full width
 - pickupRow: diagonal row (s0,x0)→(s1,x1), data.kind = coin|fish|crate|can (else mixed); 15 rows, all
-  |x| ≤ 6; crate/can rows at s ≈ 430 crate, 820 can, 1250 crate, 1480 can, 1825 can, 2240 crate,
-  2620 crate, 2990 can (+ mixed rows 1110, 2390 with one random special).
+  |x| ≤ 6; crate/can rows at s ≈ 430 crate, 820 can, 1190 crate, 1494 can, 1825 can, 2240 crate,
+  2620 crate, 2990 can (+ mixed rows 1118, 2390 with one random special); coin row 1366 on the hairpin apex.
+- Tight corners: chicane L R60 998–1053 / R R60 1059–1116; calanque R R90 1209–1304, hairpin L R46
+  1324–1427, R R90 1440–1535 (run `node sandbox/track.plan.mjs` for the live list).
 - Track.runoff = 250 m: frameAt / toWorld / project / bounds / surfaceAt valid on [0, length + 250]
   (barrier-lined straight past the FINISH gantry).
 - Start line (visual) at s = 46, grid slots painted at s = 40 / 33.5 / 27, x = −3.4 / 0 / 3.4.
 
 ## Known issues
-- Banked rail / seawall runs lean ≤ 2.6 cm into bounds at 0.5 m height (s≈1000 L, 2570–2700 L); harmless.
+- Banked rail / seawall runs lean ≤ 2.6 cm into bounds at 0.5 m height (chicane, 2570–2700 L); harmless.
+- sim: tools/feel-tour.mjs `cliffwall` stop (s 1200, x 3, steer .45) now sits in the calanque's R90 entry turn
+  and no longer reaches the wall (x 2.9→3.8). Rock-wall stretches for that test: s 1160–1205 R (x 8.4) or the
+  tunnel walls 1945–2095 (x ±8). Other stops still land on their features (sbend → chicane, crest, ramp).
+- Hill village site s 330 finds no flat dry spot (4 of 5 villages, as before).
 - content: sandbox/content.world.ts mirrors the poster billboard layout; its band is still 0.30 (now 0.38).
 
 ## Core requests
@@ -87,6 +105,8 @@
 
 ## How to test
 - `node sandbox/track.test.mjs` — API self-test (exit 1 on failure).
+- `node sandbox/track.plan.mjs [--file … --export …]` — layout plan check without a browser (exit 1 on failure)
+  + top-down plan PNG (shots/track/plan.png).
 - `node sandbox/track.shots.mjs --q "s=1300&x=2" --out shots/track/x.png` (also `view=aerial|high`,
   `sheet=0,400,…` contact sheet). Sandbox page: /sandbox/track.html.
 - `node sandbox/track.race.mjs` — autopilot race, restart, quit (1 track group, fog restored, no errors).

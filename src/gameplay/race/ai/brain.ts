@@ -27,6 +27,7 @@ const PLAN_EVERY = 0.05;
 const SKILL_EVERY = 0.5;
 const SOFT_CLOSING = 2;     // m/s: closing on a rider faster than this brakes instead of coasting
 const FOLLOW_DECEL = 4;     // m/s²: planned deceleration when closing on a rider ahead
+const CAP_SLACK = 0.5;      // m/s: aim this far above the pace cap (rubber makes the sim's top the cap itself)
 
 export class Brain {
   readonly driver = new Driver();
@@ -51,6 +52,8 @@ export class Brain {
   private wantX = 0;              // last desired lane before the planner (debug summary)
   /** Rubber band: top-speed cap (m/s before mods/boosts) set by the director; Infinity = none. */
   paceTop = Infinity;
+  /** Base pace of this rival (level reference + offset, m/s); Infinity when not racing / the player. */
+  basePace = Infinity;
   /** Ring the bell on the next racing tick (after passing the player). */
   ringBell = false;
   /** Debug/test: seconds of forced braking (e.g. let the police catch the autopilot). */
@@ -174,7 +177,8 @@ export class Brain {
     return {
       id: r.id, c: r.character, mode: r.mode, s: Math.round(r.s), x: +r.x.toFixed(2), v: +r.speed.toFixed(1),
       planX: +this.plan.x.toFixed(2), wantX: +this.wantX.toFixed(2), draft: this.draft?.id ?? null, follow: this.plan.followSpeed, hunt: this.fighter.hunt?.id ?? null,
-      pace: Number.isFinite(this.paceTop) ? +this.paceTop.toFixed(2) : null, rubber: +r.rubber.toFixed(3), aLat: +this.grip.aLat.toFixed(2), drift: this.drift.active,
+      pace: Number.isFinite(this.paceTop) ? +this.paceTop.toFixed(2) : null, base: Number.isFinite(this.basePace) ? +this.basePace.toFixed(2) : null,
+      top: +topOf(r).toFixed(2), rubber: +r.rubber.toFixed(3), aLat: +this.grip.aLat.toFixed(2), drift: this.drift.active,
       steer: +this.c.steer.toFixed(2), throttle: +this.c.throttle.toFixed(2), brake: +this.c.brake.toFixed(2),
     };
   }
@@ -193,10 +197,11 @@ export class Brain {
       return;
     }
     const boost = 1 + (r.boostTime > 0 ? r.boostPower : 0);
-    // Own bike top (× the race's unseen rubber band, which the sim multiplies in) × statuses × boost.
+    // Own bike top (× the race's rubber band factor, which the sim multiplies in) × statuses × boost.
     const top = topOf(r) * r.rubber * r.mods.speedMul * boost;
-    // Aim above top speed so the pedals stay floored, unless the pace cap binds (then ease off, no brake).
-    const cap = this.paceTop * r.mods.speedMul * boost;
+    // Aim above top speed so the pedals stay floored up to the pace cap (the rubber factor holds the sim's top
+    // there); above it (a boost wearing off, rubber still easing) ease off, no brake.
+    const cap = this.paceTop * r.mods.speedMul * boost + CAP_SLACK;
     const base = Math.min(top + 2, cap);
     if (this.time > this.driftRollAt) {
       this.driftRollAt = this.time + 6;

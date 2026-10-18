@@ -1,6 +1,8 @@
 // Audio lab (sandbox/audio.html): every song, stinger, sfx and voice line on a button, adaptive
 // intensity / muffle / bass-drop controls, a spatial pan + distance test and a live meter.
 // Built on the same Engine / Conductor / SfxPlayer / VoicePlayer the game uses.
+import { prepareDrumSamples } from '../music/instruments/drum-samples';
+import { prepareKeySamples } from '../music/instruments/keys-render';
 import { AUDIO_RATE, Engine } from '../engine';
 import { DEFAULT_VOLUMES } from '../check';
 import { Conductor } from '../music/conductor';
@@ -63,6 +65,8 @@ export function mountLab(root: HTMLElement): void {
     if (lab) return;
     const ctx = new AudioContext({ latencyHint: 'interactive', sampleRate: AUDIO_RATE });
     const engine = new Engine(ctx, DEFAULT_VOLUMES);
+    prepareDrumSamples(ctx);
+    void prepareKeySamples(ctx.sampleRate);
     const l: Lab = {
       ctx, engine, conductor: new Conductor(engine), sfx: new SfxPlayer(engine),
       voices: new VoicePlayer(engine, new URL('/', window.location.href)), meter: new Meter(ctx, engine.output, canvas),

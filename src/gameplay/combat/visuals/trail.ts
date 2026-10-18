@@ -3,6 +3,9 @@ import { Vector3, type ColorRepresentation } from 'three';
 import { Ribbon } from './ribbon';
 import type { Visual, VisualSystem } from './visuals';
 
+/** Sim seconds between new samples (a bit under 1/60 s, so frame jitter at 60 fps never skips one). */
+const SAMPLE_GAP = 0.75 / 60;
+
 export interface TrailOpts {
   color: ColorRepresentation;
   width: number;
@@ -37,7 +40,7 @@ export class Trail implements Visual {
     while (this.ages.length > 0 && (this.ages[this.ages.length - 1] ?? 0) > this.o.life) this.dropTail();
     this.acc += dt;
     if (!this.stopped && this.source(this.probe)) {
-      if (this.acc >= 1 / 60 || this.pts.length === 0) {
+      if (this.acc >= SAMPLE_GAP || this.pts.length === 0) {
         this.acc = 0;
         this.pts.unshift((this.spare.pop() ?? new Vector3()).copy(this.probe));
         this.ages.unshift(0);

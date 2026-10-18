@@ -6,7 +6,7 @@ import { clamp01, lerp } from '../core/math';
 import { TUNING as T } from './tuning';
 import { endDrift, giveBoost } from './drift';
 import { startCarry } from './steering';
-import { isRiding, isSolid, type SimCtx, type SimRider } from './state';
+import { isRiding, isSolid, trackEnd, type SimCtx, type SimRider } from './state';
 
 export class Contacts {
   private cooldown = new Map<number, number>();
@@ -62,7 +62,7 @@ export class Contacts {
       this.hurt(b, dmg * Math.min(1.25, ma / mb), ra.id, k);
     }
     const tr = this.ctx.session.track;
-    tr.toWorld(Math.min((ra.s + rb.s) / 2, tr.length), (ra.x + rb.x) / 2, 0.9, this.mid);
+    tr.toWorld(Math.min((ra.s + rb.s) / 2, trackEnd(tr)), (ra.x + rb.x) / 2, 0.9, this.mid);
     this.ctx.bus.emit('rider:bump', { a: ra.id, b: rb.id, strength, pos: { x: this.mid.x, y: this.mid.y, z: this.mid.z } });
   }
 
@@ -86,8 +86,8 @@ export class Contacts {
       // A real side impact: both riders carry the bounce instead of gluing back together within 0.15 s
       // (steering back toward the other rider is muted for a moment, steering away is not).
       const toB = n > 0 ? 1 : -1;
-      startCarry(a, T.knockTime, T.knockSteer, T.knockTau, toB);
-      startCarry(b, T.knockTime, T.knockSteer, T.knockTau, toB > 0 ? -1 : 1);
+      startCarry(a, T.knockTime, T.bumpSteer, T.knockTau, toB);
+      startCarry(b, T.knockTime, T.bumpSteer, T.knockTau, toB > 0 ? -1 : 1);
     }
     return -rel;
   }

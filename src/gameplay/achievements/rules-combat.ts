@@ -1,6 +1,7 @@
 // Fighting and skill achievements (the player as attacker, plus a couple where the player is the victim).
 import type { WeaponId } from '../../core/types';
 import type { AchievementId } from '../../data/achievements';
+import { ROSTER } from '../../data/roster';
 import type { RuleCtx } from './facts';
 
 const CHAIN_WINDOW = 3;     // s between consecutive KOs for 一鱼两吃 / 一条龙服务
@@ -8,11 +9,13 @@ const ULT_WINDOW = 3;       // s after the SHOWTIME shockwave that its victims' 
 const PAYBACK_WINDOW = 10;  // s after a seagull robbed you
 const TORPEDO_HITS = 3;
 const WING_HITS = 2;
+/** Big Gulp swallows riders up to this body scale (SPEC §7); bigger ones only get bitten. */
+const SWALLOW_SCALE = 0.85;
 
 const WEAPON_KOS: Partial<Record<WeaponId, AchievementId>> = { slipper: 'slipper', keyboard: 'keyboard' };
 
 export function combatRules(ctx: RuleCtx): Array<() => void> {
-  const { bus, facts, session } = ctx;
+  const { bus, facts } = ctx;
 
   const onPlayerKo = (victim: number, skillId: string | null, weapon: WeaponId): void => {
     const t = ctx.now();
@@ -40,8 +43,10 @@ export function combatRules(ctx: RuleCtx): Array<() => void> {
 
   const onPlayerSkillHit = (skillId: string, victim: number): void => {
     if (skillId === 'pelican.gulp') {
-      // Small rivals are swallowed (status 'gulped'); bigger ones only get bitten.
-      if (session.rider(victim)?.statuses.some((s) => s.id === 'gulped')) ctx.unlock('gulp');
+      // A gulp lands one skill:hit: the spit for a swallowed small rival (its 'gulped' status is already gone
+      // by then), the bite for a bigger one. So the victim's size tells the two apart.
+      const species = ctx.character(victim);
+      if (species && ROSTER[species].scale <= SWALLOW_SCALE) ctx.unlock('gulp');
     } else if (skillId === 'pelican.torpedo') {
       facts.torpedoHits += 1;
       if (facts.torpedoHits >= TORPEDO_HITS) ctx.unlock('torpedo');

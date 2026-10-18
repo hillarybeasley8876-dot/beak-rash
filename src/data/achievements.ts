@@ -4,7 +4,7 @@ export interface AchievementDef { id: string; name: string; desc: string; icon: 
 
 const DEFS = {
   // ---- placing & finishing
-  first_win: { name: 'C 位出道', desc: '第一次拿下冠军', icon: '冠' },
+  first_win: { name: '冠军体质', desc: '第一次拿下冠军', icon: '冠' },
   podium: { name: '上台领鱼', desc: '跑进前三名', icon: '台' },
   comeback: { name: '咸鱼翻身', desc: '从最后一名逆袭夺冠', icon: '翻' },
   clutch: { name: '绝杀', desc: '最后冲刺阶段反超夺冠', icon: '绝' },
@@ -18,8 +18,8 @@ const DEFS = {
   erba: { name: '传家宝', desc: '骑二八大杠夺冠', icon: '传' },
   // ---- fighting
   first_ko: { name: '开饭了', desc: '第一次击倒对手', icon: '饭' },
-  double: { name: '一鱼两吃', desc: '一次连续击倒两名对手', icon: '双' },
-  triple: { name: '一条龙服务', desc: '一次连续击倒三名对手', icon: '龙' },
+  double: { name: '一鱼两吃', desc: '3 秒内连续击倒两名对手', icon: '双' },
+  triple: { name: '一条龙服务', desc: '3 秒内连续击倒三名对手', icon: '龙' },
   hat_trick: { name: '帽子戏法', desc: '一场比赛击倒三名对手', icon: '帽' },
   rampage: { name: '暴力鹈鹕', desc: '一场比赛击倒六名对手', icon: '暴' },
   everyone: { name: '众生平等', desc: '一场比赛击倒四种不同的对手', icon: '众' },
@@ -31,16 +31,16 @@ const DEFS = {
   payback: { name: '物归原主', desc: '被海鸥抢劫后 10 秒内击倒它', icon: '还' },
   // ---- skills
   torpedo: { name: '鱼到病除', desc: '一场比赛咸鱼鱼雷命中三次', icon: '鱼' },
-  gulp: { name: '吃了吗您', desc: '用大嘴吞噬吞下一名对手', icon: '吞' },
+  gulp: { name: '吃了吗您', desc: '用大嘴吞噬吞下小个子对手', icon: '吞' },
   wing: { name: '大鹏展翅', desc: '一次翼展冲刺撞开两名对手', icon: '翼' },
   ult_first: { name: '从天而降', desc: '第一次发动 SHOWTIME', icon: '降' },
   showtime: { name: 'SHOWTIME', desc: '用鹈鹕天降一次击倒三名对手', icon: '天' },
   // ---- riding
   perfect_start: { name: '赢在起跑线', desc: '完美起步', icon: '起' },
-  drift3: { name: '秋名山鹈鹕', desc: '放出一次三段漂移加速', icon: '漂' },
-  perfect3: { name: '稳如老狗', desc: '一场比赛完美落地三次', icon: '落' },
-  slingshot: { name: '蹭饭达人', desc: '吃满尾流后弹射加速', icon: '蹭' },
-  near_miss: { name: '就差亿点点', desc: '一场比赛擦肩而过五次', icon: '险' },
+  drift3: { name: '粉色火花', desc: '放出一次三段漂移加速', icon: '漂' },
+  perfect3: { name: '落地生根', desc: '一场比赛完美落地三次', icon: '落' },
+  slingshot: { name: '蹭饭达人', desc: '一场比赛尾流弹射超车三次', icon: '蹭' },
+  near_miss: { name: '贴脸艺术家', desc: '一场比赛擦肩而过五次', icon: '险' },
   // ---- mishaps & rivals
   pigeon: { name: '下次一定', desc: '被隐身的鸽子超车', icon: '鸽' },
   sloth: { name: '比树懒还慢', desc: '在树懒发动闪电时被它超车', icon: '懒' },

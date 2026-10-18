@@ -34,7 +34,7 @@ export function hillVillages(d: Dress, sites: number[], side: -1 | 1 = 1): void 
   const placed: string[] = [];
   for (const s of sites) {
     const c = siteNear(d, s, side);
-    if (!c || !place.claim(c.x, c.z, 4)) continue;
+    if (!c || !place.free(c.x, c.z, 4, 40)) continue;
     bellTower(b.far.at(c.x, c.z), c.x, c.y, c.z, c.yaw, 3);
     let houses = 0;
     for (let tries = 0; tries < 40 && houses < 13; tries++) {
@@ -42,7 +42,7 @@ export function hillVillages(d: Dress, sites: number[], side: -1 | 1 = 1): void 
       const x = c.x + Math.cos(a) * r, z = c.z + Math.sin(a) * r;
       const ys = [[-3, -3], [3, -3], [-3, 3], [3, 3]].map(([dx, dz]) => ctx.groundWorld(x + (dx ?? 0), z + (dz ?? 0)));
       const lo = Math.min(...ys), hi = Math.max(...ys);
-      if (hi - lo > 3.5 || lo < 4 || !place.claim(x, z, 5)) continue;
+      if (hi - lo > 3.5 || lo < 4 || !place.free(x, z, 5, 8)) continue;
       // Streets roughly follow the site's grid, each house turned a little.
       const yaw = c.yaw + rng.int(0, 3) * (Math.PI / 2) + rng.range(-0.15, 0.15);
       farHouse(b.far.at(x, z), x, hi - 0.2, z, yaw, rng, hi - lo + 1.2);

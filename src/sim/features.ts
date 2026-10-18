@@ -4,7 +4,7 @@
 // −2 % speed, a short light fishtail) + splash event.
 import { TUNING as T } from './tuning';
 import { giveBoost } from './drift';
-import { dropStatus, setStatus, type SimCtx, type SimRider } from './state';
+import { dropStatus, setStatus, trackEnd, type SimCtx, type SimRider } from './state';
 import type { RiderState } from '../core/types';
 
 interface Box { s0: number; s1: number; x0: number; x1: number }
@@ -41,7 +41,7 @@ function crest(ctx: SimCtx, sr: SimRider, b: Box, peak: number): void {
   if (r.x < Math.min(b.x0, b.x1) - 2 || r.x > Math.max(b.x0, b.x1) + 2) return;
   const tr = ctx.session.track;
   const before = tr.frameAt(Math.max(0, peak - T.crestSpan), ctx.tmpFrame).slope;
-  const after = tr.frameAt(Math.min(tr.length, peak + T.crestSpan), ctx.tmpFrame).slope;
+  const after = tr.frameAt(Math.min(trackEnd(tr), peak + T.crestSpan), ctx.tmpFrame).slope;
   r.vy = Math.max(r.vy, r.speed * Math.max(T.crestMinKick, before - after) * T.crestKick);
   if (r.airborne) sr.airKind = 'launch'; // a hop or micro-launch at the peak becomes a full jump
 }

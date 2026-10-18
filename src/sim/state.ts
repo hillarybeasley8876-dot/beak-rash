@@ -1,7 +1,7 @@
 // Private per-rider simulation state (never shared with other units) and small shared helpers.
 import { Vector3 } from 'three';
 import { bikeTune, type BikeTune } from './tuning';
-import type { Session } from '../core/contracts';
+import type { Session, Track } from '../core/contracts';
 import type { EventBus } from '../core/events';
 import type { GameEvents } from '../core/events-map';
 import type { Rng } from '../core/rng';
@@ -65,7 +65,7 @@ export interface SimRider {
   airCalm: number;                   // s the steering has stayed below perfectSteerMax in this air episode
   hopPressAt: number;                // air time of the last hop press while airborne (−1 none)
   // crash
-  respawnPending: boolean;
+  crashBack: number;                 // m/s the crashed body slides back along the road (bounced off a vehicle)
   prevS: number;
   accel: number;                     // last forward acceleration (m/s²), camera surge
 }
@@ -82,7 +82,7 @@ export function createSimRider(r: RiderState): SimRider {
     draftLeader: -1,
     nearMiss: new Map(), nearMissCooldown: 0, touching: new Set(), wallCooldown: 0, wallHitCooldown: 0,
     wallSide: 0, wallFree: 0, swipeCooldown: 0, swipeLatch: -1, swipeFree: 0, airCalm: 0, hopPressAt: -1,
-    respawnPending: false, prevS: r.s, accel: 0,
+    crashBack: 0, prevS: r.s, accel: 0,
   };
 }
 
@@ -129,11 +129,16 @@ export function dropStatus(r: RiderState, id: StatusId): void {
   if (i >= 0) r.statuses.splice(i, 1);
 }
 
+/** Last s with real road: the finish line plus the track's drivable run-off (frames are valid up to here). */
+export function trackEnd(track: Track): number {
+  return track.length + Math.max(0, track.runoff ?? 0);
+}
+
 /** Vertical curvature d(slope)/ds around s (central difference over ±h m, smooths 1 m sampling). */
 export function verticalCurvature(ctx: SimCtx, s: number, h = 2): number {
   const tr = ctx.session.track;
   const a = tr.frameAt(Math.max(0, s - h), ctx.tmpFrame).slope;
-  const b = tr.frameAt(Math.min(tr.length, s + h), ctx.tmpFrame).slope;
+  const b = tr.frameAt(Math.min(trackEnd(tr), s + h), ctx.tmpFrame).slope;
   return (b - a) / (2 * h);
 }
 
@@ -141,7 +146,7 @@ const tmpV = new Vector3();
 
 /** World position of a rider (new object — safe to hand to event listeners). */
 export function worldPos(ctx: SimCtx, r: RiderState): Vec3Like {
-  ctx.session.track.toWorld(Math.min(r.s, ctx.session.track.length), r.x, r.y, tmpV);
+  ctx.session.track.toWorld(Math.min(r.s, trackEnd(ctx.session.track)), r.x, r.y, tmpV);
   return { x: tmpV.x, y: tmpV.y, z: tmpV.z };
 }
 

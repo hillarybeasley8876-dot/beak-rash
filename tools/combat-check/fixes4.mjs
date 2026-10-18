@@ -24,4 +24,20 @@ export const fixes4 = [
       broke.weapon === 'none' && broke.uses === Infinity && broke.ev === 1 && !!drop && picked.weapon === 'pan' && picked.uses === 2 &&
       p.weaponUses === Infinity, info: { fresh, stolen, worn, broke, drop: !!drop, picked } };
   }],
+  ['render sync: ribbons and pickup instances are rewritten once per rendered frame on final poses, hit-stop frames too', () => {
+    const cc = window.__cc; cc.reset(); const c = cc.C(); const p = cc.P(), br = window.__br;
+    c.spawn('coin', p.s + 25, 2); c.cast(0, 3); cc.step(4);
+    const root = cc.S().world.children.find((o) => o.name === 'combat');
+    const ribbons = [], coins = root.children.find((o) => o.name === 'pickups:coin');
+    root.traverse((o) => { if (o.isMesh && o.geometry.getAttribute('color')?.itemSize === 4 && o.geometry.drawRange.count > 0) ribbons.push(o); });
+    const versions = () => [...ribbons.map((m) => m.geometry.getAttribute('position').version), coins.instanceMatrix.version];
+    const delta = (a, b) => b.map((v, i) => v - a[i]);
+    const v0 = versions(), t0 = cc.S().time; cc.step(1);
+    const v1 = versions(), t1 = cc.S().time; br.app.clock.hitStop(0.1); cc.step(1);
+    const v2 = versions(), t2 = cc.S().time;
+    const normal = delta(v0, v1), frozen = delta(v1, v2);
+    cc.until(() => c.running().length === 0, 300);
+    return { ok: ribbons.length === 2 && t1 > t0 && t2 === t1 && normal.every((d) => d === 1) && frozen.every((d) => d === 1),
+      info: { ribbons: ribbons.length, normal, frozen, substepTime: t1 - t0, hitStopTime: t2 - t1 } };
+  }],
 ];

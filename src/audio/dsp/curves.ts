@@ -104,3 +104,24 @@ export function pulseWave(ctx: BaseAudioContext, duty = 1 / 6, harmonics = 40): 
     return ctx.createPeriodicWave(real, imag);
   });
 }
+
+/**
+ * Peak-normalised sawtooth / square / sine mixed into one wave at the given levels, so a voice
+ * that layered three oscillators runs one (no detune between the layers, same spectrum).
+ */
+export function mixWave(ctx: BaseAudioContext, mix: { saw?: number; square?: number; sine?: number }, harmonics = 256): PeriodicWave {
+  const key = `mix${mix.saw ?? 0}/${mix.square ?? 0}/${mix.sine ?? 0}/${harmonics}`;
+  return cachedWave(ctx, key, () => {
+    const saw = (k: number): number => ((k % 2 ? 2 : -2) / (Math.PI * k));
+    const square = (k: number): number => (k % 2 ? 4 / (Math.PI * k) : 0);
+    // WebAudio normalises its built-in waves to a peak of 1; a band-limited saw or square peaks at
+    // the Wilbraham–Gibbs value (2/π)·Si(π) ≈ 1.179, so those layers are scaled by 1 / 1.179.
+    const g = 1 / 1.179;
+    const real = new Float32Array(harmonics + 1);
+    const imag = new Float32Array(harmonics + 1);
+    for (let k = 1; k <= harmonics; k++) {
+      imag[k] = g * ((mix.saw ?? 0) * saw(k) + (mix.square ?? 0) * square(k)) + (k === 1 ? mix.sine ?? 0 : 0);
+    }
+    return ctx.createPeriodicWave(real, imag, { disableNormalization: true });
+  });
+}

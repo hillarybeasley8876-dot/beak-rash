@@ -5,6 +5,8 @@ import { PRIORITY, type CutIn, type SplashKind } from './types';
 
 const OUT = 0.1;
 const QUEUE_TTL = 1.2;
+/** Splashes from WRECKED up own the screen: the player's skill band leaves and stays out meanwhile. */
+const BAND_BLOCK = PRIORITY.wrecked;
 
 interface Live { cut: CutIn; kind: SplashKind; key: string; t: number }
 interface Leaving { root: HTMLElement; t: number }
@@ -32,8 +34,7 @@ export class Director {
     if (cur && cur.key === key && cur.t < cur.cut.dur * 0.6) return;
     if (!cur || PRIORITY[kind] >= PRIORITY[cur.kind] || cur.t > cur.cut.dur - 0.15) {
       this.retire(cur);
-      this.splash = this.mount(kind, make(), key);
-      if (PRIORITY[kind] >= PRIORITY.ko) this.endBand();
+      this.showSplash(kind, make(), key);
       return;
     }
     this.queue = this.queue.filter((q) => q.key !== key);
@@ -41,9 +42,9 @@ export class Director {
     if (this.queue.length > 2) this.queue.shift();
   }
 
-  /** Player skill band: replaces the previous band; hidden while a KO-level splash plays. */
+  /** Player skill band: replaces the previous band; never shown under a WRECKED-or-higher splash. */
   bandIn(make: () => CutIn): void {
-    if (this.splash && PRIORITY[this.splash.kind] >= PRIORITY.ko) return;
+    if (this.splash && PRIORITY[this.splash.kind] >= BAND_BLOCK) return;
     this.retire(this.band);
     this.band = this.mount('skill', make(), 'band');
   }
@@ -65,7 +66,7 @@ export class Director {
     this.queue = this.queue.filter((q) => q.age < QUEUE_TTL);
     if (!this.splash && this.queue.length) {
       const next = this.queue.shift();
-      if (next) this.splash = this.mount(next.kind, next.make(), next.key);
+      if (next) this.showSplash(next.kind, next.make(), next.key);
     }
     this.leaving = this.leaving.filter((l) => {
       l.t += dt;
@@ -76,7 +77,9 @@ export class Director {
     });
   }
 
-  private endBand(): void {
+  private showSplash(kind: SplashKind, cut: CutIn, key: string): void {
+    this.splash = this.mount(kind, cut, key);
+    if (PRIORITY[kind] < BAND_BLOCK) return;
     this.retire(this.band);
     this.band = null;
   }

@@ -6,7 +6,7 @@ import { ROSTER } from '../../../data/roster';
 import { lerp } from '../../../core/math';
 import type { RiderState } from '../../../core/types';
 import { takeWeapon } from '../armory';
-import { clampToRoad, others, targetable, type CombatCtx } from '../ctx';
+import { clampToRoad, nearest, targetable, type CombatCtx } from '../ctx';
 import { credit } from '../damage';
 import { addStatus, applyMods, removeStatus } from '../statuses';
 import { VacuumSpiral } from '../visuals/bolts';
@@ -24,8 +24,8 @@ export const GULP = {
 
 /** Nearest targetable rider in reach of the beak: ahead of or alongside the pelican, never well behind. */
 export function inBeakReach(ctx: CombatCtx, r: RiderState): RiderState | undefined {
-  return others(ctx, r, (o, ds, dx) => targetable(ctx, o) && ds >= GULP.reachBack && ds <= GULP.reachAhead &&
-    Math.abs(dx) < GULP.reachDx && Math.abs(o.y - r.y) < 2)[0];
+  return nearest(ctx, r, (o, ds, dx) => targetable(ctx, o) && ds >= GULP.reachBack && ds <= GULP.reachAhead &&
+    Math.abs(dx) < GULP.reachDx && Math.abs(o.y - r.y) < 2);
 }
 
 class Gulp extends TimedSkill {

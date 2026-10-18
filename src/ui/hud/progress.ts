@@ -63,9 +63,11 @@ export class ProgressStrip {
       const r = h.rider;
       const p = r.finishTime !== null ? 1 : clamp01(r.s / len);
       h.node.tf(`translateX(${px(p * BAR)})`);
+      // Down riders are labelled by cause: KO (knocked out), 翻车 (any other crash), 罚停 (BUSTED ticket stop).
       h.node.cls('is-down', r.mode === 'crashed' || r.mode === 'busted');
+      h.node.cls('is-wreck', r.mode === 'crashed' && r.crash?.cause !== 'ko');
+      h.node.cls('is-busted', r.mode === 'busted');
       h.node.cls('is-hidden', !r.isPlayer && r.mods.invisible);
-      if (r.isPlayer) h.node.cls('is-end', p > 0.88); // the YOU tag would sit on the km readout
     }
     if (!this.me) return;
     const me = this.me.rider;

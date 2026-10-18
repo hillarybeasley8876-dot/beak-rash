@@ -119,18 +119,45 @@ export function targetable(ctx: CombatCtx, r: RiderState): boolean {
   return active(r) && !r.mods.intangible && !r.mods.invisible && r.invuln <= 0 && !ctx.has(r, 'gulped');
 }
 
-/** Riders other than `self`, nearest first, passing `keep` (ds = other.s − self.s, dx likewise). */
-export function others(
-  ctx: CombatCtx, self: RiderState, keep: (o: RiderState, ds: number, dx: number) => boolean,
-): RiderState[] {
-  const list: Array<{ r: RiderState; d: number }> = [];
+/** Track-space filter for rider queries: ds = other.s − self.s, dx likewise. */
+export type Keep = (o: RiderState, ds: number, dx: number) => boolean;
+
+/** Squared distances parallel to the list others() is building (keep predicates never query riders). */
+const sortDist: number[] = [];
+
+/** Riders other than `self`, nearest first, passing `keep` (insertion-sorted: no per-query scratch objects). */
+export function others(ctx: CombatCtx, self: RiderState, keep: Keep): RiderState[] {
+  const out: RiderState[] = [];
+  sortDist.length = 0;
   for (const o of ctx.session.riders) {
     if (o === self) continue;
-    const ds = o.s - self.s;
-    const dx = o.x - self.x;
-    if (keep(o, ds, dx)) list.push({ r: o, d: ds * ds + dx * dx });
+    const ds = o.s - self.s, dx = o.x - self.x;
+    if (!keep(o, ds, dx)) continue;
+    const d = ds * ds + dx * dx;
+    let i = out.length;
+    for (; i > 0 && (sortDist[i - 1] ?? 0) > d; i--) {
+      out[i] = out[i - 1] as RiderState;
+      sortDist[i] = sortDist[i - 1] ?? 0;
+    }
+    out[i] = o;
+    sortDist[i] = d;
   }
-  return list.sort((a, b) => a.d - b.d).map((e) => e.r);
+  return out;
+}
+
+/** The nearest rider other than `self` passing `keep` (no allocation). */
+export function nearest(ctx: CombatCtx, self: RiderState, keep: Keep): RiderState | undefined {
+  let best: RiderState | undefined, bestD = Infinity;
+  for (const o of ctx.session.riders) {
+    if (o === self) continue;
+    const ds = o.s - self.s, dx = o.x - self.x;
+    const d = ds * ds + dx * dx;
+    if (d < bestD && keep(o, ds, dx)) {
+      best = o;
+      bestD = d;
+    }
+  }
+  return best;
 }
 
 /** Clamp a lateral offset onto the asphalt at s (keeps a margin from the edge). */

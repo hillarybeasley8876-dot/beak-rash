@@ -2,9 +2,11 @@
 import { Euler, Quaternion, Vector3 } from 'three';
 import type { ViewCue } from '../src/core/contracts';
 import { damp } from '../src/core/math';
-import type { CrashCause, Side, StatusId, WeaponId } from '../src/core/types';
+import type { CharacterId, CrashCause, Side, StatusId, WeaponId } from '../src/core/types';
+import { GRIP_BACK } from '../src/actors/rig/ride';
 import { B } from '../src/actors/rig/skeleton';
-import { speciesAsset } from '../src/actors/species';
+import { speciesAsset, speciesDef } from '../src/actors/species';
+import { CharacterBuilder } from '../src/actors/kit/builder';
 import { buildPanel } from './actors-panel';
 import { P, ROSTER_IDS, S, cam, controls, errors, placeCamera, renderer, resize, riders, scene, spawn } from './actors-scene';
 
@@ -113,7 +115,7 @@ const api = {
           foot = Math.max(foot, t.distanceTo(ps.mp[bone] as Vector3));
         }
         for (const [bone, g] of [[B.handL, inp.gripL], [B.handR, inp.gripR]] as const) {
-          t.set(g.x, g.y + m.gripDrop, g.z + 0.035);
+          t.set(g.x, g.y + m.gripDrop, g.z + GRIP_BACK);
           grip = Math.max(grip, t.distanceTo(ps.mp[bone] as Vector3));
         }
       }
@@ -146,6 +148,12 @@ const api = {
     out.drawCalls = String(renderer.info.render.calls);
     out.triangles = String(renderer.info.render.triangles);
     return out;
+  },
+  /** Triangles per builder chunk (in build order) for one species — for trimming budgets. */
+  chunks(id: CharacterId): number[] {
+    const b = new CharacterBuilder(1);
+    speciesDef(id).build(b, 'high');
+    return b.chunkTris;
   },
   riders,
 };

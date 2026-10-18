@@ -1,10 +1,10 @@
 // World pose of a rider's bike: contact point under the saddle, oriented by the road frame (slope pitch +
 // bank), then yaw about the road normal, visual pitch (air / ramps), and lean about the bike's own
-// forward axis. Beyond the track ends the pose is extrapolated straight along the end tangents.
+// forward axis. Beyond the road's ends (start, finish + run-off) it extrapolates along the end tangents.
 import { Matrix4, Quaternion, Vector3 } from 'three';
 import type { Track } from '../core/contracts';
 import type { RiderState, TrackFrame } from '../core/types';
-import { emptyFrame } from './state';
+import { emptyFrame, trackEnd } from './state';
 
 const AX_X = new Vector3(1, 0, 0);
 const AX_Y = new Vector3(0, 1, 0);
@@ -22,7 +22,7 @@ export class Poser {
 
   /** Track-space point → world, extrapolating past either end. Returns the frame used. */
   place(s: number, x: number, y: number, out: Vector3): TrackFrame {
-    const len = this.track.length;
+    const len = trackEnd(this.track);
     const sc = Math.min(Math.max(s, 0), len);
     const fr = this.track.frameAt(sc, this.fr);
     this.track.toWorld(sc, x, y, out);

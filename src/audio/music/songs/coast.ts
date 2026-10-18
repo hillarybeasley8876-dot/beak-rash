@@ -121,10 +121,12 @@ export const COAST: Song = {
   swing: 0.08,
   key: 'A major',
   lead: 'wah',
+  // Four-on-the-floor + slap octaves: a little less bass keeps the low end ≤ 40 %.
+  mix: { bass: 0.9 },
   sections: {
     vamp: { bars: 2, chords: 'Amaj9 | Amaj9', kick: K1, hat: 'x.x.x.x.x.x.x.x.', bass: rep('1> . . 8^ . 1 5 . 6 . 8^ . 5 x 3 .', 2), keys: bars('X-------........', REST) },
     intro: {
-      bars: 2, chords: 'Amaj9 | E13', kick: K1, hat: 'x.x.x.x.x.x.x.x.', keys: 'X-------........',
+      bars: 2, chords: 'Amaj9 | E13', kick: K1, hat: 'x.x.x.x.x.x.x.x.', keys: 'X-----------x---',
       cym: REST + 'W...............',
       fill: { snare: '....X...X.X.XXXX', bass: '1> . . . . . . . 5 . 8^ . 7 . 8^ .', brass: '............r---' },
     },

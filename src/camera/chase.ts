@@ -8,17 +8,19 @@ import { Matrix4, Quaternion, Vector3 } from 'three';
 import { clamp, clamp01, damp, DEG, lerp, springStep } from '../core/math';
 import { Poser } from '../sim/pose';
 import { bikeTune } from '../sim/tuning';
+import { trackEnd } from '../sim/state';
 import type { Session } from '../core/contracts';
 import type { Anchor } from './blend';
 import { ObstacleAvoid, type TrackPoint } from './avoid';
 
 export const CHASE = {
-  dist: [4.6, 5.6], height: [1.9, 2.2], ahead: [5, 9], fov: [62, 74],
+  dist: [4.3, 5.1], height: [1.9, 2.2], ahead: [5, 9], fov: [60, 70], // SPEC §6 (hero ≥ 24 % of the height)
   lookHeight: 1.0, minHeight: 1.2, headingBlend: 0.3, rollK: 0.18,
   omegaX: 10, omegaY: 9, omegaLookX: 11, omegaLookY: 9.5,
   airFollow: 0.8, airLook: 0.65, surgeK: 0.04, surgeMax: 0.5,
   fovOver: 11, overMax: 0.4,          // +deg per 1.0 of speed above the bike's top (capped at +40 % speed)
   crashDist: 4.3, crashHeight: 1.6, crashFov: 58, crashOrbit: 12 * DEG, crashBodyLambda: 20, crashLambda: 4,
+  crashZoomMin: 30, crashRise: 0.15, crashRiseMax: 1.5, // held back by the world edge: zoom (deg floor) + rise per m
   dipOmega: 13, dipLook: 0.5,         // landing dip spring (1/s) and how much of it the look point shares
   edgeMargin: 1.0,                    // m the eye keeps inside bounds() (cliff faces sit a little inside them)
   riderMid: 0.8,                      // m: the rider point the sight line must reach (obstacle avoidance)
@@ -30,14 +32,14 @@ const AX_Z = new Vector3(0, 0, 1);
 const E = Math.E;
 
 export class ChaseCam {
-  readonly pose: CamPose = { pos: new Vector3(), quat: new Quaternion(), fov: 62 };
+  readonly pose: CamPose = { pos: new Vector3(), quat: new Quaternion(), fov: 60 };
   lookBack = false;
   private poser: Poser | null = null;
   private top = 20;
   private x = 0; private xv = 0; private y = 2; private yv = 0;
   private lx = 0; private lxv = 0; private ly = 1; private lyv = 0;
   private dipY = 0; private dipV = 0;
-  private dist = 4.6; private height = 1.9; private ahead = 5; private fovBase = 62; private fovRef = 62; private fovOver = 0;
+  private dist = 4.3; private height = 1.9; private ahead = 5; private fovBase = 60; private fovRef = 60; private fovOver = 0;
   private roll = 0; private surge = 0; private lastSpeed = 0; private lastS = 0;
   private crashBlend = 0; private orbit = 0; private orbitSide = 1;
   private bodyS = 0; private bodyX = 0; private followS = 0; private followX = 0; private offS = 0; private offX = 0;
@@ -53,10 +55,10 @@ export class ChaseCam {
     this.poser = new Poser(session.track);
     this.top = bikeTune(r.bike, r.character).top;
     const vn = clamp01(r.speed / this.top);
-    this.dist = lerp(CHASE.dist[0] ?? 4.6, CHASE.dist[1] ?? 5.6, vn);
+    this.dist = lerp(CHASE.dist[0] ?? 4.3, CHASE.dist[1] ?? 5.1, vn);
     this.height = lerp(CHASE.height[0] ?? 1.9, CHASE.height[1] ?? 2.2, vn);
     this.ahead = lerp(CHASE.ahead[0] ?? 5, CHASE.ahead[1] ?? 9, vn);
-    this.fovBase = this.fovRef = lerp(CHASE.fov[0] ?? 62, CHASE.fov[1] ?? 74, vn);
+    this.fovBase = this.fovRef = lerp(CHASE.fov[0] ?? 60, CHASE.fov[1] ?? 70, vn);
     this.fovOver = 0;
     this.x = this.lx = r.x;
     this.y = Math.max(CHASE.minHeight, this.height + r.y * CHASE.airFollow);
@@ -112,14 +114,14 @@ export class ChaseCam {
     }
     this.lastSpeed = r.speed;
     const crashed = r.mode === 'crashed';
-    const baseDist = lerp(CHASE.dist[0] ?? 4.6, CHASE.dist[1] ?? 5.6, vn);
+    const baseDist = lerp(CHASE.dist[0] ?? 4.3, CHASE.dist[1] ?? 5.1, vn);
     const baseHeight = lerp(CHASE.height[0] ?? 1.9, CHASE.height[1] ?? 2.2, vn);
     this.crashBlend = damp(this.crashBlend, crashed ? 1 : 0, crashed ? 5 : 8, dt);
     const lam = crashed ? CHASE.crashLambda : 3;
     this.dist = damp(this.dist, crashed ? CHASE.crashDist : baseDist, lam, dt);
     this.height = damp(this.height, crashed ? CHASE.crashHeight : baseHeight, lam, dt);
     this.ahead = damp(this.ahead, lerp(CHASE.ahead[0] ?? 5, CHASE.ahead[1] ?? 9, vn), 3, dt);
-    this.fovRef = damp(this.fovRef, crashed ? CHASE.crashFov : lerp(CHASE.fov[0] ?? 62, CHASE.fov[1] ?? 74, vn), 4, dt);
+    this.fovRef = damp(this.fovRef, crashed ? CHASE.crashFov : lerp(CHASE.fov[0] ?? 60, CHASE.fov[1] ?? 70, vn), 4, dt);
     const over = crashed ? 0 : CHASE.fovOver * clamp(ratio - 1, 0, CHASE.overMax);
     this.fovOver = damp(this.fovOver, over, 4, dt);
     this.fovBase = this.fovRef + this.fovOver;
@@ -149,24 +151,39 @@ export class ChaseCam {
     [this.dipY, this.dipV] = springStep(this.dipY, this.dipV, 0, CHASE.dipOmega, dt);
     if (this.lookBack && !crashed) return this.lookBackPose(session, kick);
     const camS = this.followS - this.dist * Math.cos(hy) - this.surge;
-    const b = session.track.bounds(clamp(camS, 0, session.track.length));
+    const b = session.track.bounds(clamp(camS, 0, trackEnd(session.track)));
     const camX = clamp(this.x, -b.left + CHASE.edgeMargin, b.right - CHASE.edgeMargin);
     this.offS = camS - r.s;
     this.offX = camX - r.x;
     this.y = Math.max(this.y, CHASE.minHeight);
-    Object.assign(this.eyeT, { s: camS, x: camX, y: Math.max(CHASE.minHeight, this.y + this.dipY) });
+    const rise = crashed ? Math.min(CHASE.crashRiseMax, CHASE.crashRise * Math.abs(this.x - camX)) * this.crashBlend : 0;
+    Object.assign(this.eyeT, { s: camS, x: camX, y: Math.max(CHASE.minHeight, this.y + this.dipY) + rise });
     Object.assign(this.riderT, { s: this.followS, x: this.followX, y: CHASE.riderMid + r.y });
     this.poser?.place(camS, camX, this.avoid.update(session, this.eyeT, this.riderT, dt), this.eye);
     this.poser?.place(this.followS + this.ahead, this.lx, this.ly + this.dipY * CHASE.dipLook, this.look);
     if (view) this.look.lerp(view.anchor('body', this.anchorV), this.crashBlend);
-    return this.finish(this.fovBase + kick, this.fovRef, Math.hypot(this.dist, this.y - CHASE.lookHeight));
+    const dist = Math.hypot(this.dist, this.y - CHASE.lookHeight);
+    return this.finish(this.crashZoom(this.fovBase) + kick, this.crashZoom(this.fovRef), dist);
+  }
+
+  /**
+   * Crash cam farther than crashDist + 1 m from the body (the edge clamp held it back while the body flew into
+   * the sea or a void): narrow the FOV so the body keeps the size it has at that distance (floor 30°).
+   */
+  private crashZoom(fov: number): number {
+    if (this.crashBlend < 0.001) return fov;
+    const ref = CHASE.crashDist + 1;
+    const d = this.eye.distanceTo(this.look);
+    if (d <= ref) return fov;
+    const zoom = (2 * Math.atan((Math.tan((fov * DEG) / 2) * ref) / d)) / DEG;
+    return lerp(fov, Math.max(CHASE.crashZoomMin, zoom), this.crashBlend);
   }
 
   private lookBackPose(session: Session, kick: number): CamPose {
     const r = session.player;
     this.poser?.place(r.s + 4.4, r.x, r.y + 1.75, this.eye);
     this.poser?.place(r.s - 14, r.x, 0.9, this.look);
-    return this.finish((CHASE.fov[0] ?? 62) + kick, Infinity, 0);
+    return this.finish((CHASE.fov[0] ?? 60) + kick, Infinity, 0);
   }
 
   /**

@@ -72,6 +72,16 @@ screen jitter same at 30/60/144 fps, camera jerk (track space) 22.5/23.3/23.8 m/
 - race AI: drifting is road-relative now (steer sets 3.2 m/s inward ... 1.0 m/s outward; no curve push while
   drifting); charge needs commitment (steer into it, bend the same way). The AI's drift P-controller still works.
 
+## Notes for other units (fix round 2)
+- actors/fx: end-on traffic crashes now launch rider.crash differently: obstacles <= 1.9 m tall (cars, props) vault the
+  body over the roof (higher/faster launch); taller ones (van/truck/bus) throw it BACK off the vehicle (negative
+  forward velocity, backward tumble spin); the sim body slides back with it. The tumble gravity must stay 15 (T.crashVaultGravity).
+- fx/ui: the respawn now usually hard-cuts (counted in __br.sim.cam.cuts) under the respawn blink; the 0.45 s glide only
+  runs when the crash view already shows the rider from behind. Pause (clock layer 'pause' = 0) freezes shake/kicks/buzz.
+- track: the new coast corners (L60/R60 chicane, L46, R90s) are fine for sim: no crashes in grip/drift/brake runs; R46 is
+  the tightest radius grip can hold flat out (needs ~93 % steer at 20 m/s; R < 43 would force braking or a drift).
+- everyone: CameraRig.chasePose(outPos, outQuat) returns the live chase pose + FOV (also during an override).
+
 ## Notes for other units (events/data sim emits)
 - rider:obstacleHit kind 'wall' (impact, speed = lateral impact m/s) and 'wallScrape' (~6/s while
   leaning on a wall, speed = v·pressure); obstacleId −1 for walls. Traffic: speed = closing speed.
@@ -84,17 +94,19 @@ screen jitter same at 30/60/144 fps, camera jerk (track space) 22.5/23.3/23.8 m/
   (player involved). Duplicate shakes from fx are harmless (max-combined).
 
 ## Core requests
-- Hero framing (feel review F9): cruise rider is 149 px tall at 720p (21 %); the critic wants >= 175 px.
-  Proposed SPEC §6 camera numbers: distance 4.6->5.6 m => 4.3->5.1 m, FOV 62->74 => 60->70 (then edit
-  CHASE.dist/fov in src/camera/chase.ts). Boosts no longer shrink the rider (counter-dolly).
-- Optional contract: CameraRig.chasePose(outPos, outQuat): number (fov) so fx/race cinematics can fly home to
-  the real chase pose instead of re-deriving it (fx/ko/home.ts copies SPEC numbers; the crash cam changed).
+- (applied by core, implemented) CameraRig.chasePose; rider.rubber; Track.runoff (sim reads frames to length + runoff).
+- combat's RiderMods.pushImmune (status/combat.md core request): once core adds the field, sim's rider contacts will
+  skip the speed loss for a pushImmune rider (contacts.ts sideBySide/rearEnd); nothing to do until then.
 
 ## How to test
 - node tools/feel-telemetry.mjs [--only steer,drift] [--strips]  → prints PASS/FAIL vs SPEC §6
-  (fix round 1 added: driftWall knock snake wallEvents slope handoff; 60 checks)
+  (fix round 1 added: driftWall knock snake wallEvents slope handoff; round 2: wallPin driftTiming trafficCam
+  respawnCam ultHandback pauseCam + PERFECT/knock cases; 106 checks)
 - fix round 1 probes (real coast, all units): node shots/sim/fix1/scripts/{driftreal3,exploit2,knock,
   wallcarry,oil,landdip,crashcam,kotrace,soak,framing2,keys}.mjs
+- fix round 2 probes: node shots/sim/fix2/cam/{t7-traffic,t17b-grab,t4-crash,t5u-ult,t8-pause,t9n-swerve,t1-fps}.mjs
+  (camera critic's scripts, real game), shots/sim/fix2/scripts/{framing,framing-k,wallpin,walldead,hairpin,driftexit,
+  knockreal,rubber,runoff,profile,tightcorners,soak}.mjs
 - node tools/feel-tour.mjs [--only drift,crest]  → shots/sim/tour/*.png (real coast track)
 - /sandbox/sim.html?race=coast&seed=1&traffic=0&realtrack=1  (feel bench: drive with keyboard)
 - /?race=coast&seed=1&stub=world,actors,combat,fx&traffic=0 ; live tuning: __br.sim.tuning, __br.sim.riders(), __br.sim.cam
@@ -168,13 +180,73 @@ Plan (issue -> fix; [x] = done + verified). Critic scripts: shots/review/sim/r2-
 - [x] D major drift charge on real curves -> driftChargeKappa 80 -> 250, driftChargeHigh 1.3 -> 1.15 (full commitment
       on R <= 250 = 0.48/1.05/1.75 s, R300 0.55/1.20/1.98). New tools/feel-scenarios-r2.mjs driftTiming checks R300 and
       R150 against L1 0.45-0.7 / L2 1.0-1.45 / L3 1.7-2.4: all pass. Straight factor 0.25 unchanged.
-- [ ] C major crash cam inside vehicles -> chase.ts eye vs solid obstacle boxes (rise above roof / side), crash.ts wreck
-      stops against solid vehicles; scenarios car / van / bus.
-- [ ] minors: hero framing (core.md asks sim: CHASE dist/fov), PERFECT needs a clean touchdown, drift curve push
-      partial + driftLatIn 4.5 + release ramp, knock vs steering victim, telemetry, respawn glide cut, SHOWTIME settle,
-      pause freeze, water-crash FOV, camera telemetry, rider.rubber (core.md request).
+- [x] C major crash cam inside vehicles -> done, see "C major ... (verified + finished)" below.
+- [x] minors: all done, each listed below (hero framing, PERFECT, drift curve push, knock, telemetry, respawn cut,
+      SHOWTIME settle, pause freeze, water-crash zoom, camera telemetry, rider.rubber).
 - resumed 11:15 (new fixer after API outage): found UNVERIFIED code from the previous fixer for C (camera/avoid.ts
   + crash.ts vault over the roof), PERFECT calm/timed (air.ts), drift curve-cancel x1.35 + driftLatIn 4.5 + release
   ramp (steering.ts/drift.ts), knock carry direction-aware (knockSteer 0.1), rider.rubber (forces.ts). Verifying each
   now; then the camera minors (respawn cut, SHOWTIME settle, pause freeze, water FOV, framing per new SPEC numbers,
   chasePose) and the telemetry additions.
+- resumed 14:20 (third fixer, previous one stopped at 11:25 mid-verification). Baseline: tsc clean; feel-telemetry
+  79/84 (shots/sim/fix2/tele3): wallPin/driftTiming/knock pass; FAIL driftWall k0/k150 hold clear 2.0 s (driftLatIn
+  4.5 = critic's ask: check needs updating), press.sideJitterX 0.011 (> 0.01), trafficCam van/bus hiddenRun 10/19.
+- [x] C major crash cam inside vehicles (verified + finished): eye never enters a box (camera/avoid.ts lifts it over roofs
+      and sight-line blockers, hard floor). crash.ts launchFor(): end-on into an obstacle <= 1.9 m tall the body vaults,
+      high enough for the roof and fast enough (relative to it) to pass its far end before dropping to roof height;
+      taller ones (van/truck/bus) bounce the body back off the tail/nose (fwd = min(v_obs, 0) - 1.5 - 0.05*closing,
+      backward tumble; the sim body slides back with it: sr.crashBack), so it never tunnels and stays on the camera's
+      side. feel-telemetry trafficCam: car/van/bus eyeInBox 0/0/0, body hidden run 5/0/0 frames (was 4/10/19).
+      Real traffic (fix2/cam/t7-traffic.mjs s3/s5): 0 eye-in-box frames; strips t7-traffic-2-van.png (stopped van:
+      pops up and back, van stays a backdrop), 3-van (oncoming), 0-car (vault over the roof). t17b autopilot lap s7: 0 events.
+- [x] minor hero framing (core: SPEC §6 now 4.3->5.1 m, FOV 60->70): CHASE dist [4.3, 5.1], fov [60, 70].
+      framing-k.mjs on straights (s 300 / 2000): cruise 20 m/s 178-179 px = 24.7 % of 720 (was 149 px = 20.7 %);
+      the critic's framing.mjs spot s 1420 is now inside the new L46 hairpin (170 px there, angled view); L3 boost
+      keeps the size (counter-dolly), 6 m/s 215 px. Telemetry camera.fovAtTop window -> 69..72.
+- [x] minor pause -> rig.ts: while clock layer 'pause' is 0, fx.update() is skipped and the buzz holds its value.
+      fix2/cam/t8-pause.mjs: buzz / crash shake / boost kick over 1 s of pause = 0 deg, 0 m, FOV constant (was 0.86 deg/frame).
+- [x] minor SHOWTIME settle -> rig.ts: behind a cinematic the chase springs run on dtReal (nothing shows them), so the
+      hand-back lands settled. fix2/cam/t5u-ult.mjs: first frame after the 125 deg cut = eye 2.17 m (rest 2.2; was 4.58),
+      feet at 537/720 px (was 673) and steady after it (t5u-ult-handback.png).
+- [x] minor respawn glide -> listeners.ts glideKeepsRider(): the 0.45 s glide only runs when the last crash-cam view
+      already shows the respawned rider from behind (eye >= 0.5 m behind it along the road, rider mid inside 85 % of
+      the start frame); otherwise it cuts under the respawn blink. fix2/cam/t4-crash.mjs: traffic + water respawns cut
+      (31 / 71 deg in one frame, 0 glide frames, so 0 off-screen frames; was 14 / 8 of 27).
+- [x] minor water crash speck -> chase.ts crashZoom(): crash cam farther than crashDist + 1 m from the body narrows the
+      FOV to keep its size (floor 30 deg) and rises 0.15 m per m the edge clamp holds it back (<= 1.5 m).
+      t4-water-strip.png: the pelican stays readable in the sea for the whole crashed window (was a 20-30 px blob).
+- [x] minor PERFECT unconditional (air.ts, verified): PERFECT = air >= min && (calm: |steer| < 0.3 for the last 0.15 s and
+      |yaw| < 6 deg, or timed: Space <= 0.2 s before touchdown and |yaw| < 12 deg). Telemetry air: straight ramp PERFECT,
+      full steer through the flight NOT perfect, same + Space just before touchdown PERFECT (new checks).
+- [x] minor drift on rails (steering.ts/drift.ts, verified): curve push cancelled only up to 1.35 x grip authority,
+      driftLatIn 4.5, 0.2 s release ramp. Critic hairpin.mjs: R150/R60/R30 drift neutral holds (x 4.1-4.3), R15 drift
+      runs wide to the wall (bounce, no crash) while ride-full crashes; driftexit.mjs: 0 wall hits / crashes after a
+      release with 0-0.3 s steer lag (x 3.79 -> 5.62 max, was -> 7.41 at the wall). driftWall hold checks now 1.8 s +
+      "never crashes" (a full-into drift crosses ~4.5 m/s like grip steering, as the critic asked).
+- [x] minor light knock vs pressing AI: knockSteer 0.1 -> 0.05 (direction-aware: only steering back toward the hitter);
+      rider-rider side bounces keep their own bumpSteer 0.3 (press.sideJitterX back to 0.010, the round-1 value).
+      New telemetry knock.lightSteerDisp (victim steering full lock back): 0.476 m (>= 0.45); light 0.60, heavy 1.69.
+- note: the live coast track now has tight corners (profile.mjs: S-chicane L60/R60 at 995-1115, R90, near-hairpin L46
+  at 1325-1425, R90); drift charge is full-rate there (R <= 250), the curve push needs ~93 % steer at 20 m/s on L46.
+- [x] core request rider.rubber (forces.ts baseTop, verified): fix2/scripts/rubber.mjs settled speed 1 -> 19.99,
+      1.1 -> 21.98, 0.9 -> 18.0, NaN -> 19.99 (neutral), 5 -> capped at rubberMax 1.5.
+- [x] core request chasePose: rig.chasePose(outPos, outQuat) returns the live chase pose (before blend / shake) and
+      its FOV; during an override it is this frame's chase target. Telemetry pauseCam.chasePoseErr 0.
+- [x] core request run-off: state.ts trackEnd() = length + runoff; sim frames / bounds / surface / pose / crash and the
+      chase bounds read the real run-off road instead of extrapolating (runoff.mjs: finished rider stops 21 m past
+      the line on the road, pose dy 0, no errors).
+- [x] regression pass after the fixes: feel-telemetry 106/106 (shots/sim/fix2/tele3, new checks: trafficCam, respawnCam,
+      ultHandback, pauseCam, knock.lightSteerDisp, air ramp steer/stick PERFECT, driftWall crash flags); critic wallpin.mjs
+      steer 1 -> exactly 1 'wall' + 19 scrapes, yaw 0 at dt 1/30, 1/60, 1/144 (steer 0.45 now sits on the new R90's curb:
+      +-0.5 deg curb wobble, 0 walls); walldead.mjs |vx| >= 2 and yaw -5 deg in 1 frame; t9n-swerve s5: 0 eye-in-box on
+      0.53-0.70 m passes; soak s3 90 s all units: 0 NaN / out-of-bounds / tunnelling, no errors (the 25 m 'ds' jump of
+      rider 2 is pre-existing: also in the critic's soak-3-60.json, not sim). t1-fps: slalom/sbend residuals as before
+      (x1.14 from the bigger framing); the drift case now meets the curb/wall at the end (drift crosses at 4.5 m/s), from
+      x 6 instead of 2 its residuals match the critic's (sy 0.39 px, pitch 0.038 deg).
+- [x] lap check (critic t17-lap.mjs, all units, traffic + police, autopilot): seed 7: inObs [], losFrames [], spikes [],
+      blendOff 0 (respawn cut counted), minClear 1.6 m; seed 3: same, 0 frames in / behind vehicles. t17b-grab s7: 0 events.
+- [x] tight corners (new coast layout) re-validated: tightcorners.mjs grip / drift / brake runs through L46, L60, R60, R90
+      from the outside edge: 0 crashes; drift levels L1 0.67-0.87 / L2 1.22-1.43 / L3 1.92-2.12 s (started on the
+      approach straight); full-commitment drifts reach the inside wall and scrape (bounce, no crash).
+- Fix round 2 complete: the camera major + both feel majors (wall pinball, drift charge) fixed and verified, all minors done;
+  feel-telemetry 106/106; tsc clean for src/sim + src/camera (remaining tsc errors are in src/world, track/env units).

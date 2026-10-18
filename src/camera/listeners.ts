@@ -1,7 +1,30 @@
 // Bus listeners of the camera rig: trauma shakes, FOV kicks, landing dips, respawn glide, scrape buzz.
-import { clamp } from '../core/math';
+import { Quaternion, Vector3 } from 'three';
+import { clamp, DEG } from '../core/math';
 import { boostKick, RIG, type RigState } from './rig-state';
+import type { Anchor } from './blend';
 import type { RiderId } from '../core/types';
+
+const anchor: Anchor = { pos: new Vector3(), quat: new Quaternion() };
+const rel = new Vector3();
+const inv = new Quaternion();
+
+/**
+ * The respawn glide only runs when the last crash-cam view already shows the respawned rider from behind;
+ * otherwise (eye ahead of the rider, rider off the start frame) it cuts under the respawn blink, so the glide
+ * never swings around the rider with an empty road on screen.
+ */
+function glideKeepsRider(st: RigState): boolean {
+  const cam = st.app.camera;
+  st.chase.anchor(anchor);
+  rel.copy(cam.position).sub(anchor.pos).applyQuaternion(inv.copy(anchor.quat).invert());
+  if (rel.z < RIG.glideBehind) return false; // anchor space: −Z is forward along the road
+  rel.set(0, RIG.glideAim, 0).applyQuaternion(anchor.quat).add(anchor.pos).sub(cam.position);
+  rel.applyQuaternion(inv.copy(cam.quaternion).invert());
+  if (rel.z > -1) return false;
+  const ty = Math.tan((cam.fov * DEG) / 2) * RIG.glideFrame;
+  return Math.abs(rel.y / -rel.z) < ty && Math.abs(rel.x / -rel.z) < ty * cam.aspect;
+}
 
 export function listenRig(st: RigState): void {
   const { bus } = st.app;
@@ -17,7 +40,9 @@ export function listenRig(st: RigState): void {
   bus.on('rider:respawn', ({ riderId }) => {
     if (!isPlayer(riderId) || !st.session) return;
     chase.reset(st.session);
-    if (!st.cine) st.blend.start(st.app.camera, RIG.respawnBlend); // glide to the new spot instead of cutting
+    if (st.cine) return;
+    if (glideKeepsRider(st)) st.blend.start(st.app.camera, RIG.respawnBlend); // glide to the new spot …
+    else st.blend.cut(); // … or cut under the respawn blink
   });
   bus.on('rider:land', ({ riderId, airTime, perfect }) => {
     if (!isPlayer(riderId)) return;

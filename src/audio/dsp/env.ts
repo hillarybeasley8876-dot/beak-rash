@@ -1,5 +1,5 @@
 // Click-free envelope helpers. Every envelope starts from 0 and returns to exactly 0 through ramps,
-// exponential ramps never target 0 (they stop at FLOOR, then a 4 ms linear tail closes the gap),
+// exponential-looking falls are linear segments that stop at FLOOR (a 4 ms linear tail closes the gap),
 // and all automation events are scheduled in time order with values computed analytically.
 // Reused (persistent) voices are pinned to their note time: see anchor().
 
@@ -28,6 +28,33 @@ export function anchor(p: AudioParam, t: number): void {
   else p.setValueAtTime(s ? s.value : p.value, t);
 }
 
+/** Knots (fractions of the span) of the piecewise-linear exponential fall (denser at the top). */
+const KNOTS = [0.05, 0.12, 0.22, 0.36, 0.56, 1];
+
+/**
+ * An exponential-looking fall from `from` at t0 to `to` at t1 as linear segments through exact
+ * exponential knots (≤ 2 dB off above −30 dB). Exponential ramps cost the realtime audio thread
+ * a pow() per sample (≈ +80 % for an enveloped voice); linear segments cost next to nothing.
+ * Stops at `until` (≤ t1) and returns the value there.
+ */
+export function fall(p: AudioParam, t0: number, t1: number, from: number, to: number, until = t1): number {
+  const span = Math.max(1e-4, t1 - t0);
+  const at = (x: number): number => from * Math.pow(to / from, x);
+  let prev = 0;
+  for (const x of KNOTS) {
+    const t = t0 + x * span;
+    if (t >= until) {
+      const u = (until - t0) / span;
+      const v = at(prev) + ((at(x) - at(prev)) * (u - prev)) / (x - prev);
+      p.linearRampToValueAtTime(v, until);
+      return v;
+    }
+    p.linearRampToValueAtTime(at(x), t);
+    prev = x;
+  }
+  return to;
+}
+
 /** Start an envelope at t: from 0 for a fresh node, or from the in-flight value for a reused voice. */
 function begin(p: AudioParam, t: number, retrigger: boolean): void {
   if (retrigger) anchor(p, t);
@@ -35,7 +62,8 @@ function begin(p: AudioParam, t: number, retrigger: boolean): void {
 }
 
 /**
- * Attack (linear) then exponential decay to silence. Returns the time the envelope reaches 0.
+ * Attack (linear) then an exponential-looking decay (see fall) to silence. Returns the time the
+ * envelope reaches 0.
  * `retrigger` = persistent voice: ramp from whatever level the previous hit left.
  */
 export function perc(p: AudioParam, t: number, peak: number, attack: number, decay: number, retrigger = false): number {
@@ -47,7 +75,7 @@ export function perc(p: AudioParam, t: number, peak: number, attack: number, dec
     return t + a + decay;
   }
   p.linearRampToValueAtTime(peak, t + a);
-  p.exponentialRampToValueAtTime(FLOOR, t + a + Math.max(0.005, decay));
+  fall(p, t + a, t + a + Math.max(0.005, decay), peak, FLOOR);
   p.linearRampToValueAtTime(0, t + a + decay + TAIL);
   settle(p, t + a + decay + TAIL, 0);
   return t + a + decay + TAIL;
@@ -71,15 +99,14 @@ export function adsr(
   p.linearRampToValueAtTime(top, t + att);
   let level: number;
   if (off >= t + att + dec) {
-    p.exponentialRampToValueAtTime(s, t + att + dec);
+    fall(p, t + att, t + att + dec, top, s);
     // The sustain is a flat ramp, not a set: a retrigger inside it is then cut cleanly (anchor).
     p.linearRampToValueAtTime(s, off);
     level = s;
   } else {
-    level = top * Math.pow(s / top, (off - t - att) / dec);
-    p.exponentialRampToValueAtTime(level, off);
+    level = fall(p, t + att, t + att + dec, top, s, off);
   }
-  if (level > FLOOR) p.exponentialRampToValueAtTime(FLOOR, off + rel);
+  if (level > FLOOR) fall(p, off, off + rel, level, FLOOR);
   else p.linearRampToValueAtTime(FLOOR, off + rel);
   p.linearRampToValueAtTime(0, off + rel + TAIL);
   settle(p, off + rel + TAIL, 0);

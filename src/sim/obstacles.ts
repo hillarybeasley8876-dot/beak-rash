@@ -58,7 +58,7 @@ function hit(ctx: SimCtx, sr: SimRider, o: Obstacle, ds: number, dx: number, was
   const endOn = !wasTouching && depthS <= depthX + 0.3;
   if (endOn && Math.abs(rel) > (vehicle ? T.trafficCrashRel : T.propCrashRel)) {
     emitHit(ctx, sr, o, Math.abs(rel));
-    crashRider(ctx, sr, vehicle ? 'traffic' : 'obstacle', null, o.height);
+    crashRider(ctx, sr, vehicle ? 'traffic' : 'obstacle', null, o);
     return;
   }
   endDrift(ctx, sr, false);

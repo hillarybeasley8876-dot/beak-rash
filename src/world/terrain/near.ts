@@ -163,3 +163,9 @@ export function ribbonHeight(rb: NearRibbon, s: number, u: number): number | nul
   }
   return fs <= fu ? h01 + (h00 - h01) * (1 - fu) + (h11 - h01) * fs : h10 + (h11 - h10) * fu + (h00 - h10) * (1 - fs);
 }
+
+/** Ribbon reach beyond the edge at s (52 m, less where fold prevention compresses the far columns). */
+export function ribbonReach(rb: NearRibbon, s: number): number {
+  const r = Math.min(rb.rows - 1, Math.max(0, Math.round((s - rb.s0) / ROW_STEP)));
+  return colU(NEAR_U.length - 1, rb.scale[r] ?? 1);
+}

@@ -1,7 +1,8 @@
 // 鹈鹕湾海滨公路 Pelican Bay — 3.3 km point-to-point coast road, sea on the LEFT.
-// start straight → promenade → beach road → bay sweeper → S-bend → cliffside (rock wall / rail + drop)
-// → crest jump → descent with ramp → headland tunnel → bridge over a cove → hillside → fish-market
-// quay → final sprint. Heights: sea level 0, road 1–37 m.
+// start straight → promenade → beach road → bay sweeper → S-chicane (R 60) → cliffside (rock wall /
+// rail + drop) round a calanque with a near-hairpin (R 46) → lighthouse headland → crest jump →
+// descent with ramp → headland tunnel → bridge over a cove → hillside → fish-market quay → final
+// sprint. Heights: sea level 0, road 1–37 m. Marks place landmarks, signs, hill villages and gulls.
 import type { GroundDef, LayoutDef, SideDef } from '../layout/types';
 
 const G = (g: Partial<GroundDef>): GroundDef => ({
@@ -34,7 +35,7 @@ export const COAST: LayoutDef = {
   left: startL,
   right: startR,
   bumps: [
-    { s: 1505, x: -88, r: 46, h: 13, mat: 'rock' },     // lighthouse promontory
+    { s: 1514, x: -86, r: 44, h: 14, mat: 'rock' },     // lighthouse headland (calanque mouth)
     { s: 640, x: -430, r: 70, h: 16, mat: 'grass' },    // palm island
     { s: 1950, x: -400, r: 95, h: 38, mat: 'rock' },    // rocky island
     { s: 2950, x: -330, r: 46, h: 7, mat: 'sand' },     // sandbar islet
@@ -52,7 +53,10 @@ export const COAST: LayoutDef = {
     {
       len: 250, name: 'promenade', rise: -0.25, left: seawallL, right: villasR,
       features: [{ kind: 'pickupRow', at: 90, len: 18, x0: -4.5, x1: 1.5, data: { kind: 'coin' } }],
-      marks: [{ kind: 'umbrellas', at: 0, x: -1, data: { len: 250 } }, { kind: 'villas', at: 10, x: 1, data: { len: 230 } }],
+      marks: [
+        { kind: 'umbrellas', at: 0, x: -1, data: { len: 250 } }, { kind: 'villas', at: 10, x: 1, data: { len: 230 } },
+        { kind: 'sign', at: 25, x: 1, data: { sign: 'limit' } }, { kind: 'village', at: 180, x: 1 }, { kind: 'gulls', at: 150, x: -40 },
+      ],
     },
     {
       len: 300, name: 'beach', radius: -380, rise: -0.1, bank: -2, ease: 60, left: beachL,
@@ -60,7 +64,10 @@ export const COAST: LayoutDef = {
         { kind: 'pickupRow', at: 30, len: 12, x0: 3.5, x1: 3.5, data: { kind: 'crate' } },
         { kind: 'pickupRow', at: 150, len: 21, x0: -6, x1: -1, data: { kind: 'coin' } },
       ],
-      marks: [{ kind: 'villas', at: 20, x: 1, data: { len: 260 } }, { kind: 'towels', at: 30, x: -1, data: { len: 240 } }],
+      marks: [
+        { kind: 'villas', at: 20, x: 1, data: { len: 260 } }, { kind: 'towels', at: 30, x: -1, data: { len: 240 } },
+        { kind: 'sign', at: 10, x: 1, data: { sign: 'pelican' } },
+      ],
     },
     {
       len: 280, name: 'bay', radius: 320, rise: 7.35, bank: 4, ease: 70, left: rocksL, right: hillsR,
@@ -68,26 +75,56 @@ export const COAST: LayoutDef = {
         { kind: 'pickupRow', at: 120, len: 15, x0: 2.5, x1: 2.5, data: { kind: 'can' } },
         { kind: 'oil', at: 210, len: 9, x0: -5.5, x1: -2.0 },
       ],
-      marks: [{ kind: 'palms', at: 0, x: 1, data: { len: 280 } }],
-    },
-    { len: 90, name: 'sbend', radius: -150, rise: 4, bank: -5, ease: 40, marks: [{ kind: 'chevrons', at: 0, x: 1, data: { len: 90 } }] },
-    {
-      len: 90, name: 'sbend', radius: 150, rise: 5, bank: 5, ease: 45,
-      marks: [{ kind: 'chevrons', at: 0, x: -1, data: { len: 90 } }],
-      features: [{ kind: 'pickupRow', at: 40, len: 12, x0: 0.5, x1: 4.5 }],
-    },
-    {
-      len: 240, name: 'cliff', radius: -600, rise: 9, ease: 60, left: cliffL, right: rockWallR,
-      features: [
-        { kind: 'pickupRow', at: 90, len: 12, x0: 1.5, x1: -1.5, data: { kind: 'crate' } },
-        { kind: 'pickupRow', at: 150, len: 18, x0: -4.5, x1: -4.5, data: { kind: 'coin' } },
+      marks: [
+        { kind: 'palms', at: 0, x: 1, data: { len: 280 } }, { kind: 'village', at: 180, x: 1 },
+        { kind: 'sign', at: 230, x: 1, data: { sign: 'curves' } },
       ],
-      marks: [{ kind: 'chevrons', at: 20, x: -1, data: { len: 200 } }],
+    },
+    // S-chicane: an R 60 left-right flick over the bay headland; run-off outside both apexes
+    // (grass verge on the right, a wider asphalt shoulder before the rail on the left).
+    { len: 20, name: 'chicane', rise: 1, ease: 40, left: { shoulder: 3 }, sideEase: 20 },
+    {
+      len: 56, name: 'chicane', radius: -60, rise: 3, bank: -5, ease: 20,
+      marks: [{ kind: 'chevrons', at: 0, x: 1, data: { len: 50 } }],
     },
     {
-      len: 180, name: 'cliff', radius: 520, rise: 5, ease: 60,
-      features: [{ kind: 'pickupRow', at: 80, len: 12, x0: 3.5, x1: 3.5, data: { kind: 'can' } }],
-      marks: [{ kind: 'lighthouse', at: 105, x: -88 }, { kind: 'warnCrest', at: 120, x: 1 }],
+      len: 56, name: 'chicane', radius: 60, rise: 3, bank: 5, ease: 24,
+      marks: [{ kind: 'chevrons', at: 4, x: -1, data: { len: 50 } }],
+    },
+    {
+      len: 48, name: 'chicane', rise: 2, ease: 30,
+      features: [{ kind: 'pickupRow', at: 6, len: 12, x0: 3.5, x1: -0.5 }],
+      marks: [{ kind: 'sign', at: 23, x: 1, data: { sign: 'fish' } }],
+    },
+    {
+      len: 50, name: 'cliff', rise: 2, ease: 30, left: cliffL, right: rockWallR,
+      features: [{ kind: 'pickupRow', at: 30, len: 12, x0: 1.5, x1: -1.5, data: { kind: 'crate' } }],
+    },
+    // Calanque: the cliff road swings right into a narrow cove, wraps round its head in a near-hairpin
+    // (R 46: rail and drop on the inside, asphalt run-off before the rock wall outside) and back out
+    // past the lighthouse headland. Net turn ≈ 0, so the coast road continues north afterwards.
+    {
+      len: 94, name: 'cliff', radius: 90, rise: 3.5, bank: 4, ease: 30,
+      marks: [{ kind: 'chevrons', at: 8, x: -1, data: { len: 80 } }, { kind: 'sign', at: 26, x: 1, data: { sign: 'sharp' } }],
+    },
+    { len: 24, name: 'hairpin', rise: 1, ease: 24, right: { shoulder: 3.6 }, sideEase: 24 },
+    {
+      len: 96, name: 'hairpin', radius: -46, rise: 2, bank: -6, ease: 24,
+      features: [{ kind: 'pickupRow', at: 38, len: 20, x0: -4.5, x1: -4.5, data: { kind: 'coin' } }],
+      marks: [{ kind: 'chevrons', at: 0, x: 1, data: { len: 96 } }, { kind: 'gulls', at: 48, x: -50 }],
+    },
+    { len: 16, name: 'hairpin', rise: 0.5, ease: 16 },
+    {
+      len: 94, name: 'cliff', radius: 90, rise: 3.5, bank: 4, ease: 24, right: { shoulder: 1.4 }, sideEase: 16,
+      features: [{ kind: 'pickupRow', at: 54, len: 12, x0: 3.5, x1: 3.5, data: { kind: 'can' } }],
+      marks: [
+        { kind: 'chevrons', at: 6, x: -1, data: { len: 80 } }, { kind: 'sign', at: 12, x: 1, data: { sign: 'lighthouse' } },
+        { kind: 'village', at: 40, x: 1 },
+      ],
+    },
+    {
+      len: 46, name: 'cliff', rise: 1.5, ease: 30,
+      marks: [{ kind: 'lighthouse', at: -20, x: -84 }, { kind: 'warnCrest', at: 20, x: 1 }],
     },
     { len: 60, name: 'crest', rise: 6, vEase: 24, right: hillsR, sideEase: 40 },
     {
@@ -132,7 +169,7 @@ export const COAST: LayoutDef = {
         { kind: 'boostPad', at: 66, len: 6, x0: -5.2, x1: -1.8, data: { power: 0.3, time: 1 } },
         { kind: 'pickupRow', at: 110, len: 12, x0: 2.5, x1: 2.5, data: { kind: 'crate' } },
       ],
-      marks: [{ kind: 'sailboats', at: 80, x: 1, data: { count: 4 } }],
+      marks: [{ kind: 'sailboats', at: 80, x: 1, data: { count: 4 } }, { kind: 'gulls', at: 110, x: 30 }],
     },
     { len: 40, name: 'bridgeExit', rise: -1, sideEase: 2, left: rocksL, right: hillsR },
     {
@@ -141,12 +178,18 @@ export const COAST: LayoutDef = {
         { kind: 'pickupRow', at: 60, len: 18, x0: 4.5, x1: -1.5 },
         { kind: 'oil', at: 158, len: 8, x0: 0.8, x1: 4.2 },
       ],
-      marks: [{ kind: 'villas', at: 40, x: 1, data: { len: 180 } }, { kind: 'palms', at: 0, x: -1, data: { len: 230 } }],
+      marks: [
+        { kind: 'villas', at: 40, x: 1, data: { len: 180 } }, { kind: 'palms', at: 0, x: -1, data: { len: 230 } },
+        { kind: 'village', at: 130, x: 1 },
+      ],
     },
     {
       len: 140, name: 'village', radius: -340, rise: -2.5, bank: -3, ease: 60, left: seawallL, right: villasR,
       features: [{ kind: 'pickupRow', at: 60, len: 12, x0: -2, x1: -2, data: { kind: 'crate' } }],
-      marks: [{ kind: 'umbrellas', at: 10, x: -1, data: { len: 130 } }, { kind: 'villas', at: 0, x: 1, data: { len: 140 } }],
+      marks: [
+        { kind: 'umbrellas', at: 10, x: -1, data: { len: 130 } }, { kind: 'villas', at: 0, x: 1, data: { len: 140 } },
+        { kind: 'sign', at: 80, x: 1, data: { sign: 'lanes' } },
+      ],
     },
     {
       len: 320, name: 'market', ease: 50, left: quayL, right: marketR,
@@ -160,19 +203,20 @@ export const COAST: LayoutDef = {
       marks: [
         { kind: 'stalls', at: 10, x: 1, data: { len: 300 } },
         { kind: 'boats', at: 20, x: -1, data: { len: 280 } },
-        { kind: 'pier', at: 150, x: -1 },
+        { kind: 'pier', at: 150, x: -1 }, { kind: 'gulls', at: 150, x: -45 },
       ],
     },
     {
       len: 120, name: 'sprint', radius: 420, ease: 50, left: seawallL, right: villasR,
       features: [{ kind: 'pickupRow', at: 50, len: 15, x0: 0, x1: 0, data: { kind: 'coin' } }],
+      marks: [{ kind: 'village', at: 40, x: 1 }],
     },
     {
       len: 160, name: 'finish', left: startL, right: finishR,
       marks: [
         { kind: 'stands', at: 40, x: -1, data: { len: 150 } },
         { kind: 'stands', at: 40, x: 1, data: { len: 150 } },
-        { kind: 'finishGantry', at: 160, x: 0 },
+        { kind: 'finishGantry', at: 160, x: 0 }, { kind: 'gulls', at: 80, x: -20 },
       ],
     },
   ],

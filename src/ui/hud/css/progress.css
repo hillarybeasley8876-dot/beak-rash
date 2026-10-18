@@ -21,8 +21,9 @@
 }
 .pg-flag { position: absolute; right: -30px; top: 6px; width: 60px; height: 66px; }
 .pg-flag svg { width: 100%; height: 100%; overflow: visible; }
+/* Distance to go sits right of the flag, clear of the player's badge riding into the finish. */
 .pg-dist {
-  position: absolute; right: 30px; top: 72px; color: var(--paper); font: 400 30px/1 "Anton", sans-serif;
+  position: absolute; left: 842px; top: 26px; white-space: nowrap; color: var(--paper); font: 400 30px/1 "Anton", sans-serif;
   -webkit-text-stroke: 6px var(--ink); paint-order: stroke fill; font-variant-numeric: tabular-nums;
 }
 .pg-dist small { font: 400 22px/1 "Bebas Neue", sans-serif; margin-left: 3px; -webkit-text-stroke: 4px var(--ink); }
@@ -34,12 +35,15 @@
 .pg-h.is-down::before {
   content: "KO"; position: absolute; z-index: 1; left: -13px; top: -6px; padding: 2px 3px 0; background: var(--red);
   color: var(--paper); font: 400 15px/1 "Bebas Neue", sans-serif; transform: rotate(-12deg); box-shadow: 0 0 0 2px var(--ink);
+  white-space: nowrap;
 }
+.pg-h.is-wreck::before, .pg-h.is-busted::before { left: -16px; padding: 2px 3px 1px; font: 400 14px/1 "ZCOOL QingKe HuangYou", sans-serif; }
+.pg-h.is-wreck::before { content: "翻车"; background: var(--ink); }
+.pg-h.is-busted::before { content: "罚停"; background: #1F4FD1; }
 .pg-h.is-hidden { opacity: 0.35; }
 .pg-h.me { top: 55px; z-index: 2; }
 .pg-h.me::after { display: none; }
 .pg-h.me .bdg { left: -25px; top: -25px; width: 50px; height: 50px; box-shadow: 0 0 0 4px var(--ink), 0 0 0 7px var(--red), 4px 5px 0 7px var(--ink); }
-.pg-h.me.is-end .pg-me-tag { visibility: hidden; }
 .pg-me-tag {
   position: absolute; left: -20px; top: 27px; font: 400 20px/1 "Bebas Neue", sans-serif; color: var(--paper);
   background: var(--red); padding: 3px 6px 0; transform: skewX(-12deg); box-shadow: 0 0 0 2px var(--ink);

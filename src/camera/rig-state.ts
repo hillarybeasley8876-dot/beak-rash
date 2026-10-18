@@ -7,6 +7,7 @@ import type { AppContext, CameraOverride, Session } from '../core/contracts';
 
 export const RIG = {
   blendOut: 0.35, respawnBlend: 0.45,
+  glideBehind: 0.5, glideAim: 0.8, glideFrame: 0.85, // respawn glide: eye ≥ 0.5 m behind, rider mid in 85 % of the frame
   buzzCurb: 0.6, buzzRough: 0.45, buzzScrape: 0.9, buzzSpeed: 0.2, scrapeHold: 0.25,
 };
 

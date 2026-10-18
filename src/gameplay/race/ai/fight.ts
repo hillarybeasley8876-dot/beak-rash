@@ -148,7 +148,8 @@ export class Fighter {
       const chance = payback ? 0.9 : this.p.aggression * fury + (winding ? this.p.skill * 0.5 : 0);
       this.attackT = this.p.reaction * this.rng.range(0.7, 1.3);
       if (this.rng.next() > chance) return false;
-      const heavy = this.p.heavyChance * (t.isPlayer ? HEAVY_VS_PLAYER : 1);
+      // A payback is a quick jab: a heavy's long windup would just get countered by the player's next swing.
+      const heavy = payback ? 0 : this.p.heavyChance * (t.isPlayer ? HEAVY_VS_PLAYER : 1);
       if (me.weapon !== 'none' && this.rng.next() < heavy) c.heavy = true;
       else if (dx > 0) c.attackR = true;
       else c.attackL = true;

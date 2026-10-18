@@ -1,10 +1,10 @@
 // Instanced rendering for traffic: per type one paint + one trim mesh (+ decals) sharing an instance
 // matrix buffer with their outline hulls; global wheel and lamp pools. ~2–5 draw calls per type in view.
 import {
-  BoxGeometry, BufferGeometry, Color, Group, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, Quaternion, Vector3,
+  BoxGeometry, BufferGeometry, Color, Group, InstancedMesh, Matrix4, MeshBasicMaterial, Quaternion, Vector3,
   type Material,
 } from 'three';
-import { outline, toon } from '../../../render/toon';
+import { outlineMaterial, toon } from '../../../render/toon';
 import { buildModel, buildWheel, WHEEL_R, type VehicleModel } from './models';
 import { createDecalAtlas, type DecalAtlas } from './decals';
 import { VEHICLES, VEHICLE_TYPES, type VehicleType } from './types';
@@ -12,19 +12,10 @@ import { VEHICLES, VEHICLE_TYPES, type VehicleType } from './types';
 export const MAX_VEHICLES = 32;
 const STRIDE = 6;                 // wheel / lamp instances reserved per vehicle
 const OUTLINE_W = 0.04;
+const INK = '#0b0b0f';            // outline colour (same as render/toon outline())
 const HIDDEN = new Matrix4().makeScale(0, 0, 0);
 const BLINK_COLOR = new Color('#ffab1a');
 const BRAKE_COLOR = new Color('#ff2a2a');
-
-/** The shared core outline material (same look as outline()), taken from a probe hull. */
-function outlineMaterial(width: number): Material {
-  const probe = new Mesh(new BufferGeometry());
-  outline(probe, width);
-  const hull = probe.children[0];
-  probe.geometry.dispose();
-  if (!(hull instanceof Mesh)) throw new Error('[race] traffic: outline() produced no hull');
-  return hull.material as Material;
-}
 
 interface TypeMeshes {
   model: VehicleModel;
@@ -87,13 +78,13 @@ export class TrafficRender {
   constructor(adText: string, night = false) {
     this.group.name = 'race:traffic';
     this.atlas = createDecalAtlas(adText);
-    const hullMat = outlineMaterial(OUTLINE_W);
+    const hullMat = outlineMaterial(INK, OUTLINE_W);
     for (const type of VEHICLE_TYPES) this.types.set(type, this.buildType(type, hullMat));
     const wheelGeo = buildWheel();
     const cap = MAX_VEHICLES * STRIDE;
     this.wheels = this.instanced(wheelGeo, toon('#ffffff', { vertexColors: true }), cap);
     this.wheels.castShadow = true;
-    this.wheelHull = this.instanced(wheelGeo, outlineMaterial(0.03), cap);
+    this.wheelHull = this.instanced(wheelGeo, outlineMaterial(INK, 0.03), cap);
     this.wheelHull.instanceMatrix = this.wheels.instanceMatrix;
     this.lamps = this.instanced(new BoxGeometry(0.2, 0.15, 0.1), new MeshBasicMaterial({ color: '#ffffff' }), cap);
     for (let i = 0; i < cap; i++) {

@@ -1,0 +1,72 @@
+{
+  "unit": "combat",
+  "round": 3,
+  "lens": "gameplay",
+  "score": 8.1,
+  "pass": true,
+  "summary": "Combat is now rule-solid and passes round 3 (8.1/10, no blocker or major issue). combat-check passes 55/55 isolated and 55/55 --full, and tsc is clean. Every r2 gameplay issue owned by combat is fixed, which I verified with my own scenarios. The bell is no longer an SP faucet: 20 rings in 60 s at one rival pay 5 SP, and races with B every 3 s paid 11/27 and 6/28 rings with the same SHOWTIME count as without the bell. Presses after U, in a cast pose, in a bell and in a stagger all fire, and U+O in one swing casts both. A strong short slow drops back to 0.85 and then 1 (0.65 -> 0.85 -> 1) with real HONK and WHISTLE casts. The torpedo stops at a real traffic van. Rival heavies show a glint and can be countered 0-13 frames into the windup. SHOWTIME is denied within 18 m of the line. Projectile ids repeat after a restart. Edge cases hold up. Two rivals hitting the player on one substep both land with one hit-stop. A lethal trade gives two KOs, each exactly once and cross-credited. KOs mid-OIIA, while holding a gulped pigeon and at the top of SHOWTIME all end cleanly. A ghosting pigeon ignores the shockwave and the torpedo. Eight full autopilot races (coast x6, city, mountain; traffic and police; all real units) showed 0 invariant violations: no double hits, no hits on or from untouchable riders, no second KO, every cast closed by skill:end, exactly one projectile:end per spawn, no stuck actions, statuses or stale mods, and no events after a normal race end. Event positions were 0.00 m off the pose and there were 0 console errors. The same seed gives an identical event hash across page loads. It looks great: hit bursts with HEAVY and CRIT stamps, the B&W crit flash, the heavy tell glint, the gulp spit arc, and SHOWTIME into QUADRA KNOCK OUT is a real money shot. Remaining issues are minor: SHOWTIME and the torpedo keep scoring after a DNF race:end; the r2 tell fix doubled crits (24 %, mostly AI counter-crits); counters are not labelled; Big Gulp's swallow does not read; SHOWTIME is denied in the air; and MINE! can fire with nothing to steal. The most visible flaw is cross-unit: every melee impact lands 4-8 frames before the actors' weapon swings through, so the hit-stop freezes a cocked weapon. Combat needs to expose its swing timing for actors to fix it. The HUD bands and the gulped-rival flicker are also still open.",
+  "r2_recheck": "Fixed: bell faucet (A1-A3 and bell soaks); dropped presses (A4); finished caster scoring (check plus A5 line denial); status merge (A6); torpedo through cars (E6, real van); counter window too short (A7 plus tell strip; see the new crit-inflation issue); fish and cans at full HP/SP (check); Big Gulp had nothing to swallow (check, though it now needs readability, issue 5). r2-tech gameplay items fixed: ult after finish, KO credit tie, gulp lock-out, --full check, id counters (E4). Not fixed (cross-unit): HUD bands over the torpedo and gulp; gulped rival flicker.",
+  "evidence": "shots/review/combat/r3-gameplay/: check-iso.txt, check-full.txt, tsc.txt, out-a..e.txt (scenarios s-a..s-e.mjs via run.mjs), out-dnf.txt + sheet-dnf.png, soak-*.txt (soak.mjs), econ.txt, out-determ.txt, sheet-contact-light/heavy.png, sheet-melee/tell/counter/ko/trade/ult/gulp/swallow/torpedo/chill/ghost/wing/honkme.png, strip/flicker-10.png",
+  "issues": [
+    {
+      "severity": "minor",
+      "title": "cross-unit: every melee impact lands while the weapon is still cocked (4-8 frames before visual contact), so the hit-stop freezes the wrong pose",
+      "detail": "Frame-by-frame captures with every real unit (contact.mjs; sheet-contact-light.png, sheet-contact-heavy.png). Leek light swing: combat:hit, the damage number and the burst land on frame 4 (t 0.058 s, the first active substep). All three hit-stop frames (4-6) show the leek still held behind the pelican's head, and it only sweeps across the cat on frames 8-10. Baguette heavy: the hit and the B&W flash land on frame 12 (t 0.192 s). Hit-stop frames 12-16 show the baguette pointing straight up, and it comes down on frame 20, 133 ms after the 21 appears. Cause: combat resolves a hit on the first substep of the active window (melee.ts pickStrike), which is u 0.19 light / u 0.31 heavy of the action. actors/rig/cues.ts keys its windup peak at exactly those fractions but its contact pose at u 0.35 / 0.42. Rival heavies near the player have the 1.6x HEAVY_TELL windup, which moves the hit to u 0.41, so no fixed curve can match both cases (tell heavies line up by accident, tell-021.png). Pillar 2's freeze frame should show the weapon on the victim.",
+      "fix": "Combat: file a core request to expose the real swing timing to views (for example RiderAction.windup and RiderAction.active in seconds, set in startSwing, or cue opts {windup, active}), because the tell changes the ratio. Actors: key the contact pose to t = windup (strike travel in the last ~40 % of the windup) instead of the fixed u 0.35 / 0.42. Re-check that the hit-stop frames of a light, a heavy and a telegraphed heavy show the weapon touching the victim."
+    },
+    {
+      "severity": "minor",
+      "title": "Race timeout (DNF) mid-action: SHOWTIME and the torpedo still hit and score KOs after race:end",
+      "detail": "The finish-line fix (ctx.finished) only covers a caster who crosses the line. When the 60 s DNF timer ends the race, nothing stops combat. C1 (out-c.txt): race:end fires at frame 4585, then 27 frames later the ult lands with 3 combat:hit, ult:impact and 3 combat:ko, and pelican.kos becomes 3 after the results are already final. C2: the torpedo hits 9 frames after race:end. With every real unit (dnf.mjs, out-dnf.txt, sheet-dnf.png), 3 cine:ko 'start' events and the KO cinematic run behind the RESULTS screen, and the rider state (+3 KOs, +150 coins) disagrees with the results the screen shows. The brief lists 'race end mid-action' as an edge case to cover.",
+      "fix": "In system.ts, listen to race:end (or watch session.phase leave 'racing' with the player unfinished). Set ctx.over, end every running skill with EndReason 'finish' (the ult drops the pelican the same way it does at the line), poof live projectiles, and make applyHit, skillAffect, creditFor and pickups ignore everything once over. Add a finish.mjs scenario: the goose finishes, the DNF timer runs out mid-dive, and there is no combat:hit or combat:ko after race:end."
+    },
+    {
+      "severity": "minor",
+      "title": "The r2 heavy-tell fix more than doubled crits: AI riders now counter-crit each other constantly",
+      "detail": "Across 8 full races with real units (soak-*.txt; coast x6, city, mountain), crits are 24 % of landed melee hits (132/551, 18-32 % per race). SPEC's base is 10 %, and r2 measured 12.7 % before the tell. econ.mjs (econ.txt, 212 melee hits in 3 races) splits the 55 crits into 21 random (9.9 %, matching SPEC), 4 ONE MORE and 30 counter-crits. Only 3 of the 30 counters were the player's. melee.ts timing() gives HEAVY_TELL (1.6x windup) to every rival heavy within 6 m of the player, including heavies aimed at another rival, so nearby AI fights become counter-crit trades. CRIT! tags and crit bursts lose their meaning, and rival-vs-rival damage spikes.",
+      "fix": "Apply the tell only when the player is the likely victim: the swing side holds the player within reach + 1 m and |ds| < MELEE.maxDs + 0.5. Let only the player counter inside the extended part of a telegraphed windup; AI counters stay inside the base windup. Add a soak assertion that crit share is 12-16 %."
+    },
+    {
+      "severity": "minor",
+      "title": "Counter-crits look exactly like random crits, so the new tell teaches nothing",
+      "detail": "combat:hit carries only crit (core/events-map.ts), and the HUD stamps 'CRIT!' on a counter (counter-008.png), the same as a 10 % random roll. A player who reads the yellow glint (tell-008.png) and hits inside the window (A7: J 0-13 frames after the windup starts counters, frames 15+ eat the hit) gets no 'COUNTER!' stamp, parry sound or 'COUNTERED' on the rival. The best skill moment in melee goes unnamed, and the tell mechanic is undiscoverable.",
+      "fix": "Core request: add counter: boolean to combat:hit, set in melee.ts strike() from inWindup(). Then ui-hud can stamp COUNTER! (with the victim's swing visibly cancelled), audio can play a parry clang, and fx can play a distinct burst. Until the field lands, combat can emit a 'taunt' bubble 'COUNTER!' at the attacker when the player is involved."
+    },
+    {
+      "severity": "minor",
+      "title": "Big Gulp eating a HONK or WHISTLE does not read on screen",
+      "detail": "swallow-003/008/014/022.png (goose honking from 5 m behind into an open pouch): the orange ConeWave rings sweep past and around the pelican untouched. The only payoff is an expanding white FlatRing, which reads as emitting, not eating. The notes and poof bursts are spawned at a fixed world point and stream past the camera at race speed. The 咕嘟！ taunt bubble sits under the BIG GULP cut-in band. The rule works (+4 SP, no stun; check passes), but a player sees what looks like being honked at, with no clear 'my pouch ate it' moment.",
+      "fix": "In skills/swallow.ts, replace the expanding ring with a collapsing ring or spiral in the wave's colour (3 m down to 0.2 m into the beak, about 0.25 s), add a ConeWave.cut(rider) so the ring segment that reaches the pouch vanishes into it, and spawn the burst about 1 m ahead of the beak. File a core request for vel in FxSystem.burst opts so the burst travels with the rider (fx already supports vel internally, react/bus-combat.ts)."
+    },
+    {
+      "severity": "minor",
+      "title": "SHOWTIME pressed while airborne (hop, crest) is denied and lost instead of buffered",
+      "detail": "E2 (out-e.txt): with 100 SP, P pressed 6 frames into a Space hop gives skill:denied slot 4 'state', and no ult follows after landing. runner.ts check() returns 'state' for slot 4 when r.airborne, so the round-2 press buffer never applies. Torpedo presses in the same hop cast normally (E3). The ult is the game's biggest button, and a hop is only 0.38 s, so a mistimed press just reads as 'SHOWTIME refused'.",
+      "fix": "In check(), return 'busy' for the ult while r.airborne, so the press is buffered, and give ult presses a longer hold (about 0.6 s) so a hop or crest press fires on landing. Alternatively, allow SHOWTIME from the air by starting the rise from the current y."
+    },
+    {
+      "severity": "minor",
+      "title": "Seagull MINE! on a rider with nothing to steal still announces a steal",
+      "detail": "E1 (out-e.txt): the seagull casts MINE! next to the unarmed pelican with 0 SP. skills/steal.ts still emits skill:hit (victim 0), the 'MINE!' taunt, the tether visual and a camera nudge, but nothing is taken. ready() only checks that someone is within 6 m, so the AI spends its 10 s cooldown on nothing and the player sees a steal that cost them nothing.",
+      "fix": "victimOf(): pick the nearest rider within 6 m that has a weapon or SP >= 1. If there is none, ready() returns false and the AI holds the skill. Add a sigs.mjs case for an empty victim."
+    },
+    {
+      "severity": "minor",
+      "title": "cross-unit: HUD skill cut-in bands still cover the road during player skills (open since r1)",
+      "detail": "ui-hud: the full-width FISH TORPEDO band covers the upper middle of the screen for the whole flight (torpedo-020.png). BIG GULP covers it for the 1.2 s pouch and hides the 咕嘟！ bubble (gulp-003.png, swallow-008.png). WING DASH covers it during the ram window (wing-014.png). Every player skill blinds the player to the road ahead exactly when they need to see the target.",
+      "fix": "ui-hud: slam the full band for at most 0.35 s, then shrink it to a corner card. Never keep it over the road while a projectile flies (projectile:spawn / projectile:end are emitted), and draw the player's taunt bubbles above any band."
+    },
+    {
+      "severity": "minor",
+      "title": "cross-unit: a gulped rival is still drawn inside the pelican (open since r1)",
+      "detail": "actors/view.ts visibleFor() still treats 'gulped' like 'invisible' and draws the rider 1 frame in 7. flicker.mjs: the pigeon was drawn on 2 of 24 frames while held, overlapping the pelican's back (strip/flicker-10.png). That breaks the 'swallowed whole' gag.",
+      "fix": "actors: return false in visibleFor() while state.statuses has a live 'gulped' entry, before the invisible flicker."
+    },
+    {
+      "severity": "minor",
+      "title": "cross-unit: a mutual KO plays DOUBLE KNOCK OUT while the pelican is wrecked; honk bursts fill the lens",
+      "detail": "fx/ui-hud: in B2/trade, the player and the goose KO each other on one substep (combat emits two correct combat:ko events). The splash reads 'DOUBLE KNOCK OUT! 双杀!' with the goose crossed out, while the pelican tumbles off its bike (sheet-trade.png). fx: a goose honking from 4-6 m behind (the camera's position) puts huge black/white blobs in front of the lens for about 0.3 s (honkme-008.png, swallow-003.png).",
+      "fix": "fx/ui-hud: when the player is also a victim in the chain, show WRECKED (or a 'TRADE' variant) instead of DOUBLE. fx: fade or cull burst particles within about 2 m of the camera."
+    }
+  ]
+}

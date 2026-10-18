@@ -5,6 +5,7 @@
 //        [--stub world,actors,combat,race,fx,ui,audio] [--seed 1] [--browser webkit]
 // Scenarios: accel coastBrake steer keyboard slalom curveHold drift air wall bump press slipstream crash
 //            driftWall knock snake wallEvents slope wallPin driftTiming jitter camera handoff trafficCam
+//            respawnCam ultHandback pauseCam
 import path from 'node:path';
 import { parseArgs, withPage } from './lib.mjs';
 import { installFeel, installPatches, saveDataUrl, writeCsv, writeJson } from './feel-lib.mjs';
@@ -34,16 +35,21 @@ const CHECKS = [
   ['curveHold', 'R60', 0.6, 0.85], ['curveHold', 'R100', 0.3, 0.6],
   ['drift', 'boostPower', 0.34, 0.36], ['drift', 'slipMaxDeg', 25, 45], ['drift', 'bleedPerSec', 0.02, 0.06],
   ['air', 'hopAir', 0.34, 0.42], ['air', 'rampAir', 0.4, 2], ['jitter', 'slowmoMaxStepPx', 0, 6],
-  ['camera', 'fovAtTop', 70, 80], ['camera', 'minClearance', 1.15, 9], ['camera', 'blendOutSec', 0.2, 0.37],
+  // review r2: PERFECT is earned at touchdown (calm hands or a timed Space), steering through the flight misses it
+  ['air', 'rampPerfect', true, true], ['air', 'rampSteerPerfect', false, false], ['air', 'rampStickPerfect', true, true],
+  ['camera', 'fovAtTop', 69, 72], ['camera', 'minClearance', 1.15, 9], ['camera', 'blendOutSec', 0.2, 0.37],
   ['press', 'sideMaxStepX', 0, 0.12], ['press', 'sideJitterX', 0, 0.01], ['press', 'rearMaxSJump', 0, 0.06],
   ['camera', 'popRatio', 0, 1.6], ['slipstream', 'riderNearMiss', 1, 1], ['air', 'kickCrestAir', 0.35, 1.5], ['wall', 'scrapeCrashed', false, false],
   // review r1: drifts never reach a wall within 2.5 s from the centre; knocks carry; no snake farming;
   // one wall event per approach with a visible bounce; descents settle above top speed
-  ['driftWall', 'k0_hold_clearSec', 2.5, 9], ['driftWall', 'k0_neutral_clearSec', 2.5, 9],
-  ['driftWall', 'k0_counter_clearSec', 2.5, 9], ['driftWall', 'k150_hold_clearSec', 2.5, 9],
+  // (review r2: a full-into drift crosses the road like grip steering, ~4.5 m/s, so held from the centre it meets
+  // the wall after ~2 s: it must bounce, never crash, and still reach L3 first on the bend)
+  ['driftWall', 'k0_hold_clearSec', 1.8, 9], ['driftWall', 'k0_neutral_clearSec', 2.5, 9],
+  ['driftWall', 'k0_counter_clearSec', 2.5, 9], ['driftWall', 'k150_hold_clearSec', 1.8, 9],
+  ['driftWall', 'k0_hold_crashed', false, false], ['driftWall', 'k150_hold_crashed', false, false],
   ['driftWall', 'k150_neutral_clearSec', 2.5, 9], ['driftWall', 'k150_counter_clearSec', 2.5, 9],
   ['driftWall', 'k150_hold_level', 3, 3],
-  ['knock', 'lightDisp', 0.45, 0.8], ['knock', 'heavyDisp', 1.2, 1.8],
+  ['knock', 'lightDisp', 0.45, 0.8], ['knock', 'heavyDisp', 1.2, 1.8], ['knock', 'lightSteerDisp', 0.45, 0.8],
   ['snake', 'gainInto', -1, 0.03], ['snake', 'gainCounter', -1, 0.03],
   ['wallEvents', 'minGap_30', 0.25, 9], ['wallEvents', 'minGap_60', 0.25, 9], ['wallEvents', 'minGap_144', 0.25, 9],
   ['wallEvents', 'carry_60', 0.4, 1], ['slope', 'v13', 22.5, 24], ['slope', 'v055', 21, 22],
@@ -66,6 +72,14 @@ const CHECKS = [
   ['trafficCam', 'car_crashed', true, true], ['trafficCam', 'car_eyeInBox', 0, 0], ['trafficCam', 'car_hiddenRun', 0, 6],
   ['trafficCam', 'van_crashed', true, true], ['trafficCam', 'van_eyeInBox', 0, 0], ['trafficCam', 'van_hiddenRun', 0, 6],
   ['trafficCam', 'bus_crashed', true, true], ['trafficCam', 'bus_eyeInBox', 0, 0], ['trafficCam', 'bus_hiddenRun', 0, 6],
+  // respawn keeps the rider on screen (a glide that would lose it cuts instead); SHOWTIME hands back settled;
+  // pause freezes shake / kick / buzz; chasePose() is the live chase pose
+  ['respawnCam', 'traffic_respawned', true, true], ['respawnCam', 'water_respawned', true, true],
+  ['respawnCam', 'traffic_onScreen', 0.9, 1], ['respawnCam', 'water_onScreen', 0.9, 1], ['respawnCam', 'slow_onScreen', 0.9, 1],
+  ['respawnCam', 'traffic_maxRotDeg', 0, 8], ['respawnCam', 'water_maxRotDeg', 0, 8], ['respawnCam', 'slow_maxRotDeg', 0, 8],
+  ['ultHandback', 'cinematic', true, true], ['ultHandback', 'handbackDy', 0, 0.3],
+  ['pauseCam', 'buzz_rotDeg', 0, 0.01], ['pauseCam', 'shake_rotDeg', 0, 0.01], ['pauseCam', 'shake_move', 0, 0.001],
+  ['pauseCam', 'kick_fov', 0, 0.01], ['pauseCam', 'kick_move', 0, 0.001], ['pauseCam', 'chasePoseErr', 0, 0.02],
 ];
 
 function report(results) {

@@ -75,12 +75,11 @@ export class BikeLoops {
     const ly = this.layers;
     this.windBand = filter(ctx, { type: 'bandpass', frequency: 400, Q: 0.6 });
     this.white.connect(this.windBand).connect(ly.wind.gain);
-    // Chain: high-passed noise amplitude-modulated at the chainring tooth rate → buzzy whirr.
+    // Chain: noise amplitude-modulated at the chainring tooth rate, band-passed → buzzy whirr.
     const vca = new GainNode(ctx, { gain: 0.5 });
     this.teeth = new OscillatorNode(ctx, { type: 'square', frequency: 40 });
     this.teeth.connect(new GainNode(ctx, { gain: 0.5 })).connect(vca.gain);
-    this.white.connect(filter(ctx, { type: 'highpass', frequency: 1800 })).connect(vca)
-      .connect(filter(ctx, { type: 'bandpass', frequency: 3600, Q: 1 })).connect(ly.chain.gain);
+    this.white.connect(vca).connect(filter(ctx, { type: 'bandpass', frequency: 3600, Q: 1 })).connect(ly.chain.gain);
     // Freewheel: band-limited impulse train = pawl ticks, a buzz at speed.
     this.ratchet = new OscillatorNode(ctx, { frequency: 20 });
     this.ratchet.setPeriodicWave(impulseWave(ctx, 40));
@@ -100,7 +99,11 @@ export class BikeLoops {
     this.white.connect(this.skidBand).connect(ly.skid.gain);
     this.jetBand = filter(ctx, { type: 'bandpass', frequency: 1200, Q: 1 });
     this.white.connect(this.jetBand).connect(ly.jet.gain);
-    for (const o of [this.teeth, this.ratchet, this.rumble]) o.start(t);
+    for (const o of [this.teeth, this.ratchet, this.rumble]) {
+      // Speed-linked rates glide over 60 ms: one value per render quantum is plenty (CPU).
+      o.frequency.automationRate = 'k-rate';
+      o.start(t);
+    }
     this.sources = [this.white, brown, this.crackle, this.teeth, this.ratchet, this.rumble];
   }
 

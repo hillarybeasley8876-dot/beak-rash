@@ -90,7 +90,7 @@ export async function retriggerChecks(): Promise<OnsetStat[]> {
 
 /** Every stinger, 5 s apart (the stinger band idles in between), through the full graph. */
 export async function stingerIdleChecks(): Promise<OnsetStat[]> {
-  const ids: StingerId[] = ['finish', 'onemore', 'ko', 'busted', 'showtime', 'wrecked', 'go', 'count'];
+  const ids: StingerId[] = ['finish', 'finishLow', 'onemore', 'ko', 'busted', 'showtime', 'wrecked', 'go', 'count'];
   const at = (i: number): number => 0.3 + i * 5;
   const ctx = new OfflineAudioContext(2, Math.ceil(SR * (at(ids.length - 1) + 3)), SR);
   const engine = new Engine(ctx, DEFAULT_VOLUMES, { glue: false });

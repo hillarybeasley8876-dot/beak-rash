@@ -19,7 +19,7 @@ export interface BikeDef {
 
 export const BIKES: Record<BikeId, BikeDef> = {
   roadbike: {
-    id: 'roadbike', name: '风之翼 公路车', blurb: '碳纤维车架，鹈鹕友好型弯把。', price: 0,
+    id: 'roadbike', name: '风之翼 公路车', blurb: '轻到海风一吹就跑，所以骑快点。', price: 0,
     topSpeed: 20, accel: 6.2, handling: 1, brake: 12, weight: 1, durability: 0, offroad: 0.35,
     bars: { speed: 4, accel: 4, handling: 3, weight: 2, durability: 2 },
   },
@@ -39,7 +39,7 @@ export const BIKES: Record<BikeId, BikeDef> = {
     bars: { speed: 5, accel: 4, handling: 4, weight: 1, durability: 1 },
   },
   mtb: {
-    id: 'mtb', name: '山地车', blurb: '避震拉满，草地如履平地。', price: 1200,
+    id: 'mtb', name: '山地车', blurb: '避震拉满，颠簸路段也能睡着。', price: 1200,
     topSpeed: 19.5, accel: 6, handling: 1.12, brake: 13, weight: 1.15, durability: 15, offroad: 0.9,
     bars: { speed: 3, accel: 4, handling: 4, weight: 3, durability: 4 },
   },
@@ -49,7 +49,7 @@ export const BIKES: Record<BikeId, BikeDef> = {
     bars: { speed: 5, accel: 3, handling: 2, weight: 4, durability: 4 },
   },
   kidbike: {
-    id: 'kidbike', name: '儿童滑步车', blurb: '没有踏板，全靠腿蹬。灵活得离谱。', price: 66,
+    id: 'kidbike', name: '儿童滑步车', blurb: '没有踏板，全靠腿蹬。童年回来了。', price: 66,
     topSpeed: 16.5, accel: 7.4, handling: 1.4, brake: 14, weight: 0.6, durability: -15, offroad: 0.6,
     bars: { speed: 1, accel: 5, handling: 5, weight: 1, durability: 1 },
   },

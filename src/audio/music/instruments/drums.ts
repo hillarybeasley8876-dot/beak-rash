@@ -1,18 +1,23 @@
-// Drum kit (all synthesized). Noise-based pieces (snare wires, clap, hats, shaker, tambourine,
-// ride) are persistent voices re-triggered per hit; pitched one-shots (kick, snare body, rim,
-// toms) and rare long ones (crash, swell) create short-lived nodes. Gains are calibrated so the
-// drum strip at trim 1 peaks around −10 dBFS on accents.
+// Drum kit (all synthesized). Every hit (kick, snare, rim, toms, clap, hats, shaker, tambourine,
+// ride, crash, cowbell) plays a sample rendered once (drum-samples.ts): one buffer source + gain,
+// alive only while it sounds, so no oscillators, pitch glides or filter chains run on the audio
+// thread. The rare long effects (swell, riser) create short-lived nodes. Gains are calibrated so
+// the drum strip at trim 1 peaks around −10 dBFS on accents; the noise hits sit 3.5 dB (cymbals
+// 5.5 dB) over the former live voices, which had sounded early (pre-onset swells) and so carried
+// more energy than their envelopes.
 import { noise } from '../../dsp/noise';
-import { anchor, filter, perc, settle } from '../../dsp/env';
-import { NoiseVoice, osc, type Gate } from './voice';
+import { filter } from '../../dsp/env';
+import { playSample, type DrumSample } from './drum-samples';
 import type { Band } from '../band';
 
-const TOMS: Record<1 | 2 | 3, [number, number, number]> = { 1: [215, 165, 0.42], 2: [160, 122, 0], 3: [118, 86, -0.4] };
+const TOM_PAN: Record<1 | 2 | 3, number> = { 1: 0.42, 2: 0, 3: -0.4 };
+const OPEN_HAT_S = 0.34;
 
 export class DrumKit {
-  private voices = new Map<string, NoiseVoice>();
   private pans = new Map<number, StereoPannerNode>();
-  private rideBell: { vca: GainNode; gate: Gate } | null = null;
+  private turns = new Map<DrumSample, number>();
+  /** The ringing open hat, choked by the next hat like a closing pedal. */
+  private openHat: { gain: GainNode; level: number; end: number } | null = null;
 
   constructor(private b: Band) {}
 
@@ -20,17 +25,9 @@ export class DrumKit {
     return this.b.input('drums');
   }
 
-  private voice(key: string, make: () => NoiseVoice): NoiseVoice {
-    let v = this.voices.get(key);
-    if (!v) {
-      v = make();
-      this.voices.set(key, v);
-    }
-    return v;
-  }
-
-  /** One shared panner per position (one-shot hits connect into it; no per-hit panner nodes). */
+  /** One shared panner per position (hits connect into it; no per-hit panner nodes). */
   private panned(pan: number): AudioNode {
+    if (pan === 0) return this.out;
     let p = this.pans.get(pan);
     if (!p) {
       p = new StereoPannerNode(this.b.ctx, { pan });
@@ -40,126 +37,63 @@ export class DrumKit {
     return p;
   }
 
+  /** A sample hit at `level` (its takes rotate); returns the hit's gain node. */
+  private sample(kind: DrumSample, t: number, level: number, pan = 0): GainNode {
+    const turn = (this.turns.get(kind) ?? 0) + 1;
+    this.turns.set(kind, turn);
+    return playSample(this.b.ctx, kind, turn, t, level, this.panned(pan));
+  }
+
   kick(t: number, vel: number): void {
-    const ctx = this.b.ctx;
-    const o = new OscillatorNode(ctx, { type: 'sine', frequency: 165 });
-    o.frequency.setValueAtTime(165, t);
-    o.frequency.exponentialRampToValueAtTime(54, t + 0.065);
-    o.frequency.exponentialRampToValueAtTime(44, t + 0.32);
-    const g = new GainNode(ctx, { gain: 0 });
-    const end = perc(g.gain, t, 0.95 * vel, 0.002, 0.34);
-    o.connect(g).connect(this.out);
-    o.start(t);
-    o.stop(end);
-    this.voice('click', () => new NoiseVoice(this.b, [{ type: 'bandpass', frequency: 3200, Q: 0.8 }], this.out))
-      .hit(t, 0.22 * vel, 0.0008, 0.008);
+    this.sample('kick', t, 0.76 * vel);
     this.b.duck(t, 0.42 * vel);
   }
 
   snare(t: number, vel: number, ghost = false): void {
-    const ctx = this.b.ctx;
-    const body = new OscillatorNode(ctx, { type: 'triangle', frequency: 240 });
-    body.frequency.setValueAtTime(240, t);
-    body.frequency.exponentialRampToValueAtTime(180, t + 0.04);
-    const bg = new GainNode(ctx, { gain: 0 });
-    const end = perc(bg.gain, t, (ghost ? 0.12 : 0.42) * vel, 0.001, ghost ? 0.04 : 0.09);
-    body.connect(bg).connect(this.out);
-    body.start(t);
-    body.stop(end);
-    this.voice('snare', () => new NoiseVoice(this.b, [
-      { type: 'highpass', frequency: 1300, Q: 0.7 }, { type: 'peaking', frequency: 4200, Q: 1.2, gain: 5 },
-    ], this.out, -0.06)).hit(t, (ghost ? 0.16 : 0.5) * vel, 0.0015, ghost ? 0.06 : 0.17);
+    this.sample(ghost ? 'snareGhost' : 'snare', t, (ghost ? 0.24 : 0.75) * vel);
   }
 
   rim(t: number, vel: number): void {
-    const ctx = this.b.ctx;
-    const o = new OscillatorNode(ctx, { type: 'triangle', frequency: 1750 });
-    const g = new GainNode(ctx, { gain: 0 });
-    const end = perc(g.gain, t, 0.3 * vel, 0.0005, 0.03);
-    o.connect(g).connect(this.panned(-0.15));
-    o.start(t);
-    o.stop(end);
+    this.sample('rim', t, 0.3 * vel, -0.15);
   }
 
   clap(t: number, vel: number): void {
-    const v = this.voice('clap', () => new NoiseVoice(this.b, [{ type: 'bandpass', frequency: 1150, Q: 1.1 }], this.out, 0.05));
-    const p = v.vca.gain;
-    const peak = 0.55 * vel;
-    anchor(p, t);
-    for (let k = 0; k < 3; k++) {
-      const at = t + k * 0.011;
-      p.linearRampToValueAtTime(peak, at + 0.001);
-      p.exponentialRampToValueAtTime(peak * 0.15, at + 0.009);
-    }
-    p.linearRampToValueAtTime(peak * 0.8, t + 0.034);
-    p.exponentialRampToValueAtTime(0.0001, t + 0.22);
-    p.linearRampToValueAtTime(0, t + 0.225);
-    settle(p, t + 0.225, 0);
-    v.wake(t + 0.23);
+    this.sample('clap', t, 0.82 * vel);
   }
 
   hat(t: number, vel: number, open: boolean): void {
-    this.voice('hat', () => new NoiseVoice(this.b, [
-      { type: 'highpass', frequency: 7200, Q: 0.6 }, { type: 'peaking', frequency: 10500, Q: 0.9, gain: 6 },
-    ], this.out, 0.28)).hit(t, (open ? 0.3 : 0.26) * vel, 0.0012, open ? 0.3 : 0.04 + 0.02 * vel);
+    this.choke(t);
+    const level = (open ? 0.64 : 0.55) * vel;
+    const gain = this.sample(open ? 'hatOpen' : 'hat', t, level, 0.28);
+    if (open) this.openHat = { gain, level, end: t + OPEN_HAT_S };
+  }
+
+  private choke(t: number): void {
+    const o = this.openHat;
+    if (!o || t >= o.end) return;
+    o.gain.gain.setValueAtTime(o.level, t);
+    o.gain.gain.linearRampToValueAtTime(0, t + 0.008);
+    this.openHat = null;
   }
 
   shaker(t: number, vel: number): void {
-    this.voice('shaker', () => new NoiseVoice(this.b, [{ type: 'bandpass', frequency: 5600, Q: 1.4 }], this.out, -0.38))
-      .hit(t, 0.42 * vel, 0.012, 0.07);
+    this.sample('shaker', t, 0.8 * vel, -0.38);
   }
 
   tambourine(t: number, vel: number): void {
-    const v = this.voice('tamb', () => new NoiseVoice(this.b, [
-      { type: 'highpass', frequency: 5200, Q: 0.7 }, { type: 'peaking', frequency: 8800, Q: 3, gain: 9 },
-    ], this.out, 0.42));
-    const p = v.vca.gain;
-    const peak = 0.36 * vel;
-    anchor(p, t);
-    for (let k = 0; k < 3; k++) {
-      p.linearRampToValueAtTime(peak * (1 - k * 0.22), t + k * 0.016 + 0.001);
-      p.exponentialRampToValueAtTime(peak * 0.3, t + k * 0.016 + 0.012);
-    }
-    p.exponentialRampToValueAtTime(0.0001, t + 0.17);
-    p.linearRampToValueAtTime(0, t + 0.175);
-    settle(p, t + 0.175, 0);
-    v.wake(t + 0.18);
+    this.sample('tamb', t, 0.68 * vel, 0.42);
   }
 
   tom(t: number, vel: number, which: 1 | 2 | 3): void {
-    const ctx = this.b.ctx;
-    const [f0, f1, pan] = TOMS[which];
-    const o = new OscillatorNode(ctx, { type: 'sine', frequency: f0 });
-    o.frequency.setValueAtTime(f0, t);
-    o.frequency.exponentialRampToValueAtTime(f1, t + 0.18);
-    const g = new GainNode(ctx, { gain: 0 });
-    const end = perc(g.gain, t, 0.62 * vel, 0.002, 0.3 + which * 0.04);
-    o.connect(g).connect(this.panned(pan));
-    o.start(t);
-    o.stop(end);
-    this.voice('click', () => new NoiseVoice(this.b, [{ type: 'bandpass', frequency: 3200, Q: 0.8 }], this.out))
-      .hit(t, 0.1 * vel, 0.001, 0.02);
+    this.sample(`tom${which}`, t, 0.62 * vel, TOM_PAN[which]);
   }
 
   crash(t: number, vel: number): void {
-    const ctx = this.b.ctx;
-    const n = noise(ctx, 'white', t, 2.1, this.b.rng);
-    const hp = filter(ctx, { type: 'highpass', frequency: 4200, Q: 0.5 });
-    const pk = filter(ctx, { type: 'peaking', frequency: 7600, Q: 0.7, gain: 4 });
-    const g = new GainNode(ctx, { gain: 0 });
-    perc(g.gain, t, 0.3 * vel, 0.002, 1.9);
-    n.connect(hp).connect(pk).connect(g).connect(this.panned(-0.2));
+    this.sample('crash', t, 0.3 * vel, -0.2);
   }
 
   ride(t: number, vel: number): void {
-    this.voice('ride', () => new NoiseVoice(this.b, [{ type: 'highpass', frequency: 6500, Q: 0.6 }], this.out, 0.32))
-      .hit(t, 0.13 * vel, 0.001, 0.45);
-    if (!this.rideBell) {
-      const vca = new GainNode(this.b.ctx, { gain: 0 });
-      osc(this.b, 'sine', 4630).connect(vca);
-      this.rideBell = { vca, gate: this.b.gate(vca, this.panned(0.32)) };
-    }
-    this.rideBell.gate.open(perc(this.rideBell.vca.gain, t, 0.035 * vel, 0.001, 0.35, true));
+    this.sample('ride', t, 0.25 * vel, 0.32);
   }
 
   /** Reverse-cymbal swell that lands exactly on `t + dur` (section transitions, stingers). */
@@ -206,16 +140,6 @@ export class DrumKit {
 
   /** Two-square disco cowbell (lives in 0.5–3 kHz, cuts through a busy mix). */
   cowbell(t: number, vel: number): void {
-    const ctx = this.b.ctx;
-    const bp = filter(ctx, { type: 'bandpass', frequency: 1700, Q: 1.1 });
-    const g = new GainNode(ctx, { gain: 0 });
-    const end = perc(g.gain, t, 1.3 * vel, 0.001, 0.28);
-    bp.connect(g).connect(this.panned(0.22));
-    for (const f of [562, 845]) {
-      const o = new OscillatorNode(ctx, { type: 'square', frequency: f });
-      o.connect(bp);
-      o.start(t);
-      o.stop(end + 0.01);
-    }
+    this.sample('cowbell', t, 1.3 * vel, 0.22);
   }
 }

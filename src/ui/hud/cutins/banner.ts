@@ -26,10 +26,10 @@ export class FinalStretch {
     this.root.style.visibility = 'hidden';
   }
 
-  /** `alpha` dims the banner (0 while a cinematic plays). */
+  /** `alpha` dims the banner (0 while a cinematic plays); its lifetime waits for the HUD to come back. */
   update(dt: number, alpha: number): void {
     if (this.t >= LIFE) return;
-    this.t += dt;
+    if (alpha >= 0.999) this.t += dt;
     const t = this.t;
     if (t >= LIFE) {
       this.root.style.visibility = 'hidden';

@@ -1,6 +1,6 @@
 // Lead voices, each one persistent and monophonic (like a real mono synth): wah synth (saw +
 // square through an envelope band-pass), square synth (low-pass) and a breathy FM-free flute
-// (three sine partials + band-passed breath). Delayed vibrato via a shared LFO per voice.
+// (three sine partials + band-passed breath). Delayed vibrato from the band's shared LFO.
 import { adsr, anchor, filter, holdAt, settle } from '../../dsp/env';
 import { midiToHz } from '../theory';
 import { NoiseVoice, osc, type Gate } from './voice';
@@ -22,7 +22,7 @@ export class Lead {
     this.amp = new GainNode(ctx, { gain: 0 });
     this.gate = b.gate(this.amp, dest);
     this.vib = new GainNode(ctx, { gain: 0 });
-    osc(b, 'sine', voice === 'flute' ? 5.1 : 5.6).connect(this.vib);
+    b.lfo(voice === 'flute' ? 5.1 : 5.6).connect(this.vib);
     if (voice === 'flute') {
       for (const [mul, level] of FLUTE_PARTIALS) {
         const o = osc(b, 'sine');

@@ -126,6 +126,8 @@ export const MOUNTAIN: Song = {
   swing: 0.04,
   key: 'A Dorian',
   lead: 'wah',
+  // Half-note Rhodes, pad and brass hits sit in the hook's band (and warm the low end): all back a little.
+  mix: { lead: 0.68, keys: 0.55, bass: 0.66, brass: 0.8, drums: 1.0, pad: 0.6 },
   sections: {
     vamp: { bars: 2, chords: 'Am9 | Am9', kick: K1, hat: H1, bass: rep('1> . 8^ . 1 . 8^ . 1> . 8^ . 5 . 8^ .', 2), keys: KEYS_A },
     intro: {

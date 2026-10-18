@@ -14,7 +14,7 @@ const PULSE_CHECK = `window.__pulseCheck = (frames, dt) => {
     // Boosts merge (max time, max power): a short boost after a long one must not shorten the explained window.
     br.app.bus.on('rider:boost', (e) => until.set(e.riderId, Math.max(until.get(e.riderId) ?? -1, s.time + e.time + 0.1)));
   }
-  let vis = 0, total = 0, lifted = 0, maxRubber = 1;
+  let vis = 0, total = 0, lifted = 0, slowLift = 0, maxRubber = 1;
   for (let i = 0; i < frames; i++) {
     tick(dt); br.step(1, dt);
     for (const r of s.riders) {
@@ -23,11 +23,15 @@ const PULSE_CHECK = `window.__pulseCheck = (frames, dt) => {
       if (ds < -4 || ds > 80) continue;
       total++;
       if (r.boostTime > 0 && (until.get(r.id) ?? -1) < s.time) vis++;
-      if (r.rubber > 1.01) lifted++;
+      if (r.rubber > 1.01) {
+        // In view the rubber may only lift a slow bike up to its base pace (never above it).
+        const a = br.race.ai().find((q) => q.id === r.id);
+        if (!a || a.base === null || r.rubber * a.top > Math.max(a.top, a.base) * 1.01) lifted++; else slowLift++;
+      }
     }
     for (const r of s.riders) maxRubber = Math.max(maxRubber, r.rubber);
   }
-  return { vis, total, lifted, maxRubber };
+  return { vis, total, lifted, slowLift, maxRubber };
 };`;
 
 /** Ride the human controller until race time `secs` (or the race ends). */
@@ -144,17 +148,21 @@ export const fairScenarios = {
     check('a real pass (3 m ahead for 1 s) changes the player place once', n2 - n1 === 1, { passChanges: n2 - n1 });
   },
 
-  /** The rubber band never shows on rivals in view (−4…+80 m): no boost without a boost event, rubber ≤ 1.01. */
+  /**
+   * The rubber band never shows on rivals in view (−4…+80 m): no boost without a boost event, and rubber never
+   * takes a rider above its base pace there (slow bikes may be lifted up to it); the unseen catch-up still works.
+   */
   async pulses(page, h, { check, stub, a }) {
     await openRace(h, `race=coast&seed=${a.seed ?? 3}&level=1&manual=1&intro=0${stub}`);
     await h.eval(PULSE_CHECK);
-    let vis = 0, total = 0, lifted = 0, maxRubber = 1;
+    let vis = 0, total = 0, lifted = 0, slowLift = 0, maxRubber = 1;
     for (let i = 0; i < 12; i++) {
       const r = await h.eval(`window.__pulseCheck(300, ${DT})`);
-      vis += r.vis; total += r.total; lifted += r.lifted; maxRubber = Math.max(maxRubber, r.maxRubber);
+      vis += r.vis; total += r.total; lifted += r.lifted; slowLift += r.slowLift; maxRubber = Math.max(maxRubber, r.maxRubber);
     }
     check('no unexplained boosts on rivals in view', vis === 0, { unexplained: vis, samples: total });
-    check('rubber band only on unseen rivals (in view ≤ 1.01)', lifted === 0 && maxRubber > 1.01, { lifted, samples: total, maxRubber: +maxRubber.toFixed(3) });
+    check('in view, rubber never lifts a rival above its pace', lifted === 0 && maxRubber > 1.01,
+      { lifted, slowLift, samples: total, maxRubber: +maxRubber.toFixed(3) });
   },
 
   /** No AI signature skill in the first 5 s; launch boost kind 'launch'; no player place change at GO. */

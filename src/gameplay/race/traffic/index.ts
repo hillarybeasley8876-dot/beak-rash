@@ -11,6 +11,7 @@ import { AHEAD_NEAR, aheadFar, BASE_WINDOW, BEHIND, chooseSpot, spotIsFree, STAR
 
 const SPAWN_EVERY = 0.25;
 const SPAWN_BAND = 50;         // m: new vehicles appear in [far, far + band] ahead of the player
+const FOG_PUSH = 60;           // m: a spawn may move this far past `far` so a curve cannot bring it into clear view
 const AUDIBLE = 80;            // m from the player for honks to be worth an event
 
 export interface Traffic {
@@ -68,15 +69,30 @@ export function createTraffic(session: Session): Traffic {
     }
   };
 
+  const here = new Vector3(), there = new Vector3();
+  /**
+   * First s ≥ `far` ahead of the player that is also `far` away in a straight line (on a curve the road comes
+   * closer than its length); null when even FOG_PUSH m more is not enough (try again on a later tick).
+   */
+  const fogStart = (p: RiderState): number | null => {
+    track.toWorld(p.s, p.x, 0, here);
+    for (let s = p.s + far; s <= p.s + far + FOG_PUSH; s += 10) {
+      if (track.toWorld(Math.min(s, track.length), 0, 0, there).distanceTo(here) >= far) return s;
+    }
+    return null;
+  };
+
   const manage = (): void => {
     const p = session.player;
     for (let i = vehicles.length - 1; i >= 0; i--) {
       const v = vehicles[i] as Vehicle;
       const ds = v.ob.s - p.s;
-      if (ds < -BEHIND - 10 || ds > far + SPAWN_BAND + 70 || v.ob.s < 5 || (v.dir > 0 && v.ob.s > track.length - 25)) despawn(i);
+      if (ds < -BEHIND - 10 || ds > far + FOG_PUSH + SPAWN_BAND + 20 || v.ob.s < 5 || (v.dir > 0 && v.ob.s > track.length - 25)) despawn(i);
     }
     if (vehicles.length >= target) return;
-    const spot = chooseSpot(world, rng, Math.max(START_CLEAR, p.s + far), p.s + far + SPAWN_BAND);
+    const s0 = fogStart(p);
+    if (s0 === null) return;
+    const spot = chooseSpot(world, rng, Math.max(START_CLEAR, s0), s0 + SPAWN_BAND);
     if (spot) spawn(spot);
   };
 

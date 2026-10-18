@@ -19,7 +19,6 @@ export class PickupSystem {
   readonly items: Item[] = [];
   private renderer: PickupRenderer;
   private time = 0;
-  private drawnFrame = -1;
   private lastId = 0;
   private readonly nextId = (): number => ++this.lastId;
 
@@ -61,12 +60,6 @@ export class PickupSystem {
         continue;
       }
       if (collect && !it.vel) this.tryCollect(it, riders);
-    }
-    // Instance matrices are rewritten at most once per rendered frame (sim may run 2+ substeps per frame).
-    const frame = this.ctx.session.app.renderer.info.render.frame;
-    if (frame !== this.drawnFrame) {
-      this.drawnFrame = frame;
-      this.draw();
     }
   }
 
@@ -208,7 +201,8 @@ export class PickupSystem {
     this.items.splice(i, 1);
   }
 
-  private draw(): void {
+  /** Rewrite the instance matrices from the final poses: once per rendered frame (CombatSystem.frame). */
+  sync(): void {
     const p = this.ctx.session.player;
     this.renderer.begin();
     for (const it of this.items) {

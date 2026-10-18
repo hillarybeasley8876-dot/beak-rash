@@ -1,10 +1,15 @@
 // In-game check of the achievement system with every real unit, through game.ts's own instance (created
 // once, attached per race): drives a race through the real systems (launch, debug KOs → combat KO path,
-// teleport to the finish) and checks unlocks, the save and the bus events, then a restart and an autopilot
+// teleport to the finish; a real Big Gulp in the restarted race) and checks unlocks, the save and the bus events, then a restart and an autopilot
 // race. Also grabs in-game shots of content text (taunt bubbles, loading tip, results).
 // Run via: node tools/content-shots.mjs game
 import fs from 'node:fs';
 import { withPage } from './lib.mjs';
+import { importTs } from './content-ts.mjs';
+
+const { ROSTER } = await importTs('src/data/roster.ts');
+/** Two current roster lines shown as bubbles (fresh lines from fix round 1, read from the data). */
+const BUBBLES = { goose: ROSTER.goose.taunts[11], shiba: ROSTER.shiba.taunts[8] };
 
 const OUT = 'shots/content';
 const RIVALS = 'goose,cat,pigeon,capybara,shiba,seagull,sloth';
@@ -18,7 +23,14 @@ const WIRE = async () => {
   window.__ach = br.game.achievements;
   br.ach.forget();
   window.__unlocks = [];
-  br.app.bus.on('achievement:unlock', ({ id }) => window.__unlocks.push(id));
+  window.__hurt = [];   // why 'untouched' may be missing: what hit the player, with sim time
+  const { bus } = br.app;
+  const me = () => br.session()?.player.id;
+  const t = () => br.session()?.time.toFixed(2);
+  bus.on('achievement:unlock', ({ id }) => window.__unlocks.push(id));
+  bus.on('combat:hit', (e) => { if (e.victim === me() && e.damage > 0 && !e.blocked) window.__hurt.push(`${t()} hit by ${e.attacker} (${e.weapon})`); });
+  bus.on('rider:bump', (e) => { if (e.a === me() || e.b === me()) window.__hurt.push(`${t()} bump ${e.a}/${e.b}`); });
+  bus.on('rider:crash', (e) => { if (e.riderId === me()) window.__hurt.push(`${t()} crash ${e.cause}`); });
   return true;
 };
 
@@ -42,13 +54,13 @@ export async function game() {
     const goose = await idOf(page, 'goose');
     const cat = await idOf(page, 'cat');
     // Two real roster lines as bubbles over riders on the grid (race/ai/taunts emits the same event).
-    await page.evaluate(() => {
+    await page.evaluate((lines) => {
       const { bus } = window.__br.app;
       for (const r of window.__br.session().riders) {
-        if (r.character === 'goose') bus.emit('taunt', { riderId: r.id, text: '铁锅炖我？先追上我！', character: 'goose' });
-        if (r.character === 'shiba') bus.emit('taunt', { riderId: r.id, text: '墨镜一戴，谁也不爱。', character: 'shiba' });
+        const text = lines[r.character];
+        if (text) bus.emit('taunt', { riderId: r.id, text, character: r.character });
       }
-    });
+    }, BUBBLES);
     await h.step(20);
     await h.shot(`${OUT}/game-taunts.png`);
     await page.evaluate(([g]) => window.__br.ko(g, 0), [goose]);
@@ -66,6 +78,7 @@ export async function game() {
       saved: JSON.parse(localStorage.getItem('beak-rash.save.v1') ?? '{}').achievements ?? [], errors: window.__br.errors.slice(),
     }));
     expectAll(problems, end.unlocks, ['first_win', 'podium', 'untouched'], 'race 1 finish');
+    if (!end.unlocks.includes('untouched')) problems.push(`player hurt: ${await page.evaluate(() => window.__hurt.join('; '))}`);
     if (end.unlocks.includes('pacifist')) problems.push('pacifist despite two KOs to the player');
     if (end.screen !== 'results') problems.push(`expected results screen, got ${end.screen}`);
     if (new Set(end.saved).size !== end.saved.length) problems.push(`duplicate ids in save: ${end.saved}`);
@@ -86,6 +99,17 @@ export async function game() {
     }
     await page.evaluate(() => { window.__unlocks.length = 0; window.__br.race.skipIntro(); });
     await h.step(230);
+    // A real Big Gulp (I): the cat (scale 0.85) just ahead of the beak is swallowed, then spat back → 吃了吗您.
+    await page.evaluate(([c]) => {
+      const s = window.__br.session(); const p = s.player; const r = s.rider(c);
+      r.s = p.s + 1.2; r.x = p.x; r.speed = p.speed; r.vx = 0;
+    }, [await idOf(page, 'cat')]);
+    await h.controls({ throttle: 1, skill2: true });
+    await h.step(1);
+    await h.controls({ throttle: 1 });
+    await h.step(200);
+    const gulped = await page.evaluate(() => window.__unlocks.slice());
+    if (!gulped.includes('gulp')) problems.push(`real gulp of the cat did not unlock gulp (${gulped})`);
     for (const c of ['goose', 'pigeon', 'capybara']) {
       await page.evaluate(([v]) => window.__br.ko(v, 0), [await idOf(page, c)]);
       await h.step(12);
@@ -93,7 +117,7 @@ export async function game() {
     await h.step(200);
     const second = await page.evaluate(() => ({ unlocks: window.__unlocks.slice(), fresh: window.__ach.fresh().slice() }));
     for (const id of ['goose', 'first_ko', 'double']) if (second.unlocks.includes(id)) problems.push(`race 2 re-fired ${id}`);
-    expectAll(problems, second.unlocks, ['triple', 'hat_trick'], 'race 2 (attached again after restart)');
+    expectAll(problems, second.unlocks, ['gulp', 'triple', 'hat_trick'], 'race 2 (attached again after restart)');
     if (second.fresh.join() !== second.unlocks.join()) problems.push(`race 2 fresh() ${second.fresh} ≠ ${second.unlocks}`);
     console.log(`race 2 (restart) unlocks: ${second.unlocks.join(', ') || '—'}`);
     await page.evaluate(() => window.__br.show('loading', { config: window.__br.session().config }));

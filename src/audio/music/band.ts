@@ -7,26 +7,24 @@ import { Rng } from '../../core/rng';
 import { driveCurve } from '../dsp/curves';
 import { anchor, filter, holdAt, settle, steer } from '../dsp/env';
 import { noise } from '../dsp/noise';
+import { FilterSwitch } from '../dsp/switch';
 import { Brass } from './instruments/brass';
 import { DrumKit } from './instruments/drums';
 import { SlapBass } from './instruments/bass';
-import { Clav, Pad, Rhodes } from './instruments/keys';
+import { Clav, Pad } from './instruments/keys';
+import { SampledKeys } from './instruments/keys-sampler';
 import { Lead } from './instruments/lead';
-import { Gate } from './instruments/voice';
+import { Gate, osc } from './instruments/voice';
 import type { Engine } from '../engine';
 import type { Channel, LeadVoice } from './types';
 
-interface Strip {
-  input: GainNode;
-  trim: GainNode;
-}
-
-// Melody on top: lead hooks ≈ −5 LU under the full mix, bass ≈ −8, drums ≈ −3 (audio-check stems).
+// Melody on top: lead hooks ≈ −5 LU under the full mix, bass ≈ −8, drums ≈ −4 (audio-check stems).
 const DEFAULT_MIX: Record<Channel, number> = {
-  drums: 0.8, bass: 0.6, keys: 0.8, clav: 1.7, brass: 0.84, lead: 1.0, pad: 0.62, fx: 0.6,
+  drums: 0.8, bass: 0.6, keys: 0.8, clav: 2.4, brass: 0.84, lead: 0.85, pad: 0.45, fx: 0.6,
 };
-const VERB: Record<Channel, number> = { drums: 0.12, bass: 0, keys: 0.28, clav: 0.1, brass: 0.3, lead: 0.26, pad: 0.4, fx: 0.3 };
-const DELAY: Record<Channel, number> = { drums: 0, bass: 0, keys: 0.08, clav: 0.12, brass: 0.06, lead: 0.22, pad: 0, fx: 0.1 };
+// Send levels come in a few shared values: channels with the same level feed one send gain.
+const VERB: Record<Channel, number> = { drums: 0.11, bass: 0, keys: 0.29, clav: 0.11, brass: 0.29, lead: 0.29, pad: 0.4, fx: 0.29 };
+const DELAY: Record<Channel, number> = { drums: 0, bass: 0, keys: 0.09, clav: 0.09, brass: 0.09, lead: 0.22, pad: 0, fx: 0.09 };
 const DUCKED = new Set<Channel>(['bass', 'keys', 'pad', 'clav']);
 /** Comping parts that step back (−3.5 dB) while the lead plays, so the hook sits on top. */
 const UNDER_LEAD = new Set<Channel>(['keys', 'pad', 'clav']);
@@ -35,10 +33,12 @@ const UNDER_LEAD_GAIN = 0.67;
 export class Band {
   readonly ctx: BaseAudioContext;
   readonly out: GainNode;
-  private strips = new Map<Channel, Strip>();
+  private strips = new Map<Channel, GainNode>();
   private sc: GainNode;          // side-chain gain shared by bass / keys / pad / clav
   private under: GainNode;       // lead side-chain for keys / pad / clav
   private hp: BiquadFilterNode;  // bass drop
+  private bassDrop: FilterSwitch; // the high-pass is only in the path during a KO drop
+  private dropClear = Infinity;
   private sends: GainNode;       // reverb send bus, post-fader (follows fade())
   private delayIn: GainNode | null = null;
   private delayLine: DelayNode | null = null;
@@ -49,11 +49,13 @@ export class Band {
   private noiseSrc: AudioBufferSourceNode | null = null;
   private kit: DrumKit | null = null;
   private slap: SlapBass | null = null;
-  private ep: Rhodes | null = null;
+  private ep: SampledKeys | null = null;
   private clavi: Clav | null = null;
   private horns: Brass | null = null;
   private strings: Pad | null = null;
   private leads = new Map<string, Lead>();
+  private lfos = new Map<number, OscillatorNode>();
+  private sendGains = new Map<string, GainNode>();
 
   constructor(
     readonly engine: Engine, bpm: number, private mix: Partial<Record<Channel, number>> = {},
@@ -64,7 +66,7 @@ export class Band {
     this.tempo = bpm;
     this.out = new GainNode(ctx, { gain: 0 });
     this.hp = filter(ctx, { type: 'highpass', frequency: 18, Q: 0.7 });
-    this.out.connect(this.hp).connect(dest);
+    this.bassDrop = new FilterSwitch(this.out, this.hp, dest);
     this.sc = new GainNode(ctx, { gain: 1 });
     this.sc.connect(this.out);
     this.under = new GainNode(ctx, { gain: 1 });
@@ -75,7 +77,7 @@ export class Band {
 
   /** Channel input for instrument voices (strip created on first use). */
   input(ch: Channel): AudioNode {
-    return this.strip(ch).input;
+    return this.strip(ch);
   }
 
   /** Shared looping white noise for every noise-based voice in this band. */
@@ -87,22 +89,19 @@ export class Band {
     return this.noiseSrc;
   }
 
-  private strip(ch: Channel): Strip {
+  private strip(ch: Channel): GainNode {
     const hit = this.strips.get(ch);
     if (hit) return hit;
     const ctx = this.ctx;
-    const input = new GainNode(ctx, { gain: 1 });
-    const trim = new GainNode(ctx, { gain: DEFAULT_MIX[ch] * (this.mix[ch] ?? 1) });
+    const level = DEFAULT_MIX[ch] * (this.mix[ch] ?? 1);
+    // Without a drive insert the input node is the fader itself (one node less per channel).
+    const driven = ch === 'bass' || ch === 'lead';
+    const input = new GainNode(ctx, { gain: driven ? 1 : level });
     let head: AudioNode = input;
-    if (ch === 'bass' || ch === 'lead') {
+    if (driven) {
       head = head.connect(new WaveShaperNode(ctx, { curve: driveCurve(ch === 'bass' ? 1.3 : 2.2), oversample: 'none' }));
+      head = head.connect(new GainNode(ctx, { gain: level }));
     }
-    if (ch === 'bass') {
-      // Slap needs its snap: high-pass the rumble, lift the string click / growl.
-      head = head.connect(filter(ctx, { type: 'highpass', frequency: 38, Q: 0.6 }))
-        .connect(filter(ctx, { type: 'peaking', frequency: 1100, Q: 0.9, gain: 5 }));
-    }
-    head = head.connect(trim);
     if (ch === 'keys') {
       // 8th-note auto-pan, the classic suitcase-piano tremolo.
       const pan = new StereoPannerNode(ctx, { pan: 0 });
@@ -115,11 +114,22 @@ export class Band {
       head = head.connect(pan);
     }
     head.connect(UNDER_LEAD.has(ch) ? this.under : DUCKED.has(ch) ? this.sc : this.out);
-    if (VERB[ch] > 0) head.connect(new GainNode(ctx, { gain: VERB[ch] })).connect(this.sends);
-    if (DELAY[ch] > 0) head.connect(new GainNode(ctx, { gain: DELAY[ch] })).connect(this.delay());
-    const strip = { input, trim };
-    this.strips.set(ch, strip);
-    return strip;
+    if (VERB[ch] > 0) head.connect(this.send('verb', VERB[ch]));
+    if (DELAY[ch] > 0) head.connect(this.send('delay', DELAY[ch]));
+    this.strips.set(ch, input);
+    return input;
+  }
+
+  /** The shared send gain for `level` into the reverb or the delay. */
+  private send(kind: 'verb' | 'delay', level: number): GainNode {
+    const key = `${kind}${level}`;
+    let g = this.sendGains.get(key);
+    if (!g) {
+      g = new GainNode(this.ctx, { gain: level });
+      g.connect(kind === 'verb' ? this.sends : this.delay());
+      this.sendGains.set(key, g);
+    }
+    return g;
   }
 
   /** Dotted-8th feedback delay (band-passed repeats), created with the first strip that sends. */
@@ -145,8 +155,8 @@ export class Band {
     return (this.slap ??= new SlapBass(this));
   }
 
-  get keys(): Rhodes {
-    return (this.ep ??= new Rhodes(this));
+  get keys(): SampledKeys {
+    return (this.ep ??= new SampledKeys(this));
   }
 
   get clav(): Clav {
@@ -171,6 +181,16 @@ export class Band {
     return l;
   }
 
+  /** One shared vibrato LFO per rate (each lead scales it with its own depth gain). */
+  lfo(rate: number): OscillatorNode {
+    let o = this.lfos.get(rate);
+    if (!o) {
+      o = osc(this, 'sine', rate);
+      this.lfos.set(rate, o);
+    }
+    return o;
+  }
+
   /** A sleep gate for a persistent voice's output (see Gate). */
   gate(out: AudioNode, dest: AudioNode): Gate {
     const g = new Gate(out, dest);
@@ -181,6 +201,11 @@ export class Band {
   /** Unplug voices that have finished sounding (called from the scheduler). */
   tick(now: number): void {
     for (const g of this.gates) g.sleep(now);
+    if (now >= this.dropClear) {
+      this.bassDrop.set(false, now);
+      this.dropClear = Infinity;
+    }
+    this.bassDrop.tick(now);
   }
 
   /** Register a persistent source; it stops when the band is disposed. */
@@ -217,7 +242,16 @@ export class Band {
 
   /** KO: high-pass the band (kick + bass vanish), 0 = full range; `tau` = response time constant. */
   dropBass(amount: number, tau = 0.05): void {
-    steer(this.hp.frequency, this.ctx.currentTime, 18 + 340 * Math.min(1, Math.max(0, amount)), tau);
+    const a = Math.min(1, Math.max(0, amount));
+    const now = this.ctx.currentTime;
+    if (a > 0) {
+      this.dropClear = Infinity;
+      this.bassDrop.set(true, now);
+    } else if (this.bassDrop.engaged) {
+      // Unplug once the cutoff has glided back down (5 time constants).
+      this.dropClear = now + Math.max(0.1, tau * 5);
+    }
+    steer(this.hp.frequency, now, 18 + 340 * a, tau);
   }
 
   /** Tempo change (final-stretch lift): the dotted-8th delay and the keys tremolo follow. */

@@ -8,10 +8,13 @@ import { Vector3 } from 'three';
 import { AUDIO_RATE, Engine, type Volumes } from './engine';
 import { wireCombat } from './events-combat';
 import { wireRace } from './events-race';
+import { prepareDrumSamples } from './music/instruments/drum-samples';
+import { prepareKeySamples } from './music/instruments/keys-render';
 import { Conductor } from './music/conductor';
+import { SONGS } from './music/songs';
 import { Pump } from './music/pump';
 import { isStinger, type StingerId } from './music/stingers';
-import { SfxPlayer, type PlayOpts } from './sfx/bank';
+import { PREWARM_RACE, PREWARM_UI, SfxPlayer, type PlayOpts } from './sfx/bank';
 import { CENTER, place, type Placement } from './sfx/spatial';
 import { Barks } from './voice/barks';
 import { VoicePlayer } from './voice/player';
@@ -36,6 +39,8 @@ const BOOM_GAP_MS = 400;
 /** External muffle at or above this = the game is paused (voices hold, a running countdown stops). */
 const PAUSED = 0.9;
 const VOLUME_KEYS = ['master', 'music', 'sfx', 'voice'] as const;
+/** Form index the results song starts from after a finish outside the top 3 (its B section). */
+const RESULTS_LOW = Math.max(0, SONGS.results?.form.indexOf('B') ?? 0);
 
 function createContext(): AudioContext {
   try {
@@ -64,6 +69,8 @@ export class AudioRuntime implements AudioSystem, Host {
   private pos = new Vector3();
   private warnedSting = false;
   private lastBoom = -Infinity;
+  /** The player's final place (results music variant; Infinity = did not finish), null before. */
+  private finishPlace: number | null = null;
   private pump: Pump;
   private trace = new Trace();
 
@@ -80,6 +87,13 @@ export class AudioRuntime implements AudioSystem, Host {
       this.setVolumes(next);
     });
     wireRace(app.bus, this);
+    app.bus.on('race:finishLine', ({ riderId, place }) => {
+      if (this.isPlayer(riderId)) this.finishPlace = place;
+    });
+    app.bus.on('race:end', ({ results }) => {
+      const me = results.find((r) => r.isPlayer);
+      if (me) this.finishPlace = me.time === null ? Infinity : me.place;
+    });
     wireCombat(app.bus, this);
     app.bus.on('police:alert', ({ level }) => this.rt?.watcher.alert(level, this.now()));
     this.pump = new Pump({
@@ -129,6 +143,8 @@ export class AudioRuntime implements AudioSystem, Host {
       c.onstatechange = hold;
       hold();
       const engine = new Engine(c, this.volumes);
+      prepareDrumSamples(c);
+      void prepareKeySamples(c.sampleRate);
       const conductor = new Conductor(engine);
       const voices = new VoicePlayer(engine, new URL(import.meta.env.BASE_URL, window.location.href),
         (id, channel, gain) => this.trace.note(channel === 'bark' ? 'bark' : 'voice', id, gain));
@@ -152,6 +168,7 @@ export class AudioRuntime implements AudioSystem, Host {
       this.pump.start();
       this.since = performance.now();
       rt.voices.prefetch();
+      rt.sfx.prewarm(PREWARM_UI);
       if (this.wanted) this.startSong(this.wanted.id, this.wanted.fade);
     }
     if (rt.ctx.state === 'running') return Promise.resolve();
@@ -165,7 +182,9 @@ export class AudioRuntime implements AudioSystem, Host {
   }
 
   private startSong(id: string | null, fade: number): void {
-    this.rt?.conductor.play(id, fade, { vamp: this.vampFor(id) });
+    // Off the podium the results open on their gospel bridge instead of the brass fanfare.
+    const consolation = id === 'results' && this.finishPlace !== null && this.finishPlace > 3;
+    this.rt?.conductor.play(id, fade, { vamp: this.vampFor(id), section: consolation ? RESULTS_LOW : undefined });
   }
 
   // ------------------------------------------------------------------ AudioSystem
@@ -216,7 +235,9 @@ export class AudioRuntime implements AudioSystem, Host {
     this.attachUsed = true;
     this.attached = session;
     if (!session) return;
+    this.finishPlace = null;
     this.pump.set('settling');
+    this.rt?.sfx.prewarm(PREWARM_RACE);
     // Restarting the same track: the song is already current, so re-enter its vamp for the new intro.
     const id = this.raceSong();
     if (this.unlocked && this.rt && id !== null && this.rt.conductor.playing === id && this.vampFor(id)) {

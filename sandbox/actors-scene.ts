@@ -1,6 +1,6 @@
 // Actors sandbox: riders on bikes driven by a fake RiderState (treadmill). Modes: ride (one rider),
 // gallery (whole roster). Scripting: window.__actors (set/cue/crash/step) for screenshots.
-// URL: ?mode=ride|gallery&c=pelican&bike=roadbike&speed=8&lean=0&view=34|front|side|back|chase&dist=3
+// URL: ?mode=ride|gallery&c=pelican&bike=roadbike|default&speed=8&lean=0&view=34|front|side|back|chase&dist=3
 import {
   Color, DirectionalLight, GridHelper, HemisphereLight, Mesh, MeshLambertMaterial, PerspectiveCamera, PlaneGeometry,
   Scene, Vector3, WebGLRenderer,
@@ -11,6 +11,7 @@ import type { AppContext } from '../src/core/contracts';
 import { createRiderState } from '../src/core/rider';
 import type { BikeId, CharacterId, Quality, RiderState } from '../src/core/types';
 import { RiderViewImpl } from '../src/actors/view';
+import { ROSTER } from '../src/data/roster';
 
 export const errors = captureErrors();
 export const P = new URLSearchParams(location.search);
@@ -36,7 +37,7 @@ export const ROSTER_IDS: CharacterId[] = ['pelican', 'goose', 'capybara', 'cat',
 export interface Bench { view: RiderViewImpl; state: RiderState; base: Vector3 }
 export const riders: Bench[] = [];
 export const S = {
-  mode: P.get('mode') ?? 'ride', character: (P.get('c') ?? 'pelican') as CharacterId, bike: (P.get('bike') ?? 'roadbike') as BikeId,
+  mode: P.get('mode') ?? 'ride', character: (P.get('c') ?? 'pelican') as CharacterId, bike: (P.get('bike') ?? 'roadbike') as BikeId | 'default',
   speed: Number(P.get('speed') ?? 8), lean: Number(P.get('lean') ?? 0), weave: P.get('weave') === '1', scale: Number(P.get('ts') ?? 1),
   view: P.get('view') ?? '34', dist: Number(P.get('dist') ?? 3.2), t: 0,
 };
@@ -46,8 +47,9 @@ export function spawn(): void {
   riders.length = 0;
   const ids = S.mode === 'gallery' ? ROSTER_IDS : [S.character];
   ids.forEach((id, i) => {
-    const view = new RiderViewImpl(app, id, S.bike, { isPlayer: id === 'pelican', quality });
-    const state = createRiderState(i, id, S.bike, i === 0);
+    const bike = S.bike === 'default' ? ROSTER[id].defaultBike : S.bike;
+    const view = new RiderViewImpl(app, id, bike, { isPlayer: id === 'pelican', quality });
+    const state = createRiderState(i, id, bike, i === 0);
     state.mode = 'racing';
     const base = S.mode === 'gallery' ? new Vector3(((i % 5) - 2) * 1.5, 0, Math.floor(i / 5) * 2.6 - 1.3) : new Vector3();
     riders.push({ view, state, base });

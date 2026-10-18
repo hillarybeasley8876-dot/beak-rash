@@ -14,7 +14,7 @@ import { ACHIEVEMENTS } from '../src/data/achievements';
 import * as S from '../src/data/strings';
 import { BIKES, BIKE_ORDER } from '../src/data/bikes';
 import { TRACKS, TRACK_ORDER } from '../src/data/tracks';
-import { check, h, label, maxLines, maxWidth, noOrphan, noOverflow, runChecks, section } from './content.kit';
+import { balanced, check, h, label, maxLines, maxWidth, noOrphan, noOverflow, runChecks, section } from './content.kit';
 import { billboard, loadPosters, posterBillboard, roadSign } from './content.world';
 import { BILLBOARDS } from '../src/data/assets';
 import type { TrackId } from '../src/core/types';
@@ -175,8 +175,15 @@ function menus(): void {
       ...Object.entries(S.HOWTO_SKILL_TIPS).map(([id, t]) => ({ keys: id.replace('pelican.', ''), text: t })), { keys: 'SP', text: S.HOWTO_SP }])));
   count('howto', S.HOWTO_KEYBOARD.flatMap((g) => g.rows).length + S.HOWTO_GAMEPAD.length + S.HOWTO_BASICS.length);
   count('credits', S.CREDITS.length + 1);
-  sec.append(label('CREDITS'), ...S.CREDITS.map(([role, name]) => h('div', { class: 'cg-credit' }, h('span', { text: role }), h('b', { text: name }))),
-    h('div', { class: 'cg-note', text: S.CREDIT_OUTRO }));
+  // Mirrors ui/screens/credits: an 880 px column, entries indented (i % 3) × 36 px, names in the block font at 58 px.
+  const outro = h('div', { class: 'cg-credits-outro', text: S.CREDIT_OUTRO });
+  check(outro, 'credits.outro', S.CREDIT_OUTRO, maxLines(outro, 2));
+  sec.append(label('CREDITS (the credits screen column)'), h('div', { class: 'cg-credits' }, ...S.CREDITS.map(([role, name], i) => {
+    const b = h('b', { text: name });
+    check(b, `credits[${i}]`, name, maxLines(b, 2));
+    check(b, `credits[${i}]`, name, balanced(b));
+    return h('div', { class: 'cg-credit', style: `--x:${(i % 3) * 36}px` }, h('span', { text: role }), b);
+  }), outro));
   count('bikes', BIKE_ORDER.length * 2);
   sec.append(label('GARAGE'), h('div', { class: 'cg-wrap' }, ...BIKE_ORDER.map((id) => {
     const p = h('p', { text: BIKES[id].blurb });

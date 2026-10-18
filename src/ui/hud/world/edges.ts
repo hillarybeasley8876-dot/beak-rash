@@ -1,11 +1,14 @@
 // Edge warnings: chevrons at the bottom/side edges for rivals closing in from behind (angry ones and
-// skill casts flash hot with the skill glyph), plus the police siren glow and chip.
+// skill casts flash hot with the skill glyph), plus the police siren glow and chip. A caster the camera
+// can see gets no side chevron: its name tag flashes instead (tags.ts castFlash).
+import { Vector3 } from 'three';
 import { approach, clamp, clamp01 } from '../../../core/math';
 import { ROSTER } from '../../../data/roster';
 import type { Session } from '../../../core/contracts';
 import type { RiderId, RiderState } from '../../../core/types';
 import { SPECIES_GLYPH } from '../badge';
 import { el, px, w, type W } from '../dom';
+import { newPoint, type Projector } from './project';
 import '../css/edges.css';
 
 const REAR = 14;
@@ -21,6 +24,8 @@ export class EdgeWarnings {
   /** police:alert is state-based (race unit): 0 = gone, 1 = chasing, 2 = alongside / closing in. */
   private alertLevel = 0;
   private policeVis = 0;
+  private pt = newPoint();
+  private v = new Vector3();
 
   constructor(parent: HTMLElement) {
     const root = el('div', 'brh-edges', parent);
@@ -72,18 +77,24 @@ export class EdgeWarnings {
     }
   }
 
-  update(session: Session, width: number, height: number, k: number, dt: number): void {
-    const me = session.player;
-    const heat = clamp01((me.heat - 0.5) / 0.5);
-    const want = Math.max(this.alertLevel, heat * 0.8);
-    this.policeVis = approach(this.policeVis, want, dt * 2.5);
+  update(session: Session, proj: Projector, k: number, dt: number): void {
+    // Only the race's police:alert says an officer is actually on the road (heat alone is not a chase).
+    this.policeVis = approach(this.policeVis, this.alertLevel, dt * 2.5);
     this.police.op(this.policeVis * 0.85);
     this.chip.op(clamp01((this.policeVis - 0.25) * 3));
-    for (const c of this.chevs) this.updateChev(c, me, width, height, k, dt);
+    for (const c of this.chevs) this.updateChev(c, session, proj, k, dt);
   }
 
-  private updateChev(c: Chev, me: RiderState, width: number, height: number, k: number, dt: number): void {
+  /** True when r's head projects inside the screen (the rider and its tag are in plain view). */
+  private inView(session: Session, proj: Projector, r: RiderState): boolean {
+    return proj.project(proj.riderHead(session, r, 0.45, this.v), this.pt).onScreen;
+  }
+
+  private updateChev(c: Chev, session: Session, proj: Projector, k: number, dt: number): void {
     const r = c.r;
+    const me = session.player;
+    const width = proj.width;
+    const height = proj.height;
     c.hot = Math.max(0, c.hot - dt);
     const ds = r.s - me.s;
     const dx = r.x - me.x;
@@ -96,7 +107,7 @@ export class EdgeWarnings {
     const swinging = r.action !== null && (r.action.kind === 'attack' || r.action.kind === 'heavy') && ds > -4;
     let threat = 0;
     if (alive && behind && (angry || closing || swinging)) threat = (angry || swinging ? 1 : 0.7) * clamp01(1.15 + ds / REAR);
-    if (alive && c.hot > 0 && ds < 4) threat = 1;
+    if (alive && c.hot > 0 && ds < 4 && (ds < -0.8 || !this.inView(session, proj, r))) threat = 1;
     c.vis = approach(c.vis, threat, dt * 6);
     c.root.show(c.vis > 0.02);
     if (c.vis <= 0.02) return;
@@ -105,7 +116,8 @@ export class EdgeWarnings {
     let y: number;
     let rot: number;
     if (ds < -0.8) {
-      x = width / 2 + side * width * 0.3;
+      // Bottom band between the speedometer (left ~17 %) and the battle cluster (right from ~62 %).
+      x = clamp(width / 2 + side * width * 0.3, width * 0.2, width * 0.6);
       y = height - 92 * k;
       rot = side * 22;
     } else {

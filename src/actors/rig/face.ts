@@ -8,7 +8,7 @@ import type { CueOut } from './cue-types';
 import type { PoseState } from './pose-state';
 import { B, mirror } from './skeleton';
 
-const q = new Quaternion(), qi = new Quaternion();
+const q = new Quaternion(), qi = new Quaternion(), qt = new Quaternion();
 const v = new Vector3(), d = new Vector3(), axisY = new Vector3(0, 1, 0), side = new Vector3();
 
 interface EyeSide {
@@ -84,7 +84,9 @@ export class FaceRig {
     const ang = lerp(m.lid.open, m.lid.closed, clamp(this.lid, -0.3, 1));
     const pupilScale = 1 - cue.wide * 0.28 + cue.squint * 0.05;
     for (const e of this.eyes) {
-      (ps.lq[e.lid] as Quaternion).setFromAxisAngle(e.hinge, ang);
+      // Slanted lids: + tilt drops the inner corners (angry), − lifts them (worried); brows push it.
+      const tilt = (m.lidTilt ?? 0) + cue.brow * 0.22;
+      (ps.lq[e.lid] as Quaternion).setFromAxisAngle(e.dir, -e.s * tilt).multiply(qt.setFromAxisAngle(e.hinge, ang));
       side.crossVectors(axisY, e.dir).normalize();
       q.setFromAxisAngle(axisY, this.lookYaw).multiply(qi.setFromAxisAngle(side, -this.lookPitch));
       (ps.lq[e.eye] as Quaternion).copy(q);

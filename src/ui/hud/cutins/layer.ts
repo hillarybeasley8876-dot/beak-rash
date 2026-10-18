@@ -1,10 +1,12 @@
 // Cut-in layer: owns the director (splash + skill band), callouts, FINAL STRETCH banner, rival skill
 // chips and intro cards, and decides which cut-in each gameplay event deserves.
 import { approach } from '../../../core/math';
+import { ACHIEVEMENTS } from '../../../data/achievements';
 import { SKILLS } from '../../../data/skills';
 import type { Session } from '../../../core/contracts';
 import type { GameEvents } from '../../../core/events-map';
 import type { RiderId } from '../../../core/types';
+import { TICKET_HOLD } from '../events';
 import { ordinal } from '../place';
 import { DRIFT_COLORS } from '../speedo';
 import type { Projector } from '../world/project';
@@ -21,6 +23,7 @@ const ONE_MORE = 3;         // combo hits per ONE MORE! (SPEC §7)
 const KO_FALLBACK = 0.55;   // s to wait for fx's cine:ko before showing the KO splash ourselves
 const FALLBACK_CHAIN = 1.5; // s between cinematic-less KOs that still count as a chain
 const CINE_SAFETY = 3;      // s: un-hide the HUD even if a cinematic never reports 'end'
+const PERFECT_LAUNCH = 0.25; // rider:boost 'launch' power: perfect 0.3, held throttle 0.18 (race flow.ts)
 const PICKUPS: Record<string, string> = { coin: '小鱼干', coins: '小鱼干', fish: '+HP 鱼', crate: '武器箱', can: '+SP 罐头', sp: '+SP 罐头' };
 
 interface PendingKo { attacker: RiderId | null; victim: RiderId; t: number }
@@ -148,8 +151,8 @@ export class CutinLayer {
     this.director.splashIn('wrecked', () => wreckedSplash(s.player.character, e.cause, by));
   }
 
-  busted(e: GameEvents['police:busted'], penalty: number): void {
-    if (this.isMe(e.riderId)) this.director.splashIn('busted', () => bustedSplash(e.fine, penalty));
+  busted(e: GameEvents['police:busted']): void {
+    if (this.isMe(e.riderId)) this.director.splashIn('busted', () => bustedSplash(e.fine, TICKET_HOLD));
   }
 
   finish(e: GameEvents['race:finishLine']): void {
@@ -175,6 +178,15 @@ export class CutinLayer {
     if (!this.isMe(e.riderId)) return;
     if (e.kind === 'draft') this.callouts.push({ kind: 'slip', en: 'SLINGSHOT!', cn: '尾流弹射', key: 'slip' });
     else if (e.kind === 'pad') this.callouts.push({ kind: 'slip', en: 'BOOST!', cn: '加速带', key: 'pad' });
+    else if (e.kind === 'launch') this.launch(e.power);
+  }
+
+  /** Launch boost on GO: race gives 0.3 for a perfect start (fresh press during "1"), 0.18 for throttle held. */
+  private launch(power: number): void {
+    const perfect = power >= PERFECT_LAUNCH;
+    this.callouts.push(perfect
+      ? { kind: 'perfect', en: 'PERFECT START!', cn: '起步完美', key: 'launch', ransom: true, life: 1.4 }
+      : { kind: 'slip', en: 'GOOD START!', cn: '起步加速', key: 'launch' });
   }
 
   /** ONE MORE! fires on every third chained hit — the hits that grant the SP bonus + next-hit crit (SPEC §7). */
@@ -189,6 +201,12 @@ export class CutinLayer {
     if (!s || !this.isMe(e.riderId) || s.phase !== 'racing' || s.time < 1 || e.from === e.to) return;
     const up = e.to < e.from;
     this.callouts.push({ kind: 'place', en: `${up ? '▲' : '▼'} ${e.to}${ordinal(e.to)}`, cn: up ? '超车！' : '被超了', mod: up ? 'up' : 'down', key: 'place' });
+  }
+
+  /** achievement:unlock (player achievements only; the system tracks the player). */
+  achievement(id: string): void {
+    const def = ACHIEVEMENTS.find((a) => a.id === id);
+    if (def) this.chips.achievement(def);
   }
 
   finalStretch(e: GameEvents['race:finalStretch']): void {
@@ -226,10 +244,12 @@ export class CutinLayer {
       else if (s.phase !== 'intro' && this.intro.running) this.intro.stop();
       this.intro.update(s, proj, dt);
     }
-    this.calm = approach(this.calm, this.cinematic ? 0 : 1, dt / 0.12);
+    // Callouts and the FINAL STRETCH banner wait (frozen, hidden) while a cinematic or any splash owns the screen.
+    const busy = this.cinematic || this.director.splashKind !== null;
+    this.calm = approach(this.calm, busy ? 0 : 1, dt / 0.12);
     this.director.update(dt);
     this.callouts.update(dt, this.calm);
     this.banner.update(dt, this.calm);
-    this.chips.update(dt, k);
+    this.chips.update(this.cinematic ? 0 : dt, k); // the chip column is hidden with the HUD during cinematics
   }
 }

@@ -1,0 +1,110 @@
+{
+ "unit": "fx",
+ "round": 1,
+ "lens": "timing",
+ "pass": false,
+ "score": 6,
+ "summary": "The timeline engineering is exact and robust. On a real heavy-swing KO: a 90 ms hit-stop (5 frozen frames; frames 0 and 17 ms are the red/black impact frames), the cut at 100 ms, 0.1x reached at 217 ms, the peak at 450 ms, the release at 1283 ms, and the post look fully restored by about 1617 ms (1.6 s total). The timeline is frame-rate independent: release at 1283-1300 ms at 30, 60 and 144 fps and in real time, with no hitch (8.3 ms median frame, 16.6 ms max during the KO). WRECKED is 0.9 s with a side camera and red tint. A repeat KO within 10 s is 60 % shorter (release 517 ms). settings.slowmo short and off are respected (off: scale 1, chase camera, 0.05 s stop). Pause freezes the whole window and resumes it. Quit mid-cinematic restores the clock, camera and post, and the next race starts clean. cine:ko start/peak/end carry correct chain counts, including the re-peak for late chains. fx typechecks clean, and all ~20 capture runs had 0 __br.errors. A race:end landing inside a window could not be staged (a finished player's KOs start no cinematic), so that path is verified by code only (releaseNow + rise.stop). Against a commercial bar the cinematic payoff falls short in three major ways. (1) A flat 0.1x hold spends 1.07 s of real time on 0.18 s of sim, so the victim barely leaves the bike on camera, and the tumble (4.5 m in 0.5 s) plays after the cut, in the chase view, before it leaves the frame. (2) The SHOWTIME impact camera looks back from ahead of the pelican, so all three TRIPLE-KO victims are behind the lens for the whole window. (3) The KO and WRECKED cameras have no bounds or occlusion check: near a wall they sit 1.1-1.9 m behind it, and the wall hides the victim. Minor issues: the SHOWTIME slow-mo is wasted under the cut-in and the dive leaves the frame; the hit-stop frames are washed out; the punch/whoosh pulses miss their frames; chains stretch the static hold to 2.17 s; every KO is the same mirrored shot. Cross-unit: HUD splashes hide the cinematic from the peak to the release. Evidence: shots/review/fx/r1-timing/ (cap.mjs scenarios, data/*.json telemetry, sheet-*.png strips every 50 ms).",
+ "measured": {
+  "ko_full": {
+   "hitstop_frozen_ms": 83,
+   "cut_ms": 100,
+   "slowmo_0.1_reached_ms": 217,
+   "peak_ms": 450,
+   "release_ms": 1283,
+   "post_clean_ms": 1617,
+   "sim_seconds_to_release": 0.178
+  },
+  "wrecked": {
+   "cut_ms": 83,
+   "scale": 0.15,
+   "peak_ms": 283,
+   "release_ms": 883,
+   "post_clean_ms": 1183
+  },
+  "repeat_short": {
+   "peak_ms": 167,
+   "release_ms": 517,
+   "post_clean_ms": 750
+  },
+  "slowmo_off": {
+   "hitstop_s": 0.05,
+   "scale": 1,
+   "camera": "chase",
+   "peak_ms": 100,
+   "end_ms": 683
+  },
+  "chain": {
+   "release_ms": 1850
+  },
+  "ult": {
+   "rise_ms": 1583,
+   "impact_window_ms": 1550,
+   "total_ms": 3450
+  },
+  "framerate_release_ms": {
+   "30fps": 1300,
+   "60fps": 1283,
+   "144fps": 1299,
+   "realtime": 1296
+  },
+  "errors": 0
+ },
+ "evidence": "shots/review/fx/r1-timing/",
+ "issues": [
+  {
+   "severity": "major",
+   "title": "KO hold spends 1.07 s of real time on 0.11 s of sim: the victim barely leaves the bike in the cinematic, and the tumble plays after the cut, in the chase view (src/fx/ko/look.ts FULL/WRECKED + cine.ts)",
+   "detail": "Real swing KO with the HUD stubbed (?stub=ui): sheet-noui-a.png, sheet-noui-b.png, hold-noui-2x2.png, data/ko-real-motion.json. The 'ko' layer reaches 0.1 at 217 ms and stays flat until the release at 1283 ms, so only 0.178 s of sim time elapses from the KO to the release. During the whole cinematic the victim's body rises 0.67 m and turns about 30 deg. On the 50 ms strip, the 500-1250 ms frames show one held pose, and only the 28 deg orbit changes the picture. The bike sinks under the bottom bar (bike anchor NDC y -0.58 -> -0.83, front wheel -0.62 -> -1.41), so the cartwheel is out of frame. After the cut to chase (1300 ms), the body travels 4.54 m in 0.52 s (vs 1.24 m during the 1.07 s hold), seen 5 m away, and exits the frame at about 1640 ms (head NDC x 0.89 -> 1.16). The SPEC section 0 beat 'victim tumbles off the bike in slow motion' therefore happens outside the cinematic. WRECKED uses the same flat curve (0.15x for about 0.6 s = 0.09 s of sim). A commercial takedown cam keeps the whole wreck arc on screen.",
+   "fix": "Speed-ramp inside the hold instead of a flat 0.1x. Keep 0.1x from the cut to about peakAt + 0.1 s, then clock.setScale('ko', 0.35, 0.45), so roughly 0.4 s of sim (launch arc, helmet pop, bike cartwheel) plays before releaseAt; keep the existing 0.25 s ramp to 1. Add the hold ramp as Timeline fields (e.g. holdAt/holdScale) so FULL, WRECKED and the short variant all get an arc. Frame the midpoint (or bounds) of the body and bike anchors instead of the body alone, so the bike stays inside the bars. Add a check-script assertion: victim displacement between the cut and the release >= 2 m."
+  },
+  {
+   "severity": "major",
+   "title": "SHOWTIME impact camera looks back at the pelican from ahead of it, so every victim is behind the lens: the TRIPLE KNOCK OUT shows no rival (src/fx/ko/camera.ts shotFor('ult'), director.ts onUltImpact)",
+   "detail": "Real combat SHOWTIME with 3 low-HP rivals pinned 8/14/20 m ahead: data/ult-real.json, sheet-ult-impact.png, ult-impact-2.png. shotFor('ult') places the camera at azimuth 35 deg (0 = straight ahead looking back), 7 -> 6 m from a fixed focus on the impact point. Victims sit ahead of the pelican, so they end up behind or beside the camera: victim 1 is 108-116 deg off the view axis (NDC x +2.0..+3.4) for the whole window, 1583-3133 ms. From the impact to the release, every frame shows only the pelican, a smoke ring and the shockwave cylinder and ring. None of the three riders the UI announces as TRIPLE KNOCK OUT appears. This is the payoff of the game's signature move.",
+   "fix": "Build the ult framing from the victims. Take the centroid of the impact point plus the victims within 25 m. Put the camera behind or beside the pelican (azimuth about 150-165 deg, height 1.6-2.3 m), looking down the road through the cluster, and pick the distance/FOV so every victim body projects inside |NDC| < 0.8. After the hit-stop, damp the focus toward the nearest victim body (as the KO shot does) so the tumbling rivals are the subject of the hold. Keep the current shot only when there is no victim."
+  },
+  {
+   "severity": "major",
+   "title": "KO/WRECKED cinematic cameras ignore track bounds: near a wall they sit 1.1-1.9 m behind it, and the wall hides the victim (src/fx/ko/camera.ts createShot/shotFor, director.ts startCine side choice)",
+   "detail": "Edge scenario (cap.mjs edge): the victim 0.5 m inside the right wall, the attacker on the inside, so the camera takes the outside. City (wall at x = 10 m): the camera's track-space x runs 11.1 -> 11.7 m, and a black wall slab covers the lower ~40 % of the frame. Only the victim's head and arms show above it from the cut (100 ms) until the splash (sheet-edge-city.png). Mountain (wall at 9.5 m): the camera is at 10.6 -> 11.2 m, and a barrier band hides the bike (sheet-edge-mountain.png). WRECKED near the city wall: the 92 deg / 3.5 m side camera sits at x 11.5-11.9 m, and a wall band covers the bike (sheet-edge-wrecked-city.png). The side choice uses only the attacker's position (cameraLeft = other.x > r.x), and nothing tests clearance or occlusion. Knockback and the crash launch push victims toward walls, and the WRECKED side camera already leaves the bounds when |x| > ~6.5 m on a 7 m half-width road, so this happens in normal races.",
+   "fix": "In startCine, choose the side by available room (track.bounds(s).left/right minus the victim's x), falling back to the attacker rule when both sides fit. In createShot, project the eye into track space every frame and clamp its lateral offset to bounds - 0.6 m by shortening the distance or swinging the azimuth toward the road. If neither side fits, lift the eye above the wall top + 0.5 m and look down. Add coast/city/mountain edge cases to sandbox/fx.check.mjs that assert the eye stays inside bounds and the victim body is unoccluded (a depth test at its NDC)."
+  },
+  {
+   "severity": "minor",
+   "title": "SHOWTIME rise: the 0.3x slow-mo is spent entirely under the full-screen cut-in, and the dive leaves the frame before the impact (src/fx/ko/rise.ts RESUME_AT, camera.ts y damping)",
+   "detail": "data/ult-real.json, sheet-ult-rise.png, ult-dive-2x2.png. The 'ult' layer holds 0.3 from about 150 ms to 983 ms, exactly while the UI SHOWTIME cut-in covers 100 % of the screen (50-950 ms). When the leap becomes visible (1000 ms) the scale is already ramping 0.47 -> 1, so the player never sees the slow-mo leap SPEC section 7 asks for. In the dive, the eye stays at y ~7 m (focus.y damped at lambda 6, heightFollow 0.72), so the pelican drops through the bottom bar at ~1533 ms. The last frames before the impact cut (1550-1567 ms) show only sky and the pink trail.",
+   "fix": "Run 1x (or 0.7x) while the cut-in is up, and apply the 0.3x slow-mo for ~0.4 s after RESUME_AT around the apex, where it is visible; then let the dive play at speed. During the dive, use a fast y follow (lambda >= 14) or aim 0.12 s ahead along the subject's velocity, and cut to the impact shot when the pelican is under ~1.5 m, not after it has left the frame."
+  },
+  {
+   "severity": "minor",
+   "title": "Hit-stop frames are washed out: after the 2 red/black impact frames, the frozen frames sit under a 65 -> 30 % white fade, so a crisp impact never shows (src/fx/ko/cine.ts update flash at 0.034 s)",
+   "detail": "ko-real and ko-real-noui at 0-83 ms (hitstop-wrecked-2.png, top). Frames 0 and 17 ms are the inverted impact frames, which are punchy. Then post.flash(0.65) fires at 33 ms and decays at 7/s (0.53, 0.42, 0.30 over 50/67/83 ms), so the rest of the 90 ms freeze is a grey, low-contrast chase view. The victim in it is a small figure 6.3 m away (NDC +0.16). SPEC asks for a single white-red flash frame. Action and fighting games show the frozen hit crisp and high contrast for the whole hit-stop.",
+   "fix": "Drop the second flash or reduce it to 1 frame (strength <= 0.35, decay >= 18/s), so frames 33-83 ms show the frozen hit at full contrast with the impact burst. Optionally add a small real-time push-in during the freeze (FOV -4 deg) to focus the eye on the hit."
+  },
+  {
+   "severity": "minor",
+   "title": "Punctuation pulses miss their frames: the 0 ms chromatic punch never renders, and the release punch and whoosh land off the cut (src/fx/ko/cine.ts start/doRelease, post/composite.ts sync)",
+   "detail": "post.punch(0.016) in start() runs during the sim step, and post.tick (3.2/s) zeroes it in the same frame before render: pulse.chroma is 0.000 in every rendered row from 0 to 83 ms (data/ko-real.json). It would sit under the impact frames anyway, so the SPEC 'chromatic punch' is never seen. At the release, punch(0.01) renders only on the last cinematic frame (1283 ms), and the first chase frame (1300 ms) has 0. Composite.sync multiplies the speed lines and edge blur by (1 - cine.ko), so the whoosh rush (lines 0.9) reaches the screen at 0.04 on the cut frame and peaks at only ~0.68 at 1400-1417 ms, 110 ms after the cut.",
+   "fix": "Fire the start punch together with the 33 ms flash (after the impact frames) with a slower decay (e.g. 0.012 fading over 0.15 s). Move the release punch and whoosh to the first handed-back frame (when handedBack first becomes true). Add the whoosh share of the lines and blur outside the (1 - ko) mask so the rush is on screen at the cut."
+  },
+  {
+   "severity": "minor",
+   "title": "Chain KOs stretch the near-static 0.1x hold to 1.63 s (2.17 s window), and the debug chain stages both victims on one spot (src/fx/ko/look.ts extend, ko/tester.ts ko)",
+   "detail": "chain (data/chain.json, sheet-chain-a.png) and chain-late (data/chain-late.json, sheet-chain-late.png): extend 0.55 s at 0.1x moves the release to 1850 ms. The hold runs 217 -> 1850 ms for ~0.22 s of sim, and the window ends at 2.17 s, beyond SPEC's 1.2-1.8 s. testKo({chainAfter}) stages the chained victim at the same p.s + 4.5 / p.x +- 1.7 as the first, so the bodies overlap, and the critic tool cannot show whether the camera re-targets the second victim cleanly.",
+   "fix": "Spend the extension at a higher scale (ramp to ~0.35x while extended), shorten it to ~0.35 s, or cap the window at 1.8 s. In KoTester, stage the chained victim on the opposite side, 3-4 m further ahead."
+  },
+  {
+   "severity": "minor",
+   "title": "Every KO uses the same mirrored shot: nothing varies on repeat (src/fx/ko/camera.ts shotFor('ko'))",
+   "detail": "shotFor('ko') always returns azimuth +-30 -> +-58 deg, distance 3.3 -> 2.6 m, height 0.75 -> 1.0 m and FOV 52 -> 46, with the same red ray burst. Only the side flips. The repeat variant is the same shot 60 % shorter. With 5-10 KOs per race, the shots become predictable, against SPEC section 0's 'never boring on repeat'.",
+   "fix": "Add 3-4 framings: a worm's-eye low dolly (0.35 m, FOV 60), a high 3/4 spin (2.6 m up, orbit 40 deg/s), a side tracking dolly, and an over-the-shoulder shot from the attacker. Pick with a cosmetic Rng, never the same twice in a row, and only among framings that pass the bounds check from the edge-camera issue."
+  },
+  {
+   "severity": "minor",
+   "title": "cross-unit: HUD splashes cover the fx cinematic from the peak to the release, and outlast the short variant by ~0.5 s (src/ui/hud/cutins/splashes.ts dur, layer.ts cineKo)",
+   "detail": "KNOCK OUT covers ~85-90 % of the frame from 450 to 1300 ms (sheet-ko-real-a.png, sheet-ko-real-b.png); DOUBLE covers 450-1900 ms, and a late chain restarts it (sheet-chain-late.png); WRECKED covers 300-1100 ms; the SHOWTIME cut-in covers 50-950 ms. Only ~100-450 ms of the 3D cinematic is ever visible. The splash runs a fixed dur of 0.95/1.05 s independent of cine:ko end, so in the repeat/short variant (release 517 ms) it stays over live gameplay until ~1050 ms (sheet-repeat-2.png).",
+   "fix": "ui-hud: make the KO splash a band <= 40 % of the frame height, kept off the subject (cine focus is the screen centre), and close it on cine:ko end (0.15 s fade), so it never outlives the cinematic."
+  }
+ ]
+}

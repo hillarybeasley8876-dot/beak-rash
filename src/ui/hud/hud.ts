@@ -5,9 +5,10 @@ import { approach } from '../../core/math';
 import type { AppContext, Session } from '../../core/contracts';
 import type { Hud } from './contract';
 import { Cluster } from './cluster';
+import { preloadPortraits } from './badge';
 import { CutinLayer } from './cutins/layer';
 import { el, w } from './dom';
-import { wireHudEvents } from './events';
+import { TICKET_HOLD, wireHudEvents } from './events';
 import { preloadHudFonts } from './fonts';
 import { Counters, PlaceBlock } from './place';
 import { ProgressStrip } from './progress';
@@ -33,13 +34,14 @@ export function createHud(app: AppContext, layer: HTMLElement): Hud {
   const counters = new Counters(corner('tr'));
   const speedo = new Speedo(corner('bl'));
   const brCorner = corner('br');
-  const world = new WorldOverlay(app, proj, worldHost, edgesHost);
+  const world = new WorldOverlay(proj, worldHost, edgesHost);
   const cutins = new CutinLayer(root, hudLayer);
   let cluster: Cluster | null = null;
   let session: Session | null = null;
   let visible = false;
   let k = -1;
-  let penalty = 0;
+  /** Sim time of the player's last BUSTED (ticket-stop countdown), null = none this race. */
+  let bustAt: number | null = null;
   /** Static HUD + world overlays fade out (160 ms, real time) for the intro flyover and cinematics. */
   let alpha = 0;
   const fadeW = [w(hudLayer), w(worldHost), w(edgesHost)];
@@ -48,7 +50,7 @@ export function createHud(app: AppContext, layer: HTMLElement): Hud {
     session: () => session,
     place, speedo, world, cutins,
     cluster: () => cluster,
-    addPenalty: (sec) => (penalty += sec),
+    busted: () => (bustAt = session?.time ?? null),
   });
 
   const resize = (): void => {
@@ -61,7 +63,8 @@ export function createHud(app: AppContext, layer: HTMLElement): Hud {
   return {
     attach(s) {
       session = s;
-      penalty = 0;
+      bustAt = null;
+      if (s) preloadPortraits(s.player.character, s.riders.filter((r) => !r.isPlayer).map((r) => r.character));
       cluster?.root.remove();
       cluster = s ? new Cluster(brCorner, s.player.character) : null;
       progress.setRiders(s?.riders ?? []);
@@ -82,7 +85,9 @@ export function createHud(app: AppContext, layer: HTMLElement): Hud {
       alpha = approach(alpha, quiet ? 0 : 1, dtReal / 0.16);
       for (const f of fadeW) f.op(alpha);
       proj.begin(app.size.width, app.size.height);
-      place.update(p.place, session.riders.length, p.finishTime ?? session.time, penalty, dtReal);
+      const held = bustAt !== null ? session.time - bustAt : p.modeTime;
+      const ticket = p.mode === 'busted' ? Math.max(0, TICKET_HOLD - held) : 0;
+      place.update(p.place, session.riders.length, p.finishTime ?? session.time, ticket, dtReal);
       progress.update(session.track.length);
       counters.update(p.kos, p.coins, dtReal);
       speedo.update(p, dtReal);

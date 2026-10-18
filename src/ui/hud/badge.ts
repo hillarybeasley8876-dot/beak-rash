@@ -27,21 +27,49 @@ export function portraitUrl(id: CharacterId, mood: Mood | 'eyes'): string | null
   return resolve(set[mood]) ?? (mood === 'eyes' ? null : resolve(set.main));
 }
 
-/** <img> that swaps itself for `fallback()` markup if the file fails to load. */
+/** Decoded portrait images kept alive per URL, so cards built later show the art on their first frame. */
+const warm = new Map<string, HTMLImageElement>();
+
+function warmUp(url: string): void {
+  if (warm.has(url)) return;
+  const img = new Image();
+  img.decoding = 'async';
+  img.src = url;
+  warm.set(url, img);
+  img.decode().catch((err: unknown) => console.warn(`[ui-hud] portrait failed to preload: ${url}`, err));
+}
+
+/** Fetch + decode the portraits a race will show (cluster, badges, calling cards, KO busts, eyes strip). */
+export function preloadPortraits(player: CharacterId, rivals: readonly CharacterId[]): void {
+  const want: Array<[CharacterId, Mood | 'eyes']> = [[player, 'main'], [player, 'smug'], [player, 'hurt'], [player, 'eyes']];
+  for (const id of rivals) want.push([id, 'main'], [id, 'smug'], [id, 'hurt']);
+  for (const [id, mood] of want) {
+    const url = portraitUrl(id, mood);
+    if (url) warmUp(url);
+  }
+}
+
+/** The art as an <img>; until it is decoded (or if it fails) the host shows `fallback()` markup, never an
+ *  empty frame. Already-decoded art (preloaded) goes in at once. */
 function imgOr(host: HTMLElement, url: string | null, cls: string, fallback: () => string): void {
   if (!url) {
     host.innerHTML = fallback();
     return;
   }
-  const img = el('img', cls, host);
+  const img = el('img', cls);
   img.alt = '';
   img.decoding = 'async';
   img.draggable = false;
-  img.addEventListener('error', () => {
-    console.warn(`[ui-hud] portrait missing, using fallback: ${url}`);
-    host.innerHTML = fallback();
-  }, { once: true });
   img.src = url;
+  if (img.complete && img.naturalWidth > 0) {
+    host.append(img);
+    return;
+  }
+  host.innerHTML = fallback();
+  img.decode().then(
+    () => host.replaceChildren(img),
+    (err: unknown) => console.warn(`[ui-hud] portrait missing, using fallback: ${url}`, err),
+  );
 }
 
 function tint(node: HTMLElement, id: CharacterId): void {

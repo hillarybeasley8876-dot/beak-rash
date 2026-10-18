@@ -59,7 +59,7 @@ export function lanternString(props: MeshBuf, glow: MeshBuf, cloth: MeshBuf, a: 
   const p = new Vector3();
   for (let i = 0; i < k; i++) {
     sagAt(a, b, (i + 0.5) / k, sag, p);
-    lantern(props, glow, p.x, p.y - 0.05, p.z, rng, rng.range(0.85, 1.1));
+    lantern(props, glow, p.x, p.y - 0.05, p.z, rng, rng.range(0.7, 0.9));
   }
 }
 

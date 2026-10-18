@@ -39,10 +39,11 @@ export function wreckedSplash(player: CharacterId, cause: CrashCause, by: Charac
   });
 }
 
-export function bustedSplash(fine: number, penalty: number): CutIn {
+/** `hold` = seconds of the ticket stop (the whole penalty: nothing is added to the race time). */
+export function bustedSplash(fine: number, hold: number): CutIn {
   return splashCut({
     cls: 'ci-busted', title: 'BUSTED!', scheme: 'mono', dur: 1.1, seed: nextSeed(), stamp: true, flash: true,
-    cn: '被抓了！', sub: `罚款 ${fine} 小鱼干 · 罚时 +${penalty}S`,
+    cn: '被抓了！', sub: `罚款 ${fine} 小鱼干 · 靠边 ${hold} 秒`,
     left: { id: 'corgi', mood: 'smug', name: ROSTER.corgi.name },
   });
 }

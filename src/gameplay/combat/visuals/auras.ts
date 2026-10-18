@@ -1,7 +1,7 @@
 // Visuals that follow a rider: chill aura disc, doge shield bubble, OIIA spin swirl.
 import {
-  CircleGeometry, IcosahedronGeometry, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial, Quaternion, TorusGeometry,
-  Vector3, WireframeGeometry, type BufferGeometry, type ColorRepresentation, type Material,
+  LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial, Quaternion, Vector3, type BufferGeometry, type ColorRepresentation,
+  type Material,
 } from 'three';
 import type { RiderState } from '../../../core/types';
 import { frameQuat } from './frame';
@@ -11,6 +11,8 @@ const FLAT = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), -Math.PI / 
 const SPIN = new Quaternion();
 const AXIS_Y = new Vector3(0, 1, 0);
 const OFF = new Vector3();
+
+type AuraProp = 'disc' | 'rim' | 'ripple' | 'shell' | 'wire' | 'arc';
 
 /** Base: owns meshes (shared geometry, pooled materials), follows a rider, fades in and out over `dur`. */
 abstract class Follower implements Visual {
@@ -43,8 +45,8 @@ abstract class Follower implements Visual {
   protected abstract place(dt: number): void;
 
   /** Unit-size geometry shared through the session prop library (never disposed by the visual). */
-  protected geo(key: string, make: () => BufferGeometry): BufferGeometry {
-    return this.vs.ctx.lib.get(`aura:${key}`, make);
+  protected geo(key: AuraProp): BufferGeometry {
+    return this.vs.ctx.lib.get(`aura:${key}`);
   }
 
   /** Pooled tinted material for one of this visual's meshes (returned to the pool on dispose). */
@@ -68,9 +70,9 @@ export class AuraDisc extends Follower {
 
   constructor(vs: VisualSystem, r: RiderState, private radius: number, dur: number, color: ColorRepresentation, rimColor: ColorRepresentation) {
     super(vs, r, dur, 0.35);
-    this.disc = this.own(new Mesh(this.geo('disc', () => new CircleGeometry(1, 48)), this.mat(color, 0.16, true)));
-    this.rim = this.own(new Mesh(this.geo('rim', () => new TorusGeometry(1, 0.012, 4, 72)), this.mat(rimColor, 0.9)));
-    const ripple = this.geo('ripple', () => new TorusGeometry(1, 0.008, 4, 64));
+    this.disc = this.own(new Mesh(this.geo('disc'), this.mat(color, 0.16, true)));
+    this.rim = this.own(new Mesh(this.geo('rim'), this.mat(rimColor, 0.9)));
+    const ripple = this.geo('ripple');
     for (let i = 0; i < 3; i++) this.ripples.push(this.own(new Mesh(ripple, this.mat(rimColor, 0.5))));
     for (const m of [this.disc, this.rim, ...this.ripples]) m.renderOrder = 1;
   }
@@ -104,9 +106,8 @@ export class ShieldBubble extends Follower {
 
   constructor(vs: VisualSystem, r: RiderState, dur: number, color: ColorRepresentation) {
     super(vs, r, dur, 0.2);
-    const geo = this.geo('shell', () => new IcosahedronGeometry(1.35, 1));
-    this.shell = this.own(new Mesh(geo, this.mat(color, 0.22)));
-    this.wire = this.own(new LineSegments(this.geo('wire', () => new WireframeGeometry(geo)), vs.materials.line('#fff6c8', 0.8)));
+    this.shell = this.own(new Mesh(this.geo('shell'), this.mat(color, 0.22)));
+    this.wire = this.own(new LineSegments(this.geo('wire'), vs.materials.line('#fff6c8', 0.8)));
     this.shell.renderOrder = this.wire.renderOrder = 2;
   }
 
@@ -132,7 +133,7 @@ export class SpinSwirl extends Follower {
   constructor(vs: VisualSystem, r: RiderState, private radius: number, dur: number, colors: [ColorRepresentation, ColorRepresentation]) {
     super(vs, r, dur, 0.12);
     for (let i = 0; i < 6; i++) {
-      const arc = new Mesh(this.geo('arc', () => new TorusGeometry(1, 0.035, 4, 20, Math.PI * 0.55)), this.mat(colors[i % 2] as ColorRepresentation, 0.9));
+      const arc = new Mesh(this.geo('arc'), this.mat(colors[i % 2] as ColorRepresentation, 0.9));
       arc.renderOrder = 3;
       this.arcs.push(this.own(arc));
     }

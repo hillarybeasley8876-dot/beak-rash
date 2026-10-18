@@ -3,6 +3,7 @@
 // Usage: node tools/content-lint.mjs [--verbose] [--dump]   (exit code 1 on errors; --dump prints every line)
 import { importTs } from './content-ts.mjs';
 import { missingGlyphs } from './content-fonts.mjs';
+import { nearDuplicates, oneNote, styleIssues, templates } from './content-repeat.mjs';
 
 const { ROSTER, POLICE_LINES } = await importTs('src/data/roster.ts');
 const { TIPS } = await importTs('src/data/tips.ts');
@@ -11,6 +12,7 @@ const { ACHIEVEMENTS } = await importTs('src/data/achievements.ts');
 const S = await importTs('src/data/strings.ts');
 const { BIKES } = await importTs('src/data/bikes.ts');
 const { VOICE } = await importTs('src/data/voice.ts');
+const { TRACKS } = await importTs('src/data/tracks.ts');
 
 const errors = [];
 const warnings = [];
@@ -29,8 +31,8 @@ const norm = (s) => {
   const bare = s.toLowerCase().replace(/[\s\p{P}\p{S}]/gu, '');
   return Array.from(bare).length >= 2 ? bare : s.replace(/\s/g, '');
 };
-/** Symbols any fallback font draws fine (arrows on lane signs). */
-const FALLBACK_OK = new Set(['→', '←', '↑', '↓']);
+/** Symbols any fallback font draws fine (arrows on lane signs, the no-break spaces in the credits prompt). */
+const FALLBACK_OK = new Set(['→', '←', '↑', '↓', '\u00a0']);
 
 const FONTS = {
   play: ['zcool-kuaile', 400], block: ['zcool-qingke-huangyou', 400], brush: ['ma-shan-zheng', 400], heavy: ['noto-sans-sc', 900],
@@ -78,7 +80,7 @@ group('announcer.cn', [...Object.values(S.ANNOUNCER), ...S.PLACE_CALLOUTS].map((
 group('announcer.alt', [...Object.values(S.ANNOUNCER), ...S.PLACE_CALLOUTS].flatMap((c) => c.alt), { max: 12, font: 'play' });
 for (const [cause, lines] of Object.entries(S.WRECK_LINES)) group(`wreck.${cause}`, lines, { max: 12, font: 'play', min: 2 });
 group('credits.role', S.CREDITS.map(([r]) => r), { max: 8, font: 'block' });
-group('credits.name', S.CREDITS.map(([, n]) => n), { max: 24, font: 'play' });
+group('credits.name', S.CREDITS.map(([, n]) => n), { max: 24, font: 'block' });
 group('howto.keyboard', S.HOWTO_KEYBOARD.flatMap((g) => g.rows).map((r) => r.text), { max: 12, font: 'heavy' });
 group('howto.gamepad', S.HOWTO_GAMEPAD.map((r) => r.text), { max: 12, font: 'heavy' });
 group('howto.basics', [...S.HOWTO_BASICS, ...Object.values(S.HOWTO_SKILL_TIPS)], { max: 24, font: 'play' });
@@ -161,6 +163,56 @@ for (const id of ['comeback', 'double', 'goose', 'pacifist', 'pigeon', 'corgi', 
 }
 const icons = new Map();
 for (const a of ACHIEVEMENTS) { if (icons.has(a.icon)) warnings.push(`achievement icon ${a.icon} shared by ${icons.get(a.icon)} and ${a.id}`); icons.set(a.icon, a.id); }
+
+// ---------------------------------------------------------------- repetition (tools/content-repeat.mjs)
+// Flavour text only (functional copy such as achievement descs and key legends may repeat its terms).
+const flavour = [];
+const add = (where, lines, speaker) => lines.forEach((text, i) => flavour.push({ where: `${where}[${i}]`, text, mine: true, speaker }));
+for (const def of Object.values(ROSTER)) {
+  for (const field of [...Object.keys(LINE_COUNTS), 'tagline', 'title']) add(`${def.id}.${field}`, [def[field]].flat(), def.id);
+}
+for (const [phase, lines] of Object.entries(POLICE_LINES)) add(`police.${phase}`, lines, 'corgi');
+add('tips', TIPS);
+add('billboards', BILLBOARD_LINES);
+add('signs', ROAD_SIGNS);
+for (const [t, lines] of Object.entries(TRACK_BILLBOARDS)) add(`billboards.${t}`, lines);
+for (const [t, lines] of Object.entries(TRACK_SIGNS)) add(`signs.${t}`, lines);
+for (const [t, lines] of Object.entries(S.CALENDAR)) add(`calendar.${t}`, lines.flatMap((l) => [l.good, l.bad]));
+for (const [g, lines] of Object.entries(S.GRADE_QUOTES)) add(`gradeQuotes.${g}`, lines);
+add('grades', GRADES.map((g) => g.title));
+add('achievements.name', ACHIEVEMENTS.map((a) => a.name));
+add('bikes.blurb', Object.values(BIKES).map((b) => b.blurb));
+add('announcer.alt', [...Object.values(S.ANNOUNCER), ...S.PLACE_CALLOUTS].flatMap((c) => c.alt));
+for (const [cause, lines] of Object.entries(S.WRECK_LINES)) add(`wreck.${cause}`, lines);
+add('credits.name', S.CREDITS.map(([, n]) => n));
+add('credits.outro', [S.CREDIT_OUTRO]);
+add('howto', [...S.HOWTO_BASICS, ...Object.values(S.HOWTO_SKILL_TIPS)]);
+// Read-only context on the same screens (other units' text): content lines must not echo it.
+const context = Object.values(TRACKS).map((t) => ({ where: `tracks.${t.id}.blurb`, text: t.blurb, mine: false }));
+try {
+  const { CITY_LINES, GANTRY } = await importTs('src/world/dressing/city/lines.ts');
+  CITY_LINES.forEach((text, i) => context.push({ where: `env-city CITY_LINES[${i}]`, text, mine: false }));
+  for (const [k, g] of Object.entries(GANTRY)) context.push({ where: `env-city GANTRY.${k}`, text: `${g.sub} ${g.backSub}`, mine: false });
+} catch (err) {
+  warnings.push(`context: env-city CITY_LINES not loaded (${err instanceof Error ? err.message : String(err)})`);
+}
+for (const { a, b, run } of nearDuplicates([...flavour, ...context])) {
+  errors.push(`near-duplicate «${run}»: ${a.where} «${a.text}» ~ ${b.where} «${b.text}»`);
+}
+for (const t of templates(flavour)) errors.push(`template ${t}`);
+for (const it of flavour) for (const issue of styleIssues(it)) errors.push(issue);
+const pools = Object.values(ROSTER).map((def) => ({
+  name: def.id, lines: [...Object.keys(LINE_COUNTS).flatMap((f) => def[f]), def.tagline],
+}));
+pools.push({ name: 'police', lines: Object.values(POLICE_LINES).flat() }, { name: 'tips', lines: TIPS },
+  { name: 'billboards', lines: BILLBOARD_LINES }, { name: 'signs', lines: ROAD_SIGNS },
+  ...Object.entries(S.GRADE_QUOTES).map(([g, lines]) => ({ name: `gradeQuotes.${g}`, lines })),
+  { name: 'announcer', lines: [...Object.values(S.ANNOUNCER), ...S.PLACE_CALLOUTS].flatMap((c) => c.alt) },
+  { name: 'wreck', lines: Object.values(S.WRECK_LINES).flat() }, { name: 'credits', lines: S.CREDITS.map(([, n]) => n) });
+for (const t of Object.keys(TRACK_BILLBOARDS)) {
+  pools.push({ name: `track.${t}`, lines: [...TRACK_BILLBOARDS[t], ...TRACK_SIGNS[t], ...S.CALENDAR[t].flatMap((l) => [l.good, l.bad])] });
+}
+for (const issue of oneNote(pools)) errors.push(`one-note ${issue}`);
 
 // ---------------------------------------------------------------- report
 const total = allText.length;

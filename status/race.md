@@ -20,10 +20,11 @@
                            features), plan (candidate-lane cost planner with commitment), control
                            (P + learned-bias steering → handles curve push), speed (corner speed w/ braking
                            distance, adaptive grip, drift plan), fight (melee side select, heavy, counters,
-                           hunting; angry → hunt the bell ringer), skills (rules for all 8 sig skills +
-                           pelican kit for autopilot), personality (species temperament + stats + level),
-                           taunts (roster lines ~1 per 8–14 s near the player, KO/respawn lines),
-                           brain (per rider), index (rubber band ±8 %, bell after passing the player)
+                           hunting; angry → hunt the bell ringer; grudges), skills (rules for all 8 sig skills
+                           + pelican kit for autopilot), personality (species temperament + stats + level),
+                           taunts (one line at a time across the field, per-rider no-repeat bags, KO/respawn/
+                           skill lines), pace (level pace, leader ease, unseen catch-up, rider.rubber),
+                           brain (per rider), index (director: pace offsets, hunt token, grudges, bell)
 - traffic/                 types (7 vehicles), kit/models-cars/models-trucks/models (merged vertex-colour
                            toon geometry), decals (canvas atlas: 鹈鹕海鲜, 冰淇淋, 1路 鹈鹕湾, bus meme ad),
                            render (InstancedMesh per type: paint (instance colour) + trim + decal + outline
@@ -51,25 +52,28 @@
   2-lane sections → traffic lane logic already collapses to ±hw/2).
 
 ## Known issues
-- Rival bikes differ a lot in top speed (kidbike 16.5 … fixie 22.5 m/s); with the ±8 % rubber band the
-  shared/kidbike riders (capybara, penguin) always trail. Variety, but sim/content may narrow it.
-- Rubber-band catch-up and the hunting sprint (+7 %) use tiny `boostTime/boostPower` pulses (the SPEC
-  boost API), so a hunting rival may show boost streaks/tuck. A dedicated mod would be cleaner (core req 5).
-- Police speech uses `app.ui.toast` (the corgi is not a session rider, so no `taunt` bubble).
+- Rival top speeds come from the level pace (±2 % per rider), not their bikes: `rider.rubber` holds fast bikes down
+  (≥ 0.7) and lifts slow ones up to the pace (≤ 1.35); bikes still differ in accel / handling / weight. The player's
+  bike is the only real top-speed edge (by design: garage upgrades matter).
+- Police speech uses `app.ui.toast` (the corgi is not a session rider, so no `taunt` bubble; core request 6).
 - Police whistle pushes a `slow` status (1 s, 15 %) onto the player directly (combat owns statuses).
+- PERFECT START is still a race toast (flow.ts) until ui-hud ships its 'launch' callout (ui-hud fix item 13).
 
 ## Core requests
-1. `rider:boost.kind` add `'launch'` (race currently emits `'pad'` for launch boosts).
-2. `race:intro` payload: optional `duration` (s) so the HUD can pace intro cards (intro is 3.6 s).
-3. Export `outlineMaterial(color, width)` from render/toon.ts (traffic gets it via a probe outline()).
-4. Optional `police:alert` field `reason?: 'spawn' | 'lost' | 'busted'` (achievement 腿短不是借口).
-   Current levels: 1 = chase/siren, 2 = alongside/closing (whistle), 0 = gave up / ticket done.
-5. `RiderMods.rubber` (or a race-owned speed factor physics multiplies in) for rubber band/hunt sprint.
+1–5 applied by core (rider:boost 'launch', race:intro.duration, outlineMaterial export (traffic uses it since fix r2),
+police:alert.reason, RiderState.rubber; sim multiplies rubber in).
+6. (open) a world-anchored speech line for non-session riders (the corgi), or let `taunt` take a world position.
+Cross-unit (critic r2, not race-owned):
+- sim: no draft slingshot while braking (brake > 0.5) or below ~8 m/s, and reset `draft` while braking
+  (sim/contacts.ts slipstream(): a fully braking player was pushed 13.3 → 15.8 m/s by kind 'draft' boosts).
+- ui-hud: 'launch' callout (PERFECT START! 起步完美) → then race drops its toast in flow.ts (2 lines); the BUSTED
+  '+4S' timer chip should be a 4-3-2-1 ticket-hold countdown while the player's mode is 'busted' (no time is added).
 
 ## How to test
 - Play: `/?race=coast&seed=3` (Enter skips the intro). Autopilot: `&autopilot=1`. Aerial debug cam:
   `__br.race.spectate('aerial')`. Police: `__br.race.setHeat(0.9)` then slow down.
-- `node tools/race-scenarios.mjs [--only police,launch,finish,restart,timeout] [--shots]`
+- `node tools/race-scenarios.mjs [--only police,launch,…] [--shots] [--stub combat]` (all quick groups ≈ 8 min; the full-race
+  checks run only when named: `--only close,bikes,mugging,arrive`; groups listed in the file header)
 - `node tools/race-soak.mjs --seeds 1,2,3` (full autopilot races, any console error fails; isolate with
   `--stub world,fx,ui,audio --lenient`)
 - `node tools/race-gallery.mjs --views row,front,side` → shots/race/gallery-*.png
@@ -168,3 +172,44 @@ brake, 10 launch/ticket HUD) → re-run scenarios + soak. Status per issue (appe
   set `rider.rubber` (ai/pace.ts easeRubber: cap ÷ own bike top, ≤ 1.35, eased 0.1/s, 1 when in view / not racing)
   instead of boostTime pulses (no boost streaks, no `free`-road gate); brain's top includes it. `--only pulses` now also
   asserts rubber ≤ 1.01 on rivals in view (0 of 9812 samples; max unseen 1.297), opening PASS.
+- Continuation 2 (resumed fixer #2, 14:20): all code items above are in; remaining = full suite re-run (scenarios +
+  soak) → 10 launch callout / ticket chip (ui-hud) → cross-unit notes 8/9 → final suite.
+- Suite re-run 14:25: `race-soak --seeds 1,2,3` SOAK OK (busted 1/1/1, stuck ≤ 2.0 s, 0 errors); default scenarios 44/48,
+  the 4 failures (brakecheck s4, penalty, tie, popin) threw `ctx.pickups.sync is not a function` inside combat/system.ts
+  (combat mid-edit, not race) → re-running.
+- Re-runs 14:45: brakecheck seeds 1,2,3,5,6 PASS, tie PASS, penalty + popin PASS (`--stub combat`: combat/melee.ts threw
+  `nearest is not defined` mid-edit); `--only bikes` PASS (caps identical; roadbike 8th 167.1 s → fixie 3rd 143.2 s);
+  `--only arrive` brawler 1-2 PASS (reach 4.7 s, lost 25–35 s later, alongside 10–12 s); rest of arrive blocked by combat.
+- [8 results tracker] not race-owned; not reproduced: `ctx.tracker.earned` no longer exists in src/ui; autopilot seed 2
+  finished in real time builds the results screen with 0 errors (shots/race/r2fix/results.mjs → results-s2.png).
+- [9 draft while braking] not race-owned (sim/contacts.ts slipstream has no brake gate yet) → request under Core requests.
+  Race side already copes: brakecheck seeds 1,2,3,5,6 clean.
+- [10 launch / ticket HUD] ui-hud has both queued (its fix items 4 and 13, not done yet) → the race keeps its PERFECT START
+  toast until the 'launch' callout exists (else nothing marks the perfect start); request under Core requests.
+- [cleanup] traffic/render.ts uses core's exported `outlineMaterial(INK, w)` instead of a probe outline() (core req 3);
+  gallery shot shots/race/r2fix/gallery-row.png unchanged (outlines on all 7 vehicles); sandbox/race.html favicon 404 gone.
+- Visual check (shots/race/r2fix/visual.mjs, brawler seed 1): POLICE banner + arrival toast, corgi beside the player
+  4.7 s after the spawn (police-along-s1.png), escape toast with content's lost line at 25 s (police-lost-s1.png),
+  pack shots with one bubble at a time (pack-s1-*.png); 0 errors.
+- Final suite 15:15 (full game): default 48/50 — FAIL grudge 11/32 landed back (< 40 %, was 12/28–14/26; combat changed
+  melee targeting meanwhile), FAIL popin one spawn at fog 0.59 (ds 746 m but only 661 m straight-line on a curve);
+  `--only close,mugging`: mugging 6/6, close FAIL (median leader gap 126/124/67 m vs < 120; last place capybara ×3 —
+  slow-bike rivals are capped by their own bike in view, catch-up now only +8 %). Plan: (a) popin: spawn by straight-line
+  distance; (b) grudge: payback swings are quick light jabs (heavy windup gets countered); (c) close: in view, rubber may
+  lift a slow bike up to the field's pace (never above it), pulses check asserts "never above the pace in view".
+- [popin regression] DONE: traffic/index.ts spawns at the first s past `far` that is also `far` away in a straight line
+  (fogStart, ≤ +60 m; skip the tick otherwise; despawn limit moved out by the same margin). `--only popin` PASS (min fog 0.70).
+- [grudge regression] DONE: fight.ts payback swings are light jabs (a heavy's 0.16 s windup got countered). `--only grudge`
+  PASS 14/31 landed back, 20/31 swung back, 0 early hits.
+- [close regression] DONE: (1) pace.ts easeRubber: in view a slow bike may be lifted to its base pace (never above it;
+  unseen it still gets the +8 % catch-up); (2) a fast bike gets rubber < 1 (cap ÷ own top, floor 0.7), so after a boost or
+  a descent the sim's overspeed drag returns it to the cap instead of coasting above the field (the fixie cat led by
+  120–275 m and won 3/3); brain aims CAP_SLACK 0.5 m/s above the cap so the pedals stay floored up to it. Brain summary
+  exposes `base` / `top`; `--only pulses` now asserts "in view, rubber never lifts a rival above its pace" (0 of 13668;
+  4138 slow-bike lifts). `--only close` PASS: median leader gap 69/31/75 m, first→last 5.5/8.4/8.1 s, winners pigeon/sloth/
+  pigeon, last cat/capybara/capybara; `--only bikes` PASS (roadbike 6th 167.1 s → fixie 1st 143.4 s); koGap PASS
+  (−62.8/−62.5 m at +15/+30 s); opening PASS.
+- FINAL 16:05 (full game, real units): `race-scenarios` default 50/50; named `close,bikes,mugging,arrive` 4/4 + 2/2 + 6/6 + 8/8;
+  `race-soak --seeds 1,2,3` SOAK OK (winners shiba/pigeon/sloth, busted 1/1/1, stuck ≤ 2.0 s, 0 errors); tsc: 0 errors in
+  race files. Fix round 2 complete; open items are cross-unit only (sim draft-while-braking, ui-hud launch callout + ticket
+  countdown → then drop flow.ts PERFECT START toast).

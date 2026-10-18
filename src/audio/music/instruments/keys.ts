@@ -3,7 +3,8 @@
 import { adsr, anchor, filter, holdAt, perc, settle } from '../../dsp/env';
 import { pulseWave } from '../../dsp/curves';
 import { midiToHz } from '../theory';
-import { NoiseVoice, Pool, osc, type Gate } from './voice';
+import { playSample } from './drum-samples';
+import { Pool, osc, type Gate } from './voice';
 import type { Band } from '../band';
 
 /** ±0.5 detune / timing jitter from the band's Rng (reproducible per band). */
@@ -14,7 +15,9 @@ interface EpVoice {
   bark: OscillatorNode;
   bodyAmp: GainNode;
   barkAmp: GainNode;
-  gate: Gate;
+  /** Separate gates: the bark (≈ 0.3 s) unplugs long before a sustained body does. */
+  bodyGate: Gate;
+  barkGate: Gate;
   busyUntil: number;
   startedAt: number;
 }
@@ -44,32 +47,34 @@ function epWaves(ctx: BaseAudioContext): [PeriodicWave, PeriodicWave] {
 }
 
 /**
- * 6-voice electric piano. Each voice = body + bark oscillators at the same pitch; the bark decays
- * in ~0.3 s (louder when played harder) so notes bite then mellow, like an FM tine piano, while
- * every oscillator stays on WebAudio's cheap constant-frequency path.
+ * 4-voice electric piano: every voicing has 4 notes, so a new chord takes over the last one's
+ * voices, which fade out in the 6 ms before it (like lifted keys). Each voice = body + bark
+ * oscillators at the same pitch; the bark decays in ~0.3 s (louder when played harder) so notes
+ * bite then mellow, like an FM tine piano, while every oscillator stays on WebAudio's cheap
+ * constant-frequency path.
  */
 export class Rhodes {
   private pool: Pool<EpVoice>;
 
-  constructor(private b: Band) {
+  /** `dest`: the keys channel, or (sample rendering) any node. */
+  constructor(b: Band, dest: AudioNode = b.input('keys')) {
     const [bodyWave, barkWave] = epWaves(b.ctx);
     const voices: EpVoice[] = [];
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 4; i++) {
       const body = osc(b, 'sine', 220, jitter(b) * 7);
       const bark = osc(b, 'sine', 220, jitter(b) * 7);
       body.setPeriodicWave(bodyWave);
       bark.setPeriodicWave(barkWave);
       const bodyAmp = new GainNode(b.ctx, { gain: 0 });
       const barkAmp = new GainNode(b.ctx, { gain: 0 });
-      const mix = new GainNode(b.ctx, { gain: 1 });
-      body.connect(bodyAmp).connect(mix);
-      bark.connect(barkAmp).connect(mix);
-      voices.push({ body, bark, bodyAmp, barkAmp, gate: b.gate(mix, b.input('keys')), busyUntil: 0, startedAt: 0 });
+      body.connect(bodyAmp);
+      bark.connect(barkAmp);
+      voices.push({ body, bark, bodyAmp, barkAmp, bodyGate: b.gate(bodyAmp, dest), barkGate: b.gate(barkAmp, dest), busyUntil: 0, startedAt: 0 });
     }
     this.pool = new Pool(voices);
   }
 
-  private note(t: number, midi: number, dur: number, vel: number): void {
+  note(t: number, midi: number, dur: number, vel: number): void {
     const v = this.pool.take(t);
     const f = midiToHz(midi);
     if (v.busyUntil > t) {
@@ -87,14 +92,9 @@ export class Rhodes {
     const keyScale = Math.min(1.15, Math.max(0.5, (midi - 36) / 40));
     const peak = 0.2 * (0.55 + 0.45 * vel);
     v.busyUntil = adsr(v.bodyAmp.gain, t, dur, peak, 0.003, 1.6, 0.3, 0.3, true);
-    perc(v.barkAmp.gain, t, peak * (0.25 + 0.75 * vel) * keyScale, 0.002, Math.min(dur + 0.05, 0.22 + 0.18 * vel), true);
+    v.barkGate.open(perc(v.barkAmp.gain, t, peak * (0.25 + 0.75 * vel) * keyScale, 0.002, Math.min(dur + 0.05, 0.22 + 0.18 * vel), true));
     v.startedAt = t;
-    v.gate.open(v.busyUntil);
-  }
-
-  /** Chord with a slight low-to-high roll. */
-  chord(t: number, midis: number[], dur: number, vel: number): void {
-    midis.forEach((m, i) => this.note(t + i * 0.006 + Math.abs(jitter(this.b)) * 0.004, m, dur, vel * (1 + 0.12 * jitter(this.b))));
+    v.bodyGate.open(v.busyUntil);
   }
 }
 
@@ -103,23 +103,27 @@ export class Clav {
   private wah: BiquadFilterNode;
   private amp: GainNode;
   private gate: Gate;
-  private scratch: NoiseVoice;
+  private input: AudioNode;
+  private mutes = 0;
 
-  constructor(b: Band) {
+  constructor(private b: Band) {
     const ctx = b.ctx;
-    const hp = filter(ctx, { type: 'highpass', frequency: 170, Q: 0.7 });
+    // The envelope band-pass alone shapes it (the pulse has no DC and plays above 300 Hz).
     this.wah = filter(ctx, { type: 'bandpass', frequency: 900, Q: 1.6 });
     this.amp = new GainNode(ctx, { gain: 0 });
-    hp.connect(this.wah).connect(this.amp);
+    this.wah.connect(this.amp);
     this.gate = b.gate(this.amp, b.input('clav'));
+    // Funk double-stops: the voicing's two guide tones (3rd + 7th of the rootless voicings).
     const wave = pulseWave(ctx, 0.22);
-    for (let i = 0; i < 3; i++) {
+    const level = new GainNode(ctx, { gain: 0.52 });
+    level.connect(this.wah);
+    for (let i = 0; i < 2; i++) {
       const o = osc(b, 'sine', 330, jitter(b) * 6);
       o.setPeriodicWave(wave);
-      o.connect(new GainNode(ctx, { gain: 0.42 })).connect(hp);
+      o.connect(level);
       this.oscs.push(o);
     }
-    this.scratch = new NoiseVoice(b, [{ type: 'bandpass', frequency: 1700, Q: 1.8 }], b.input('clav'));
+    this.input = b.input('clav');
   }
 
   hit(t: number, midis: number[], dur: number, vel: number): void {
@@ -138,7 +142,7 @@ export class Clav {
   }
 
   mute(t: number, vel: number): void {
-    this.scratch.hit(t, 0.16 * vel, 0.001, 0.025);
+    playSample(this.b.ctx, 'clavMute', this.mutes++, t, 0.16 * vel, this.input);
   }
 }
 

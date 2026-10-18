@@ -47,6 +47,8 @@ export class SongPlayer {
   private stepInSection = 0;
   private intensity = 0;
   private pendingForm: 'main' | 'stretch' | typeof BUILD | null = null;
+  /** A top-3 change (0 ↔ 1) waiting for the next 2-bar line. */
+  private pendingLevel: number | null = null;
   private building = false;
   private holdName: string | null = null;
   private crashNext = false;
@@ -104,13 +106,20 @@ export class SongPlayer {
     return this.compiled.sections.get(section)?.chords[0] ?? null;
   }
 
-  /** 0 = base, 1 = top-3 layer, 2 = final stretch (a one-bar build, then the stretch form). */
+  /**
+   * 0 = base, 1 = top-3 layer, 2 = final stretch (a one-bar build, then the stretch form).
+   * Top-3 layers come and go on a 2-bar line, never mid-phrase.
+   */
   setIntensity(level: number): void {
     const next = Math.max(0, Math.min(2, Math.round(level)));
-    if (next === this.intensity) return;
     const wasStretch = this.intensity >= 2;
+    if (next < 2 && !wasStretch) {
+      this.pendingLevel = next === this.intensity ? null : next;
+      return;
+    }
+    this.pendingLevel = null;
+    if (next === this.intensity) return;
     this.intensity = next;
-    if (!wasStretch && next < 2) this.band.fade(this.levelGain(false), 0.6, this.engine.ctx.currentTime);
     if (!this.song.stretch || (next >= 2) === wasStretch) return;
     this.pendingForm = next >= 2 ? BUILD : 'main';
   }
@@ -189,6 +198,11 @@ export class SongPlayer {
   private advance(): void {
     this.nextTime += this.stepDur;
     this.stepInSection++;
+    if (this.pendingLevel !== null && this.stepInSection % 32 === 0) {
+      this.intensity = this.pendingLevel;
+      this.pendingLevel = null;
+      this.band.fade(this.levelGain(false), 0.6, this.nextTime);
+    }
     if (this.stepInSection % 16 === 0 && this.pendingForm) {
       if (this.pendingForm === BUILD) {
         this.pendingForm = 'stretch';
@@ -329,7 +343,7 @@ export class SongPlayer {
     const vel = this.vel(tok);
     if (lane === 'keys') this.band.keys.chord(t, notes, dur, vel);
     else if (lane === 'pad') this.band.pad.chord(t, notes, dur, vel);
-    else if (lane === 'clav') this.band.clav.hit(t, notes.slice(-3), dur, vel);
+    else if (lane === 'clav') this.band.clav.hit(t, notes.slice(0, 2), dur, vel);
     else this.band.brass.stab(t, notes, dur, vel, tok === 'f' ? 'fall' : tok === 'r' ? 'rip' : 'hit');
   }
 

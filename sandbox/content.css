@@ -96,9 +96,12 @@ body { width: 1920px; }
 .cg-face small { font: 900 15px/1.2 var(--heavy); color: rgba(255, 255, 255, 0.55); }
 
 /* menus */
-.cg-credit { display: flex; gap: 20px; align-items: baseline; width: 900px; padding: 8px 0; border-bottom: 1px dashed #333; }
-.cg-credit span { width: 220px; text-align: right; font: 400 28px/1.2 var(--block); color: var(--red); }
-.cg-credit b { font: 400 34px/1.2 var(--play); font-weight: 400; }
+/* Same box as ui/screens/credits.css (.br-cr-view 880 px, .br-cr-entry / -role / -name / -outro). */
+.cg-credits { width: 880px; padding: 24px 0; outline: 1px dashed #444; }
+.cg-credit { display: flex; flex-direction: column; gap: 6px; margin: 0 0 46px var(--x); }
+.cg-credit span { align-self: flex-start; padding: 2px 16px 0; background: var(--red); font: 400 28px/1.2 var(--block); transform: skewX(-10deg); }
+.cg-credit b { font: 400 58px/1.1 var(--block); color: var(--paper); text-shadow: 5px 5px 0 #8c0f14; }
+.cg-credits-outro { max-width: 900px; margin: 40px 0 0; font: 400 36px/1.4 var(--play); color: rgba(255, 255, 255, 0.85); }
 .cg-howto { width: 900px; padding: 18px 24px; background: #16161d; }
 .cg-howto-row { display: flex; gap: 18px; align-items: center; padding: 5px 0; font: 900 26px/1.2 var(--heavy); }
 .cg-howto-row kbd { min-width: 170px; padding: 4px 10px; background: var(--paper); color: var(--ink); font: 400 24px/1 var(--display); text-align: center; }

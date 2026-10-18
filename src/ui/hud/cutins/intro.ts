@@ -1,22 +1,29 @@
-// Intro flyover: track title banner + one P5 "calling card" per rival (roster title + tagline). The
-// card follows whichever rival the race camera is looking at; if none is in view it cycles the grid.
+// Intro flyover: track title banner + a P5 "calling card" (roster title + tagline) for the rival the race
+// camera is presenting. Like race's IntroCamera.focus(): the subject is the rider nearest (in s, ≤ 4.5 m)
+// to the camera's look point (where the view ray meets the look-target height); cards change with the subject.
 import '../css/intro.css';
 import { Vector3 } from 'three';
+import { easeInOutCubic } from '../../../core/math';
 import { ROSTER } from '../../../data/roster';
 import { SKILLS } from '../../../data/skills';
 import { TRACKS } from '../../../data/tracks';
 import type { Session } from '../../../core/contracts';
-import type { RiderState } from '../../../core/types';
+import type { RiderState, TrackFrame } from '../../../core/types';
 import { enter, exit, fadeOut } from '../anim';
 import { PortraitCard } from '../badge';
 import { el } from '../dom';
 import { setRansom } from '../ransom';
-import { newPoint, type Projector } from '../world/project';
+import type { Projector } from '../world/project';
 import { animateGlyphs } from './splash';
 
-const MIN_SHOW = 0.6;
-const CYCLE = 0.75;
+const MIN_SHOW = 0.25;
 const OUT = 0.1;
+/** Height of race's intro look target over the eased flyover e: 1.0 m at both ends, 1.1 m mid-way
+ *  (gameplay/race/intro-camera.ts). Core request: a race:introFocus event would make this mirror unnecessary. */
+const lookY = (e: number): number => 1 + 0.4 * e * (1 - e);
+const FOCUS_RANGE = 4.5;   // m in s around the look point (race intro-camera.ts)
+const PLAYER_FROM = 0.8;   // share of the flyover after which the camera may present the player
+const INTRO_FALLBACK = 3.6;
 /** The next card waits for the previous one to drop out of the way. */
 const ENTER_DELAY = 0.08;
 
@@ -26,11 +33,13 @@ export class IntroCards {
   private banner: HTMLDivElement;
   private card: Card | null = null;
   private leaving: Array<{ root: HTMLDivElement; t: number }> = [];
-  private shown = new Set<number>();
   private active = false;
   private t = 0;
+  private duration = INTRO_FALLBACK;
   private bannerOut = 1;
-  private pt = newPoint();
+  private frame: TrackFrame | undefined;
+  private o = new Vector3();
+  private d = new Vector3();
   private v = new Vector3();
 
   constructor(private stage: HTMLElement) {
@@ -40,6 +49,11 @@ export class IntroCards {
 
   get running(): boolean {
     return this.active;
+  }
+
+  /** race:intro — flyover length, so the player becomes a valid subject at the same point as for race. */
+  setDuration(seconds: number | undefined): void {
+    this.duration = seconds !== undefined && seconds > 0 ? seconds : INTRO_FALLBACK;
   }
 
   start(session: Session): void {
@@ -59,7 +73,6 @@ export class IntroCards {
     this.active = false;
     if (this.card) this.retire(this.card);
     this.card = null;
-    this.shown.clear();
     if (immediate) {
       for (const l of this.leaving) l.root.remove();
       this.leaving = [];
@@ -79,35 +92,43 @@ export class IntroCards {
       this.drawCard(card);
     }
     if (card && card.t < MIN_SHOW) return;
-    const next = this.pickInView(session, proj) ?? (this.t > 0.25 && (!card || card.t > CYCLE) ? this.nextInGrid(session) : null);
-    if (next && next !== card?.r) this.show(next);
+    const subject = this.subject(session, proj);
+    if (!subject || subject === card?.r) return;
+    if (subject.isPlayer) {
+      if (card) this.retire(card);
+      this.card = null;
+    } else this.show(subject);
   }
 
-  private pickInView(session: Session, proj: Projector): RiderState | null {
+  /** Rider nearest the camera's look point (null = nobody near it: keep the current card). */
+  private subject(session: Session, proj: Projector): RiderState | null {
+    const p = session.player;
+    this.frame = session.track.frameAt(p.s, this.frame);
+    const up = this.frame.up;
+    const progress = Math.min(1, this.t / this.duration);
+    const plane = session.track.toWorld(p.s, 0, lookY(easeInOutCubic(progress)), this.v);
+    proj.viewRay(this.o, this.d);
+    const denom = this.d.x * up.x + this.d.y * up.y + this.d.z * up.z;
+    if (denom > -1e-3) return null;
+    const along = ((plane.x - this.o.x) * up.x + (plane.y - this.o.y) * up.y + (plane.z - this.o.z) * up.z) / denom;
+    if (along <= 0 || along > 150) return null;
+    const lookS = session.track.project(this.o.addScaledVector(this.d, along), p.s).s;
+    const playerOk = progress >= PLAYER_FROM;
     let best: RiderState | null = null;
-    let bestScore = Infinity;
+    let bestD = FOCUS_RANGE;
     for (const r of session.riders) {
-      if (r.isPlayer) continue;
-      proj.project(proj.riderHead(session, r, 0, this.v), this.pt);
-      if (!this.pt.onScreen || this.pt.depth > 24) continue;
-      const score = Math.abs(this.pt.x / proj.width - 0.5) + this.pt.depth / 40 + (this.shown.has(r.id) ? 1 : 0);
-      if (score < bestScore) {
-        bestScore = score;
+      if (r.isPlayer && !playerOk) continue;
+      const dist = Math.abs(r.s - lookS);
+      if (dist < bestD) {
+        bestD = dist;
         best = r;
       }
     }
-    return best && !this.shown.has(best.id) ? best : null;
-  }
-
-  private nextInGrid(session: Session): RiderState | null {
-    const rivals = session.riders.filter((r) => !r.isPlayer && !this.shown.has(r.id));
-    rivals.sort((a, b) => b.s - a.s);
-    return rivals[0] ?? null;
+    return best;
   }
 
   private show(r: RiderState): void {
     if (this.card) this.retire(this.card);
-    this.shown.add(r.id);
     const def = ROSTER[r.character];
     const root = el('div', 'ic', this.stage);
     el('div', 'ic-sh', root);

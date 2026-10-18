@@ -1,6 +1,6 @@
-// Brass section: two alternating persistent chord voices (5 detuned saws spread left/right, a
-// shared "bwah" filter + VCA), so stabs can overlap their release tails without creating nodes.
-// Chords with fewer than 5 notes double their top notes an octave down to fill the section.
+// Brass section: one persistent chord voice (a detuned saw per voicing note into a shared "bwah"
+// filter + VCA); a stab arriving during the previous one's release closes it in the 6 ms before
+// its onset. Chords with fewer than 4 notes double their top notes an octave down.
 import { adsr, anchor, filter, holdAt, settle } from '../../dsp/env';
 import { midiToHz } from '../theory';
 import { osc, type Gate } from './voice';
@@ -8,9 +8,9 @@ import type { Band } from '../band';
 
 export type BrassKind = 'hit' | 'fall' | 'rip';
 
-const SLOTS = 5;
+const SLOTS = 4;
 
-const DETUNE = [-9, 7, -4, 10, -11];
+const DETUNE = [-9, 7, -4, 10];
 
 interface ChordVoice {
   saws: OscillatorNode[];
@@ -25,7 +25,7 @@ export class Brass {
   private next = 0;
 
   constructor(private b: Band) {
-    for (let v = 0; v < 2; v++) this.voices.push(this.makeVoice());
+    this.voices.push(this.makeVoice());
   }
 
   private makeVoice(): ChordVoice {
@@ -34,15 +34,10 @@ export class Brass {
     const amp = new GainNode(ctx, { gain: 0 });
     lp.connect(amp);
     const gate = this.b.gate(amp, this.b.input('brass'));
-    const sides = [-0.32, 0.32].map((pan) => {
-      const p = new StereoPannerNode(ctx, { pan });
-      p.connect(lp);
-      return p;
-    });
     const saws: OscillatorNode[] = [];
     for (let s = 0; s < SLOTS; s++) {
       const o = osc(this.b, 'sawtooth', 220, DETUNE[s] ?? 0);
-      o.connect(sides[s % 2] ?? lp);
+      o.connect(lp);
       saws.push(o);
     }
     return { saws, lp, amp, gate, busyUntil: 0 };
@@ -82,7 +77,8 @@ export class Brass {
     fr.setValueAtTime(380, t);
     fr.exponentialRampToValueAtTime(peak, t + 0.04);
     fr.exponentialRampToValueAtTime(peak * 0.55, t + 0.22);
-    v.busyUntil = adsr(v.amp.gain, t, dur, 0.16 * vel, 0.016, 0.16, 0.68, rel, true);
+    // 0.126: the mono 4-saw section matches the loudness of the former 5-saw stereo spread.
+    v.busyUntil = adsr(v.amp.gain, t, dur, 0.126 * vel, 0.016, 0.16, 0.68, rel, true);
     v.gate.open(v.busyUntil);
   }
 }

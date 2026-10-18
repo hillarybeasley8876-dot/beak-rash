@@ -1,9 +1,12 @@
-// Slap synth bass, one persistent monophonic voice: saw + square through a plucked resonant
-// low-pass (bright, growly sustain), a light sine sub, thumb / pop string transients, slides and
-// dead (muted) ghost notes. Retriggers ramp from the current level, so legato lines never click.
+// Slap synth bass, one persistent monophonic voice: saw + square (+ a light sine sub, one mixed
+// wave) through a plucked resonant low-pass (bright, growly sustain), thumb / pop string
+// transients, slides and dead (muted) ghost notes. Retriggers ramp from the current level, so
+// legato lines never click.
+import { mixWave } from '../../dsp/curves';
 import { adsr, filter, holdAt, perc } from '../../dsp/env';
 import { midiToHz } from '../theory';
-import { NoiseVoice, osc } from './voice';
+import { playSample, type DrumSample } from './drum-samples';
+import { osc, type Gate } from './voice';
 import type { Band } from '../band';
 
 export interface BassNote {
@@ -19,21 +22,22 @@ export class SlapBass {
   private oscs: OscillatorNode[];
   private lp: BiquadFilterNode;
   private amp: GainNode;
-  private click: NoiseVoice;
+  private gate: Gate;
+  private input: AudioNode;
+  private turn = 0;
 
-  constructor(b: Band) {
+  constructor(private b: Band) {
     const ctx = b.ctx;
-    const saw = osc(b, 'sawtooth');
-    const sq = osc(b, 'square', 110, 5);
-    const sub = osc(b, 'sine');
-    this.oscs = [saw, sq, sub];
+    // The sub rides through the low-pass too (its cutoff stays above the fundamental). The layers
+    // now add in phase (they were 5 cents apart), so saw / square sit lower for the same loudness.
+    const tone = osc(b, 'sine');
+    tone.setPeriodicWave(mixWave(ctx, { saw: 0.33, square: 0.17, sine: 0.3 }));
+    this.oscs = [tone];
     this.lp = filter(ctx, { type: 'lowpass', frequency: 400, Q: 5 });
     this.amp = new GainNode(ctx, { gain: 0 });
-    saw.connect(new GainNode(ctx, { gain: 0.5 })).connect(this.lp);
-    sq.connect(new GainNode(ctx, { gain: 0.26 })).connect(this.lp);
-    sub.connect(new GainNode(ctx, { gain: 0.3 })).connect(this.amp);
-    this.lp.connect(this.amp).connect(b.input('bass'));
-    this.click = new NoiseVoice(b, [{ type: 'bandpass', frequency: 1250, Q: 1.6 }], b.input('bass'));
+    tone.connect(this.lp).connect(this.amp);
+    this.input = b.input('bass');
+    this.gate = b.gate(this.amp, this.input);
   }
 
   private pitch(t: number, f: number, slide: boolean): void {
@@ -48,13 +52,9 @@ export class SlapBass {
     }
   }
 
-  private transient(t: number, freq: number, level: number): void {
-    const bp = this.click.filters[0];
-    if (bp) {
-      holdAt(bp.frequency, t);
-      bp.frequency.setValueAtTime(freq, t);
-    }
-    this.click.hit(t, level, 0.0008, 0.012);
+  /** String noise: band-passed bursts rendered once (pop 2.7 kHz, thumb 1.4 kHz, dead note 0.9 kHz). */
+  private transient(t: number, kind: DrumSample, level: number): void {
+    playSample(this.b.ctx, kind, this.turn++, t, level, this.input);
   }
 
   note(t: number, n: BassNote): void {
@@ -62,7 +62,8 @@ export class SlapBass {
     this.pitch(t, f, n.slide);
     const bright = (n.pop ? 36 : n.accent ? 20 : 12) * (0.6 + 0.4 * n.vel);
     const start = Math.min(9500, f * bright);
-    const settle = Math.min(start, f * 3.6 + 280);
+    // Growl: the settled cutoff also lifts the 1 kHz string bite (no separate EQ stage).
+    const settle = Math.min(start, f * 4.4 + 420);
     const fr = this.lp.frequency;
     holdAt(fr, t);
     fr.setValueAtTime(start, t);
@@ -70,9 +71,9 @@ export class SlapBass {
     holdAt(this.lp.Q, t);
     this.lp.Q.setValueAtTime(n.pop ? 9 : 6, t);
     const level = 0.42 * n.vel * (n.accent ? 1.12 : 1) * (n.pop ? 1.08 : 1);
-    adsr(this.amp.gain, t, n.dur, level, 0.002, 0.24, 0.55, 0.045, true);
-    if (n.pop) this.transient(t, 2700, 0.3 * n.vel);
-    else if (n.accent) this.transient(t, 1400, 0.2 * n.vel);
+    this.gate.open(adsr(this.amp.gain, t, n.dur, level, 0.002, 0.24, 0.55, 0.045, true));
+    if (n.pop) this.transient(t, 'slapPop', 0.3 * n.vel);
+    else if (n.accent) this.transient(t, 'slapThumb', 0.2 * n.vel);
   }
 
   /** Muted ghost note: percussive "tk" with a hint of pitch. */
@@ -82,7 +83,7 @@ export class SlapBass {
     holdAt(fr, t);
     fr.setValueAtTime(1400, t);
     fr.exponentialRampToValueAtTime(300, t + 0.03);
-    perc(this.amp.gain, t, 0.2 * vel, 0.001, 0.035, true);
-    this.transient(t, 900, 0.1 * vel);
+    this.gate.open(perc(this.amp.gain, t, 0.2 * vel, 0.001, 0.035, true));
+    this.transient(t, 'slapDead', 0.1 * vel);
   }
 }

@@ -3,8 +3,11 @@
 // faster bike does not speed the field up) while rival bike differences are compressed; leaders ease off
 // from 40 m ahead; riders far behind (out of the chase camera) get a catch-up nudge (none for 12 s after
 // their own respawn, so a KO buys a real gap), and a hunter closing in from behind pedals freely. Riders only
-// exceed their own bike top through `rider.rubber` (a top-speed factor the sim multiplies in, no boost visuals),
-// raised only while they are out of the chase camera and eased back to 1 before they come into view.
+// exceed their own bike top through `rider.rubber` (a top-speed factor the sim multiplies in, no boost visuals):
+// out of the chase camera it carries the catch-up; in view it only lifts a slow bike (kidbike, shared) up to the
+// field's pace, never above it, so those riders race the pack instead of always finishing last. A fast bike gets a
+// rubber below 1 (its cap ÷ its top), so after a boost or a descent the sim's overspeed drag brings it back to the
+// cap instead of letting it coast for seconds above the field (runaway fixie leaders).
 import { BIKES } from '../../../data/bikes';
 import { clamp, smoothstep } from '../../../core/math';
 import type { RiderState } from '../../../core/types';
@@ -19,6 +22,7 @@ const UNSEEN_BEHIND = 20;             // m behind the player: behind the chase c
 const CATCH_FULL = 90;                // m behind where the catch-up is complete
 const SPRINT_BEHIND = 8;              // a hunter this far behind the player may sprint (unseen)
 const MAX_RUBBER = 0.35;              // max top-speed factor above the rider's own bike (kidbike → pace + 8 %)
+const MIN_RUBBER = 0.7;               // floor of the factor that holds a fast bike to its cap (fixie 22.5 → 15.8 m/s)
 const RUBBER_RATE = 0.1;              // 1/s: how fast rider.rubber moves (0.08 settles in under a second)
 
 export interface PaceInput {
@@ -34,10 +38,13 @@ export interface PaceInput {
   recovering: boolean;
 }
 
+/** A rival's base pace (m/s): the level reference plus its per-rider offset. */
+export const basePace = (level: number, offset: number): number => REF_TOP * (1 + 0.02 * (level - 1) + offset);
+
 /** Target top-speed cap (m/s, before mods/boosts) for an AI rider; Infinity = pedal freely. */
 export function paceCap(i: PaceInput): number {
   const { rider: r, player: p } = i;
-  const pace = REF_TOP * (1 + 0.02 * (i.level - 1) + i.offset);
+  const pace = basePace(i.level, i.offset);
   const d = r.s - p.s;
   if (d > 0) {
     const levelEase = Math.max(0.4, 1 - 0.15 * (i.level - 1));
@@ -52,11 +59,12 @@ export function paceCap(i: PaceInput): number {
 }
 
 /**
- * Ease `rider.rubber` toward what the cap needs above the rider's own bike top while it is unseen (1 when
- * in view or not racing). Statuses such as chill still slow the rider down: the sim multiplies both in.
+ * Ease `rider.rubber` toward cap ÷ own bike top: the whole cap while unseen, at most the base `pace` in view
+ * (1 when not racing). Statuses such as chill still slow the rider down: the sim multiplies both in.
  */
-export function easeRubber(r: RiderState, cap: number, unseen: boolean, dt: number): void {
-  const want = unseen && r.mode === 'racing' ? clamp(cap / Math.max(1, topOf(r)), 1, 1 + MAX_RUBBER) : 1;
+export function easeRubber(r: RiderState, cap: number, pace: number, unseen: boolean, dt: number): void {
+  const goal = unseen ? cap : Math.min(cap, pace);
+  const want = r.mode === 'racing' ? clamp(goal / Math.max(1, topOf(r)), MIN_RUBBER, 1 + MAX_RUBBER) : 1;
   const now = r.rubber > 0 ? r.rubber : 1;
   r.rubber = now + clamp(want - now, -RUBBER_RATE * dt, RUBBER_RATE * dt);
 }

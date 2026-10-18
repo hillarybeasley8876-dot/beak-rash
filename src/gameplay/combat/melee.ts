@@ -4,7 +4,7 @@ import { ROSTER } from '../../data/roster';
 import { WEAPONS } from '../../data/weapons';
 import type { Controls, RiderAction, RiderState, Side, WeaponId } from '../../core/types';
 import { consumeUse, knockLoose } from './armory';
-import { active, others, posing, targetable, type CombatCtx, type SwingTiming } from './ctx';
+import { active, nearest, posing, targetable, type CombatCtx, type SwingTiming } from './ctx';
 import { applyHit } from './damage';
 import { HEAVY_PHASES, HEAVY_TELL, INPUT_BUFFER, LIGHT_PHASES, MELEE, PRESS_HOLD, SWING_REF, powerMul } from './tuning';
 import { HeavyTell } from './visuals/tell';
@@ -82,8 +82,8 @@ export function startSwing(ctx: CombatCtx, r: RiderState, heavy: boolean, sideIn
 function autoSide(ctx: CombatCtx, r: RiderState): Side {
   const reach = WEAPONS[r.weapon].reach + MELEE.heavyAutoSideRange;
   const near =
-    others(ctx, r, (o, ds, dx) => targetable(ctx, o) && Math.abs(ds) < MELEE.maxDs + 0.6 && Math.abs(dx) <= reach)[0] ??
-    others(ctx, r, (o, ds, dx) => targetable(ctx, o) && Math.abs(ds) < 8 && Math.abs(dx) < 6)[0];
+    nearest(ctx, r, (o, ds, dx) => targetable(ctx, o) && Math.abs(ds) < MELEE.maxDs + 0.6 && Math.abs(dx) <= reach) ??
+    nearest(ctx, r, (o, ds, dx) => targetable(ctx, o) && Math.abs(ds) < 8 && Math.abs(dx) < 6);
   if (near) return near.x >= r.x ? 1 : -1;
   return r.x > 0 ? -1 : 1;
 }

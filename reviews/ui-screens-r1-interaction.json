@@ -1,0 +1,82 @@
+{
+  "unit": "ui-screens",
+  "round": 1,
+  "lens": "interaction",
+  "pass": false,
+  "score": 5.5,
+  "summary": "The keyboard path is in good shape. Every screen is reachable with arrows/WASD + Enter. Esc/Backspace backs out everywhere (menu goes to title, settings goes back to pause mid-race, pause resumes, results goes to menu, modals answer no). Focus is always visible and is remembered on menu/track select/garage/howto. Quick and career races start with the right config (track, mode, level, the bike bought in the garage). Pause/restart/quit keep the config. The first key or click unlocks audio (even a click on the boot splash). Layout holds at 1280x720, 1920x1080 and 2560x1600 (16:10 letterboxes with full-bleed backgrounds). I saw zero console errors across about 17 probes. The other input paths are not at that bar. Gamepad A/B and keyboard Space are dead in every confirm modal, so a pad player cannot buy a bike or confirm restart/quit. Mashing hop over the finish line skips the results screen and launches another track. A mouse double-click on pause > 设置 silently dumps you into the main menu with the race left half-alive. Clicking a settings option pill cycles to the next value instead of picking the one you clicked (clicking 中 sets 低). With reduced motion on, every transition flashes the red/black shards and then hard-cuts. Not yet commercial grade: 1 blocker, 4 majors.",
+  "issues": [
+    {
+      "severity": "blocker",
+      "title": "Confirm modals ignore gamepad A/B and keyboard Space (garage buy, pause restart/quit, reset save)",
+      "detail": "src/ui/confirm.ts handle() returns true for every action. The game action that shares the key arrives first: 'hop' for Space and pad A, 'attackR' for pad B. The modal consumes it as a no-op, so shell.onAction sets swallow and the sibling 'confirm'/'back' is dropped. Probes: probe4/probe16/probe3. Pause > 退出比赛 with 退出 focused: A does nothing, B does nothing, only START closes it (pad/25-quit-A.png, pad/26-quit-B.png). Garage buy with 买了 focused: A and B do nothing, so a pad player can never buy a bike (pad2/09-modal-A.png). Space on 买了/重来 does nothing either (modal/09-modal-space.png, modal/21-restart-space.png), although SPEC §10 lists Space as confirm. Only Enter and Esc work.",
+      "fix": "In Modal.handle consume only up/down/left/right/confirm/back/pause and return false for everything else ('hop', attacks, skills). Better: in UiShell.onAction, only set swallow when the consumed action is a menu action, or dispatch confirm/back/pause before the game actions bound to the same key. Add a pad + Space modal step to tools/ui-tour.mjs."
+    },
+    {
+      "severity": "major",
+      "title": "Results accept input on mount: mashing hop across the line skips results and starts the next track",
+      "detail": "probe7 'mash' presses Space every 180 ms while finishing on coast. Results came up at 7.2 s and 1.5 s later the game was already loading NEON NIGHT (results/1280x720-mash-after.png). On results, 'hop' goes unused and the following 'confirm' activates the default 下一站. The player never sees place, grade, coins or achievements, and a different track starts. The root cause is general: shell.show() sets mounting=false right after mount(), before wipe.reveal() finishes, so any screen takes confirm while still hidden under the shards.",
+      "fix": "In shell.show() keep confirm/back gated until reveal() resolves; directions can stay buffered. On results also ignore confirm for about 0.8-1.0 s after entered(), or until the RESULTS slam and coin count-up land, and require a fresh keydown/button-down made after the screen appeared."
+    },
+    {
+      "severity": "major",
+      "title": "Mouse clicks bypass the transition gate: double-click on pause > 设置 abandons the race",
+      "detail": "Nav's click handler calls activate() directly, so clicks skip the mounting/swallow guard that key presses get. Double-clicking 设置 on pause calls show('settings') twice. The second call sees from === 'settings', skips the wipe and mounts settings with ctx.from = 'settings', so settings.ts sets backTo = 'menu'. Esc then lands on the main menu with the old session still alive: clock scale 0, menu music muffled (probe15: 'screen=menu sess=racing scale=0 muffle=1 song=menu'). There is no way back to the race and no 退出比赛 confirmation (dbl/1280x720-14-dbl-settings.png, -15-settings-esc.png). Double-clicking a shop bike in the garage or 退出比赛 on pause opens the confirm modal, and the second click lands on the veil and cancels it straight away (dbl/1280x720-05).",
+      "fix": "Route Nav clicks through the shell (ignore while ui.busy) and disable the current screen's navs as soon as show() starts leaving. Make show(id) a no-op while a transition to the same id is in flight. In settings, derive backTo from ctx.session() !== null (back to pause), not from ctx.from. Ignore veil clicks for about 250 ms after a modal opens."
+    },
+    {
+      "severity": "major",
+      "title": "Settings: clicking an option pill or meter tick does not pick it; the row just cycles +1",
+      "detail": "Pills (低/中/高, 关/开, 完整/简短/关闭) and meter ticks have no click handlers. A click anywhere on the row runs NavItem.confirm = pick(i, +1). With 画质 on 高, clicking 中 gives 低 (wrap-around), and that wrong quality is applied silently on the next restart (mouse2/1280x720-12-quality-pill-mid-click.png). Clicking a volume tick adds 10 % wherever you click, and does nothing at 100. Mouse users must use the small ◀ ▶ arrows.",
+      "fix": "In settings-rows.ts give each pill a click handler that sets that option, and give each meter tick a click (or click-drag) that sets (i+1)/10. Stop propagation so the row's cycle-on-click only fires on the label. Keep Enter = cycle for keyboard."
+    },
+    {
+      "severity": "major",
+      "title": "prefers-reduced-motion: every transition flashes the red/black shards, then hard-cuts",
+      "detail": "In ShardWipe.reveal() the call halt('translateX(0)', '1') pins all six shards in the covering position, also in reduced mode. Only the black fade animates, so as it goes 1 to 0 the static red/black stripes fade in and then snap away. Timeline from probe8b: 181-322 ms shardL=-543 (covering) while fade 1.00 to 0.11, then a cut at 340 ms. Frozen frame: rm/r11-rm-reveal-frozen.png. That is a saturated full-screen flash on every screen change for exactly the users who asked for less motion. Related, in normal mode: in the 'covered' state the shards leave gaps, so roughly a third of the viewport shows the old screen being swapped for the new one (rm/normal-covered-frozen.png).",
+      "fix": "In transition.ts reveal(): halt(reducedMotion() ? 'translateX(-105%)' : 'translateX(0)', '1'), so shards stay parked off-screen in reduced mode. For normal mode, overlap the shards more (height + 8 % instead of + 3px, or a smaller jy) or fill the wipe box with ink while covered."
+    },
+    {
+      "severity": "minor",
+      "title": "A parked mouse pointer hijacks keyboard focus and remembered selections on screen mount",
+      "detail": "pointerenter fires for the item that appears under a stationary cursor. probe12: a keyboard player whose mouse rests mid-screen opens Quick Race on card 02 instead of 01. After choosing 03, backing out and re-entering, it opens on 02 again, so the remembered selection is lost and a quick Enter starts the wrong track. The same thing made settings open on 画质 in probe6.",
+      "fix": "In nav.ts take hover focus on pointermove only when the pointer has actually moved (store the last clientX/Y), or ignore pointerenter until the first real pointermove after the screen mounts."
+    },
+    {
+      "severity": "minor",
+      "title": "Locked items explain themselves only to keyboard/pad, not to mouse clicks",
+      "detail": "Clicking a locked career event or the disabled 下一站 only shakes and plays ui.back. The explanations ('先在上一站拿到前三名', '前三名才能解锁下一站') are wired only in onAction('confirm') (career.ts:78, results.ts:89), so mouse users get no reason (flow/1280x720-11-click-locked-next.png, mouse2/1280x720-24-career-locked-click.png: toasts []).",
+      "fix": "Add NavItem.onDenied() and call it from Nav.activate() for disabled items, used by both the click and confirm paths. Move the two toasts there."
+    },
+    {
+      "severity": "minor",
+      "title": "Button-looking CTAs do nothing on click and keep keyboard glyphs in gamepad mode",
+      "detail": "The career detail 'ENTER 出发！' (.br-car-dgo) and the garage action box 'ENTER 购买 / ENTER 装备' (.br-gar-action) look like the primary button, but clicking them does nothing (probe17). With a pad they still say ENTER while the hint bar correctly switches to A. The pause controls sheet (pause.ts CONTROLS) and the howto skill cards show only keyboard keys in pad mode (pad/25-quit-A.png).",
+      "fix": "Make both CTAs clickable (call nav.activate() for the focused item) and render their key glyph with the same .is-kb/.is-pad kbd pair the hint bar uses. Give the pause sheet and skill cards a pad variant (LB/RB/X/Y/d-pad) shown under .is-pad."
+    },
+    {
+      "severity": "minor",
+      "title": "Selection memory gaps: pause after settings, settings itself, career results",
+      "detail": "Backing out of settings to pause lands on 继续 instead of 设置 (v2/race-1280x720/16-back-to-pause.png). Settings always reopens on 主音量 (kb2 log), unlike menu, track select, garage and howto, which recall. After a career race, both Esc and 主菜单 on results drop to the main menu; there is no route back to the career ladder where the newly unlocked event is.",
+      "fix": "Use recall/remember('settings'). In pause.ts start the Nav at index 2 when ctx.from === 'settings'. For career races, send Esc/主菜单 to 'career' (or add a 巡回赛 button), focused on the next event."
+    },
+    {
+      "severity": "minor",
+      "title": "Overlaps and an unexpandable '+N MORE' on results/garage",
+      "detail": "The '新纪录 NEW BEST!' tag covers the 击倒 / 小鱼干 column headers, and it celebrates an 8th-place first finish (flow/1280x720-11-click-locked-next.png). Garage toasts cover the first row of the bike list (kb1-1280x720-09-garage-bought.png). The results '+N MORE' achievement chip cannot be focused or opened, and there is no achievements list anywhere, so those unlocks can never be read (overflow/2560x1600-results-demo.png).",
+      "fix": "Place NEW BEST beside the RESULTS sub-tag or in the player's row, and only for a real improvement (label a first finish 首次完赛). Move toasts below the coin badge, clear of lists. Make '+N MORE' a nav item that expands the full list (or add an achievements page under HOW TO / CREDITS)."
+    },
+    {
+      "severity": "minor",
+      "title": "Gamepad-only players never get audio",
+      "detail": "shell.ts listenForGesture() unlocks only on keydown/pointerdown. probe16 drives title > menu > garage > buy modal with the pad only, and the AudioContext stays 'suspended' with live=false the whole time. Even where autoplay is allowed (the Electron desktop build, or test flags), unlock() is never attempted, and nothing tells the player why the game is silent.",
+      "fix": "Also call app.audio.unlock() on the first input.onAction while lastDevice === 'gamepad'. If the context is still suspended, show a small '点击或按任意键开启声音 / CLICK FOR SOUND' chip on title/menu."
+    },
+    {
+      "severity": "minor",
+      "title": "cross-unit: gamepad triggers move menu focus and the left stick cannot move left/right",
+      "detail": "core input.ts PADMAP maps LT/RT to down/up, so resting a finger on a trigger moves menu focus (pad/03-menu-RT.png, pad/04-menu-LT.png). pollPad maps only axes[1], so horizontal lists (track cards, howto tabs, results buttons, modal yes/no) work with the d-pad only. Held directions never auto-repeat (Input drops e.repeat).",
+      "fix": "Core: add stick X to left/right edges with a deadzone and repeat, and keep triggers out of menu up/down. Until then ui-screens could synthesize left/right from axes[0] in UiShell.update() for menu screens, and add its own hold-to-repeat for directions."
+    }
+  ]
+}

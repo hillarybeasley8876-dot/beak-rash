@@ -64,17 +64,22 @@ export const MOUNTAIN: LayoutDef = {
         { kind: 'stands', at: 8, x: -1, data: { len: 110 } },
         { kind: 'stands', at: 8, x: 1, data: { len: 110 } },
         { kind: 'lanterns', at: 20, x: 0, data: { len: 130, every: 22 } },
+        { kind: 'signLimit', at: 150, x: 1 },
       ],
     },
     {
       len: 140, name: 'village', radius: 500, rise: 2.5, ease: 50, left: lakeL, right: houseR,
       features: [{ kind: 'pickupRow', at: 70, len: 15, x0: -3.5, x1: 1.5, data: { kind: 'coin' } }],
-      marks: [{ kind: 'houses', at: 0, x: 1, data: { len: 140 } }, { kind: 'lanterns', at: 10, x: 0, data: { len: 120, every: 30 } }],
+      marks: [
+        { kind: 'houses', at: 0, x: 1, data: { len: 140 } },
+        { kind: 'lanterns', at: 10, x: 0, data: { len: 120, every: 30 } },
+        { kind: 'signPelican', at: 125, x: 1 },
+      ],
     },
     {
       len: 200, name: 'pines', radius: -300, rise: 14, bank: -3, ease: 60, left: forestDown, right: forestUp,
       features: [{ kind: 'pickupRow', at: 110, len: 12, x0: 3, x1: 3, data: { kind: 'crate' } }],
-      marks: [{ kind: 'teaTerraces', at: 20, x: 1, data: { len: 170 } }, { kind: 'hotSpring', at: 150, x: -1 }],
+      marks: [{ kind: 'teaTerraces', at: 20, x: 1, data: { len: 170 } }],
     },
     {
       len: 130, name: 'pines', rise: 9, ease: 50,
@@ -147,13 +152,17 @@ export const MOUNTAIN: LayoutDef = {
     {
       len: 130, name: 'bridge', sideEase: 2, left: gorgeL, right: gorgeR,
       features: [{ kind: 'pickupRow', at: 50, len: 15, x0: 0, x1: 0, data: { kind: 'fish' } }],
-      marks: [{ kind: 'gorgeBridge', at: 0, x: 0, data: { len: 130 } }, { kind: 'waterfall', at: 70, x: -1 }],
+      marks: [{ kind: 'gorgeBridge', at: 0, x: 0, data: { len: 130 } }, { kind: 'waterfall', at: 130, x: -36, data: { w: 18 } }],
     },
     { len: 36, name: 'bridgeExit', sideEase: 2, left: ridgeUp, right: ridgeDown },
     {
       len: 160, name: 'summit', radius: 260, rise: 13, bank: 4, ease: 60, left: summitL, right: summitR, sideEase: 30,
       features: [{ kind: 'pickupRow', at: 70, len: 15, x0: 3, x1: -1, data: { kind: 'can' } }],
-      marks: [{ kind: 'warnCrest', at: 130, x: 1 }, { kind: 'prayerFlags', at: 20, x: 1, data: { len: 140 } }],
+      marks: [
+        { kind: 'warnCrest', at: 130, x: 1 },
+        { kind: 'signScenic', at: 95, x: 1 },
+        { kind: 'prayerFlags', at: 20, x: 1, data: { len: 140 } },
+      ],
     },
     { len: 60, name: 'crest', rise: 6, vEase: 24 },
     {
@@ -168,7 +177,7 @@ export const MOUNTAIN: LayoutDef = {
         { kind: 'pickupRow', at: 120, len: 12, x0: -3, x1: -3, data: { kind: 'crate' } },
         { kind: 'oil', at: 200, len: 8, x0: -4.6, x1: -1.4 },
       ],
-      marks: [{ kind: 'signChicane', at: 200, x: 1 }],
+      marks: [{ kind: 'signDownhill', at: 30, x: 1 }, { kind: 'signChicane', at: 200, x: 1 }],
     },
     {
       len: 50, name: 'chicane', radius: -45, rise: -7, bank: -6, ease: 30,
@@ -199,7 +208,10 @@ export const MOUNTAIN: LayoutDef = {
         { kind: 'boostPad', at: 140, len: 6, x0: -1.7, x1: 1.7, data: { power: 0.3, time: 1 } },
         { kind: 'pickupRow', at: 190, len: 15, x0: -3, x1: -3, data: { kind: 'crate' } },
       ],
-      marks: [{ kind: 'lanterns', at: 120, x: 0, data: { len: 120, every: 40 } }],
+      marks: [
+        { kind: 'hotSpring', at: 70, x: -1 },
+        { kind: 'lanterns', at: 120, x: 0, data: { len: 120, every: 40, style: 'posts' } },
+      ],
     },
     {
       len: 160, name: 'finish', left: finishL, right: finishR,

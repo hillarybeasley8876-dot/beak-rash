@@ -97,7 +97,7 @@ export function billboard(text: string, where: string): HTMLElement {
 
 /** Poster billboard like world artBillboard(): 512×288 art, the line on a tilted red/black band on top. */
 export function posterBillboard(text: string, where: string, art: HTMLImageElement | null): HTMLElement {
-  const w = 512, ht = 288, band = ht * 0.3;
+  const w = 512, ht = 288, band = ht * 0.38;   // world/scenery/signs/faces.ts bandH
   const [c, g] = canvas(w, ht, 0.82);
   const rng = new Rng(hashString(text));
   if (art) {

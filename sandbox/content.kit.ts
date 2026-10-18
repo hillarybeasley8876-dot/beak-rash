@@ -75,6 +75,14 @@ export const noOrphan = (el: HTMLElement, min = 2) => (): string | null => {
   return n < min ? `last line holds ${n} glyph (min ${min})` : null;
 };
 
+/** A wrapped block keeps at least `frac` of its letters on the last line (no lone 'bicycle' under a full line). */
+export const balanced = (el: HTMLElement, frac = 0.3) => (): string | null => {
+  if (lineCount(el) < 2) return null;
+  const total = Array.from(el.textContent ?? '').filter((ch) => /[\p{L}\p{N}]/u.test(ch)).length;
+  const n = lastLineGlyphs(el);
+  return n < frac * total ? `last line holds ${n} of ${total} letters (min ${Math.round(frac * 100)} %)` : null;
+};
+
 export const maxWidth = (el: HTMLElement, px: number) => (): string | null => {
   const w = el.getBoundingClientRect().width;
   return w > px + 0.5 ? `${Math.round(w)} px wide (max ${px})` : null;

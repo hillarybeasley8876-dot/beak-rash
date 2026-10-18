@@ -10,7 +10,10 @@ import { box, cylinder, sphere, trs } from '../../kit/shapes';
 const C = (h: string): Color => new Color(h);
 const POLE = C('#2a2c36'), STEEL = C('#8a93a3'), HOUSING = C('#16171d'), GLASS = C('#9fd6ff');
 const RED = new Color(1, 0.12, 0.08), AMBER = new Color(1, 0.6, 0.05), GREEN = new Color(0.1, 1, 0.55);
-const BLOSSOM = [C('#ff9ccf'), C('#ffb8dc'), C('#ff7fbf')], GINKGO = [C('#ffd23a'), C('#ffc21f'), C('#f2b318')];
+// Canopies are pushed past 1.0 (lamp-lit look): toon-shaded under moonlight they still read pink / gold.
+const BLOSSOM = [C('#ff8cc8'), C('#ffa8d8'), C('#ff6fb8')].map((c) => c.multiplyScalar(2.3));
+const GINKGO = [C('#ffd400'), C('#ffbf00'), C('#ffe23a')].map((c) => c.multiplyScalar(2.3));
+const FAIRY = new Color(2.4, 2.0, 1.4);
 const PLANTER = C('#4c4a55'), BARK = C('#4a3326');
 const m = new Matrix4(), m2 = new Matrix4();
 
@@ -81,15 +84,22 @@ export function vending(props: MeshBuf, glow: MeshBuf, x: number, y: number, z: 
   box(props, new Matrix4().multiplyMatrices(base, trs(0.36, 1.1, -0.02, 0, 0.14, 0.3, 0.04, m)), HOUSING);
 }
 
-/** Planter box with a cherry (pink) or ginkgo (yellow) tree. */
-export function planterTree(props: MeshBuf, x: number, y: number, z: number, rng: Rng, kind: 'cherry' | 'ginkgo'): void {
+/** Planter box with a cherry (pink) or ginkgo (yellow) tree; fairy lights go into `glow`. */
+export function planterTree(props: MeshBuf, glow: MeshBuf, x: number, y: number, z: number, rng: Rng, kind: 'cherry' | 'ginkgo'): void {
   box(props, trs(x, y + 0.3, z, rng.range(0, 3), 1.6, 0.6, 1.6, m), PLANTER);
   const h = rng.range(2.6, 3.4);
   cylinder(props, trs(x, y + 0.5, z, 0, 0.13, h, 0.13, m), BARK, 6, 1, 0.7);
   const pal = kind === 'cherry' ? BLOSSOM : GINKGO;
   for (let i = 0; i < 4; i++) {
     const r = rng.range(0.8, 1.2);
-    sphere(props, trs(x + rng.range(-0.7, 0.7), y + 0.5 + h + rng.range(-0.2, 0.6), z + rng.range(-0.7, 0.7), 0, r, r * 0.8, r, m), rng.pick(pal), 7, 5);
+    const cx = x + rng.range(-0.7, 0.7), cy = y + 0.5 + h + rng.range(-0.2, 0.6), cz = z + rng.range(-0.7, 0.7);
+    sphere(props, trs(cx, cy, cz, 0, r, r * 0.8, r, m), rng.pick(pal), 7, 5);
+    // Fairy lights on the canopy surface.
+    for (let k = 0; k < 4; k++) {
+      const a = rng.range(0, Math.PI * 2), e = rng.range(-0.5, 0.9);
+      const lx = cx + Math.cos(a) * Math.cos(e) * r * 1.02, ly = cy + Math.sin(e) * r * 0.82, lz = cz + Math.sin(a) * Math.cos(e) * r * 1.02;
+      box(glow, trs(lx, ly, lz, a, 0.07, 0.07, 0.07, m), FAIRY);
+    }
   }
 }
 

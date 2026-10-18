@@ -28,7 +28,7 @@ export const TUNING = {
   airControl: 0.35,       // steering authority in the air
   airTauMul: 3,           // lateral time constant multiplier in the air
   knockTime: 0.22,        // s carry window after a lateral impulse / hard bump: the shove reads on screen …
-  knockSteer: 0.1,        // … steering back toward the hitter ×this (steering away keeps full authority) …
+  knockSteer: 0.05,       // … steering back toward the hitter ×this (steering away keeps full authority) …
   knockTau: 0.3,          // … and the grip lag is at least this (≈ 0.19 s × knock m/s of travel: 9 → 1.7 m)
   knockMin: 0.5,          // m/s lateral impulse below which no carry window opens
   leanLambda: 12,         // 1/s smoothing of the visual lean
@@ -146,6 +146,7 @@ export const TUNING = {
   contactDx: 0.75,
   contactRestitution: 0.8, // side impacts above bumpBounceMin (1 = full lateral velocity swap)
   bumpBounceMin: 1.5,     // m/s closing; gentler side contact is an inelastic shove (no jitter)
+  bumpSteer: 0.3,         // side bounce carry: steering back toward the other rider ×this (knocks use knockSteer)
   rearRestitution: 0.3,
   contactMaxFix: 0.04,    // m positional correction per substep (≈ 4.8 m/s): push, never teleport
   bumpMin: 1.0,           // m/s strength before rider:bump fires (gentle shoulder pressing stays quiet)
@@ -172,7 +173,11 @@ export const TUNING = {
   crashSpin: [4, 9],
   crashBodyHeight: 1.0,   // m: the tumbling body starts about here (actors' spine bone) …
   crashVaultGravity: 15,  // … and falls with the actors' tumble gravity, so a vehicle crash launches it at
-  crashVaultMargin: 0.45, // ≥ √(2g·(roof + margin − start)) and it clears the roof instead of tunnelling
+  crashVaultMargin: 0.45, // ≥ √(2g·(roof + margin − start)) and it clears the roof instead of tunnelling …
+  crashVaultMaxHeight: 1.9, // … only for obstacles up to this tall (cars, pickups, props) …
+  crashVaultClear: 0.8,   // … flying forward fast enough to pass their far end (+ this m) before it drops to roof height
+  crashBounceBack: 1.5,   // taller ones (vans, trucks, buses) bounce the body back off them at this m/s …
+  crashBounceK: 0.05,     // … + this × the closing speed, never faster forward than the vehicle (it brakes ahead)
   crashSlideDecel: 7,
   crashedTime: 2.6,
   respawnTime: 0.6,

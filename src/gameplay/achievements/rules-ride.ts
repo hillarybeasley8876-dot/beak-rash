@@ -3,6 +3,9 @@ import type { RuleCtx } from './facts';
 
 const PERFECT_LANDINGS = 3;
 const NEAR_MISSES = 5;
+/** 蹭饭达人: a slingshot only counts when it turns into an overtake this soon, and it takes a few of them. */
+const SLINGSHOT_PASS_WINDOW = 2;
+const SLINGSHOT_PASSES = 3;
 /** Launch boosts: a perfect start gives clearly more power than a plain one (race flow: 0.30 vs 0.18). */
 const PERFECT_LAUNCH_POWER = 0.25;
 
@@ -20,10 +23,16 @@ export function rideRules(ctx: RuleCtx): Array<() => void> {
     }),
     bus.on('rider:boost', ({ riderId, kind, power }) => {
       if (!ctx.isPlayer(riderId)) return;
-      if (kind === 'draft') ctx.unlock('slingshot');
+      if (kind === 'draft') facts.slingshotAt = ctx.now();
       // Launch boosts arrive just before race:start (older race builds tag them 'pad').
       const launch = kind === 'launch' || (kind === 'pad' && !facts.started);
       if (launch && power >= PERFECT_LAUNCH_POWER) ctx.unlock('perfect_start');
+    }),
+    bus.on('race:placeChange', ({ riderId, from, to }) => {
+      if (!ctx.isPlayer(riderId) || to >= from || ctx.now() - facts.slingshotAt > SLINGSHOT_PASS_WINDOW) return;
+      facts.slingshotAt = -Infinity;   // one slingshot, one credit (however many riders it passes)
+      facts.slingshotPasses += 1;
+      if (facts.slingshotPasses >= SLINGSHOT_PASSES) ctx.unlock('slingshot');
     }),
     bus.on('rider:nearMiss', ({ riderId }) => {
       if (!ctx.isPlayer(riderId)) return;
@@ -52,9 +61,9 @@ export function rideRules(ctx: RuleCtx): Array<() => void> {
         return;
       }
       if (!facts.chase.active) return;
-      // Outrun = the corgi gave up while you were still racing and had not been ticketed this chase.
-      const escaped = !facts.chase.busted && player.finishTime === null
-        && (reason === undefined ? player.mode === 'racing' : reason === 'lost');
+      // Outrun = race/police.ts reports 'lost' while you were still racing and unticketed this chase. A level 0
+      // without a reason is the corgi letting a calm rider go (or a teardown), never an escape.
+      const escaped = reason === 'lost' && !facts.chase.busted && player.finishTime === null;
       if (escaped) ctx.unlock('corgi');
       facts.chase.active = false;
     }),

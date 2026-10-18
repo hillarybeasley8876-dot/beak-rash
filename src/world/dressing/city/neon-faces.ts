@@ -13,7 +13,7 @@ const BOARD = '#0d0a16';
 const LIGHTBOX = ['#e5191c', '#ffe600', '#1f6fe0', '#13a36f', '#ff7a1a', '#f4f1ea'] as const;
 
 /** Glowing tube text: coloured halo, coloured body, pale hot core. */
-function tube(g: G, text: string, x: number, y: number, size: number, color: string, font: string, weight = 400): void {
+export function tube(g: G, text: string, x: number, y: number, size: number, color: string, font: string, weight = 400): void {
   g.save();
   g.textAlign = 'center';
   g.textBaseline = 'middle';
@@ -32,7 +32,7 @@ function tube(g: G, text: string, x: number, y: number, size: number, color: str
 }
 
 /** Neon outline tube around a rectangle. */
-function frameTube(g: G, x: number, y: number, w: number, h: number, color: string, lw: number): void {
+export function frameTube(g: G, x: number, y: number, w: number, h: number, color: string, lw: number): void {
   g.save();
   g.strokeStyle = color;
   g.lineWidth = lw;
@@ -47,7 +47,7 @@ function frameTube(g: G, x: number, y: number, w: number, h: number, color: stri
 }
 
 /** Fits a font size so `text` spans at most `maxW` px. */
-function fit(g: G, text: string, font: string, size: number, maxW: number, weight = 400): number {
+export function fit(g: G, text: string, font: string, size: number, maxW: number, weight = 400): number {
   g.font = `${weight} ${Math.round(size)}px ${font}`;
   const w = g.measureText(text).width;
   return w > maxW ? size * (maxW / w) : size;

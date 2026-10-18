@@ -42,8 +42,10 @@ const POSES: Record<string, Pose> = {
   lowhp: (p) => Object.assign(p, { hp: Math.round(p.maxHp * 0.18) }),
   spfull: (p) => Object.assign(p, { sp: 100 }),
   cooldowns: (p) => Object.assign(p, { cooldowns: [3.4, 7.6, 0.4] }),
-  weapon: (p) => Object.assign(p, { weapon: 'saltfish' as WeaponId }),
-  slipper: (p) => Object.assign(p, { weapon: 'slipper' as WeaponId }),
+  weapon: (p) => Object.assign(p, { weapon: 'saltfish' as WeaponId, weaponUses: 5 }),
+  slipper: (p) => Object.assign(p, { weapon: 'slipper' as WeaponId, weaponUses: 1 }),
+  /** A weapon whose wear combat never reported: the slot shows '?'. */
+  weaponUnknown: (p) => Object.assign(p, { weapon: 'pan' as WeaponId, weaponUses: Infinity }),
   rich: (p) => Object.assign(p, { kos: 3, coins: 420 }),
 };
 
@@ -95,9 +97,11 @@ export function installDriver(game: Game, hooks: HudHooks): void {
     driftEnd: () => bus.emit('rider:drift', { riderId: sess().player.id, phase: 'end', level: 0 }),
     nearMiss: () => bus.emit('rider:nearMiss', { riderId: sess().player.id, kind: 'traffic' }),
     slingshot: () => bus.emit('rider:boost', { riderId: sess().player.id, kind: 'draft', power: 0.15, time: 0.8 }),
+    launch: (o) => bus.emit('rider:boost', { riderId: sess().player.id, kind: 'launch', power: Number(o.power ?? 0.3), time: 1.1 }),
     combo: (o) => bus.emit('combat:combo', { riderId: sess().player.id, count: Number(o.count ?? 3) }),
     placeChange: (o) => bus.emit('race:placeChange', { riderId: sess().player.id, from: Number(o.from ?? 4), to: Number(o.to ?? 3) }),
     finalStretch: () => bus.emit('race:finalStretch', { riderId: sess().player.id }),
+    achievement: (o) => bus.emit('achievement:unlock', { id: String(o.id ?? 'first_ko') }),
     taunt: (o) => {
       const r = o.id !== undefined ? sess().rider(Number(o.id)) ?? nearestRival() : nearestRival();
       bus.emit('taunt', { riderId: r.id, text: String(o.text ?? ROSTER[r.character].taunts[0] ?? '…'), character: r.character });
@@ -111,8 +115,20 @@ export function installDriver(game: Game, hooks: HudHooks): void {
         heavy: Boolean(o.heavy), crit: Boolean(o.crit), blocked: Boolean(o.blocked), pos: posOf(victim), skillId: null,
       });
     },
+    incoming: (o) => {
+      const s = sess();
+      const r = o.owner !== undefined ? s.rider(Number(o.owner)) ?? nearestRival() : nearestRival();
+      bus.emit('projectile:spawn', { id: Number(o.id ?? 1), owner: r.id, target: s.player.id, kind: String(o.kind ?? 'pelican.torpedo'), pos: posOf(r) });
+    },
+    projEnd: (o) => bus.emit('projectile:end', { id: Number(o.id ?? 1), hit: null, pos: posOf(sess().player) }),
     denied: (o) => bus.emit('skill:denied', { riderId: sess().player.id, slot: Number(o.slot ?? 1), reason: (String(o.reason ?? 'cooldown')) as 'cooldown' }),
-    pick: (o) => bus.emit('combat:weaponPick', { riderId: sess().player.id, weapon: String(o.weapon ?? 'saltfish') as WeaponId, stolenFrom: null }),
+    pick: (o) => {
+      // Like combat's equip(): the weapon arrives with its remaining uses, then the pick event fires.
+      const p = sess().player;
+      const weapon = String(o.weapon ?? 'saltfish') as WeaponId;
+      Object.assign(p, { weapon, weaponUses: Number(o.uses ?? 3) });
+      bus.emit('combat:weaponPick', { riderId: p.id, weapon, stolenFrom: null });
+    },
   };
 
   window.__hud = {

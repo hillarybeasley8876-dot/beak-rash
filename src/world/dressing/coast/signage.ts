@@ -97,16 +97,26 @@ function signAt(d: Dress, s: number, side: -1 | 1, rect: AtlasRect | null, w: nu
   postSign(d.b.props.at(sp.pos.x, sp.pos.z), d.b.faces.at(sp.pos.x, sp.pos.z), sp.pos.x, y, sp.pos.z, towardRiders(d, s, sp.side, 0.25), w, h, lift, rect, mirror);
 }
 
-export function roadSigns(d: Dress): void {
+/** Sharp-bend caption (content's ROAD_SIGNS has one; the first six entries are positional). */
+const SHARP = ROAD_SIGNS.find((t) => t.startsWith('急弯')) ?? '急弯 别急';
+
+/** Road sign placed by a layout mark { kind: 'sign', data: { sign } } so signs follow the corners. */
+export function roadSign(d: Dress, s: number, side: -1 | 1, sign: string): void {
   const { atlas } = d;
   const [limit, fish, pelican, laneR, laneL, curves] = ROAD_SIGNS;
-  signAt(d, 175, 1, roundSignFace(atlas, '限速', (limit ?? '限速：随缘').split('：')[1] ?? '随缘'), 1.4, 1.4);
-  signAt(d, 1145, 1, warnFace(atlas, '鱼', fish ?? '注意落鱼'), 1.3, 1.5);
-  signAt(d, 410, 1, warnFace(atlas, '鹕', pelican ?? '鹈鹕出没'), 1.3, 1.5);
-  signAt(d, 930, 1, roadSignFace(atlas, curves ?? '前方连续弯道'), 2.6, 1.6);
-  signAt(d, 2640, 1, roadSignFace(atlas, laneR ?? '内卷车道 →'), 2.4, 1.5);
-  signAt(d, 2640, -1, roadSignFace(atlas, laneL ?? '← 躺平车道'), 2.4, 1.5);
-  signAt(d, 1395, 1, roadSignFace(atlas, '鹈鹕湾灯塔 ←'), 2.4, 1.5);
+  switch (sign) {
+    case 'limit': signAt(d, s, side, roundSignFace(atlas, '限速', (limit ?? '限速：随缘').split('：')[1] ?? '随缘'), 1.4, 1.4); break;
+    case 'fish': signAt(d, s, side, warnFace(atlas, '鱼', fish ?? '注意落鱼'), 1.3, 1.5); break;
+    case 'pelican': signAt(d, s, side, warnFace(atlas, '鹕', pelican ?? '鹈鹕出没'), 1.3, 1.5); break;
+    case 'curves': signAt(d, s, side, roadSignFace(atlas, curves ?? '连续弯道 弯弯有鹅'), 2.6, 1.6); break;
+    case 'sharp': signAt(d, s, side, warnFace(atlas, '弯', SHARP), 1.3, 1.5); break;
+    case 'lighthouse': signAt(d, s, side, roadSignFace(atlas, '鹈鹕湾灯塔 ←'), 2.4, 1.5); break;
+    case 'lanes':
+      signAt(d, s, 1, roadSignFace(atlas, laneR ?? '内卷车道 →'), 2.4, 1.5);
+      signAt(d, s, -1, roadSignFace(atlas, laneL ?? '← 躺平车道'), 2.4, 1.5);
+      break;
+    default: console.warn('[track] unknown road sign', sign);
+  }
 }
 
 /** Warnings tied to layout marks (crest, ramp). */
