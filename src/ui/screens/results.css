@@ -9,6 +9,9 @@
    (unlock + best + sub) pack tighter so the top one stays inside the stage under the -5° title tilt. */
 .br-res-unlock { font-size: 30px; color: var(--red); rotate: 2deg; box-shadow: 6px 6px 0 var(--red); animation: br-pop 0.3s var(--ease-slam) 1.5s both; }
 .br-res-tags.is-three { gap: 6px; margin-bottom: 18px; }
+/* Cup / career clear: the headline of the result, a red slab with a white offset and an ink outline. */
+.br-res-tags.has-clear { margin-bottom: 4px; }
+.br-res-clear { font-size: 36px; color: var(--white); rotate: -3deg; padding-inline: 18px 22px; box-shadow: 8px 8px 0 var(--white), 0 0 0 4px var(--ink); }
 .br-res-tags.is-three .br-tag { font-size: 26px; }
 .br-scr-results .br-stage.is-thump { animation: br-shake 0.26s var(--ease-out); }
 

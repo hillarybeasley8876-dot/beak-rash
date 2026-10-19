@@ -1,0 +1,18 @@
+/* First-race control prompts (hints.ts): one key chip at the bottom centre, between the speedometer and the
+   battle cluster, under the rider. Device glyphs via glyphs.ts (.kg-kb / .kg-pad). */
+.brh-corner.bc { left: 50%; bottom: calc(var(--k) * 18px); width: 0; height: 0; transform-origin: 0 100%; }
+.ht { position: absolute; left: 0; bottom: 0; transform-origin: 50% 100%; visibility: hidden; }
+.ht-card {
+  display: flex; align-items: center; gap: 20px; padding: 9px 26px 7px 18px; background: var(--ink); color: var(--paper);
+  white-space: nowrap; transform: skewX(-12deg); box-shadow: 0 0 0 4px var(--paper), 9px 9px 0 4px var(--red);
+}
+.ht-head { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding-right: 18px; border-right: 4px solid var(--red); }
+.ht-head b { font: 400 30px/0.9 "Bangers", sans-serif; letter-spacing: 2px; color: var(--hot); }
+.ht-head i { font: 400 18px/1 "ZCOOL QingKe HuangYou", sans-serif; font-style: normal; color: var(--paper); }
+.ht-part { display: flex; align-items: center; gap: 10px; }
+.ht-key {
+  min-width: 48px; padding: 6px 11px 3px; text-align: center; background: var(--paper); color: var(--ink);
+  font: 400 30px/1 "Anton", sans-serif; box-shadow: 0 0 0 3px var(--ink), 4px 4px 0 3px var(--red);
+}
+.ht-lbl { font: 400 32px/1 "ZCOOL QingKe HuangYou", sans-serif; }
+.ht-pre { font: 400 26px/1 "ZCOOL QingKe HuangYou", sans-serif; color: #c9c9cf; }

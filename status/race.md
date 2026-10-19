@@ -6,9 +6,9 @@
 - flow.ts                  intro (3.6 s, skippable with Enter / `?intro=0`) → countdown 3-2-1-GO →
                            launch boost (throttle held on GO; fresh press during "1" = PERFECT START) →
                            player finish (+3 s FINISH beat) or winner + 60 s (DNF) → race:end once
-- intro-camera.ts          rig.override swoop: high in front of the grid → low along the left flank →
-                           lands exactly on the chase pose behind the player (blend 0.35 s)
-- grid.ts                  re-grid: strongest rivals in front, player mid-pack (slot 5), staggered rows
+- intro-camera.ts          rig.override: high in front of the grid → dolly down the middle presenting each rival
+                           (eased stop, 3/4 front, HUD card follows) → crane onto the chase pose (blend 0.35 s)
+- grid.ts                  re-grid by rating + today's form, player mid-pack (slot 4), staggered two-wide grid
 - standings.ts             progress, places with 0.35 m hysteresis, placeChange / finishLine / finalStretch
 - results.ts               RaceResult rows, coins = place bonus + rider.coins (KO/pickups − fines),
                            projected times for riders still racing when the player finishes, saveStats()
@@ -24,7 +24,9 @@
                            + pelican kit for autopilot), personality (species temperament + stats + level),
                            taunts (one line at a time across the field, per-rider no-repeat bags, KO/respawn/
                            skill lines), pace (level pace, leader ease, unseen catch-up, rider.rubber),
-                           brain (per rider), index (director: pace offsets, hunt token, grudges, bell)
+                           brain (per rider), index (director: pace offsets, hunt token, grudges, bell,
+                           blunder gate), form (today's form per race + favourite + handling handicap),
+                           blunder (one in-view traffic blunder per race)
 - traffic/                 types (7 vehicles), kit/models-cars/models-trucks/models (merged vertex-colour
                            toon geometry), decals (canvas atlas: 鹈鹕海鲜, 冰淇淋, 1路 鹈鹕湾, bus meme ad),
                            render (InstancedMesh per type: paint (instance colour) + trim + decal + outline
@@ -33,8 +35,8 @@
                            spawner (40–400 m ahead / 60 m behind, not before s 190 or on the finish run,
                            never inside riders), index (manager, session.obstacles, traffic:honk)
 - police.ts, police-heat.ts, police-view.ts   heat model, corgi chase (sprint 25.5 → 22 m/s), whistle
-                           (slow 1 s), BUSTED (2 s alongside while slow/crashed: fine 100, +4 s, 2.2 s
-                           ticket stop), give-up when outrun; corgi = actors RiderView + red/blue beacon
+                           (slow 1 s), BUSTED (2 s alongside while < 60 % top / wrecked / respawning: fine 100,
+                           4 s ticket stop), 'lost' only with a 60 m lead, else let-go; corgi = RiderView + beacon
 
 ## Done
 - Everything above, verified on the full game (real world/sim/camera/combat/actors/fx/ui) and on stubs.
@@ -281,3 +283,81 @@ toast → 1 predictable podium (form dice, purposeful speed skills, podium regre
 - Other units' requests: env-city late finishers (done above), content req 10 chase line (done above); ui-hud's optional
   race:introFocus / police:busted.hold need core event changes (not requested by core; HUD works without them).
 Fix round 3 complete.
+
+## Acceptance round 1
+Plan (reviews/game-r1-*.json, owner race: 3 issues). Order: A podium (feel major) → B traffic/police bite (feel minor) →
+C intro close-up (aesthetic minor) → suite (scenarios + soak + podium) → tsc. Status per issue (DONE lines as each lands):
+- [A podium, feel major] DONE. Baseline (critic's bot, shots/race/a1/fair.mjs = shots/accept/r1-feel/bot.mjs passive, seeds 1-3 ×
+  coast/city/mountain): pigeon 6/9 wins, podium 9/9, goose 0 podiums (reproduced exactly). Changes: new ai/form.ts (today's form per
+  race, salted with the track id so a seed on another track is another day: pace −1..1 → offset ±3.5 %, drive −1..1; one favourite
+  drawn uniformly from the field with pace .7–1 / drive .3–1; handling handicap +0.05 × (1 − rider handling): erba/tandem a little
+  more straight-line pace, kidbike less); personality.ts: skill = 0.68 + 0.3 × (species − 0.68) + 0.05·lv + 0.15·drive, corner
+  risk 0.81 ± 0.01 species ± 0.02 form (spread 0.78–0.84, centred on the old field average so difficulty holds), drafter/drifter
+  mostly form; speed.ts L2/L3 drift skill gates 0.55/0.8 → 0.5/0.75 (no species locked out of L3); grid.ts qualifying key =
+  0.5 × rating + 1.5 × pace form + luck; fight.ts a rival race leader gets hunt pull ×2 and attack chance ×1 (others 0.65);
+  brain.ts huntLimit: a hunted rival is fought in passing (≥ +0.8 m/s, never waited for: the goose landed 23 hits and finished
+  5th with the best form); skills.ts speed skills holstered on the podium places (was: leader only), defence only when hurt there.
+  Result: critic's 9: wins cat 3, goose 2, pigeon 2, shiba 1, sloth 1; goose podiums 6. 24 races (seeds 1-8): wins cat 5,
+  pigeon 5, goose 4, sloth 3, seagull 3, capybara 2, shiba 1, penguin 1; podiums 6–11 each (shots/race/a1/fair-g24.json).
+- [B traffic + police bite, feel minor] DONE (code). (1) new ai/blunder.ts: one in-view traffic blunder per race (director gate in
+  ai/index.ts: config.traffic, race time > 15 s, chase camera, rival −4…45 m from the player): a rival with a slow or oncoming
+  vehicle 10–30 m ahead in its lane, closing > 9 m/s, may fixate (0.25/s × (1.2 − skill)): it steers at it and neither dodges nor
+  brakes (plan.ts `blind`, sense.ts blips carry the obstacle id) → the sim's 'traffic' crash. Autopilot races s1-3: in-view AI
+  traffic crashes in 3/9 (shiba ds −3.1, cat +3.9, goose −2.9), plus natural ones behind the player. (2) police-heat.ts: hit .07→.09,
+  skill hit .05→.07, KO .2→.25, cooling .012→.01/s: the corgi spawned in 9/9 'decent' and 9/9 autopilot races (1–3 chases each;
+  city s2 had none before). (3) police.ts: BUSTED counts any wreck/respawn (SPEC 'slow or crashed', whoever wrecked you; the
+  self-crash exemption is gone) and slow = below 60 % of the player's top (was 8 m/s); 'lost' (escape credit) needs 60 m held 2 s
+  (was 38 m, plus the trailing / calm / 25 s-cap escapes): every other end is a let-go (own toast + toot).
+  Scenario expectations superseded (tools/, not editable here → Requests): chase.mjs koNoBust (now BUSTED by design) and
+  outrun (a full-throttle player now gets a let-go, not 'lost').
+- [C intro close-up, aesthetic minor] DONE. grid.ts: staggered two-wide grid (COL_X ±2, row gap 5 m, right column 2.5 m back:
+  every rider on its own s; neighbour/calm slots remapped to [2,3,5,6] / [7,0,1]). intro-camera.ts rewritten: establishing shot
+  from high in front → dolly down the middle of the grid presenting each rival front to back from 3 m ahead (3/4 front view,
+  ~30 % of the frame height), an eased stop per rival (look pans first, camera follows, slow creep) → craning swing onto the chase
+  pose that turns to the player first. Not the critic's literal camM (x −3.5 would fly through the left column). Real-time
+  check (shots/race/a1/intro-rt.mjs): HUD calling cards land on the rival in frame (seagull/MINE, shiba/DOGE, pigeon/GUGU,
+  sloth/FLASH, cat/OIIA, capybara/CHILL, goose/HONK); manual stepping makes the cards look one rider late (HUD timers run on
+  real time). Sheets: shots/race/a1/intro/coast-sheet3.jpg, rt-sheet.jpg.
+- [A follow-up] grid change (C) reshuffled the outcomes, so A was re-tuned on 24-race runs (critic's bot, seeds 1-8 × 3 tracks):
+  brain.ts huntLimit also keeps a rival-hunter ≥ 90 % of its own race speed (FIGHT_PACE: a slow rival gets one swing in passing);
+  skills.ts sloth.flash only from the bottom 3 (trailing the player made the sloth a podium regular); form.ts handling handicap
+  0.05 → 0.04; personality.ts drafter / drifter mostly form (0.35 + 0.3 × species + 0.15/0.2 × drive). Final (k24): wins cat 6,
+  sloth 4, shiba 3, pigeon 3, goose 2, capybara 2, seagull 2, penguin 2; critic's 9: shiba 3, cat 2, goose / capybara / pigeon /
+  seagull 1, goose podiums 3 (PASS). Decent + autopilot (18): the player wins 10, rival wins spread over 6 species; one natural
+  BUSTED (city auto s2). Residual: the sloth averages 2.9 (podium 15/24) in passive races, the seagull 5.4 (noise is ±0.5).
+- [B follow-up] suite run 1 (default 48/53): besides the expected outrun/koNoBust, 'visible' fell to 0.50 (chases where the
+  corgi never arrived: a SHOWTIME leap or boosts left it 45–65 m back, mid-sprint, so the trail rule never counted). police.ts:
+  trailing out of sight for 7 s counts even mid-sprint (STUCK_TIME, let-go once the chase may end), a corgi 38 m back for 3 s
+  lets go (FAR), and one out-of-sight shortcut back to the spawn gap when left far behind before it ever arrived (1 s settle).
+  `--only visible` 0.56, arrive 8/8, police 5/5, selfBust PASS.
+- [A/B follow-up 2] blunder rate: in-view encounters are short (rivals dodge early), so blunder.ts qualifies a vehicle 10–40 m
+  ahead within its lane ±1 m, closing > 8.5 m/s, rate 0.6/s × (1.2 − skill); gate window rival −4…30 m from the player (crash
+  readable on screen). Forced-rate check: capybara into a bus at +24 m, pigeon into a truck beside the player. In-view AI
+  traffic crashes after 15 s: 10/24 passive races. Each change reshuffles the (chaotic) outcomes, so form now dominates harder:
+  form.ts PACE_SPREAD 0.035 → 0.045, favourite pace .85–1 / drive .5–1, others pace −1…0.7. Final 24 (n24): avg place per
+  species 4.0–4.9 (was 2.9–5.4), wins capybara 5, pigeon 5, shiba 3, cat 3, seagull 3, goose 2, penguin 2, sloth 1; critic's 9:
+  capybara 3, shiba 2, cat 2, pigeon 1, seagull 1, goose podiums 2 (PASS, but any sim/combat change reshuffles single races).
+- [suite 2] default scenarios 48/53, then koGap fixed (below) → expected fails only: outrun ×2, koNoBust (design change, see
+  Requests) and restart (core). koGap had failed (KO'd sloth back level with the player in 15 s: its flash fired on the
+  'fresh after respawn' clause) → skills.ts: speed skills holstered for 12 s after a respawn (recovering(), the same window as
+  pace.ts' no-catch-up), the fresh clause is gone. `--only koGap,opening,pulses` 6/6 (gaps −82/−61/−46 m). Named:
+  close 4/4, mugging 6/6, arrive 8/8, bikes: fixie PASS, caps FAIL = sampling (see Requests; probe shots/race/a1/bikes-probe.mjs:
+  base paces identical on both bikes, only a rider 24 m behind the player has the unseen +0.01 catch-up). `race-soak --seeds
+  1,2,3` SOAK OK (stuck ≤ 2.0 s, busted 1 each, 0 errors). tsc: 0 errors in race files.
+- FINAL balance (p24, critic's bot, passive, seeds 1-8 × 3 tracks): avg place per species 3.9–4.9; wins pigeon 7, seagull 6,
+  cat 3, capybara 3, shiba 2, sloth/penguin/goose 1; critic's 9: cat 3, seagull 2, capybara 2, pigeon 1, shiba 1 (max 3 PASS),
+  goose podiums 2 (PASS); in-view AI traffic crashes in 9/24; 0 console errors.
+Requests (acceptance r1; files outside src/gameplay/race/**, so not edited by this fixer):
+- tools/race-scenarios/chase.mjs (race tool): `koNoBust` now expects the old exemption; per the acceptance critic + SPEC §9
+  a wreck next to the corgi is BUSTED whoever caused it → flip it to "KO by a rival next to the corgi is BUSTED". `outrun`
+  expects 'lost' for a plain full-throttle player; 'lost' now needs a 60 m lead → expect a let-go (alert level 0, no reason)
+  within 26 s, or give the player a Wing Dash / knock-back to earn 'lost'.
+- tools/race-scenarios/basic.mjs `restart`: core's new async shader warm-up (core/game.ts warmUp, sim frozen behind the
+  loading card) eats the 400 manual frames; wait ~4 s real time (or for the loading card to close) before stepping. Verified:
+  with a 4 s wait the restarted race reaches 'racing' (shots/race/a1/restart-probe4.mjs). Not a race bug.
+- tools/race-scenarios/fair.mjs `bikes`: compare `b.base` (identical on both bikes), not `b.pace` (a rider > 20 m behind the
+  player at the 2 s sample carries the unseen catch-up, which depends on where the player is).
+- ui-hud (optional): the intro calling cards trail the camera by ~0.1 s in real time (MIN_SHOW / enter delay); fine as is.
+Acceptance round 1 complete (A major + B, C minors done).
+- Last checks: decent + autopilot (18, p18): player wins 13, corgi spawned in every race, 2 natural BUSTED (mountain auto s3:
+  one slow, one wrecked), 0 errors. `race-podium --seeds 1-8` PASS (max rival share 21 %, every species podiums, 0 errors).

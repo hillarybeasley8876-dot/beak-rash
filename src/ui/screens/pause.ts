@@ -5,13 +5,14 @@ import type { Session } from '../../core/contracts';
 import { TRACKS } from '../../data/tracks';
 import { Nav } from '../nav';
 import { HINT_BACK, HINT_NAV, HINT_OK, button, h, headSvg, jagged, ransom, svg } from '../p5';
-import { ordinal } from '../progress';
+import { careerEvent, ordinal } from '../progress';
 import { frame, type ScreenCtx, type ScreenFactory } from '../screen';
+import { remember } from './memory';
 import { fmtTime } from './results-parts';
 
 /** [keyboard, gamepad, action]: the sheet shows the glyphs of the device in use (.is-pad on the root). */
 const CONTROLS: Array<[string, string, string]> = [
-  ['W / ↑', 'RT', '踩踏'], ['S / ↓', 'LT', '刹车'], ['A D / ← →', '左摇杆', '转向'], ['SHIFT', 'RB', '漂移'],
+  ['W / ↑', 'RT', '踩踏'], ['S / ↓', 'LT', '刹车'], ['A D / ← →', '左摇杆 / ✚←→', '转向'], ['SHIFT', 'RB', '漂移'],
   ['SPACE', 'A', '跳跃'], ['J / L', 'X / B', '左挥 / 右挥'], ['K', 'Y', '重击'], ['U I O', 'LB ✚↑ ✚↓', '技能'],
   ['P', 'R3', 'SHOWTIME'], ['B', 'BACK', '打铃嘲讽'], ['C', 'L3', '回头看'], ['ESC', 'START', '暂停'],
 ];
@@ -58,7 +59,16 @@ function resume(ctx: ScreenCtx): void {
 async function leaveRace(ctx: ScreenCtx, kind: 'restart' | 'quit'): Promise<void> {
   const ok = await ctx.confirm(kind === 'restart' ? '重新开始？' : '退出比赛？', kind === 'restart' ? '这一局的进度会清零。' : '本局不计成绩，小鱼干也不发。', kind === 'restart' ? '重来' : '退出', '再想想');
   if (!ok) return;
-  ctx.app.bus.emit(kind === 'restart' ? 'flow:restartRace' : 'flow:quitRace', {});
+  if (kind === 'restart') {
+    ctx.app.bus.emit('flow:restartRace', {});
+    return;
+  }
+  // Core answers quitRace with the menu; a career race goes back to its ladder instead (latest-wins router).
+  const ev = careerEvent(ctx.session()?.config);
+  ctx.app.bus.emit('flow:quitRace', {});
+  if (!ev) return;
+  remember('career', ev.index - 1);
+  ctx.go('career');
 }
 
 export const pauseScreen: ScreenFactory = (ctx) => {

@@ -7,6 +7,7 @@ import type { Session } from '../../../core/contracts';
 import type { GameEvents } from '../../../core/events-map';
 import type { RiderId } from '../../../core/types';
 import { TICKET_HOLD } from '../events';
+import { SLOT_KEYS } from '../glyphs';
 import { ordinal } from '../place';
 import { DRIFT_COLORS } from '../speedo';
 import type { Sfx } from '../sfx';
@@ -49,6 +50,8 @@ export class CutinLayer {
   private clock = 0;
   private slipArmed = true;
   private calm = 1;
+  /** Skills whose band already played this race: later casts get the cluster's compact cast tag. */
+  private bandSeen = new Set<string>();
   /** The player's current skill band (a projectile skill slims it on projectile:spawn). */
   private band: { cut: BandCut; at: number } | null = null;
   /** Delayed UI sounds (real time), e.g. the BUSTED stamp landing. */
@@ -88,6 +91,18 @@ export class CutinLayer {
     return this.cineLeft > 0;
   }
 
+  /** The HUD stays hidden past a cinematic's end while its KNOCK OUT / WRECKED splash makes its exit (≤ 0.15 s),
+   *  so the stamp never fades out over the returning gauges. */
+  get holdHud(): boolean {
+    return this.director.cineSplashUp;
+  }
+
+  /** A splash (not the countdown), the player's skill band or a cinematic owns the screen. */
+  get screenBusy(): boolean {
+    const kind = this.director.splashKind;
+    return this.cinematic || this.director.bandUp || (kind !== null && kind !== 'countdown');
+  }
+
   attach(session: Session | null): void {
     this.session = session;
     this.director.clear();
@@ -99,6 +114,7 @@ export class CutinLayer {
     this.cineLeft = 0;
     this.koChain = 0;
     this.band = null;
+    this.bandSeen.clear();
     this.cues = [];
     this.lastPlaceTick = -9;
   }
@@ -111,19 +127,26 @@ export class CutinLayer {
     this.director.splashIn('countdown', () => countdownCut(n), `cd${n}`);
   }
 
-  skillCast(e: GameEvents['skill:cast']): void {
+  /** The player's skill:cast: the top-strip band plays for the first cast of each skill per race. Returns
+   *  false when it did not (repeat cast, ult, or a WRECKED-class splash is up): the cast tag shows it instead. */
+  playerSkill(e: GameEvents['skill:cast']): boolean {
+    const r = this.session?.rider(e.riderId);
+    const def = SKILLS[e.skillId];
+    if (!r || !def || def.slot === 'ult' || this.bandSeen.has(def.id)) return false;
+    const slot = typeof def.slot === 'number' ? def.slot : 1;
+    const cut = skillBand(def, r.character, SLOT_KEYS[slot - 1] ?? 'skill1');
+    if (!this.director.bandIn(() => cut)) return false;
+    this.bandSeen.add(def.id);
+    this.band = { cut, at: this.clock };
+    return true;
+  }
+
+  /** A rival's skill:cast within CHIP_RANGE: a small chip in the top-right column. */
+  rivalSkill(e: GameEvents['skill:cast']): void {
     const s = this.session;
     const r = s?.rider(e.riderId);
     const def = SKILLS[e.skillId];
-    if (!s || !r || !def || def.slot === 'ult') return;
-    if (r.isPlayer) {
-      const slot = typeof def.slot === 'number' ? def.slot : 1;
-      const cut = skillBand(def, r.character, ['U', 'I', 'O'][slot - 1] ?? 'U');
-      this.band = { cut, at: this.clock };
-      this.director.bandIn(() => cut);
-    } else if (Math.abs(r.s - s.player.s) <= CHIP_RANGE) {
-      this.chips.push(r.character, def);
-    }
+    if (s && r && def && def.slot !== 'ult' && Math.abs(r.s - s.player.s) <= CHIP_RANGE) this.chips.push(r.character, def);
   }
 
   /** projectile:spawn — the player's own shot (FISH TORPEDO) slims its band, so the flight stays in view. */

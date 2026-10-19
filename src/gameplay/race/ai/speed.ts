@@ -49,6 +49,7 @@ export interface DriftPlan {
 const DRIFT_COOLDOWN = 1.6;
 
 const BEND_K = 0.0042;     // |curvature| worth drifting through (R < ~240 m)
+const SKILL_L2 = 0.5, SKILL_L3 = 0.75;   // driving skill that plans a level-2 / level-3 mini-turbo
 
 /** Metres of same-direction bend ahead of s (stops where the bend eases or flips). */
 function bendLength(line: RacingLine, s: number, dir: number): number {
@@ -74,11 +75,11 @@ export function updateDrift(plan: DriftPlan, r: RiderState, line: RacingLine, dr
     const dir = Math.sign(k);
     const len = bendLength(line, r.s, dir);
     const t = len / r.speed;
-    if (t < (skill > 0.75 ? 1.3 : 0.75)) return;
+    if (t < (skill > SKILL_L3 ? 1.3 : 0.75)) return;
     plan.active = true;
     plan.cool = 0;
     plan.dir = dir;
-    plan.goal = t > 2.3 && skill > 0.8 ? 2.05 : t > 1.4 && skill > 0.55 ? 1.25 : 0.6;
+    plan.goal = t > 2.3 && skill > SKILL_L3 ? 2.05 : t > 1.4 && skill > SKILL_L2 ? 1.25 : 0.6;
     return;
   }
   const ahead = line.curv(r.s + 4);

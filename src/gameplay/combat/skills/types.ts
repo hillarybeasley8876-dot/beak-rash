@@ -10,6 +10,8 @@ export interface ActiveSkill {
   readonly caster: RiderState;
   /** Blocks melee and other skills while true (may change as the skill runs, e.g. Big Gulp's pouch). */
   readonly exclusive: boolean;
+  /** Seconds until `exclusive` turns false at the latest (0 when not exclusive); presses queue behind a short lock. */
+  lockLeft(): number;
   /** Before physics (e.g. holding a gulped rider in the pouch). */
   pre(dt: number): void;
   /** After physics; return false when finished. */
@@ -24,6 +26,8 @@ export interface SkillImpl {
   readonly id: string;
   /** Extra precondition beyond cooldown / SP / state, e.g. a target in range. */
   ready?(ctx: CombatCtx, r: RiderState): boolean;
+  /** Line the caster shouts when ready() refuses the cast (e.g. SHOWTIME's 无目标！). */
+  readonly noTarget?: string;
   cast(ctx: CombatCtx, r: RiderState): ActiveSkill;
 }
 
@@ -45,6 +49,10 @@ export abstract class TimedSkill implements ActiveSkill {
 
   get exclusive(): boolean {
     return this.lockout;
+  }
+
+  lockLeft(): number {
+    return this.lockout ? Math.max(0, this.duration - this.t) : 0;
   }
 
   pre(dt: number): void {

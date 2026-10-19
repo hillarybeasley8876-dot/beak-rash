@@ -52,6 +52,11 @@ class Gulp extends TimedSkill {
     return this.t < GULP.open || (this.victim !== null && this.phase === 'held');
   }
 
+  override lockLeft(): number {
+    const held = this.victim !== null && this.phase === 'held' ? GULP.hold - this.pt : 0;
+    return Math.max(0, GULP.open - this.t, held);
+  }
+
   override pre(): void {
     const v = this.victim;
     if (v && this.phase === 'held' && this.still(v)) this.carry(v);

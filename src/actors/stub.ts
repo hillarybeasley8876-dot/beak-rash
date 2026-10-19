@@ -3,11 +3,11 @@
 // Models face -Z (forward), +Y up, +X right; origin = road contact point under the saddle.
 import { BoxGeometry, CapsuleGeometry, Group, Mesh, MeshLambertMaterial, Quaternion, TorusGeometry, Vector3 } from 'three';
 import { ROSTER } from '../data/roster';
-import type { AppContext, RiderView } from '../core/contracts';
-import type { BikeId, CharacterId, Quality } from '../core/types';
+import type { AppContext, RiderView, RiderViewOpts } from '../core/contracts';
+import type { BikeId, CharacterId } from '../core/types';
 
 export function createRiderView(
-  app: AppContext, character: CharacterId, bike: BikeId, opts: { isPlayer: boolean; quality: Quality },
+  app: AppContext, character: CharacterId, bike: BikeId, opts: RiderViewOpts,
 ): RiderView {
   void app; void bike; void opts;
   const def = ROSTER[character];

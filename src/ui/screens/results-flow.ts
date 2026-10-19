@@ -6,6 +6,7 @@ import { RACER_POOL, ROSTER } from '../../data/roster';
 import { TRACK_ORDER } from '../../data/tracks';
 import { CAREER, careerEvent, isUnlocked } from '../progress';
 import type { ScreenCtx } from '../screen';
+import { queueFinale } from './finale';
 import { remember } from './memory';
 
 export const DEMO_ACHIEVEMENTS = ['first_ko', 'double', 'goose', 'perfect_start', 'drift3'];
@@ -30,9 +31,17 @@ export function nextRace(ctx: ScreenCtx, config: RaceConfig | undefined): Partia
   return { trackId: TRACK_ORDER[(i + 1) % TRACK_ORDER.length] ?? 'coast', mode: 'quick' };
 }
 
-/** quitRace ends the session and asks for the menu; a later go() to another screen wins (latest-wins router). */
-export function leaveRace(ctx: ScreenCtx, config: RaceConfig | undefined, to: 'menu' | 'garage' | 'career'): void {
+/** quitRace ends the session and asks for the menu; a later go() to another screen wins (latest-wins router).
+ * 'finale' = the career is clear: credits as a trophy roll (it backs out to the ladder). */
+export function leaveRace(ctx: ScreenCtx, config: RaceConfig | undefined, to: 'menu' | 'garage' | 'career' | 'finale'): void {
   const ev = careerEvent(config);
+  if (to === 'finale') {
+    remember('career', CAREER.length - 1);
+    queueFinale();
+    ctx.app.bus.emit('flow:quitRace', {});
+    ctx.go('credits');
+    return;
+  }
   if (to === 'career' && ev) {
     const next = CAREER[ev.index];
     remember('career', next && isUnlocked(ctx.app.save, next) ? ev.index : ev.index - 1);

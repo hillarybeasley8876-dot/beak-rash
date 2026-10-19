@@ -1,17 +1,18 @@
 // Police: when the player's heat passes 0.5 the corgi officer sprints in from behind (siren, whistle),
-// rides alongside, and BUSTS you if you stay slow (or crash yourself) next to it for 2 s: fine 100 and a
-// 4 s stop served on the road (so crossing order = final order). Counterplay: it cruises just under
-// your top speed, tires after riding alongside for a while, gets stuck behind traffic and can be
-// knocked back. The chase stays on screen: once it trails you (behind the camera for 2 s) it sprints back once with
-// a line, and the next time it trails it gives up (escape toast). A real lead (25 m from its closest
-// approach, then 38 m for 2 s, or 15 m with the heat cooled) also loses it; a chase ends after 25 s
-// (escape when you ride ahead of it, else a let-go with its own toast). No escape in the first 8 s.
+// rides alongside, and BUSTS you if you stay next to it for 2 s while slow (below 60 % of your top speed),
+// wrecked or respawning (SPEC §9 'slow or crashed', whoever wrecked you): fine 100 and a 4 s stop served on the
+// road (so crossing order = final order). Counterplay: it cruises just under your top speed, tires after riding
+// alongside for a while, gets stuck behind traffic and can be knocked back. The chase stays on screen: once it
+// trails you (behind the camera for 2 s) it sprints back once with a line, and the next time it trails it gives
+// up (left far behind before it ever arrived, it first takes one out-of-sight shortcut back). Only a real lead is
+// an escape ('lost' + toast): 60 m held for 2 s, built from its closest approach; every other end (stuck or trailing
+// out of sight, a cooled heat, the 25 s cap) is a let-go with its own toast. No escape in the first 8 s.
 import { Quaternion, Vector3 } from 'three';
 import { clamp } from '../../core/math';
 import { createRiderState } from '../../core/rider';
 import { POLICE_LINES, ROSTER } from '../../data/roster';
 import { WEAPONS } from '../../data/weapons';
-import type { CrashCause, Obstacle } from '../../core/types';
+import type { Obstacle } from '../../core/types';
 import { topOf } from './ai/control';
 import type { RaceCtx } from './ctx';
 import { createCorgi, knock, resetCorgi, resprint, ride, sprinting, tire, tired, WALK_BACK, type RideWorld } from './police-chase';
@@ -22,18 +23,21 @@ import { trackPose } from './pose';
 const SPAWN_HEAT = 0.5;
 const SPAWN_BEHIND = 20;      // m: out of the chase camera, close enough to arrive in ~3 s
 const SPAWN_BEFORE = 0.9;     // no new chase in the last 10 % of the track
-const SLOW = 8;               // m/s: slower than this next to the corgi counts toward BUSTED
+const SLOW = 0.6;             // × the player's flat top: slower than this next to the corgi counts toward BUSTED
 const BUST_TIME = 2;
 const FINE = 100, PENALTY = 4; // the penalty is the ticket stop itself
 const WHISTLE_CD = 9;
 const COOLDOWN = 20;
-const LOSE_GAP = 38, LOSE_TIME = 2;
+const LOSE_GAP = 60, LOSE_TIME = 2; // m held for s: the only escape ('lost')
+const FAR_GAP = 38, FAR_TIME = 3;   // a corgi this far back for this long (even mid-sprint) lets the player go
+const SHORTCUT_AFTER = 1;     // s far back before the corgi's one out-of-sight shortcut (never arrived yet)
 const LEAD_BUILT = 25;        // m the player must pull away from the corgi's closest approach to escape
 const MIN_CHASE = 8;          // s: no escape before the chase has really begun
 const REACHED = 6;            // m: the corgi has caught up with the player this chase
 const CALM_HEAT = 0.3, CALM_GAP = 15;
 const LET_GO_HEAT = 0.12;     // a model citizen alongside: the corgi lets it go (no 'lost' credit)
-const TRAIL_GAP = 4.5, TRAIL_TIME = 2; // behind the chase camera for this long: re-sprint once, then give up
+const TRAIL_GAP = 4.5, TRAIL_TIME = 2; // behind the chase camera for this long: re-sprint once, then give up…
+const STUCK_TIME = 7;         // …or this long even while sprinting (blocked by traffic or a pack): give up
 const CHASE_MAX = 25;         // s: the chase ends (escape, or a let-go when still beside the player)
 const SIDE_CLEAR = 1.2;       // m clearance from other riders at the spot beside the player
 const LET_GO_LINES = ['算了，下不为例。', '今天心情好，放你一马。', '下次再让我看见……就算了。'];
@@ -71,9 +75,10 @@ export function createPolice(ctx: RaceCtx): Police {
   let wingT = 0;                              // s left of the player's Wing Dash
   let minGap = Infinity;                      // closest approach (player.s − corgi.s) this chase
   let trailT = 0;                             // s trailing more than TRAIL_GAP behind the player
+  let farT = 0;                               // s more than FAR_GAP behind the player
   let resprinted = false;                     // the one re-sprint of this chase is used
+  let shortcut = false;                       // the one out-of-sight catch-up of this chase is used
   let spoke = false;                          // the chase line (first time alongside) is said
-  let selfCrash = false;                      // the player's current crash was their own doing
   const pos = new Vector3(), quat = new Quaternion();
 
   // Corgi speech (content's POLICE_LINES) stays in toasts, only for the arrival, the fine and an escape
@@ -93,8 +98,8 @@ export function createPolice(ctx: RaceCtx): Police {
     st.x = clamp(player.x, -4, 4);
     st.speed = Math.max(player.speed + 4, 12);
     st.vx = 0;
-    bustT = lostT = trailT = 0;
-    resprinted = spoke = false;
+    bustT = lostT = trailT = farT = 0;
+    resprinted = spoke = shortcut = false;
     minGap = player.s - st.s;
     whistleCd = 2.5;
     rideWorld.playerTop = topOf(player);
@@ -161,7 +166,6 @@ export function createPolice(ctx: RaceCtx): Police {
       if (e.riderId === player.id) tryKnock(WEAPONS[e.weapon].reach, e.heavy ? null : e.side, `hit.${e.weapon}`);
     }),
     app.bus.on('skill:cast', (e) => { if (e.riderId === player.id && e.skillId === 'pelican.wing') wingT = WING_TIME; }),
-    app.bus.on('rider:crash', (e) => { if (e.riderId === player.id) selfCrash = isSelfCrash(e.cause, e.attacker); }),
   ];
 
   /** Is the spot beside the player at lateral `x` taken by another rider? */
@@ -177,10 +181,12 @@ export function createPolice(ctx: RaceCtx): Police {
     if (offRoad(here) || (taken(here) && !offRoad(there) && !taken(there))) side = side === 1 ? -1 : 1;
   };
 
-  /** Trailing behind the camera: one more sprint back (with a line), then the corgi gives up. */
+  /** Trailing behind the camera: one more sprint back (with a line), then the corgi gives up; stuck behind it
+   * (still out of sight after STUCK_TIME, sprinting or not) it gives up as soon as the chase may end. */
   const trail = (dt: number, gap: number): boolean => {
-    trailT = gap > TRAIL_GAP && !sprinting(corgi) ? trailT + dt : 0;
-    if (trailT < TRAIL_TIME) return false;
+    trailT = gap > TRAIL_GAP ? trailT + dt : 0;
+    if (trailT > STUCK_TIME) return true;
+    if (trailT < TRAIL_TIME || sprinting(corgi)) return false;
     trailT = 0;
     if (resprinted || tired(corgi)) return true;
     resprinted = true;
@@ -192,8 +198,7 @@ export function createPolice(ctx: RaceCtx): Police {
   const chase = (dt: number): void => {
     const gap = player.s - st.s;
     const down = player.mode === 'crashed' || player.mode === 'respawning';
-    // Only crashes the player caused count; a rival's KO (and its respawn grace) is not an offence.
-    const excused = !selfCrash && (down || player.invuln > 0);
+    const slow = player.speed < SLOW * rideWorld.playerTop;
     const want = gap < -3 && player.speed < 3 ? -WALK_BACK
       : gap < 6 ? player.speed + gap * 1.5 : player.speed + clamp(gap * 0.7, -5, 9);
     chooseSide(gap);
@@ -202,23 +207,31 @@ export function createPolice(ctx: RaceCtx): Police {
     const alongside = Math.abs(gap) < 4 && Math.abs(player.x - st.x) < 3.4;
     tire(corgi, dt, gap);
     if (alongside && !spoke) { spoke = true; say(rng.pick(POLICE_LINES.chase)); }
-    const offending = !excused && (down || player.speed < SLOW);
+    const offending = down || slow;
     bustT = alongside && offending ? bustT + dt : Math.max(0, bustT - dt * 0.6);
     if (bustT >= BUST_TIME) { bust(); return; }
     whistleCd -= dt;
     if (gap > -1 && gap < 12 && whistleCd <= 0 && !tired(corgi) && player.mode === 'racing') whistle();
     minGap = Math.min(minGap, Math.max(0, gap));
-    // Escaping needs a lead built during the chase (never just a corgi that has not arrived yet): 25 m
-    // pulled from its closest approach and 38 m held for 2 s, or a calm lead of 15 m after it rode alongside.
+    farT = gap > FAR_GAP ? farT + dt : 0;
+    // Left far behind before it ever arrived (a SHOWTIME leap, a boost chain): once the gap has settled for a
+    // second, one shortcut back to the spawn gap, out of sight, so the chase is seen instead of ending as a phantom.
+    if (!shortcut && minGap > REACHED && farT > SHORTCUT_AFTER) {
+      shortcut = true;
+      st.s = player.s - SPAWN_BEHIND;
+      minGap = SPAWN_BEHIND;
+      trailT = farT = 0;
+      return;
+    }
+    // Escaping needs a real lead built during the chase (never just a corgi that has not arrived yet): 25 m
+    // pulled from its closest approach and 60 m held for 2 s. Falling 38 m back for 3 s (out of sight), trailing
+    // twice, a calm lead of 15 m after it rode alongside, the 25 s cap and a cooled-down heat end it as a let-go.
     const settled = modeT > MIN_CHASE;
     lostT = settled && gap - minGap > LEAD_BUILT && gap > LOSE_GAP ? lostT + dt : Math.max(0, lostT - dt);
-    const calmEscape = settled && minGap < REACHED && gap > CALM_GAP && player.heat < CALM_HEAT;
-    if (lostT > LOSE_TIME || calmEscape || (trail(dt, gap) && settled)) { giveUp(true); return; }
-    if (player.finishTime !== null) { giveUp(false); return; }
-    // Out of time: an escape when the player rides ahead of it, a let-go when it is still beside a slow player;
-    // a cooled-down player is let go unless the corgi is already trailing.
-    if (modeT > CHASE_MAX) { giveUp(gap > 2 && player.speed >= SLOW); return; }
-    if (player.heat < LET_GO_HEAT && modeT > 20) { giveUp(gap > TRAIL_GAP); return; }
+    if (lostT > LOSE_TIME) { giveUp(true); return; }
+    const calm = settled && ((minGap < REACHED && gap > CALM_GAP && player.heat < CALM_HEAT) || farT > FAR_TIME);
+    const outOfTime = modeT > CHASE_MAX || (player.heat < LET_GO_HEAT && modeT > 20);
+    if (calm || (trail(dt, gap) && settled) || outOfTime || player.finishTime !== null) { giveUp(false); return; }
     alert(alongside || gap < 20 ? 2 : 1);
   };
 
@@ -280,7 +293,3 @@ export function createPolice(ctx: RaceCtx): Police {
     },
   };
 }
-
-/** Crashes the player caused (traffic, walls, water, props) — not KOs or skill hits by rivals. */
-const isSelfCrash = (cause: CrashCause, attacker: number | null): boolean =>
-  attacker === null && cause !== 'ko' && cause !== 'skill';

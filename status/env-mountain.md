@@ -230,3 +230,57 @@ Plan in order (cheap code fixes first, then headroom, then the art majors):
   seed 3 and seed 5: player 1st, all 8 finished, 0 errors · build 0.9 s (sandbox) · chase sheet shots/env-mountain/fix2/
   final_sheet.jpg (start, H1, cliff, portal, bridge + waterfall, crest, lake, hot spring); close-ups fix2/{c,e2,f,h,i,j}.
   Skipped: dry-stone walls (uphill edge is already the track's stone wall), per-tile tree cone twins (budget met without).
+
+## Acceptance round 1 (10-19; checkpoint after each item, a resumed fixer skips [x])
+Reviews: reviews/game-r1-*.json. Owner env-mountain: aesthetic#0 (major), aesthetic#6, aesthetic#7 (minor);
+perf#7 (owner env-city, mountain part: leg blend 342 ms in one task). Plan in order:
+1. [x] aesthetic#0 floating granite slabs over the cliff road (crags.ts faceRocks: seat on sampled ground, skip, log; smoother crags)
+2. [x] aesthetic#7 grade: neutral whites / cool shadow side; dress the switchback legs (scree, posts, flags, signposts, boulders)
+3. [x] aesthetic#6 waterfall from the bridge (thickness, base foam ring, mist, wet-rock lip)
+4. [x] perf#7 leg blend / terrain grading split with yields (if the hook allows it from our files)
+5. [x] verify: tsc, track.test, perfgame, race, chase sheet, __br.errors
+- aesthetic#0 DONE: crags.ts faceRocks no longer assumes an evenly leaning wall. faceProfile() rebuilds the rendered wall
+  cross-section at s (ground() at every near column out to 12 m + the same cragOffset push-back near.ts applies, which
+  ground() alone does not see), sizes columns by the real wall height (skips where it is < 4 m: R-150 bank, relief), and
+  wedges each slab where the rendered face reaches its height (back third buried); slabs whose face never gets that
+  high are skipped. Log: 'rock walls: 44 columns, 20 slabs (1 skipped: face too low)'; warns if any slab base sits > 0.3 m
+  above groundWorld (0). Rocks: new props/mountain-granite.ts bevelRock() = the jittered icosahedron subdivided once with
+  edge midpoints lifted (80 facets, one tone per plane + bevel facets): wall, lip and portal rocks use it; GRANITE palette
+  shared from there (was copied in crags.ts + portal.ts). Verified in game: shots/env-mountain/acc1/crag2_sheet.jpg.
+- aesthetic#7 DONE (own files only; looks.ts is track's): new env/mountain-fill.ts adds a shadowless cyan-blue sky fill
+  (#8fe0ff × 0.8) from the sky opposite the low sun (29° up). Back-lit / shaded sides, sun shadows and the asphalt now pick
+  up the cool sky instead of the orange key's toon floor band: pelican back (descent s 2440) RGB 206,136,115 → 203,170,176
+  (HLS sat 0.48 → 0.24), road beside the bike 77,50,48 → 78,59,62 (brown → neutral grey-violet), kerbs crisp; the sky,
+  sun and lit sides stay golden. Fades with the cube of the sun's tunnel dimming (sky light does not reach into the bore).
+  Sunlit whites stay peachy: needs a less saturated key (request below). Legs: new dressing/mountain/legs.ts, every
+  20–30 m per side: half-buried bevelled boulder clusters with tufts, scree fans (outcrop + 16 stones fanning to the curb)
+  on the cut slope, a split-rail fence and a trail signpost per leg (「前方还有 两个回头弯」 / 「最后一弯 鹈鹕加油」),
+  prayer-flag lines down the fall-away beyond the rail (21 rock items + flags). Verified: acc1/fill_cmp.jpg, g2_sheet.jpg.
+- aesthetic#6 DONE: env/mountain-waterfall.ts rebuilt around strands: 1–4 separate curved ribbons per fall (one per ~4.5 m;
+  side strands start 0.8–1.8 m lower = stepped lip), each curls over the lip, bulges outward across (rounded column) and
+  widens downward; toon stripes across (deep-blue edge, pale blue, white core) with lane streaks racing down, an ink line
+  inside the ragged cut sides, lip foam + foot spray; cut (discard) + opaque, so no sorting against the mist. Foam pool
+  gets a churning white ring; mist 16 → 20 puffs, bigger. falls.ts: dark wet-rock lip bar the strands pour over (shows
+  in the gaps), notch rocks use bevelRock. Same API (FallSpec + optional strands). Verified: acc1/wf2_sheet.jpg (bridge
+  view: four white strands over wet rock with mist; close view: stripes, ink, ring).
+- perf#7 DONE (mountain part): env/mountain-legs.ts LegBlend no longer marches 61 steps + 5 bisections per ray over every
+  candidate: the ray point w m out is exactly w from the own centre point, so each candidate's crossing is the closed form
+  w = |q − p0|² / (2 (q − p0)·d) and the mid-line is the minimum (same criterion, exact; same 1013 rows): 182 → 27–43 ms.
+  dressMountain now yields between stages like coast (stages(): debug ms per stage, ctx.progress, breathe; batches via
+  finishDressYielding + rocks.finishYielding): terrain grade 22–30 · sky 3 · landmarks 91–101 · tunnel 2 · walls/legs/signs
+  63–90 · trees 20–24 · verges/far 30–65 ms (loaded machine), i.e. no dressing task over ~100 ms.
+- VERIFY (acceptance r1 done): tsc 0 errors (whole project; a transient combat ult.ts error mid-run was combat's) ·
+  track.test --track mountain 0 fails, rebuild/dispose clean · in-game perf
+  (perfgame seed 3, 1920x1080 high) max 212 calls / 706k tris at the stacked legs (85 % / 88 % of 250 / 800k; was 207 /
+  684k before the leg dressing) · sandbox sweep max 188 calls / 563k (85 % gate ok) · autopilot race seed 3: all 8
+  finished, 0 errors · __br.errors empty in every run · final chase sheet shots/env-mountain/acc1/final_sheet.jpg
+  (start, H1, leg, cliff, bridge + falls, crest pagoda, descent, lake).
+- Requests (acceptance r1):
+  - track (aesthetic#7 remainder, looks.ts is track's): MOUNTAIN_LOOK sun colour #ffb46e → ~#ffc79a (a less saturated key,
+    so sunlit whites read cream instead of salmon) and ambient sky #b48ad8 → ~#a6a2e6 (bluer). env/mountain-fill.ts stays
+    either way. The per-track env hook (tech#7) would let mountain own these values.
+  - track: LayoutDef.curbs (delivered, thanks) is not adopted yet: mountain needs its own painted rumble edge / gutter
+    first (new dressing work, not in this round's issues).
+  - perf#4 (track): turbine rotors and gondolas compile when the fog cull first shows them; covered by the core warm-up
+    request (perf#0), nothing mountain-side to change.
+

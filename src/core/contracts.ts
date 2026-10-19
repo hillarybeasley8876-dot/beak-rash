@@ -27,6 +27,9 @@ export interface AppContext {
   quality: Quality;
   size: { width: number; height: number; dpr: number };
   modules: Modules;
+  /** Set only where the game may close itself (the desktop shell, served from app://): menus may offer
+   *  退出游戏 QUIT (with a confirm) when present. Browsers cannot close their own tab. */
+  quit?: () => void;
   // App-level systems (created once, live across races):
   rig: CameraRig;
   fx: FxSystem;
@@ -155,6 +158,14 @@ export type ViewCue =
   | 'attack' | 'heavy' | 'hit' | 'stun' | 'ko' | 'respawn' | 'taunt' | 'bell'
   | 'victory' | 'defeat' | 'skill' | 'ult' | 'land' | 'boost';
 
+/** Options for Modules.createRiderView. `track` is set for a race session's views (absent in menus / sandboxes),
+ *  e.g. to ground crash debris exactly with track.project / frameAt. */
+export interface RiderViewOpts {
+  isPlayer: boolean;
+  quality: Quality;
+  track?: Track;
+}
+
 export interface RiderView {
   readonly root: Object3D;
   /** Place & animate from sim state; pose comes from PhysicsSystem.pose(). */
@@ -177,9 +188,11 @@ export interface FxSystem {
 }
 
 // ---------------------------------------------------------------- ui/
-export type ScreenId =
-  | 'boot' | 'title' | 'menu' | 'career' | 'garage' | 'trackSelect' | 'intro'
-  | 'loading' | 'race' | 'pause' | 'results' | 'settings' | 'howto' | 'credits';
+export const SCREEN_IDS = [
+  'boot', 'title', 'menu', 'career', 'garage', 'trackSelect', 'intro',
+  'loading', 'race', 'pause', 'results', 'settings', 'howto', 'credits',
+] as const;
+export type ScreenId = (typeof SCREEN_IDS)[number];
 
 export interface ScreenProps {
   results?: RaceResult[];

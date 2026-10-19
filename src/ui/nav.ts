@@ -2,6 +2,11 @@
 // The focused element always carries .is-focus (visible focus is a hard UI rule).
 import type { Action } from '../core/input';
 
+const DIRECTIONS: ReadonlySet<Action> = new Set<Action>(['up', 'down', 'left', 'right']);
+
+/** Menu movement (arrows / WASD / d-pad / stick); everything else picks, backs out or is a race action. */
+export const isDirection = (a: Action): boolean => DIRECTIONS.has(a);
+
 export interface NavItem {
   el: HTMLElement;
   confirm?(): void;

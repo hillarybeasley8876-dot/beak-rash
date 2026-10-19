@@ -1,4 +1,7 @@
-// Persistent profile in localStorage. Corrupt or old saves fall back to defaults field by field.
+// Persistent profile in localStorage. Corrupt or old saves fall back to defaults field by field
+// (core/save-sanitize.ts): unknown bike ids, quality names and bad numbers never reach the game.
+import { BIKES } from '../data/bikes';
+import { sanitizeSave } from './save-sanitize';
 import type { BikeId, Quality } from './types';
 
 export interface Settings {
@@ -66,15 +69,10 @@ export class SaveStore {
     try {
       const raw = this.storage.getItem(KEY);
       if (!raw) return base;
-      const parsed = JSON.parse(raw) as Partial<SaveData>;
-      return {
-        ...base,
-        ...parsed,
-        career: { ...base.career, ...parsed.career },
-        settings: { ...base.settings, ...parsed.settings },
-        stats: { ...base.stats, ...parsed.stats },
-        version: 1,
-      };
+      const fixed: string[] = [];
+      const data = sanitizeSave(JSON.parse(raw) as unknown, base, Object.keys(BIKES) as BikeId[], fixed);
+      if (fixed.length) console.warn(`[save] repaired invalid fields: ${fixed.join(', ')}`);
+      return data;
     } catch (err) {
       console.warn('[save] unreadable save, starting fresh', err);
       return base;

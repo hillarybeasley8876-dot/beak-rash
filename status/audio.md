@@ -31,10 +31,10 @@
   / 叮 taunt) → 叮叮叮 · weapon break · incoming-projectile warning (projectile:spawn targeting the player) · police lost.
 - Bike loops (player): wind (speed²), chain whirr (pedalling, tooth-rate AM), freewheel ticks (coasting), tyre roll, curb
   rumble, grass / sand / dirt / water layers, drift skid, boost jet; tunnel reverb. Rival / traffic pass-by whooshes.
-- CPU: frequent instruments are persistent voices (only pitch / filter / VCA automated per note) that unplug when silent;
-  k-rate filters / vibrato; strips and instruments created lazily; sfx voice limits (32 total, per-id caps) steal the
-  quietest sound first. Offline net render cost per song 1.7–3.4 % of one core (busiest = final-stretch layer) measured on
-  a heavily loaded shared machine; bike loops + sfx add < 1 %; main-thread scheduling 0.6 %.
+- CPU (round 3): drums play one pre-mixed buffer per bar; keys, pad, clav and bass play pre-mixed buffers at rate 1
+  from note banks rendered at boot (bank.ts / premix.ts); lead and brass are persistent voices that unplug when silent;
+  the music reverb is a diffused feedback loop unplugged when no music plays; cached sfx takes play at rate 1; sfx voice
+  limits (16 total, per-id caps) steal the quietest sound first. Realtime numbers: Fix round 3 below.
 
 ## Songs (critics can't listen — arrangement notes)
 - **title** — "BEAK RASH! (Main Theme)" · 126 bpm · D Dorian · lead wah (solo synth) · form [intro, A, A2, B, A3, S, D, B2, A4] (loops back to A)
@@ -52,8 +52,10 @@
 - **Stingers**: count (880 Hz beep + kick), GO (beep + E6/9 brass fall + crash), KO (Dm stab → Dm(b13) fall, boom, low tom),
   SHOWTIME (tom roll + rising A → B → C# brass rips into Dmaj9 hit + synth A5 + crash), BUSTED (sad wah Bb–A–Ab–G),
   FINISH (tom pickup, Bb → C → Dmaj9/E fall + D6 lead), WRECKED (Fm fall + boom), ONE MORE (G → A rip + clap).
-- Mix: kick side-chains bass / keys / pad / clav; bass driven + high-passed at 32 Hz; music reverb 1.5 s plate-ish IR;
-  dotted-8th band-passed delay on keys / clav / lead; keys 8th-note auto-pan. Peaks −1.9…−4.2 dBFS, RMS ≈ −15…−17 dB.
+- Mix (round 3): kick side-chains bass / keys / pad / clav (depth 0.3); comping + horns dip −7.5 dB under lead notes;
+  bass driven + high-passed; music reverb = diffused loop (≈ 0.9 s, decorrelated L / R); dotted-8th band-passed delay on
+  keys / clav / lead; keys 8th-note auto-pan ±0.85, pad voices ±0.6, horns +0.4, clav −0.55; per-section levels (A −3 dB,
+  B2 +2 dB) and the D breakdown / build. Tone, width and dynamics per song: Fix round 3 (M0 / M2 / M3).
 
 ## Known issues / gaps
 - Can't be judged by ear in this environment: timbres were tuned by spectrum / level analysis only.
@@ -72,10 +74,12 @@
 
 ## How to test
 - `node tools/audio-check-adaptive.mjs` runs inside `--game`: top-3 hold / 2-bar line, finish freeze, place-based cues.
-- `node tools/audio-check.mjs` — offline (every song 20 s + loop seam + final-stretch layer, 8 stingers, 98 sfx: peak < −1 dBFS,
-  0 clipped, 0 clicks, 0 dropouts, CPU) then in-game (nothing before unlock, countdown, loops, mix peak, 11 event→sound
-  mappings within one frame, KO cinematic muffle / bass drop / voice, pause, mute, screen music, no errors).
-  `--offline`, `--game`, `--only race-city`, `--sfx --verbose`.
+- `node tools/audio-check.mjs` — offline (every song 20 s + loop seam + final-stretch layer, 9 stingers, every sfx: peak
+  < −1 dBFS, 0 clipped / clicks / dropouts; per song the bass stem, the hook over music + bike at 20 m/s, and one full
+  loop's tone: octaves vs 125 Hz, width above 200 Hz, LRA, breakdown / build; 22-instrument retrigger check) then in-game
+  (nothing before unlock, countdown, loops, mix peak, 11 event→sound mappings within one frame, KO cinematic, held KO lines
+  (audio-check-barks.mjs), pause, mute, screen music, race-start sync, adaptive layers, no-WebAudio / WebKit, no errors),
+  then the realtime CPU gate with a control tab (audio-check-cpu.mjs). `--offline`, `--game`, `--cpu`, `--only race-city`.
 - Lab: http://127.0.0.1:5300/sandbox/audio.html (click UNLOCK, then any button).
 - In game: `window.__br.audio.state() / trace() / level(s) / record(s) / music(id) / stinger(id) / voice(id) / play(id)`.
 - Regenerate voices: `node tools/gen-tts.mjs [--force] [--only ann_ko]` (IOA VPN); manifest rebuilt from files on disk.
@@ -282,91 +286,82 @@ t2 voice pause → t3 trace → t4 WebKit → m2 hysteresis → m1 finish → m5
   race-coast.jpg, lab-title.jpg). Scratch probes for this round: shots/audio/fix2b/*.mjs.
 
 ## Fix round 3
-Critic issues (reviews/audio-r3-music.json = M0–M7, audio-r3-tech.json = T0–T4). [x] = done + verified, [ ] = open.
-Order: T1+M4 barks → T4 warning → T2 gate burst → M0 tonal balance → T0/M1 CPU (brass/pad chord buffers, lead double,
-gate vs control) → M2 stereo → M3 dynamics → M5 groove → M6 gen-tts active-RMS (+ taunts if the API answers) → M7/T3 cross-unit.
+Critic issues (reviews/audio-r3-music.json = M0–M7, audio-r3-tech.json = T0–T4). [x] = done + verified, [~] = improved, still
+open, [ ] = not audio's files. Scratch probes / logs: shots/audio/fix3/ (probe-*.mjs, tone.mjs, check-full-*.log).
 - [x] T1 + M4 held barks: VoicePlayer.cut() ends the cut line's busy time at the fade (now + 0.07 s) and a separate
   `barkGate` (earliest next bark: bark end + 1.3 s gap, or a loud announcer line's end + 0.25 s) replaces busy.bark + GAP,
   so a bark silenced by ann_ko / pause no longer blocks anything. Lines held for a KO cinematic's end pass `wait` 1.2 s
-  (Host.bark(…, wait) → Barks.say → VoiceOpts.wait): instead of 'dropped' they take the one waiting slot and start when the
-  gate opens (placed where the speaker is then; first come keeps the slot, so the pelican's line still pre-empts the rival's).
-  New permanent check tools/audio-check-barks.mjs (in audio-check --game): long sloth bark cut by ann_ko → pelican_ko_1 at
-  +0 ms after cine end; repeat KO (517 ms cinematic) → capybara_hurt_0 +318 ms; player wrecked (492 ms) → pelican_hurt_1
-  +468 ms. With HELD_WAIT 0 the last two FAIL (no bark), as the critic measured.
-- [x] T4 misleading warning: createContext() throws at once when AudioContext is undefined and retries without the 32 kHz
-  rate only for a NotSupportedError. audio-check-robust asserts 0 "32 kHz" warnings in the no-constructor case (green).
-- [x] T2 + gate honesty: tools/audio-check-cpu.mjs takes the weapon ids from src/data/weapons.ts (dynamic import in the page:
-  9 weapons, was a non-existent 'fish'), fails on any '[audio] unknown' warning, and samples a control tab (one 32 kHz
-  oscillator, second browser context) alongside every phase: an overrun FAILS while the control reads < 1 % (only a
-  control ≥ 1 % turns it into a warning; loadavg no longer matters). Baseline (load 11, control 0.3–0.36 %): menu 4.85 / 8.63,
-  idle 1.14 / 3.59, race 5.78 / 7.76, pack 6.97 / 9.31, stretch 7.09 / 9.14, sfx only 2.3 / 4.99 → FAIL (honestly).
-- [~] T0 / M1 CPU (in progress). Realtime component costs measured in a quiet page (shots/audio/fix3/probe-rt*.mjs, fresh
-  32 kHz context each, renderCapacity over CDP): the 1.1 s stereo ConvolverNode plate costs +1.8 % while fed (its early
-  FFT stages run on the audio thread; idle 0.1 %), a persistent lead voice +0.5 %, a 4-saw pad +0.4 %, 24 buffer notes/s
-  +0.5 %, the glue comp +0.3 %, a gain node ≈ 0.016 %; any feedback loop renders while connected, even when silent.
-  Done so far: · music reverb = dsp/plate.ts: a diffused feedback loop (12 ms pre-delay → Σ → 16 ms truncated Schroeder
-  allpass chain as a mono ConvolverNode, peak-normalised so the loop gain is fb × LP → 4.8 kHz damping → × 0.73 → 21 ms
-  delay; L after the diffuser, R one loop later: corr ≈ 0, RT60 ≈ 0.9 s, NED ≈ 0.9 from 60 ms), +0.55–0.9 % instead of
-  1.8 %, return matched to the old plate's tail level (±1 dB); unplugged 4 s after the last music (Engine.keepReverb /
-  tick: an unplugged loop costs 0). · lead2 octave doubles play inside the lead voice (Lead sub oscillator, SongPlayer
-  .doubled): one oscillator instead of a second voice. · drums: SongPlayer.drumBar pre-mixes each bar's hits (same
-  samples / takes / levels / pan law, open-hat choke) into one stereo buffer (drum-mix.ts; DrumKit.record / flush / cut;
-  cue / hold cut the queued bar). Offline cpu race-coast 0.66 % (was 1.42). Gate (load 10–16, control 0.34 %): menu
-  2.71 / 6.02, race 4.27 / 7.13 (ok), stretch 5.29 / 6.53, pack 7.57 / 9.49 (sfx burst ≈ +3.3 %), sfx only 3.59.
-- [x] M3 macro-dynamics: Section.gainDb / shape (types.ts, compile.ts) → Band.section() at each section start, on a new
-  section gain + a switchable low-pass (FilterSwitch, in the path only during a breakdown): every song's D is
-  `shape: 'breakdown'` (bars 1–4 −6 dB behind a 900 Hz low-pass, bars 5–8 climb back in even dB steps to +2 dB while the
-  filter opens to 14 kHz), A sits −1.5 dB (lighter opening), B2 +1 dB (climax). New analysis src/audio/check-tone.ts
-  (one full loop through the real graph: octave balance vs 125 Hz, S/M + correlation, EBU LRA, section levels, D shape;
-  matches the critic's numbers: coast 1k −0.5, S/M −12.8, LRA 2.85 before). After: D bars 1–4 −7.3…−9.7 dB under B2
-  (was −1.3…−3.5), build bars rise monotonically (coast −24.8 → −23.2 → −21.3 → −18.2), LRA 4.2–5.4 LU (was 1.6–3.5).
-  drum lanes moved to music/groove.ts (player.ts 371 lines).
-- [x] M0 tonal balance (loop-level, src/audio/check-tone.ts; values = dB vs the 125 Hz octave). Kick re-rendered: body
-  150 → 56 → 47 Hz, holds ~35 ms then rings out over 0.42 s (the 50–56 Hz fundamental lands); side-chain depth
-  0.42 → 0.3; lead 0.85 → 0.4 with the wah sustain Q 3.8 → 2.2 and settle 1250 → 1700 Hz, flute partials 0.12 / 0.04 →
-  0.3 / 0.12; comping + horns dip −7.5 dB under lead notes (was −3.5, horns now on their own un-ducked under-lead gain);
-  hats −5 dB (and the 10.5 kHz sizzle peak +6 → +3 dB), ride / crash −3 dB, tambourine −2 dB; the bike loops gave the
-  hook's band back (wind centre 250 + 1100·v/20 Hz, was + 1700, wind −2 dB, roll −1.7 dB, chain −2 dB); per-song trims
-  (mountain lead 0.67 → 0.87, keys 0.7, drums 1.08). Before → after (coast): 63 Hz −2.5 → +0.2, 1 kHz −0.5 → −6.4,
-  8 kHz −4.5 → −10.0; all six songs: 63 −0.1…+0.4, 1 kHz −6.1…−8.6, 8 kHz −10.0…−14.5. Hook over the rest of the music +
-  bike at 20 m/s (A2): coast +4.3, city +4.4, mountain +3.2 dB (gate ≥ 3). Peaks −1.26…−6 dBFS, 0 clicks.
-  audio-check: the lead-LU and the r1 "60–150 Hz ≤ 40 %" gates are replaced by the loop tone gates (63 Hz −1…+3,
-  31.5 Hz ≤ −4, 1 kHz ≤ −6, 8 kHz ≤ −10) — the r3 target spectrum puts ≈ 50–59 % of the energy below 150 Hz by design;
-  bass stem window −11…−5 LU (the mids came down around it).
-- [x] M2 stereo image: Haas-widened brass (dry ±0.7, copy +12 ms) and pad (±0.75, +17 ms) at −3 dB each, clav panned −0.5,
-  two quiet early copies of the lead (11 ms left, 17 ms right, −8.9 dB: width without moving the hook), keys auto-pan
-  depth 0.32 → 0.7, hats 0.28 → 0.36, drum / clav reverb sends 0.11 → 0.15, the new reverb decorrelated (corr ≈ 0).
-  Width above 200 Hz (the low end stays mono): −8.0…−11.9 dB S/M (coast −10.2, was ≈ −15); full band −12.7…−17.6
-  (coast −15.3, was −12.8: the louder mono kick / bass the tone fix asked for dominates full-band energy), correlation
-  0.90–0.97. Gate: S/M above 200 Hz ≥ −12 dB. ≈ 10 extra nodes per band (panners / delays), ≈ 0.15 %.
+  (Host.bark(…, wait) → Barks.say → VoiceOpts.wait): instead of 'dropped' they take the one waiting slot and start when
+  the gate opens (placed where the speaker is then; first come keeps the slot, so the pelican's line still pre-empts the
+  rival's). The pelican's own lines outrank rival barks (priority 2 cuts a playing rival line; the loud-announcer block
+  and the bark gap are tracked apart). Clips prefetch 4 at a time, announcer → pelican → rivals. New permanent check tools/audio-check-barks.mjs (in
+  audio-check --game): long sloth bark cut by ann_ko → pelican_ko_1 +0 ms after cine end; repeat KO (516 ms cinematic) →
+  capybara_hurt +319 ms; player wrecked (493 ms) → pelican_hurt +460 ms. With HELD_WAIT 0 the last two FAIL (no bark).
+- [x] T4: createContext() throws at once when AudioContext is undefined and retries without the 32 kHz rate only for a
+  NotSupportedError; audio-check-robust asserts 0 "32 kHz" warnings in the no-constructor case (green).
+- [x] T2 + an honest gate: tools/audio-check-cpu.mjs takes the weapon ids from src/data/weapons.ts (9, was a non-existent
+  'fish'), fails on any '[audio] unknown' warning, and samples a control tab (one 32 kHz oscillator, second browser
+  context) with every phase: an overrun FAILS while the control reads < 1 %; loadavg no longer excuses anything.
+- [~] T0 / M1 audio-thread CPU. Method: paired A/B in a quiet page (toggle a part every 3 s, 8–12 pairs, mean ± s.e.).
+  Measured: convolution plate +2.17 ± 0.10 % vs the new loop reverb +0.75 ± 0.08 %; a resampling buffer source ≈ 2.2× a
+  unity-rate one (+0.30 vs +0.14 %); the pack burst's sounds +2.8 ± 0.5 % with random pitch, +0.6 ± 0.1 % without; any
+  feedback loop renders while connected; Haas widener +0.16, lead echoes +0.25, panner +0.04, keys auto-pan +0.13,
+  biquad +0.09 %. Changes: · music reverb = dsp/plate.ts (12 ms pre-delay → Σ → 16 ms truncated Schroeder allpass chain
+  as a mono ConvolverNode, peak-normalised → 4.8 kHz damping → × 0.73 → 21 ms loop delay; L after the diffuser, R one loop
+  later: corr ≈ 0, RT60 ≈ 0.9 s), tail 1.5 dB over the old plate's; unplugged 4 s after the last music (Engine.keepReverb
+  / tick). · drums: one pre-mixed stereo buffer per bar (drum-mix.ts, DrumKit.record / flush / cut, SongPlayer.drumBar;
+  same samples, takes, levels, pan law, open-hat choke). · note banks (bank.ts: the live voice rendered per pitch zone /
+  velocity / articulation in one OfflineAudioContext at boot, prepareSampleBanks in banks.ts) + JS pre-mix (premix.ts:
+  resample, bend-in, equal-power pan, release at the note-off) → one buffer source at rate 1 per chord / note for keys
+  (every chord ≤ 2 s), pad (16 kHz bank, voices ±0.6), clav and bass (+ its string transient; monophonic: a gain closes
+  the previous note in 6 ms). Solo A/B vs the live voices: pad −0.30 ± 0.06, bass −0.28 ± 0.09, clav −0.14 ± 0.09 %;
+  brass measured no cheaper (its voices sleep between stabs) and stays live. Banks ≈ 18 MB (keys 6, bass 7.3, pad 3.6,
+  clav 1.7). · lead2 octave doubles inside the lead voice (Lead sub oscillator). · sfx: short sounds render three takes
+  with a baked ±3 % pitch, heavy hits a baked 0.9 variant; cached takes play at rate 1; caps 24 → 16 voices, 4 → 3 per id.
+  · bike loops: wind / roll filter the shared noise (the wind loop was stereo + resampled), parameters move ≤ 25 Hz with
+  exact ramps (a playbackRate steered towards 1 never reached it and kept resampling). Gate (p50 / p90 %, control
+  0.3–0.4 %): baseline menu 4.85 / 8.63, race 5.78 / 7.76, pack 6.97 / 9.31, stretch 7.09 / 9.14. Now at load 6–9: menu
+  2.6–3.1 / 3.4–7.1, race 4.1–4.7 / 5.6–6.4, pack 4.7–5.4 / 6.2–7.3, stretch 4.5–5.7 / 5.5–7.4; at load 17–21 race
+  5.2–5.7, pack 6.0–6.9, stretch 5.3–6.7 → the gate passes at moderate load and still FAILS on a busy machine (a heavier
+  reference graph in another tab does not inflate like the game page, so the control cannot excuse it). Still costing:
+  loop reverb 0.75, glue comp 0.33 (it adds ≈ 2.7 dB make-up gain and ≈ 3 dB of peak control: kept), lead voice ≈ 0.25,
+  bike loops 0.35 %. Next levers: sampled lead, keys auto-pan baked into the pre-mix, fewer engine gain stages.
+- [x] M0 tonal balance (loop level, src/audio/check-tone.ts; dB vs the 125 Hz octave). Kick re-rendered (body 150 → 56 → 47
+  Hz, holds ~35 ms, rings out over 0.42 s); side-chain 0.42 → 0.3; lead 0.85 → 0.45 with the wah sustain Q 3.8 → 2.2 and
+  settle 1250 → 1700 Hz, flute partials 0.12 / 0.04 → 0.3 / 0.12; comping + horns dip −7.5 dB under lead notes (horns on
+  their own un-ducked under-lead gain); hats −5 dB (10.5 kHz sizzle peak +6 → +3 dB), ride / crash −3 dB, tambourine
+  −2 dB; the bike loops gave the hook's band back (wind centre 250 + 1100·v/20 Hz, wind −2 dB, roll −1.7, chain −2);
+  per-song trims (mountain lead 0.93, keys 0.92, bass 0.74, brass / pad up). Coast before → after: 63 Hz −2.5 → +0.2,
+  1 kHz −0.5 → −6.1, 8 kHz −4.5 → −10.1; all six songs: 63 −0.2…+0.4, 1 kHz −6.0…−7.5, 8 kHz −10.1…−14.3. Hook over the
+  rest of the music + bike at 20 m/s (A2): coast +5.4, city +4.1, mountain +3.1 dB (gate ≥ 3). Peaks −1.28…−6 dBFS, 0
+  clicks. audio-check: the lead-LU and r1 "60–150 Hz ≤ 40 %" gates are replaced by loop tone gates (63 Hz −1…+3, 31.5 Hz
+  ≤ −4, 1 kHz ≤ −6, 8 kHz ≤ −10; the r3 target spectrum puts ≈ 51–56 % of the energy below 150 Hz by design); bass stem
+  window −11…−5 LU. Mountain sits on several edges at once (1 kHz −6.0, hook +3.1, width −11.6).
+- [x] M2 stereo: pad voices pre-mixed ±0.6, horns panned +0.4, clav −0.55, keys auto-pan depth 0.32 → 0.85, hats 0.28 →
+  0.36, drum / clav reverb sends 0.11 → 0.15, lead send 0.29 → 0.38, a decorrelated reverb. Width above 200 Hz (the low
+  end stays mono): −8.9…−11.9 dB S/M (coast −11.1, was ≈ −15). Full band −13.1…−16.6 dB (coast −15.8, was −12.8) with
+  correlation 0.91–0.96: the louder mono kick / bass M0 asked for dominates full-band energy, so the critic's −10 dB
+  full-band target conflicts with M0. Gate: S/M above 200 Hz ≥ −12 dB.
+- [x] M3 macro-dynamics: Section.gainDb / shape (types.ts, compile.ts) → Band.section() at each section start, on a
+  section gain + a low-pass switched in only during a breakdown: every D is `shape: 'breakdown'` (bars 1–4 −6 dB behind
+  900 Hz, bars 5–8 climb in even dB steps to +2 dB as the filter opens to 14 kHz), A −3 dB (lighter opening), B2 +2 dB.
+  D bars 1–4 now −7.5…−8.7 dB under B2 (was −1.3…−3.5), builds rise bar by bar, LRA 4.1–5.1 LU (was 1.6–3.5). Gates: D
+  drop ≤ −6 dB, rising build, LRA ≥ 4 LU. Drum lanes moved to music/groove.ts (player.ts 371 lines).
 - [x] M5 groove: city hook bars 1 / 3 / 6 and mountain bars 1 / 3 / 5 / 6 push a note per bar onto the 'a' of a beat
-  (e.g. city bar 1 'G5 - Bb5 - C6 - . Eb6 - D6 - C6 Bb5 - G5 -': Eb6 anticipates beat 3; mountain bar 1 G5 on the 'a' of 1,
-  C6 on the 'a' of 3); lead2 follows (it is the hook an octave down); reviewer harmony.mjs flags unchanged (the accepted
-  13ths / #11s only). Lead legato glide: a note starting while the last still sounds (≤ 60 ms after its end, ≤ a fifth
-  away) slides from its pitch in 35 ms (Lead.note; scoops unchanged). Coast H1 hats 'xxOxxxOx…' → 'XoOoxoOoXoOoxoOo'
-  (quarters strong, 16ths soft, open hats on the off-8ths).
-- [x] M6 voices (TTS API reachable 10-19 03:55): tools/gen-tts.mjs voices every roster taunt (ROSTER_CAP taunts ∞, KO /
-  hurt lines 3) and matches every clip's active-speech RMS (20 ms frames above −50 dB, measured on the decoded PCM) to
-  −16 dB after loudnorm / trim (WAV in between, one MP3 encode, limiter −2 dBFS). 181 clips (was 92), 105 of the 109
-  roster taunts voiced (was 34; the rest are the 叮 bell / letter-less lines), 3.3 MB; active RMS −17.5…−14.5 dB (median
-  −16.2), countdown 三 / 二 / 一 / 冲 −16.4 / −16.4 / −16.1 / −16.5 (was −13.4 / −13.6 / −12.8 / −13.1), peaks ≤ −1.4 dBFS,
-  0.28–2.4 s; src/data/voice.ts regenerated.
-- [ ] M7 / T3 cross-unit (not audio's files): race/police.ts still calls app.audio.sfx('traffic.horn.police' /
-  'police.whistle' / knock). Core request below stands (police:whistle event + knocks via combat:hit); audio places
-  them like every world sound once emitted.
-- [~] T0 / M1 CPU, continued (paired A/B in a quiet page: toggle a part every 3 s, 8–12 pairs, mean ± s.e.;
-  shots/audio/fix3/probe-pairs / probe-blocks / probe-burst / probe-verbs.mjs). Findings: the loop reverb +0.75 ± 0.08 %
-  vs the convolution plate +2.17 ± 0.10 %; a Haas widener +0.16 %, the lead echoes +0.25 %, a panner +0.04 %, the keys
-  auto-pan +0.13 %, a biquad +0.09 %; a buffer source resampling (playbackRate ≠ 1) costs ≈ 2.2× a unity-rate one
-  (+0.30 vs +0.14 %): the pack burst's sounds cost +2.8 ± 0.5 % with the ±3 % random pitch and +0.6 ± 0.1 % without.
-  Changes: · brass and pad are note banks (bank.ts: the live voice rendered per pitch zone / velocity layer / articulation
-  in one OfflineAudioContext at boot; pad at 16 kHz) and every stab / chord is pre-mixed in JS (premix.ts: resample,
-  equal-power spread — horn slots 1+3 left / 2+4 right, pad voices ±0.45 —, release at the note-off, brass falls bend in
-  the mix) into one buffer source at rate 1 (brass-sampler.ts, pad-sampler.ts; the per-note shapes are shared with the
-  live voices, which still play until the banks exist); the Haas wideners are gone (the spread is baked). · keys: every
-  chord ≤ 2 s is one pre-mixed buffer with its release baked (no per-note sources, release automation or resampling).
-  · lead echoes removed (lead reverb send 0.29 → 0.5 for width, lead 0.45). · sfx: short sounds render three takes with
-  a baked ±3 % pitch and cached takes play at rate 1; voice caps 24 → 16 total, 4 → 3 per sound. · bike loops: wind and
-  roll filter the shared noise sources (k-rate cutoffs; the wind buffer was stereo and resampled), loop parameters move
-  at ≤ 25 Hz with exact linear ramps (a playbackRate steered towards 1 never reached it and kept resampling).
-  prepareSampleBanks() (banks.ts) replaces prepareKeySamples at the three call sites.
+  (e.g. city bar 1 'G5 - Bb5 - C6 - . Eb6 - D6 - C6 Bb5 - G5 -'); lead2 follows; reviewer harmony.mjs flags unchanged.
+  Lead legato glide: a note starting ≤ 60 ms after the last one ends (≤ a fifth away) slides from its pitch in 35 ms.
+  Coast H1 hats 'xxOxxxOx…' → 'XoOoxoOoXoOoxoOo'.
+- [x] M6 voices (TTS API reachable 10-19 03:55): gen-tts voices every roster taunt (KO / hurt lines: first 3) and matches
+  every clip's active-speech RMS (20 ms frames above −50 dB, decoded PCM) to −16 dB after loudnorm / trim (WAV in
+  between, one MP3 encode, limiter −2 dBFS). 181 clips (was 92), 105 of 109 roster taunts voiced (was 34; the rest are
+  叮 / letter-less), 3.1 MB, active RMS −17.5…−14.5 dB (median −16.2); 三 / 二 / 一 / 冲 −16.4 / −16.4 / −16.1 / −16.5 (was
+  −13.4 / −13.6 / −12.8 / −13.1); peaks ≤ −1.4 dBFS; src/data/voice.ts regenerated.
+- [x] Requests to audio in other status files: content #7 / core "regenerate barks for content's new roster lines" — done
+  (M6: every roster taunt + the first 3 KO / hurt lines voiced); content #9 (player barks) — done in round 2.
+- [ ] M7 / T3 cross-unit: race/police.ts still calls app.audio.sfx('traffic.horn.police' / 'police.whistle' / knock);
+  the request under "Core requests" stands (police:whistle event + knocks via combat:hit).
+- Verification (10-19 06:10): tsc clean; `node tools/audio-check.mjs` offline + game + start + adaptive + barks + robust
+  green (check-full-3.log + the bell / barks / robust re-runs after the bark-priority fix: with every taunt voiced, a
+  rival bark had taken the channel before the pelican's bell taunt); in game 0 __br.errors, race mix peak −3.3…−4.1 dBFS /
+  rms −19.7…−20.1 (shots/audio/fix3/race.jpg, lab.jpg). CPU part of that run: menu 2.31 / 3.09, race 5.53 / 7.40,
+  pack 5.58 / 6.56, stretch 5.00 / 6.30 → race / pack p50 FAIL (T0 stays [~]).

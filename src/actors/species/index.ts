@@ -5,6 +5,7 @@ import { riderMaterial } from '../kit/material';
 import type { CharacterId, Quality } from '../../core/types';
 import { CharacterBuilder } from '../kit/builder';
 import { hullFor } from '../kit/outline';
+import { cullable } from '../lod';
 import { createRig, type Rig } from '../rig/skeleton';
 import { capybara } from './capybara';
 import { cat } from './cat';
@@ -63,9 +64,9 @@ export function instantiate(id: CharacterId, quality: Quality, outlineWidth = 0.
   mesh.name = `body:${asset.def.id}`;
   mesh.add(rig.bones[0] as SkinnedMesh['skeleton']['bones'][number]);
   mesh.bind(rig.skeleton, new Matrix4());
-  mesh.frustumCulled = false;
   mesh.castShadow = true;
   const hull = hullFor(mesh, outlineWidth) as SkinnedMesh;
   mesh.add(hull);
+  cullable(mesh, hull);
   return { mesh, hull, rig, def: asset.def };
 }

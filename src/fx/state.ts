@@ -1,10 +1,11 @@
 // Shared post-processing parameters. Writers: system (grade + speed, every frame), react/* (pulses),
 // ko/* (cinematic look). Reader: post/composite (uniforms). Pulses decay in real time.
-import { Color, Vector2 } from 'three';
+import { Color, Vector2, type Object3D } from 'three';
 import { clamp01 } from '../core/math';
+import type { CastRole } from './post/mask';
 
-/** Track look, eased toward the current track's EnvLook.grade. */
-export interface GradeState { saturation: number; contrast: number; tint: Color; exposure: number; bloom: number; threshold: number }
+/** Track look, eased toward the current track's EnvLook.grade; `wb` = sRGB white balance for KO cast colours. */
+export interface GradeState { saturation: number; contrast: number; tint: Color; exposure: number; bloom: number; threshold: number; wb: Color }
 
 /** Speed sensation, recomputed from the player each frame; `rush` = the release-whoosh share (never masked by the KO look). */
 export interface SpeedState { edgeBlur: number; chroma: number; lines: number; rush: number }
@@ -27,6 +28,8 @@ export interface CineState {
   subjectDepth: number; // view-space distance of the subject (m), for the burst mask
   bgMargin: number;    // metres behind the subject before the burst takes over
   behindAt: number;    // metres behind the subject where the dark 'behind' band starts (ult: past the farthest victim)
+  cast: Map<Object3D, CastRole>; // rider / vehicle roots for the subject mask (empty = depth-only look)
+  hide: Set<Object3D>; // riders between the lens and a victim, skipped while the comic look is on
 }
 
 /** One-shot pulses (decay automatically). */
@@ -41,11 +44,11 @@ export interface PulseState {
 }
 
 export class PostState {
-  readonly grade: GradeState = { saturation: 1, contrast: 1, tint: new Color(1, 1, 1), exposure: 1, bloom: 0.2, threshold: 1 };
+  readonly grade: GradeState = { saturation: 1, contrast: 1, tint: new Color(1, 1, 1), exposure: 1, bloom: 0.2, threshold: 1, wb: new Color(1, 1, 1) };
   readonly speed: SpeedState = { edgeBlur: 0, chroma: 0, lines: 0, rush: 0 };
   readonly cine: CineState = {
     ko: 0, halftone: 0, zoom: 0, lines: 0, heroLines: 0, focus: new Vector2(0.5, 0.5), red: 0, grain: 0, vignette: 0, letterbox: 0,
-    bgBurst: 0, burstInk: 0, rim: 0, subjectDepth: 4, bgMargin: 3, behindAt: 2,
+    bgBurst: 0, burstInk: 0, rim: 0, subjectDepth: 4, bgMargin: 3, behindAt: 2, cast: new Map(), hide: new Set(),
   };
   readonly pulse: PulseState = {
     damage: 0, flash: 0, flashColor: new Color(1, 1, 1), chroma: 0, impact: 0, impactColor: new Color(1, 1, 1), whoosh: 0,
@@ -101,6 +104,8 @@ export class PostState {
     c.bgMargin = 3;
     c.behindAt = 2;
     c.focus.set(0.5, 0.5);
+    c.cast.clear();
+    c.hide.clear();
   }
 
   reset(): void {

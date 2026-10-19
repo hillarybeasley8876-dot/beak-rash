@@ -39,6 +39,7 @@ interface Playing {
 const STALE = 1.4;        // s: queued announcer lines older than this are dropped
 const BARK_GAP = 1.3;     // s between character barks
 const LOUD = 3;           // announcer priority that silences barks while it speaks
+const PREFETCH = 4;       // clips fetched / decoded at once
 const FADE = 0.07;        // s: a cut line's fade-out
 
 export class VoicePlayer {
@@ -47,8 +48,9 @@ export class VoicePlayer {
   private byText = new Map<string, string>();
   /** When each channel's line ends (or ended, when it was cut). */
   private busy: Record<VoiceChannel, number> = { announcer: 0, bark: 0 };
-  /** Earliest start of the next bark: the gap after a bark, or the end of a loud announcer line. */
-  private barkGate = 0;
+  /** Earliest start of the next bark: the gap after the last bark, and the end of a loud announcer line. */
+  private barkUntil = 0;
+  private loudUntil = 0;
   private current: Record<VoiceChannel, Playing | null> = { announcer: null, bark: null };
   private pending: { id: string; opts: VoiceOpts; at: number } | null = null;
   private pendingBark: { id: string; opts: VoiceOpts; at: number } | null = null;
@@ -64,15 +66,15 @@ export class VoicePlayer {
     return this.byText.get(text) ?? null;
   }
 
-  /** Load clips in the background, two at a time. */
+  /** Load clips in the background, four at a time: the announcer first, then the pelican, then the rivals. */
   prefetch(ids: string[] = Object.keys(VOICE)): void {
-    const queue = ids.filter((id) => !this.clips.has(id) && !this.loading.has(id));
+    const rank = (id: string): number => (VOICE[id]?.speaker === 'announcer' ? 0 : VOICE[id]?.speaker === 'pelican' ? 1 : 2);
+    const queue = ids.filter((id) => !this.clips.has(id) && !this.loading.has(id)).sort((a, b) => rank(a) - rank(b));
     const next = (): void => {
       const id = queue.shift();
       if (id) void this.load(id).then(next);
     };
-    next();
-    next();
+    for (let k = 0; k < PREFETCH; k++) next();
   }
 
   private load(id: string): Promise<Clip> {
@@ -108,6 +110,7 @@ export class VoicePlayer {
     if (!(id in VOICE)) return 'none';
     const now = this.engine.now;
     const channel = opts.channel ?? 'announcer';
+    if (channel === 'bark' && !this.paused && now < this.barkUntil && now >= this.loudUntil && this.outranks(opts)) this.cut('bark');
     if (channel === 'bark' && (this.paused || now < this.barkGate)) return this.waitForBark(id, opts);
     const clip = this.clips.get(id);
     if (clip === 'missing') return 'none';
@@ -131,6 +134,16 @@ export class VoicePlayer {
     }
     this.start(id, clip, opts, channel);
     return 'started';
+  }
+
+  private get barkGate(): number {
+    return Math.max(this.barkUntil, this.loudUntil);
+  }
+
+  /** A more important bark (the player's own line) cuts the rival line that is playing. */
+  private outranks(opts: VoiceOpts): boolean {
+    const cur = this.current.bark;
+    return cur !== null && (opts.priority ?? 1) > cur.priority;
   }
 
   /** A bark that may wait (a KO line held for the cinematic's end) takes the one waiting slot. */
@@ -166,7 +179,7 @@ export class VoicePlayer {
     if (channel === 'bark') {
       pan = new StereoPannerNode(ctx, { pan: Math.max(-1, Math.min(1, where?.pan ?? opts.pan ?? 0)) });
       head = head.connect(pan);
-      this.barkGate = now + clip.duration + BARK_GAP;
+      this.barkUntil = now + clip.duration + BARK_GAP;
     }
     head.connect(this.engine.voiceIn);
     src.start(now);
@@ -179,7 +192,7 @@ export class VoicePlayer {
       if (priority >= LOUD) {
         // A big call (countdown, KO, SHOWTIME, finish): character lines step aside until it ends.
         this.cut('bark');
-        this.barkGate = Math.max(this.barkGate, now + clip.duration + 0.25);
+        this.loudUntil = Math.max(this.loudUntil, now + clip.duration + 0.25);
       }
     }
   }
@@ -195,7 +208,7 @@ export class VoicePlayer {
     this.current[channel] = null;
     // The line stopped now: its remaining length (and a bark's gap after it) no longer blocks anything.
     this.busy[channel] = Math.min(this.busy[channel], now + FADE);
-    if (channel === 'bark') this.barkGate = Math.min(this.barkGate, now + FADE);
+    if (channel === 'bark') this.barkUntil = Math.min(this.barkUntil, now + FADE);
   }
 
   /** Per frame: play the queued announcer line when free, move barks with their speaker, release the duck. */

@@ -1,21 +1,22 @@
 // AI director: one Brain per AI rider (and the player on autopilot), shared perception and racing
-// line, pace-normalised rubber band (pace.ts), one hunter on the player at a time, the hunt budget
+// line, today's form (form.ts) and the pace-normalised rubber band (pace.ts), one hunter on the player at a time, the hunt budget
 // (hits landed on the player), grudges (rivals the player hits), bell after overtaking the player, taunts.
 import type { Session } from '../../../core/contracts';
-import type { Rng } from '../../../core/rng';
 import type { RiderId, RiderState } from '../../../core/types';
-import { riderRating } from '../grid';
+import type { BlunderGate } from './blunder';
 import { Brain, type AiWorld } from './brain';
 import type { HuntToken } from './fight';
+import { paceOffset, type FormTable } from './form';
 import { buildRacingLine } from './line';
 import { basePace, easeRubber, paceCap, paybackPace, unseenBehind } from './pace';
 import { makePersonality } from './personality';
 import { Senses } from './sense';
 import { Taunts } from './taunts';
 
-const PACE_SPREAD = 0.02;   // ± pace offset between the best and the worst rival of the day
-const RANK_WEIGHT = 0.25;   // share of the offset that comes from strength rank (the rest is today's form)
 const RECOVER = 12;         // s after a respawn without catch-up (a KO buys a real gap)
+const BLUNDERS = 1;         // in-view traffic blunders per race (blunder.ts)…
+const BLUNDER_FROM = 15;    // …not before this race time…
+const BLUNDER_AHEAD = [-4, 30] as const;  // …by a rival this far ahead of the player (close in the chase camera)
 
 export interface AiDirector {
   preStep(dt: number, countdownTime: number): void;
@@ -23,18 +24,8 @@ export interface AiDirector {
   dispose(): void;
 }
 
-/**
- * Per-rider pace offsets within ±PACE_SPREAD: mostly today's form (per race dice), a quarter from strength
- * rank (strongest +, weakest −), so the favourites start a little quicker without owning the podium.
- */
-function paceOffsets(riders: readonly RiderState[], rng: Rng): Map<RiderId, number> {
-  const rivals = riders.filter((r) => !r.isPlayer).sort((a, b) => riderRating(b) - riderRating(a));
-  const n = Math.max(1, rivals.length - 1);
-  const offset = (rank: number): number => PACE_SPREAD * (RANK_WEIGHT * (1 - (2 * rank) / n) + (1 - RANK_WEIGHT) * rng.range(-1, 1));
-  return new Map(rivals.map((r, i) => [r.id, offset(i)]));
-}
-
-export function createAi(session: Session): AiDirector {
+/** `form` = today's form of every rival (form.ts): personality dice and pace offsets. */
+export function createAi(session: Session, form: FormTable): AiDirector {
   const { config, track, app } = session;
   const rng = session.rng.fork(0xa1);
   const line = buildRacingLine(track);
@@ -43,17 +34,27 @@ export function createAi(session: Session): AiDirector {
   for (const r of session.riders) {
     const c = session.controls.get(r.id);
     if (!c) continue;
-    const p = makePersonality(r.character, config.level, rng.fork(r.id + 1));
+    const p = makePersonality(r.character, config.level, rng.fork(r.id + 1), form.get(r.id));
     brains.set(r.id, new Brain(r, c, p, rng.fork(0x100 + r.id), token));
   }
-  const offsets = paceOffsets(session.riders, rng.fork(0xf0f));
+  const offsets = new Map(session.riders.filter((r) => !r.isPlayer).map((r) => [r.id, paceOffset(r, form.get(r.id))]));
   const taunts = new Taunts(session, rng.fork(0x7a), (id) => brains.get(id)?.p.taunty ?? 1);
   const lastDs = new Map<RiderId, number>();
   const respawnAt = new Map<RiderId, number>();
+  let blunders = config.traffic ? BLUNDERS : 0;
+  const blunder: BlunderGate = {
+    may: (r) => {
+      const ahead = r.s - session.player.s;
+      return blunders > 0 && !r.isPlayer && session.phase === 'racing' && session.time > BLUNDER_FROM
+        && app.rig.mode === 'chase' && ahead > BLUNDER_AHEAD[0] && ahead < BLUNDER_AHEAD[1];
+    },
+    spend: () => { blunders--; },
+  };
   const world: AiWorld = {
     phase: session.phase, countdownTime: 0, time: 0, riders: session.riders, player: session.player, line,
     senses: new Senses(session),
     bounds: (s) => track.bounds(s),
+    blunder,
   };
   const offs = [
     app.bus.on('combat:hit', ({ attacker, victim, blocked }) => {

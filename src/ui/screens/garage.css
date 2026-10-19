@@ -48,3 +48,9 @@
 .br-gar-action.is-equipped { background: #3a3a44; box-shadow: none; }
 .br-gar-action.is-poor { background: #55555e; }
 .br-gar-coins { position: absolute; right: 70px; top: 64px; }
+/* Stat comparison: caption + ± badges against the equipped bike; joke bikes carry a 整活 sticker. */
+.br-gar-vs { align-self: flex-start; margin: 0 0 2px 10px; padding: 1px 12px 0; background: var(--ink); color: rgba(255, 255, 255, 0.85); font-family: var(--f-cn-block); font-size: 22px; transform: skewX(var(--skew)); }
+.br-gar-stats { top: 666px; gap: 5px; }
+.br-gar-stats .br-stat-segs i { height: 25px; }
+.br-gar-joke { margin-left: 12px; padding: 0 8px; background: var(--ink); color: var(--white); font-style: normal; font-family: var(--f-cn-block); font-size: 20px; rotate: -6deg; box-shadow: 3px 3px 0 var(--red); }
+.br-gar-row.is-focus .br-gar-joke { background: var(--red); color: var(--white); }

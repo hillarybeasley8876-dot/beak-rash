@@ -20,6 +20,10 @@ export interface FramingDef {
   lookUp?: number;
   /** NDC y the subject sphere is centred on (+ = upper part of the frame). */
   bias?: number;
+  /** Score bonus (subtracted) for a preferred, geometry-built framing. */
+  bonus?: number;
+  /** SHOWTIME pan share toward the other victims (ShotFraming.pan). */
+  pan?: number;
 }
 
 export const FRAMINGS: Record<Kind, FramingDef[]> = {
@@ -49,12 +53,38 @@ export const FRAMINGS: Record<Kind, FramingDef[]> = {
 /** SHOWTIME impact with nobody hit: a wide low shot of the impact point. */
 export const ULT_WIDE: FramingDef = { id: 'wide', azimuth: 35, orbit: 16, dist: [7.0, 6.0], height: [1.6, 2.3], fov: [60, 54], lookUp: 0.6 };
 
+const OTS = { back: 2.4, side: 1.3, bias: 0.15, fov: [18, 50] as const };
+
+/**
+ * SHOWTIME impact, low over the pelican's shoulder: the eye sits OTS.back behind the impact point (away
+ * from the hero victim) and OTS.side to its left, ~1.1 m up, so the victims stand against the rays and
+ * the pelican is a foreground edge. The FOV makes the hero's subject sphere fill FIT_NDC - bias of the
+ * half-height from there (the shot's fit then keeps it). Built for the left side; the picker mirrors it.
+ * Null when the hero is too close to the impact for a shoulder (the raised 3/4 framings cover that).
+ */
+export function ultOverShoulder(impact: Vector3, hero: Vector3, heading: Vector3, radius: number): FramingDef | null {
+  const ux = hero.x - impact.x;
+  const uz = hero.z - impact.z;
+  const d = Math.hypot(ux, uz);
+  if (d < 3 || radius <= 0) return null;
+  const ex = impact.x - (ux / d) * OTS.back + (uz / d) * OTS.side - hero.x;
+  const ez = impact.z - (uz / d) * OTS.back - (ux / d) * OTS.side - hero.z;
+  const dist = Math.hypot(ex, ez);
+  let az = Math.atan2(ex, ez) - Math.atan2(heading.x, heading.z);
+  az = Math.atan2(Math.sin(az), Math.cos(az));
+  const fov = clamp((2 * Math.atan(radius / ((FIT_NDC - OTS.bias) * dist))) / DEG, OTS.fov[0], OTS.fov[1]);
+  return {
+    id: 'ultOts', azimuth: az / DEG, orbit: 3, dist: [dist, dist], height: [1.15, 1.05], fov: [fov, fov * 0.93],
+    lookUp: 0, bias: OTS.bias, bonus: 1.2, pan: 0,
+  };
+}
+
 /** Camera on the left (+1) or right (−1) of the subject. Heading −Z with +X right: azimuth > 0 = left. */
 export function framingOf(def: FramingDef, side: 1 | -1, heading: Vector3, duration: number): ShotFraming {
   return {
     heading, duration, azimuth: side * def.azimuth * DEG, orbit: side * def.orbit * DEG,
     dist: def.dist, height: def.height, fov: def.fov, roll: def.roll === undefined ? undefined : side * def.roll * DEG, lookUp: def.lookUp,
-    bias: def.bias,
+    bias: def.bias, pan: def.pan,
   };
 }
 
@@ -80,15 +110,15 @@ const RIDER_R = 0.7;
  * How badly a rider at p hides the subject seen from `eye` (angular overlap with rough body radii):
  * 2 = nearer than the subject and right over it, 1 = partly over it, 0.5 = crowding it from just behind.
  */
-function blocks(p: Vector3, eye: Vector3, focus: Vector3, ab: Vector3, ap: Vector3): number {
+function blocks(p: Vector3, eye: Vector3, focus: Vector3, ab: Vector3, ap: Vector3, radius = RIDER_R): number {
   ab.subVectors(focus, eye);
   ap.subVectors(p, eye);
   const len = ab.length();
   const dp = ap.length();
   if (len < 1e-3 || dp < 1e-3) return 0;
-  if (dp >= len) return p.distanceTo(focus) < 1.2 ? 0.5 : 0;
+  if (dp >= len) return p.distanceTo(focus) < 0.5 + radius ? 0.5 : 0;
   const ang = Math.acos(clamp(ab.dot(ap) / (len * dp), -1, 1));
-  const overlap = Math.atan(SUBJECT_R / len) + Math.atan(RIDER_R / dp);
+  const overlap = Math.atan(SUBJECT_R / len) + Math.atan(radius / dp);
   if (ang < overlap * 0.6) return 2;
   return ang < overlap ? 1 : 0;
 }
@@ -102,8 +132,8 @@ export interface PickInput {
   s: number;
   heading: Vector3;
   duration: number;
-  /** Riders that must not stand between the eye and the subject (world body point + velocity). */
-  others: Array<{ readonly pos: Vector3; readonly vel: Vector3 }>;
+  /** Riders / vehicles that must not stand between the eye and the subject (world centre, velocity, radius m). */
+  others: Array<{ readonly pos: Vector3; readonly vel: Vector3; readonly r?: number }>;
   /** Subject velocity (a wrecked body keeps ~70 % of its speed, so riders close in on a front camera). */
   focusVel: Vector3;
   /** Side the attacker rule prefers (+1 left / −1 right). */
@@ -131,7 +161,7 @@ export function pickFraming(o: PickInput): { framing: ShotFraming; id: string } 
     for (const side of [o.prefer, -o.prefer as 1 | -1]) {
       const framing = framingOf(def, side, o.heading, o.duration);
       const minDist = (o.fitRadius ?? 0) / ((FIT_NDC - Math.abs(def.bias ?? 0)) * Math.tan((def.fov[0] * DEG) / 2));
-      let score = side === o.prefer ? 0 : 0.6;
+      let score = (side === o.prefer ? 0 : 0.6) - (def.bonus ?? 0);
       if (def.id === o.avoid) score += 1.5;
       let room = 0;
       let occ = 0;
@@ -142,7 +172,7 @@ export function pickFraming(o: PickInput): { framing: ShotFraming; id: string } 
         for (const r of o.others) {
           moved.subVectors(r.vel, o.focusVel).multiplyScalar(0.3 * t).add(r.pos);
           // Blocked only if the line to the head is blocked too (a high eye looks over a rider beside the victim).
-          const hit = Math.min(blocks(moved, eye, o.focus, ab, ap), blocks(moved, eye, head.copy(o.focus).setY(o.focus.y + HEAD_UP), ab, ap));
+          const hit = Math.min(blocks(moved, eye, o.focus, ab, ap, r.r), blocks(moved, eye, head.copy(o.focus).setY(o.focus.y + HEAD_UP), ab, ap, r.r));
           occ += hit * (t === 0 ? 3 : 1.5);
         }
       }

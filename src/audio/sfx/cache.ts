@@ -20,7 +20,7 @@ const MAX_S = 3.2;
 export class SfxCache {
   private takes = new Map<string, AudioBuffer[]>();
   private queued = new Set<string>();
-  private queue: Array<{ id: string; fn: SfxFn; dur: number | null }> = [];
+  private queue: Array<{ id: string; fn: SfxFn; dur: number | null; pitch: number }> = [];
   private seconds = 0;
   private running = false;
   private next = 0;
@@ -35,11 +35,14 @@ export class SfxCache {
     return list[this.next % list.length] ?? null;
   }
 
-  /** Render `id` in the background (once); `dur` = its length at pitch 1 (null = not known yet). */
-  request(id: string, fn: SfxFn, dur: number | null): void {
+  /**
+   * Render `id` in the background (once); `dur` = its length at pitch 1 (null = not known yet);
+   * `pitch` bakes a fixed tape speed into the takes (a variant played at rate 1, e.g. heavy hits).
+   */
+  request(id: string, fn: SfxFn, dur: number | null, pitch = 1): void {
     if (this.takes.has(id) || this.queued.has(id) || (dur !== null && dur <= 0) || this.seconds + (dur ?? 1) > BUDGET_S) return;
     this.queued.add(id);
-    this.queue.push({ id, fn, dur });
+    this.queue.push({ id, fn, dur, pitch });
     if (!this.running) void this.drain();
   }
 
@@ -47,10 +50,11 @@ export class SfxCache {
     this.running = true;
     for (let job = this.queue.shift(); job; job = this.queue.shift()) {
       try {
-        const first = await this.render(job.fn, job.dur, 1);
+        const first = await this.render(job.fn, job.dur, job.pitch);
         const list = [first];
         if (first.duration < SHORT_S) {
-          for (const pitch of TAKE_PITCHES.slice(1)) list.push(await this.render(job.fn, first.duration, pitch));
+          const atOne = first.duration * job.pitch;
+          for (const p of TAKE_PITCHES.slice(1)) list.push(await this.render(job.fn, atOne, job.pitch * p));
         }
         this.takes.set(job.id, list);
         this.seconds += list.reduce((s, b) => s + b.duration, 0);

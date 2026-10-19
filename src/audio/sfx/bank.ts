@@ -41,6 +41,8 @@ export const PREWARM_RACE = [
  *  two nodes the realtime thread renders, and a dozen overlapping hits already mask each other). */
 const MAX_ACTIVE = 16;
 const PER_ID_DEFAULT = 3;
+/** Pitches asked for often enough to get their own pre-rendered takes (heavy hits). */
+const BAKED_PITCHES = new Set([0.9]);
 const PER_ID: Record<string, number> = { 'ui.count': 2, 'ui.move': 2, 'bike.bump': 2, 'swing.light': 2, 'ko.boom': 2 };
 
 interface Active {
@@ -93,22 +95,29 @@ export class SfxPlayer {
     if (same.length >= (PER_ID[id] ?? PER_ID_DEFAULT) && !this.steal(same, vol, t)) return 0;
     if (this.active.length >= MAX_ACTIVE && !this.steal(this.active, vol, t)) return 0;
     const ctx = this.engine.ctx;
-    const take = this.cache?.get(id) ?? null;
+    // Cached takes play at rate 1 (resampling costs the audio thread ≈ 2×): a common pitch has
+    // its own baked variant; any other pitch resamples the plain take.
+    const asked = Math.max(0.25, opts.pitch ?? 1);
+    const variant = asked === 1 ? id : BAKED_PITCHES.has(asked) ? `${id}@${asked}` : null;
+    const baked = variant !== null ? this.cache?.get(variant) ?? null : null;
+    const take = baked ?? this.cache?.get(id) ?? null;
     const out = new GainNode(ctx, { gain: take ? vol : 1 });
     let head: AudioNode = out;
     if (opts.lowpass !== undefined && opts.lowpass < 14000) head = head.connect(filter(ctx, { type: 'lowpass', frequency: opts.lowpass, Q: 0.7 }));
     if (opts.highpass !== undefined && opts.highpass > 30) head = head.connect(filter(ctx, { type: 'highpass', frequency: opts.highpass, Q: 0.7 }));
     this.route(head, opts);
-    // Live world sounds vary ±3 % so repeats never machine-gun (cached takes bake that variation in
-    // and play at rate 1 unless a pitch is asked for); UI sounds stay exact.
+    // Live world sounds vary ±3 % so repeats never machine-gun (cached takes bake that variation
+    // in); UI sounds stay exact.
     const vary = take || id.startsWith('ui.') ? 1 : 1 + (this.rng.next() - 0.5) * 0.06;
-    const pitch = Math.max(0.25, (opts.pitch ?? 1) * vary);
+    const pitch = asked * vary;
     let dur: number;
     if (take) {
-      const src = new AudioBufferSourceNode(ctx, { buffer: take, playbackRate: pitch });
+      const rate = baked ? 1 : asked;
+      const src = new AudioBufferSourceNode(ctx, { buffer: take, playbackRate: rate });
       src.connect(out);
       src.start(t);
-      dur = take.duration / pitch;
+      dur = take.duration / rate;
+      if (!baked && variant !== null) this.cache?.request(variant, fn, take.duration, asked);
     } else {
       dur = fn({ ctx, out, t, vol, pitch, rng: this.rng });
       this.cache?.request(id, fn, dur * pitch);

@@ -31,8 +31,8 @@
 
 /* The EN line ends left of / above the hero's beak (H box ≤ x 840; the beak hook tops out near 850,480),
    at 16:9 and 16:10 alike (the art sits in the stage). */
-.br-title-logo { position: absolute; left: 96px; top: 100px; rotate: -7deg; transform-origin: left center; }
-.br-title-cn { display: flex; font-size: 196px; }
+.br-title-logo { position: absolute; left: 96px; top: 116px; rotate: -7deg; transform-origin: left center; }
+.br-title-cn { display: flex; font-size: 184px; }
 .br-title-en { display: flex; margin: 22px 0 0 24px; font-size: 104px; --delay: 220ms; }
 
 .br-title-sub {

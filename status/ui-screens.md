@@ -67,8 +67,9 @@
 ## How to test
 - `node tools/ui-tour.mjs` (add `--real` to use every real unit) → shots/ui-tour/<size>/NN-*.png.
 - `node tools/ui-input.mjs [--real]` → modal Space/pad A/B, results mash (Space 180/450 ms, fake pad B 220 ms,
-  arm delay, default focus), title ignores back keys, double-click, pills/ticks, reduced motion, parked
-  pointer, locked-click toast (exits 1 on failure).
+  arm delay, default focus, first Space after arming nudges, Space / pad A every 0.8 s leave in ≤ 2 presses),
+  records sheet (pad LB/B/A, TAB/Space, d-pad after), title ignores back keys, double-click, pills/ticks,
+  reduced motion, parked pointer, locked-click toast (exits 1 on failure).
 - `node tools/ui-comfort.mjs` → auto-pause (blur / hidden / pad lost), key hold-to-repeat, reset locked
   mid-race, toast quiet in cine:ko, unlock tag, results back hint, credits wheel + reduced motion, quality
   restart offer (reloads the page), no scrolled UI boxes.
@@ -187,3 +188,137 @@ Checklist (I = interaction, A = art; [x] = done + verified):
   if core forwards directional repeats to onAction listeners, delete key-repeat.ts.
 - ScreenCtx.confirmGap() was replaced by sincePress() (ms since the latest key / pad press of any action).
 - track A7 (intro title card over the START header) belongs to ui-hud / race (intro cards), not ui-screens.
+
+## Acceptance round 1
+Reviews: reviews/game-r1-{aesthetic,e2e,feel,interaction,perf}.json, owner ui-screens (16 issues).
+Checklist ([x] = done + verified, [-] = skipped with reason):
+- [-] e2e#4 (major) character select: skipped per SPEC design decision (pelican is the only playable hero).
+- [x] int#1 (major) career finale: progress.ts isCupFinal/isCareerFinal/cupCleared/careerCleared + Reward.clear
+      (first top-3 on a cup's last event pays CLEAR_BONUS 300/600/1000 as a breakdown row). Results: title-row
+      stamp ★ <杯名> CUP CLEAR! / ★ 巡回赛通关 CAREER CLEAR! (pops 1.5 s + ui.unlock); after the final event 下一站
+      becomes 通关！ FINALE → credits finale (screens/finale.ts token: header 通关 CAREER CLEAR, trophy card +
+      three cup chips, bubble line, Esc → career ladder); disabled 下一站 on the final event says 已经是最后一站了：
+      前三名即可通关. Career ladder: inked CLEAR! stamp per cleared cup, ★ 巡回赛通关 chip by the stats, detail row
+      目标 = 前 3 名解锁下一站 / 通关<杯名> / 通关巡回赛. Verified (stubs, 1920): final 1st → +1000, 通关 focused →
+      credits finale → Esc → career with 3 stamps; cup 1 clear; final 5th; repeat clear (no bonus); 0 errors.
+- [x] e2e#8 results: a confirm that arrives as a hop twin (Space / pad A) needs ≥ 1 s since the previous press
+      (shell ctx.pressGap()); Enter always works once armed. Default focus never RETRY: 下一站 / 通关！ in a career
+      (巡回赛 when locked), 主菜单 after a quick race. ui-input: Space right after arming + 400 ms rhythm do nothing.
+- [x] int#4 results: shell notes a press on every window pointerdown on menu screens (clicks delay arming like
+      keys); row clicks wait 350 ms after arming (slide-in); a click anywhere skips the show. ui-input clickChecks.
+- [x] int#3 title: pad START (pause without a back twin) proceeds; Esc still ignored (isDown('back')); menu: pad
+      START = confirm (keyboard Esc's pause twin is ignored there). ui-input: 4 new title/menu checks pass.
+- [x] int#6 pause 退出比赛 in a career race: quitRace, then go('career') focused on that event (remember). Verified
+      (stubs + real): quick → menu, career city T1 → career, focus index 1.
+- [x] int#8 loading: same track again from pause / results (restart, 再来一局) holds 0.5 s instead of 2 s
+      (module-level lastTrack). Real units: fresh start → race 4.3 s, pause restart → race 2.4 s.
+- [x] int#11 settings: rows with > 2 options (画质, 慢镜头) clamp at their ends (ui.deny), 2-option toggles wrap;
+      pressing the lit first meter tick again mutes (meter onPick gets a drag flag, so dragging never toggles).
+      ui-input: 6 new settings checks pass.
+- [x] int#14 title logo: CN row 196 → 184 px, logo top 100 → 116, and the last glyph (鹕, where the -7° tilt lifts
+      most) gets k 1 / dy .05em / r +1.5°. Glyph tops now 11 / 16 / 22 / 57 px inside at 1280 / 1920 / 2560 /
+      1440×900; the EN H box moved 2 px (still ends left of the beak).
+- [x] int#5 key art: p5 preloadArt() (boot: title decoded before boot ends, cap 1.5 s; menu / garage / loading
+      vignettes warm in the background) + artReady(img, cap) as ready on title / menu / garage (1.2 s) and loading
+      (0.3 s), so the wipe reveals the art in place. Cold start (fresh browser): title settles at 1.9 s with its art
+      decoded; menu and garage art decoded at reveal.
+- [x] perf#8 loading: bar (scaleX) + runner (a road-wide box moved by translateX(p×100 %)) glide on CSS transform
+      transitions (creep to 90 % over 6 s, real progress 0.5 s, leave 0.3 s); JS sets targets + reads the % text
+      from the computed transform. No per-frame 'left' writes. Verified: runner at 0.7 s = 29 % (real units).
+- [x] int#10 settings row 动态效果 MOTION (跟随系统 / 减弱 / 完整), ui-side pref in localStorage 'beak-rash.motion'
+      (p5/motion-pref.ts; core request below): .br-ui.is-reduced = the CSS kill-switch, .is-full-motion opts out
+      of the OS query; p5 reducedMotion() honours it (wipe shards, credits scroll, coin count-up). Reset save
+      resets it. Rows 74 → 66 px so 10 rows fit (list ends at 968, hints at 1008). Enter cycles choices (wraps),
+      ←→ clamp. ui-input motion checks + ui-comfort (reset row found by class) pass.
+- [x] ae#13 garage turntable: bikes shorter than the road bike (Box3 length < 1.39 m) grow about the clamp
+      (≤ 1.6×, wheels kept above the drawn floor; shadow scaled too): 儿童滑步车 0.94 m → ×1.48, fills the stand
+      like the road bike. Longer bikes unchanged (they already fill it).
+- [x] e2e#7 garage: p5 statBar(label, v, max, ref) draws gained segments solid red, lost ones red-hatched and a
+      ±n badge; garage compares with the equipped bike (caption 对比当前：…, 当前座驾 on the equipped one); bikes
+      with speed ≤ 2 carry a 整活 sticker; the buy modal adds （整活向，比赛不一定更快） + 对比…：速度 −3、加速 +1….
+- [x] ae#11 track stills: CSS print treatment — 6-level posterise SVG filter (defs injected once by
+      track-stills.ts), contrast/saturation up, exposure lifted for 霓虹夜城 (×1.5) and 落日山道 (×1.22), red corner
+      slash + ink wedge + 6 px ink frame (::after, multiply) over the existing halftone; quick-race dimming composes
+      with it (var(--still-fx)). Checked on track select + career at 1920.
+- [x] int#12 records sheet (screens/records.ts + .css; no new ScreenId needed): on the career screen TAB / pad
+      LB·RB or the 成就 N/42 chip (top right) opens a white sheet over an ink veil: all 42 achievements in a 6 × 7
+      grid (earned = red star + glyph, tinted cell; locked = grey ? silhouette, name + desc greyed), N/42 counter,
+      杯赛通关 n/3 + lifetime stats. Esc / B / Enter / TAB / veil click close it (Esc then backs out to the menu).
+      Verified 1280 / 1920 / 2560: inside the viewport, no clipped cells, 0 errors. Per-track best times: not in
+      the save (request below).
+- Verified at the end: tsc clean for ui files; ui-input (stubs + --real), ui-comfort, ui-results, ui-tour (stubs:
+  1280/1920 + 2560×1440, 1440×900; --real 1920) all pass; 0 console errors. Tool fixes: ui-input new checks
+  (results Space-after-arm, click mash, START, settings clamp/mute/motion), ui-comfort finds the reset row by class
+  and judges hold-to-repeat by rate (the machine ran at load 30-50), ui-tour boot shot tolerates a late __br.
+  Shots: shots/ui-screens/acc1/ (sheet-finale, sheet-garage, sheet-stills, records-1280, sheet-tour).
+
+### Acceptance round 1 requests
+- core: add `Settings.motion: 'system' | 'reduced' | 'full'` to the save (ui keeps it in localStorage
+  'beak-rash.motion' via src/ui/p5/motion-pref.ts until then; swap motionPref()/setMotionPref() to the save).
+  fx (reducedFlashes, chromatic punch) and camera (shake ×0.35) should read it alongside the media query.
+- ui-hud: honour `.br-ui.is-reduced` (and the p5 `reducedMotion()` helper) wherever the HUD checks
+  prefers-reduced-motion, and skip motion under `.is-full-motion` only if you want 完整 to override the OS.
+- content: please review / restyle the finale copy (src/ui/copy.ts FINALE) and add achievements for a cup clear and
+  the career clear (ids e.g. cup1/cup2/cup3/career); the records sheet lists whatever data/achievements.ts holds.
+- core / race (optional): store per-track best times in the save so the records sheet can show them.
+- ScreenCtx gained pressGap() (ms between the latest press and the one before; clicks count as presses on menu
+  screens). p5 statBar() takes an optional 4th `ref` arg; meter onPick gets a drag flag (both backwards compatible).
+
+## Acceptance round 2
+Reviews: reviews/game-r2-{aesthetic,e2e,feel,interaction,perf}.json, owner ui-screens (9 issues).
+Checklist ([x] = done + verified, [-] = skipped with reason, [ ] = open):
+- [x] int#0 (major) results: the hop-twin guard now judges only the FIRST Space / pad A confirm after arming, against
+      the last press before arming (quietFrom): < 1 s → ignored with ui.deny + a 240 ms scale nudge of the focused
+      button (WAAPI, skipped under reduced motion); the next one ≥ 350 ms later goes through; an arrow / d-pad move
+      after arming ends the guard. ScreenCtx.pressGap() removed (unused). ui-input: first Space after arming nudges,
+      the next 0.8 s later acts; Space and pad A every 0.8 s from the reveal leave within 2 presses after arming;
+      180 / 450 ms Space and 220 ms pad B mashing still never arm the row.
+- [x] int#1 (major) career records sheet: while open, back / confirm / pause / LB·RB close it, directions are eaten,
+      every other action returns false (pad B's attackR, pad A's / Space's hop twins fall through to back / confirm).
+      nav.ts isDirection() shared by shell / results / career. ui-input: LB opens, B closes, LB + A closes (no race),
+      the d-pad then moves the ladder, TAB + Space closes.
+- [x] e2e#2 grade: progress.ts gradeFor caps the KO bonus at 3 KOs (×8), S needs a top-2 finish, A the podium
+      (field of 8: 3rd + 8 KOs = A, was S; last + 8 KOs = C, was B; 1st needs 2 KOs for S). Reward.place added;
+      results-parts gradeQuote drops lines that claim the win (/最快|第一|冠军/) unless the player won (no quote
+      if none fit). Content request below for place-tagged S lines.
+- [x] e2e#6 records sheet: the stats.wrecked cell (KOs suffered, combat ko.ts) is now labelled 被击倒 (fits, 1920).
+      An all-crashes count needs race/core to track one (optional request below).
+- [x] int#3 menu: with AppContext.quit (desktop shell) a 7th, smaller step 退出游戏 QUIT ends the stair (step 124 →
+      112 px, 62 px type) and asks 退出游戏？ (退出 / 再骑会, default NO) before app.quit(). Browser: unchanged (6 items).
+      Verified 1920 with a fake quit: NO keeps the menu, YES calls quit once; quit box ends at y 956 (hints 1022).
+      The macOS app menu / Cmd+Q is desktop/main.cjs (core).
+- [x] int#5 screens/memory.ts persists the 'menu' and 'trackSelect' focus in localStorage 'beak-rash.ui-focus'
+      (validated on load, warn on failure; other screens stay session-only). Verified: 快速比赛 + 落日山道 → reload →
+      menu on 快速比赛, track select on 03 落日山道.
+- [x] int#6 menu 操作 blurb per device (MenuEntry.padBlurb, .br-kb-only / .br-pad-only spans): pad shows
+      'X 往左扇，B 往右扇，Y 用力扇。'; pause CONTROLS steer pad label 左摇杆 / ✚←→ (fits the sheet). HOWTO_BASICS
+      ('按 P') is on the KEYBOARD tab only (the GAMEPAD tab has its own R3 callout), so it stays; content may still
+      make it device-neutral.
+- [x] int#7 cold start: boot preloads the title art first and only then (or after its 1.5 s cap) warms menu /
+      garage / loading art. p5 artImage keeps every key art hidden (.br-art-pending = visibility, works under the
+      br-pop animations) until img.decode() resolves, then fades it in 150 ms (WAAPI, none under reduced motion); an
+      optional stand-in is removed on reveal and stays as the fallback on a broken file: title = the drawn hero on
+      the ink art panel, menu = a drawn pelican sticker (portrait drawn: true; a broken cut-out swaps in the
+      portrait). Verified with title.webp / menu.webp held 3.5 s: title settles with the drawn hero, the art fades in
+      when it lands (hero removed), request order title → rest; 0 errors.
+- [x] perf#6 loading: the lane dashes are a strip one period (86 px) wider than the road, scrolled by a
+      transform keyframe (br-road-run, 0.215 s ≈ the old 400 px/s, also removes the old 28 px loop jump),
+      will-change: transform → compositor. The % text already reads the CSS bar's computed transform each frame,
+      so it catches up right after a long task (it cannot tick during one). Verified: animation running, 0 errors.
+- Verified at the end: tsc clean; ui-input (stubs + --real, new steady-cadence + records-sheet checks), ui-comfort,
+  ui-results, ui-tour (stubs: 1280/1920 + 2560×1440, 1440×900) all pass; 0 console errors. Shots:
+  shots/ui-screens/acc2/ (sheet-menu = quit step / modal / pad blurb, sheet-rec-pause, sheet-cold, sheet-tour).
+
+### Acceptance round 2 requests
+- core (int#2, still open from acc1): `Settings.motion: 'system' | 'reduced' | 'full'` in the save + one
+  app-level reducedMotion() that fx / camera / ui-hud read; ui swaps p5/motion-pref.ts over to it then.
+- core (int#3 second half): desktop/main.cjs minimal macOS app menu ({role:'appMenu'}, editMenu, windowMenu) so
+  Cmd+Q / Cmd+H work; the in-game 退出游戏 entry appears whenever AppContext.quit is set.
+- content: grade quotes tagged by place (S lines that do not claim the win, or a win-only pool) — ui filters
+  /最快|第一|冠军/ off non-wins meanwhile; optional device-neutral HOWTO_BASICS SP line ('按 P' sits on the keyboard
+  tab only); cup1/cup2/cup3/career achievements (int#8, still open from acc1).
+- race / core (optional, e2e#6): an all-crashes counter in save.stats (the sheet's 被击倒 is KOs suffered).
+- core (optional): SaveData.ui = { menu, track } could replace ui's localStorage 'beak-rash.ui-focus'.
+- API notes: ScreenCtx.pressGap() removed (unused); nav.ts exports isDirection(); p5 artImage(rel, cls, onFail?,
+  stand?) keeps art hidden until decoded (+ optional stand-in); portrait() takes { drawn: true }.
+

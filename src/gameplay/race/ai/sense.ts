@@ -12,6 +12,7 @@ export interface Blip {
   hw: number;          // half width
   hl: number;          // half length
   rider: RiderState | null;
+  oid: number | null;  // obstacle id (traffic, police, props), else null
 }
 
 const RIDER_HW = 0.42;
@@ -42,7 +43,7 @@ export class Senses {
   }
 
   private take(): Blip {
-    const b = this.pool.pop() ?? { kind: 'rider', ds: 0, x: 0, vs: 0, hw: 0, hl: 0, rider: null };
+    const b = this.pool.pop() ?? { kind: 'rider', ds: 0, x: 0, vs: 0, hw: 0, hl: 0, rider: null, oid: null };
     this.blips.push(b);
     return b;
   }
@@ -56,7 +57,7 @@ export class Senses {
       const ds = r.s - me.s;
       if (ds < -BEHIND || ds > AHEAD) continue;
       const b = this.take();
-      b.kind = 'rider'; b.ds = ds; b.x = r.x; b.vs = r.speed; b.hw = RIDER_HW; b.hl = RIDER_HL; b.rider = r;
+      b.kind = 'rider'; b.ds = ds; b.x = r.x; b.vs = r.speed; b.hw = RIDER_HW; b.hl = RIDER_HL; b.rider = r; b.oid = null;
     }
     for (const o of this.session.obstacles) {
       if (!o.active) continue;
@@ -64,7 +65,7 @@ export class Senses {
       if (ds < -BEHIND - o.halfLength || ds > AHEAD + o.halfLength) continue;
       const b = this.take();
       b.kind = o.kind === 'police' ? 'police' : o.solid ? 'traffic' : 'hazard';
-      b.ds = ds; b.x = o.x; b.vs = o.speed; b.hw = o.halfWidth; b.hl = o.halfLength; b.rider = null;
+      b.ds = ds; b.x = o.x; b.vs = o.speed; b.hw = o.halfWidth; b.hl = o.halfLength; b.rider = null; b.oid = o.id;
     }
     for (const { f, kind } of this.features) {
       if (f.s0 > me.s + AHEAD) break;
@@ -77,6 +78,7 @@ export class Senses {
       b.hw = Math.abs(f.x1 - f.x0) / 2;
       b.vs = 0;
       b.rider = null;
+      b.oid = null;
     }
   }
 }

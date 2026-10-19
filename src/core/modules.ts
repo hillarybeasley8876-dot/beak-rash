@@ -1,15 +1,17 @@
 // Loads every unit through dynamic import. A unit that fails to load (or is listed in ?stub=a,b)
 // falls back to its core-owned stub, with a console.error so tests notice.
-import type { AppContext, AudioSystem, CameraRig, CombatSystem, FxSystem, PhysicsSystem, RaceLogic, RiderView, Session, Track, Ui } from './contracts';
+import type {
+  AppContext, AudioSystem, CameraRig, CombatSystem, FxSystem, PhysicsSystem, RaceLogic, RiderView, RiderViewOpts, Session, Track, Ui,
+} from './contracts';
 import type { Rng } from './rng';
-import type { BikeId, CharacterId, Quality, TrackId } from './types';
+import type { BikeId, CharacterId, TrackId } from './types';
 import type { AchievementSystemLike } from '../gameplay/achievements-stub';
 
 export interface Modules {
   createTrack(app: AppContext, id: TrackId, rng: Rng): Promise<Track>;
   createPhysics(session: Session): PhysicsSystem;
   createCameraRig(app: AppContext): CameraRig;
-  createRiderView(app: AppContext, character: CharacterId, bike: BikeId, opts: { isPlayer: boolean; quality: Quality }): RiderView;
+  createRiderView(app: AppContext, character: CharacterId, bike: BikeId, opts: RiderViewOpts): RiderView;
   createCombat(session: Session): CombatSystem;
   createRaceLogic(session: Session): RaceLogic;
   createFx(app: AppContext): FxSystem;

@@ -18,7 +18,7 @@ import { NearPasses } from './nearpass';
 import { obstacleContacts } from './obstacles';
 import { crashRider, crashedUpdate, respawnRider, respawningUpdate } from './crash';
 import { Poser } from './pose';
-import { round, simDebug } from './debug';
+import { noRows, riderRows, simDebug } from './debug';
 import { TUNING as T } from './tuning';
 
 export function createPhysics(session: Session): PhysicsSystem {
@@ -136,21 +136,11 @@ export function createPhysics(session: Session): PhysicsSystem {
     },
     dispose() {
       const dbg = simDebug();
-      if (dbg) dbg.riders = () => [];
+      if (dbg) dbg.riders = noRows;
     },
   };
 
   const dbg = simDebug();
-  if (dbg) {
-    dbg.riders = () => riders.map((sr) => ({
-      id: sr.r.id, mode: sr.r.mode, s: round(sr.r.s, 2), x: round(sr.r.x), v: round(sr.r.speed), vx: round(sr.r.vx),
-      y: round(sr.r.y), vy: round(sr.r.vy), yaw: round(sr.r.yaw), lean: round(sr.r.lean), pitch: round(sr.pitch),
-      air: sr.r.airborne, airKind: sr.airKind, drifting: sr.r.drifting, driftLevel: sr.driftLevel, driftDir: sr.driftDir,
-      charge: round(sr.r.driftCharge), boost: round(sr.r.boostTime), boostPower: round(sr.r.boostPower),
-      draft: round(sr.r.draft), surface: sr.r.surface, oil: round(sr.oilTime), wet: round(sr.wetTime),
-      wobble: round(sr.wobbleTime), accel: round(sr.accel), top: round(sr.tune.top), mass: round(sr.tune.mass),
-      carry: round(sr.carryTime), driftLock: round(sr.driftLock),
-    }));
-  }
+  if (dbg) dbg.riders = riderRows(riders);
   return physics;
 }

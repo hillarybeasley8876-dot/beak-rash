@@ -2,13 +2,15 @@
 // bleeds ~4 %/s. Charge levels at 0.55 / 1.2 / 2.0 charge-seconds; the charge rate rewards commitment (steer
 // into the drift, a bend turning the same way), so counter-steered wiggles on a straight barely charge.
 // Releasing Shift fires the mini-turbo for that level and hands the lateral speed over to grip steering
-// over 0.35 s (steering.ts), so a release with the stick held never darts inward. Ends without a boost below
+// over 0.35 s (steering.ts), so a release with the stick held never darts inward; a release with L1+ charged
+// arms the exit carve (carve.ts) so the rest of a hairpin stays holdable. Ends without a boost below
 // 6 m/s or on a collision (endDrift(sr, false)). Any end locks drifting out for 0.3 s, and no drift starts
 // toward a wall the rider is pressed against.
 import { clamp, clamp01, lerp } from '../core/math';
 import { TUNING as T } from './tuning';
 import { hasStatus, type SimCtx, type SimRider } from './state';
 import type { Controls } from '../core/types';
+import { startCarve, stopCarve } from './carve';
 
 export function updateDrift(ctx: SimCtx, sr: SimRider, c: Controls, dt: number): void {
   const r = sr.r;
@@ -55,6 +57,7 @@ function startDrift(ctx: SimCtx, sr: SimRider, dir: -1 | 1): void {
   r.drifting = true;
   r.driftCharge = 0;
   sr.driftDir = dir;
+  stopCarve(sr); // the new drift brings its own cancel; a forced end of it must not revive the old carve
   sr.driftLevel = 0;
   ctx.bus.emit('rider:drift', { riderId: r.id, phase: 'start', level: 0 });
 }
@@ -64,6 +67,7 @@ export function endDrift(ctx: SimCtx, sr: SimRider, reward: boolean): void {
   const r = sr.r;
   if (!r.drifting) return;
   const level = sr.driftLevel;
+  const dir = sr.driftDir;
   r.drifting = false;
   r.driftCharge = 0;
   sr.driftDir = 0;
@@ -75,6 +79,7 @@ export function endDrift(ctx: SimCtx, sr: SimRider, reward: boolean): void {
     sr.driftExitVx = r.vx;
   }
   if (reward && level > 0) {
+    if (dir !== 0) startCarve(sr, dir); // the rest of the bend keeps the drift's bite (carve.ts)
     const time = T.driftBoostTime[level - 1] ?? 0;
     const power = T.driftBoostPower[level - 1] ?? 0;
     giveBoost(ctx, sr, 'drift', power, time);

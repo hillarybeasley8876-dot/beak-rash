@@ -1,5 +1,6 @@
 // AI fighting: melee on riders alongside (side select, heavy when armed, counters), who to hunt
-// (angry → the bell ringer; aggressive riders pick fights, the player a bit more often). Fairness rules
+// (angry → the bell ringer; aggressive riders pick fights, the player and a rival race leader more often, so a
+// runaway leader gets hit). Fairness rules
 // for the player: nobody picks on them in the first seconds, one hunter at a time (token), no fresh hunt
 // on a battered player, and a hunter backs off for a few seconds once it has landed its hit budget.
 // Hit a rival and it may hold a grudge (species temper): it owes you one swing for 5 s (taken as soon as it
@@ -21,6 +22,8 @@ const RETALIATE_WINDOW = 5;     // s after being hit by the player in which a gr
 const PAYBACK_RETRY = 0.25;     // s before another payback try after a failed roll (not a full reaction period)
 const CATCH_UP_TIME = 3;        // s of grudge catch-up (pace.ts paybackPace, also in view) per grudge…
 const CATCH_UP_GAP = 8;         // …only to close the last metres to the player ahead
+const LEADER_PULL = 2;          // hunt weight of a rival leading the race (the player has playerPull)
+const LEADER_FURY = 1;          // attack-chance multiplier on a rival race leader in reach (others 0.65)
 
 /** Who currently hunts the player (at most one rider; angry riders ignore it). */
 export interface HuntToken { holder: RiderId | null }
@@ -130,7 +133,8 @@ export class Fighter {
       if (r === me || !targetable(r) || (r === player && !playerOk)) continue;
       const ds = r.s - me.s;
       if (ds < -8 || ds > 16) continue;
-      const score = (r === player ? this.p.playerPull : 1) * (1 - Math.abs(ds) / 18) * this.rng.range(0.6, 1.4);
+      const pull = r === player ? this.p.playerPull : r.place === 1 ? LEADER_PULL : 1;
+      const score = pull * (1 - Math.abs(ds) / 18) * this.rng.range(0.6, 1.4);
       if (score > bestScore) { bestScore = score; best = r; }
     }
     if (best) {
@@ -153,7 +157,7 @@ export class Fighter {
       if (ad < 0.45 || ad > reach - 0.15) continue;
       const winding = t.action !== null && (t.action.kind === 'attack' || t.action.kind === 'heavy') && t.action.t < WINDUP_LIGHT * 2;
       const hunted = this.hunt === t;
-      const fury = t.isPlayer ? (hunted ? this.p.playerFury : 1) : hunted ? 1.4 : 0.65;
+      const fury = t.isPlayer ? (hunted ? this.p.playerFury : 1) : hunted ? 1.4 : t.place === 1 ? LEADER_FURY : 0.65;
       const payback = t.isPlayer && this.retaliateT > 0;
       const chance = payback ? 0.9 : this.p.aggression * fury + (winding ? this.p.skill * 0.5 : 0);
       // A missed payback roll retries soon (it is still owed); a swing or any other decision waits a reaction period.

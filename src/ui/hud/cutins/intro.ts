@@ -1,7 +1,8 @@
 // Intro flyover: track title banner + a P5 "calling card" (roster title + tagline) for the rival the race
 // camera is presenting. Like race's IntroCamera.focus(): the subject is the rider nearest (in s, ≤ 4.5 m)
 // to the camera's look point (where the view ray meets the look-target height); cards change with the subject.
-// Each card takes the lower corner (right or left) that covers less of its rider on screen.
+// Each card takes the lower corner (right or left) that covers less of its rider on screen. A small
+// 「ENTER / A 跳过」 chip (bottom right, device glyph) says the flyover can be skipped (race flow: confirm).
 import '../css/intro.css';
 import { Vector3 } from 'three';
 import { easeInOutCubic } from '../../../core/math';
@@ -10,9 +11,10 @@ import { SKILLS } from '../../../data/skills';
 import { TRACKS } from '../../../data/tracks';
 import type { Session } from '../../../core/contracts';
 import type { RiderState, TrackFrame } from '../../../core/types';
-import { enter, exit, fadeOut } from '../anim';
+import { enter, exit, fadeOut, reducedMotion } from '../anim';
 import { PortraitCard } from '../badge';
-import { el } from '../dom';
+import { el, w, type W } from '../dom';
+import { keyGlyphs } from '../glyphs';
 import { setRansom } from '../ransom';
 import { newPoint, type Projector } from '../world/project';
 import { animateGlyphs } from './splash';
@@ -27,6 +29,8 @@ const PLAYER_FROM = 0.8;   // share of the flyover after which the camera may pr
 const INTRO_FALLBACK = 3.6;
 /** The next card waits for the previous one to drop out of the way. */
 const ENTER_DELAY = 0.08;
+/** The skip chip fades in this long after the flyover starts and leaves with it. */
+const SKIP_AFTER = 0.5;
 
 /** Calling-card boxes (stage px, css/intro.css .ic): lower right, or lower left (.is-left). */
 const CARD = { w: 660, h: 340, top: 610, right: 1180, left: 80 };
@@ -42,6 +46,8 @@ const overlapArea = (a: number[], b: number[]): number =>
 
 export class IntroCards {
   private banner: HTMLDivElement;
+  private skip: W;
+  private skipOp = 0;
   private card: Card | null = null;
   private leaving: Leaving[] = [];
   private head = newPoint();
@@ -59,6 +65,12 @@ export class IntroCards {
   constructor(private stage: HTMLElement, private cue: (what: 'banner' | 'card') => void = () => {}) {
     this.banner = el('div', 'ib', stage);
     this.banner.style.visibility = 'hidden';
+    const skip = el('div', 'ic-skip', stage);
+    keyGlyphs(el('kbd', '', skip), 'confirm');
+    el('b', '', skip, '跳过');
+    el('i', '', skip, 'SKIP');
+    this.skip = w(skip);
+    this.skip.show(false);
   }
 
   get running(): boolean {
@@ -93,6 +105,8 @@ export class IntroCards {
       this.leaving = [];
       this.banner.style.visibility = 'hidden';
       this.bannerOut = 1;
+      this.skipOp = 0;
+      this.skip.show(false);
     }
   }
 
@@ -100,6 +114,7 @@ export class IntroCards {
     this.t += dt;
     this.updateLeaving(dt);
     this.updateBanner(dt);
+    this.updateSkip(dt);
     if (!this.active) return;
     const card = this.card;
     if (card) {
@@ -212,6 +227,16 @@ export class IntroCards {
       l.root.remove();
       return false;
     });
+  }
+
+  /** In 0.2 s once SKIP_AFTER has passed, out in 0.1 s when the flyover ends (countdown). */
+  private updateSkip(dt: number): void {
+    const want = this.active && this.t >= SKIP_AFTER ? 1 : 0;
+    this.skipOp = Math.max(0, Math.min(1, this.skipOp + (want ? dt / 0.2 : -dt / OUT)));
+    this.skip.show(this.skipOp > 0);
+    this.skip.op(this.skipOp);
+    const slide = reducedMotion() ? 0 : (1 - this.skipOp) * 60;
+    this.skip.tf(`translateX(${slide.toFixed(0)}px) skewX(-12deg)`);
   }
 
   private updateBanner(dt: number): void {

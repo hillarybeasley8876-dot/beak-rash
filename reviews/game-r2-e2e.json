@@ -1,0 +1,56 @@
+{
+ "pass": true,
+ "score": 8,
+ "summary": "Whole-game e2e round 2: 8/10, pass (0 blocker, 0 major, 7 minor). Played as a first-time player on a cleared profile with a keyboard bot that sends real key events and reads the race state (scripts + shots: shots/accept/r2-e2e/). Path: title -> menu -> settings (music 50, shake 70) -> garage (browsed all 7 bikes, deltas + 整活 stickers) -> career coast T1 on 风之翼 (3rd, 2:48.66, 8 KOs; pause/resume) -> garage buy+equip 二八大杠 (975 -> 175) -> career city T1 (pause>restart, pause>settings slow-mo 简短>back>resume; 8th after 4 traffic crashes) -> HOW TO -> settings auto-pedal ON + quality 高->中->高 with the restart prompt (reloads 2.6 s, persisted) -> quick race mountain, pause>quit (coins unchanged, back on 快速比赛) -> mountain again (1st, 2:58.53, 11 KOs) -> reload (save byte-identical, career 3 races / 1 win / 19 KOs, records sheet on TAB 23/42). Extra probes: a naive player who only attacks/drifts/hops/ults once a HUD prompt teaches it (mountain), two city races for traffic fairness (1st both, 0 and 1 crash), a real-time SHOWTIME/KO burst on coast. 0 console errors in every session, tsc clean, fps p10 91-119 at 1080p. Round-1 blockers/majors: (1) ui-hud first-race prompts FIXED: the naive player got LAUNCH (countdown), ATTACK (5 s), DRIFT (27.6 s), SHOWTIME (65.8 s) and HOP (123 s) chips, each leaving once used; none after the profile's 2nd race. (2) fx KO/SHOWTIME readability FIXED: victims are full-colour stickers with an ink rim, bystanders inked (capybara/shiba read at a glance); residual framing/identity problems are now a minor (#4). (3) combat SHOWTIME hitting nobody FIXED: 8 of 8 casts in range hit 1-6 rivals, out of range it is denied with 无目标！ and SP is kept; the HUD still advertises READY then (#2). (4) species beak FIXED: bill and pouch stick out beside the helmet in most chase frames on all 3 tracks (sheetD-crops.jpg). (5) character select: waived by the SPEC design decision, so 'different characters' was replaced by different bikes. Round-1 minors re-checked: P during a KO cine now waits for the cine end; finish-line Space/J mashing no longer leaves results and the default focus is 下一站/主菜单; garage shows stat deltas. What keeps it from a 9: the SHOWTIME economy feeds itself (3 per race, KOs refund SP, 8-13 KOs, S rank even in 3rd) and a handful of confusing signals (READY with no target, S-rank quote '你最快' on 3rd, SHOWTIME shots that feature a rider who was not knocked out).",
+ "issues": [
+  {
+   "severity": "minor",
+   "owner": "combat",
+   "title": "SHOWTIME feeds itself: 3 casts per race, the first 12 s into the first race, 8-13 KOs per race",
+   "detail": "Fresh profile -> 巡回赛 -> 鹈鹕湾海滨公路 T1, using U/I/O and J/L in the opening pack: SP hit 100 at ~11 s and SHOWTIME fired at 11.9 s, hitting 6 of 7 rivals (s1-notes.json: ult:impact victims [1,3,4,5,6,7]). Casts per race for an aggressive player: coast 11.9/45.2/176.5 s, mountain 26.8/46.6/148.9 s (the 2nd only 19.8 s after the 1st). Each cast hits 4-6 rivals and its KOs pay +20 SP each, so it refunds ~40 SP; skill hits pay +6 like swings. Player KOs: 8 (coast), 11 (mountain), 13 (city probe seed 2), 5-6 of them from the ult. The KO money shot plays 8-13 times a race (~9 % of race time at full slow-mo), and wins come from the ult loop more than from riding.",
+   "fix": "Hits and KOs caused by pelican.ult pay no SP. Skill hits (torpedo/gulp/wing) pay +3 instead of +6 (swings keep +6). Optionally lock SP gain for ~10 s after a cast. Target 1-2 SHOWTIMEs per race for an aggressive player (combat-check soak: casts/race <= 2 on coast/city/mountain)."
+  },
+  {
+   "severity": "minor",
+   "owner": "ui-hud",
+   "title": "HUD shows 'SHOWTIME READY P' and the first-race 'P 放大招！' prompt while the ult would be denied",
+   "detail": "Career city T1, race 2 of the profile (s2-notes.json): after 4 traffic crashes the player was 8th from 30.8 s and more than 120 m behind. From ~92 s to the finish the SP bar glowed 'SHOWTIME READY P' (r2-racing110.jpg, sheetI-detail.jpg). The first-race chip 'SHOWTIME SP 满了 P 放大招！' showed at 91.6 s and again at 104.6 s. All 67 P presses from 101 s to 212 s were denied (skill:denied slot 4, 50 无目标！ quips). The game tells a new player to press P and then refuses. The trailing player, who needs a comeback tool most, sits at full SP for the last 110 s.",
+   "fix": "Mirror combat's planUlt window in the HUD (a racing, unfinished rival 120 m ahead to 30 m behind; skills/ult-aim.ts). While the check fails, grey the P diamond, show 'SHOWTIME · 无目标' without the READY glow, and hold back the 'ult' prompt. Alternatively combat publishes a canUlt flag the HUD reads."
+  },
+  {
+   "severity": "minor",
+   "owner": "ui-screens",
+   "title": "Grade inflation: 3rd place gets 'S RANK 鹈鹕之神 路宽，鱼多，你最快。'",
+   "detail": "s1, coast T1: 3rd in 2:48.66 (1.1 s behind 2nd, 4.1 s behind 1st) with 8 KOs. The results stamp says S RANK 鹈鹕之神 with the quote '路宽，鱼多，你最快。' ('you were the fastest'), right beside a podium that puts you 3rd (r1-results.jpg). gradeFor() (src/ui/progress.ts) adds placeScore 57 and kos x 8 = 64, which gives 121 >= 92. With SHOWTIME producing 8-13 KOs, nearly every race grades S whatever the place: the mountain win was S, and even last place with 8 KOs would be B.",
+   "fix": "Cap the KO bonus (e.g. min(kos, 3) x 8). Require top 2 for S and the podium for A. Pick grade quotes that fit the place, so '你最快' only shows on a win. Ask content for place-neutral S lines."
+  },
+  {
+   "severity": "minor",
+   "owner": "fx",
+   "title": "SHOWTIME cinematic often features a rider who was not knocked out; grey/white species turn into identical paper-white figures",
+   "detail": "(a) s1 coast T1, first SHOWTIME (11.9 s): cine:ko starts with victim 1 while combat:ko reports victim 4. The shot shows the capybara big and in colour, but the KNOCK OUT splash crosses out 闪电 (r1-ult.jpg; crop in sheetI-detail.jpg). probe-cine2 (coast seed 3), second SHOWTIME: the sloth and capybara go down, yet the centre of the frame is a goose that was only hit, while the splash crosses out the sloth (cine2-coast-ko+450.jpg). So the camera and the splash disagree about who went down in 2 of 4 sampled casts. (b) In the cast look, near-neutral albedo maps to paper white: the KO'd grey pigeon (first coast SHOWTIME, cine2-coast-ult+850/+1300.jpg) reads as a white blob with a green neck patch, the same as the goose, seagull or pelican. Plain KOs (capybara on mountain) frame the right victim and read well.",
+   "fix": "Pick the cine hero from the riders KO'd by this impact (their combat:ko events arrive in the same frame), name that rider in cine:ko, and keep it centred for the hold. Fall back to the nearest hit rider only if nobody was KO'd. For near-neutral albedo keep the species' own luminance (grey pigeon mid-grey, penguin black) inside the sticker rim instead of mapping it to paper white."
+  },
+  {
+   "severity": "minor",
+   "owner": "combat",
+   "title": "A SHOWTIME cast from mid-pack drops you 3 places and the HUD says '被超了' right after your own ult",
+   "detail": "s1 coast T1: SHOWTIME cast from 4th at 11.91 s with the pack around the player. During the leap the place went 4 -> 6 (13.16 s, before the 13.41 s impact), then to 7th at 14.09 s. Right after the KNOCK OUT splash the HUD slammed '▼ 7TH 被超了' (r1-ko2.jpg). The player got back to 3rd only at 16.7 s. The leap homes onto an anchor and lands 2.5 m behind it, so a pack around or behind you carries you backwards while the field rides on under the cinematic.",
+   "fix": "In skills/ult-aim.ts, never land the caster behind its pre-cast s: when the best anchor is at or behind the player, land beside the hit group (lateral offset) or ahead of it. Keep the caster's s advancing at >= its pre-cast speed during the leap, so a cast never costs places."
+  },
+  {
+   "severity": "minor",
+   "owner": "content",
+   "title": "16 of 42 achievements unlock in the first race (6 in the first 12 s); 23/42 after three races",
+   "detail": "Fresh profile, coast T1: thief 2.7 s, wing 6.6 s, one_more 6.9 s, first_ko + keyboard 10.4 s, ult_first 11.9 s, then double, triple, hat_trick, torpedo, everyone, near_miss, drift3, slingshot, rampage and podium (s1-notes.json). During the opening brawl the chips stack three deep on the right edge with the police toast and taunts (r1-ko2.jpg, sheetI-detail.jpg). After three races the records sheet shows 23/42, so most of the long-term goals are gone in 10 minutes. The SHOWTIME loop (issue 1) hands out double/triple/hat_trick/rampage for free.",
+   "fix": "Raise the thresholds: hat_trick/triple/rampage need KOs that are not from the ult, or tier 2+. Turn the 'first use of a skill' unlocks (wing, torpedo, ult_first) into silent tutorial ticks that don't count toward the 42. Ask ui-hud to queue achievement chips at one on screen, ~1.2 s each."
+  },
+  {
+   "severity": "minor",
+   "owner": "ui-screens",
+   "title": "Records sheet shows '翻车 0' after six traffic crashes",
+   "detail": "After s1-s3 (2 traffic crashes on coast, 4 on city, plus respawns), career -> TAB opens the records sheet with '翻车 0' (s3-notes.json records). stats.wrecked only counts KOs by rivals (combat ko.ts -> race results.ts), but the sheet labels it 翻车 ('crashed'), so a player who wiped out six times reads 0.",
+   "fix": "Relabel the cell 被击倒 KO'D in src/ui/screens/records.ts, or show a separate all-crashes count once race/results tracks one (a request to race/core)."
+  }
+ ]
+}

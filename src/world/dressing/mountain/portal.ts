@@ -9,12 +9,11 @@ import type { MeshBuf } from '../../geom';
 import type { PropBatch } from '../../kit/batch';
 import { box, trs } from '../../kit/shapes';
 import { fir, pine } from '../../scenery/props/mountain-trees';
-import { crag } from '../../scenery/props/rocks';
+import { bevelRock, GRANITE } from '../../scenery/props/mountain-granite';
 import type { Dress } from '../dress';
 
 const STONE = [new Color('#b9aa9b'), new Color('#a39489'), new Color('#cbbca9')] as const;
 const CORNICE = new Color('#d8cab6');
-const GRANITE = [new Color('#cf9f86'), new Color('#b4846f'), new Color('#93695f')] as const;
 const m = new Matrix4();
 const p = new Vector3();
 
@@ -79,7 +78,7 @@ function faceMasses(d: Dress, rocks: PropBatch, f: TrackFeature, s: number, dir:
     if (top - low < r) continue;
     const y = rng.range(low + r * 0.75, top - r * 0.25);
     ctx.q.toWorld(s + dir * r * 0.1, x, y, p);
-    crag(rocks.at(p.x, p.z), p.x, p.y, p.z, r * rng.range(1.0, 1.4), r * rng.range(0.8, 1.1), r * 0.6, yaw + rng.range(-0.3, 0.3), rng,
+    bevelRock(rocks.at(p.x, p.z), p.x, p.y, p.z, r * rng.range(1.0, 1.4), r * rng.range(0.8, 1.1), r * 0.6, yaw + rng.range(-0.3, 0.3), rng,
       rng.pick([...GRANITE]), false);
   }
 }
@@ -96,7 +95,7 @@ function capRidge(d: Dress, rocks: PropBatch, f: TrackFeature, s: number, dir: n
     const roll = rng.next();
     if (roll < 0.45) {
       const r = rng.range(2.4, 4.6);
-      crag(rocks.at(p.x, p.z), p.x, y + r * 0.15, p.z, r * rng.range(1.0, 1.4), r * rng.range(0.8, 1.3), r, rng.range(0, 6.3), rng, rng.pick([...GRANITE]));
+      bevelRock(rocks.at(p.x, p.z), p.x, y + r * 0.15, p.z, r * rng.range(1.0, 1.4), r * rng.range(0.8, 1.3), r, rng.range(0, 6.3), rng, rng.pick([...GRANITE]));
     } else if (roll < 0.8) pine(d.b.props.at(p.x, p.z), p.x, y, p.z, rng, rng.range(0.9, 1.3));
     else fir(d.b.props.at(p.x, p.z), p.x, y, p.z, rng, rng.range(0.9, 1.15));
   }

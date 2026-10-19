@@ -17,7 +17,7 @@ export interface SwingTiming { windup: number; active: number; recover: number; 
 export interface RiderCombat {
   swing: SwingTiming;                             // timing of the current / last swing
   buffered: { heavy: boolean; side: Side | 0; age: number } | null; // swing pressed during a swing tail / stagger
-  skillBuf: Array<{ slot: number; age: number }>; // skills pressed mid-swing / mid-stagger (one per slot), retried
+  skillBuf: Array<{ slot: number; age: number; hold: number }>; // skills pressed while busy (one per slot), retried
   bellBuf: number | null;                         // age of a bell press held while a swing / stagger finishes
   bellCd: number;
   bellPaid: number[];                             // combat time the bell last paid SP for provoking rider [id]

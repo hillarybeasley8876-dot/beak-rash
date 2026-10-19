@@ -1,10 +1,11 @@
 // Garage turntable: one small WebGLRenderer showing a bike from the bikes unit (createBike), clamped by
 // its seatpost in the repair stand drawn in art/garage (the canvas and the art share the 1920×1080 stage,
 // so the clamp lines up at every size; a small 3D jaw grips the post in front). It swings around a 3/4
-// view (drag to turn), wheels turning slowly, with a soft contact shadow on the drawn floor. Falls back
-// to the stub bike, then a flat SVG.
+// view (drag to turn), wheels turning slowly, with a soft contact shadow on the drawn floor. Bikes shorter
+// than the road bike are shown larger (scaled about the clamp) so the showroom never looks empty. Falls
+// back to the stub bike, then a flat SVG.
 import {
-  CanvasTexture, DirectionalLight, Group, HemisphereLight, Mesh, MeshBasicMaterial, PerspectiveCamera, PlaneGeometry, Scene,
+  Box3, CanvasTexture, DirectionalLight, Group, HemisphereLight, Mesh, MeshBasicMaterial, PerspectiveCamera, PlaneGeometry, Scene,
   Vector3, WebGLRenderer,
 } from 'three';
 import type { AppContext } from '../../core/contracts';
@@ -18,6 +19,9 @@ const CLAMP = { x: 815, y: 486 };
 const PX_PER_M = 448;
 const FLOOR_DROP = 0.98;        // m from the clamp down to the drawn floor
 const CLAMP_BELOW_SADDLE = 0.12;
+/** Display length (m) every bike is grown to (the road bike's): a kids' bike fills the stand like the rest. */
+const SHOW_LENGTH = 1.39;
+const MAX_GROW = 1.6;
 const CAM_DIST = 5.2;
 const CAM_ELEVATION = (12 * Math.PI) / 180;
 /** Yaw: π/2 = side view, front to the left; larger turns the front towards the camera (never edge-on). */
@@ -189,18 +193,24 @@ export class Turntable {
     this.mount(this.bike);
   }
 
-  /** Hang the bike by its (rear) seatpost on the pivot = the drawn clamp; the shadow lies on the floor. */
+  /** Hang the bike by its (rear) seatpost on the pivot = the drawn clamp; the shadow lies on the floor.
+   * Short bikes grow about the clamp (never so much that the wheels reach the drawn floor). */
   private mount(bike: BikeModel): void {
     const root = bike.root;
     root.position.set(0, 0, 0);
+    root.scale.setScalar(1);
     root.updateMatrixWorld(true);
+    const size = new Box3().setFromObject(root).getSize(new Vector3());
     const seat = (bike.markers.stoker ?? bike.markers.saddle).getWorldPosition(new Vector3());
     const clampY = seat.y - CLAMP_BELOW_SADDLE;
-    root.position.set(-seat.x, -clampY, -seat.z);
+    const fit = SHOW_LENGTH / Math.max(0.3, size.x, size.z);
+    const k = Math.min(MAX_GROW, Math.max(1, fit), (FLOOR_DROP - 0.06) / Math.max(0.1, clampY));
+    root.scale.setScalar(k);
+    root.position.set(-seat.x * k, -clampY * k, -seat.z * k);
     this.pivot.add(root);
-    const lift = Math.max(0, FLOOR_DROP - clampY);
-    this.shadow.position.set(-seat.x, -FLOOR_DROP + 0.004, -seat.z);
-    this.shadow.scale.set(0.75, bike.wheelbase + 2 * bike.wheelRadius + 0.35, 1);
+    const lift = Math.max(0, FLOOR_DROP - clampY * k);
+    this.shadow.position.set(-seat.x * k, -FLOOR_DROP + 0.004, -seat.z * k);
+    this.shadow.scale.set(0.75 * k, (bike.wheelbase + 2 * bike.wheelRadius + 0.35) * k, 1);
     this.shadow.material.opacity = Math.max(0.3, 0.95 - lift * 1.2);
     this.pivot.add(this.shadow);
   }

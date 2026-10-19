@@ -112,6 +112,11 @@ export class EdgeWarnings {
     }
   }
 
+  /** A rear chevron is drawn in the bottom band this frame. */
+  get rearUp(): boolean {
+    return this.chevs.some((c) => c.on && c.rear);
+  }
+
   /** Screen boxes of the side chevrons drawn this frame (call after update). */
   boxes(): readonly TagBox[] {
     return this.boxList;

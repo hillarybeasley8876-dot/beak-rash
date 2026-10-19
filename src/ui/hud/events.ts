@@ -4,6 +4,7 @@ import type { GameEvents } from '../../core/events-map';
 import type { Session } from '../../core/contracts';
 import type { Cluster } from './cluster';
 import type { CutinLayer } from './cutins/layer';
+import type { Hints } from './hints';
 import type { PlaceBlock } from './place';
 import type { Quip } from './quip';
 import type { Speedo } from './speedo';
@@ -21,6 +22,8 @@ export interface HudParts {
   cutins: CutinLayer;
   /** The player's own lines (KO / skill / respawn) from the cluster portrait. */
   quip: Quip;
+  /** First-race control prompts: each leaves once the player does what it asks. */
+  hints: Hints;
   /** The player was BUSTED (starts the ticket-stop countdown next to the timer). */
   busted(): void;
 }
@@ -40,8 +43,15 @@ export function wireHudEvents(bus: EventBus<GameEvents>, p: HudParts): () => voi
     bus.on('race:finalStretch', (e) => p.cutins.finalStretch(e)),
     bus.on('rider:drift', (e) => {
       if (!me(e.riderId)) return;
+      if (e.phase === 'start') p.hints.done('drift');
       p.speedo.onDrift(e.phase, e.level);
       p.cutins.drift(e);
+    }),
+    bus.on('rider:hop', (e) => {
+      if (me(e.riderId)) p.hints.done('hop');
+    }),
+    bus.on('combat:swing', (e) => {
+      if (me(e.riderId)) p.hints.done('swing');
     }),
     bus.on('rider:land', (e) => p.cutins.land(e)),
     bus.on('rider:nearMiss', (e) => p.cutins.nearMiss(e)),
@@ -63,14 +73,20 @@ export function wireHudEvents(bus: EventBus<GameEvents>, p: HudParts): () => voi
     }),
     bus.on('combat:combo', (e) => p.cutins.combo(e)),
     bus.on('skill:cast', (e) => {
-      if (me(e.riderId)) p.quip.say('skill', e.slot);
-      p.cutins.skillCast(e);
+      if (me(e.riderId)) {
+        p.quip.say('skill', e.slot);
+        // The band plays for the first cast of each skill per race; later casts get the compact cast tag.
+        if (!p.cutins.playerSkill(e)) p.cluster()?.castTag(e.skillId);
+      } else p.cutins.rivalSkill(e);
       p.world.onSkillCast(e);
     }),
     bus.on('skill:denied', (e) => {
       if (me(e.riderId)) p.cluster()?.skills.deny(e.slot, e.reason);
     }),
-    bus.on('ult:start', (e) => p.cutins.ultStart(e.riderId)),
+    bus.on('ult:start', (e) => {
+      if (me(e.riderId)) p.hints.done('ult');
+      p.cutins.ultStart(e.riderId);
+    }),
     bus.on('cine:ult', (e) => p.cutins.cineUlt(e)),
     bus.on('cine:ko', (e) => p.cutins.cineKo(e)),
     bus.on('pickup:take', (e) => p.cutins.pickup(e)),

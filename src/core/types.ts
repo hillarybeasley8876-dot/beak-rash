@@ -63,11 +63,12 @@ export interface RiderMods {
   intangible: boolean; // ignores rider collisions & melee
   invisible: boolean;
   shield: boolean;     // blocks next hit
+  pushImmune: boolean; // rider contacts cost this rider no speed (the other rider is still pushed, rider:bump still fires)
 }
 
 export const defaultMods = (): RiderMods => ({
   speedMul: 1, accelMul: 1, steerMul: 1, gripMul: 1,
-  canAttack: true, intangible: false, invisible: false, shield: false,
+  canAttack: true, intangible: false, invisible: false, shield: false, pushImmune: false,
 });
 
 export type RiderMode = 'grid' | 'racing' | 'crashed' | 'respawning' | 'finished' | 'busted';

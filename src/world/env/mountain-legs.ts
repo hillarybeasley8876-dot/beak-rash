@@ -62,7 +62,12 @@ export class LegBlend implements TerrainMod {
     return found;
   }
 
-  /** March the outward ray of row r until a candidate sample is nearer than the own centre line. */
+  /**
+   * First point of row r's outward ray that is nearer to another leg than to its own centre point.
+   * The ray point w = bound + u metres out is exactly w from the own centre point p0, so candidate q
+   * is nearer for every w > |q − p0|² / (2 (q − p0)·d) (a half-line): the crossing is the smallest such
+   * w over the candidates (closed form, no marching).
+   */
   private march(r: number, i: number, side: -1 | 1, cand: number[]): boolean {
     const L = this.field.L;
     const s = L.sMin + i;
@@ -70,31 +75,19 @@ export class LegBlend implements TerrainMod {
     const a = flatAxes(fr, this.ax);
     const rx = a.rx * side, rz = a.rz * side;
     const bound = this.field.bound(s, side);
-    const nearest = (u: number): { d: number; j: number } => {
-      const px = fr.pos.x + rx * (bound + u), pz = fr.pos.z + rz * (bound + u);
-      let d = Infinity, jb = -1;
-      for (const j of cand) {
-        const dd = ((L.px[j] ?? 0) - px) ** 2 + ((L.pz[j] ?? 0) - pz) ** 2;
-        if (dd < d) { d = dd; jb = j; }
-      }
-      return { d: Math.sqrt(d), j: jb };
-    };
-    let prev = 0;
-    for (let u = 0; u <= RAY; u += 3) {
-      const n = nearest(u);
-      if (n.d > bound + u) { prev = u; continue; }
-      // Bisect the crossing between prev and u.
-      let a = prev, b = u, jb = n.j;
-      for (let k = 0; k < 5; k++) {
-        const m = (a + b) / 2, nm = nearest(m);
-        if (nm.d > bound + m) a = m; else { b = m; jb = nm.j; }
-      }
-      const k = side < 0 ? 0 : 1;
-      (this.roomU[k] as Float32Array)[r] = (a + b) / 2;
-      (this.other[k] as Float32Array)[r] = L.sMin + jb;
-      return true;
+    let wMin = Infinity, jb = -1;
+    for (const j of cand) {
+      const qx = (L.px[j] ?? 0) - fr.pos.x, qz = (L.pz[j] ?? 0) - fr.pos.z;
+      const dot = qx * rx + qz * rz;
+      if (dot <= 0) continue;
+      const w = (qx * qx + qz * qz) / (2 * dot);
+      if (w < wMin) { wMin = w; jb = j; }
     }
-    return false;
+    if (jb < 0 || wMin - bound > RAY) return false;
+    const k = side < 0 ? 0 : 1;
+    (this.roomU[k] as Float32Array)[r] = Math.max(0, wMin - bound);
+    (this.other[k] as Float32Array)[r] = L.sMin + jb;
+    return true;
   }
 
   private row(s: number): number {

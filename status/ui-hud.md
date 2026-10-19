@@ -227,3 +227,60 @@ cine:ko end"). [x] = done + verified. Resume: skip [x] items.
   > 0.5 ms, 0 > 1 ms (was 16 / 10 / 2.9 ms). Images: fix2/sheet-race1.jpg, sheet-race2.jpg, sheet-cuts.jpg, tagLod.jpg.
 - [x] harness: sandbox/hud.shots.mjs queries only #hud ($h helper), so --live no longer counts the game's own HUD;
   new asserting scenes quipDock, chipStack, tagLod; pack/packLater assert float≤2 (docked bubbles are extra).
+
+## Acceptance round 1
+Plan (reviews/game-r1-*.json, owner ui-hud). [x] = done + verified. Resume: skip [x] items.
+- [x] G1 (major, e2e) first-race prompts → new hints.ts + css/hints.css: one P5 key chip at the bottom centre (under the
+  rider, between speedometer and cluster) while save stats.races < 2: LAUNCH 按住 [W / ↑] 起步加速 during the countdown (leaves
+  at GO), ATTACK [J] ◀扇 [L] 扇▶ [K] 重击 when a rival is within 2.2 m (from 3 s after GO), DRIFT [SHIFT] + 转向 = 漂移 30–70 m
+  before a bend with R < 90 m, HOP [SPACE] 跳！ 12–55 m before a jumpCrest / ramp, SHOWTIME [P] 放大招！ when SP is full. One at a
+  time, ≤ 2 shows per prompt per app session, 8 s apart; a prompt leaves (and never returns) once the player does it
+  (combat:swing, rider:hop, rider:drift start, ult:start); it waits hidden (clock frozen) under splashes / the skill band /
+  cinematics / intro and while an INCOMING chip or rear chevron holds the bottom band; > 1.5 s hidden = dropped. Fonts warmed.
+  Check shots/ui-hud/acc1/t/t1-hints.mjs (fresh profile, coast s4): launch → swing → off after J → ult → off after
+  ult:start → drift @945 → off on drift start → hop @1590 → off after SPACE; errors [] (sheet-g1.jpg).
+- [x] G2 (minor, interaction) pad glyphs → glyphs.ts (KEY_LABELS kb/pad per action, keyGlyphs() renders both); hud.ts
+  toggles .brh.is-pad from app.input.lastDevice each frame (cached), base.css shows one label. Skill diamonds U/I/O ↔ LB/✚↑/✚↓,
+  ult + SHOWTIME READY P ↔ R3, skill band key, prompts. t1-hints.mjs: keys 'U,I,O,P,P' → 'LB,✚↑,✚↓,R3,R3', launch chip RT.
+- [x] G3 (minor, interaction) intro skip → intro.ts + css/intro.css: chip 「[ENTER] 跳过 SKIP」 (pad: [A]) bottom right under the
+  calling cards, slides/fades in 0.5 s into the flyover, out in 0.1 s when the countdown starts. t3-skip.mjs: visible@1 at
+  0.87 s (box 1676–1880 × 1005–1046 at 1080p), pad '[A] 跳过', confirm → countdown → hidden@0 within 10 frames; errors [].
+- [x] G4 (minor, e2e + feel) skill band over the horizon → (a) the band is a top strip now (css/cutins.css: strip y −10…130
+  tilted −2°, eyes / key / nameEn + 中文名 in its on-screen part; thin variant 100 px for projectile skills), 0.45 s (in 0.09,
+  out 0.1); (b) it plays only for the first cast of each skill per race (layer.ts playerSkill(), bandSeen reset on attach);
+  later casts get casttag.ts: a compact plate 「glyph BIG GULP 大嘴吞噬」 just above the diamond row (below the quip), 0.7 s.
+  Rival chips split out (rivalSkill()). t4-band.mjs (coast s4 1080p): gulp band visible 0.43 s, lowest point 16.6 % of H at
+  the left edge / 14.5 % over the centre third (was 19–41 % across the centre); 2nd gulp → no band, tag 'visible 吞BIG GULP
+  大嘴吞噬', gone by +58 frames; errors []. Sandbox skill/skillThin/skillWide/bandCallout/bandWreck/quip/quipDock/quipDeny
+  PASS (sheet-g34.jpg).
+- [x] G5 (minor, aesthetic) WRECKED stamp over the returning HUD → CutIn.cine marks KO / WRECKED splashes shown over a
+  cinematic; director.cineSplashUp → layer.holdHud keeps the static HUD hidden (hud.ts quiet) until that splash has made its
+  hurried exit (≤ 0.15 s after cine:ko end), then the HUD fades in. t5-wreck.mjs (mountain s3 __br.fx.testWrecked(), coast
+  testKo): frames with stamp and HUD both visible 8 → 0 / 0; sandbox ko, ko2, koFallback, koEnd, quipKo PASS; errors [].
+- [x] G6 (minor, aesthetic) cluster / place too big while cruising → (a) the battle cluster is drawn at 0.85 toward the corner
+  (css/cluster.css .cl scale; zones.ts CL_SCALE mirrors it for the gauges / cluster rects, quip anchor 374 → 318): 612×323 px
+  at 1080p (was 720×380), diamond row top y ≈ 792 (was ≈ 746); (b) occlusion.ts dims the gauges (0.4) for rivals from 4 m
+  behind to 12 m ahead (was ±4 m) and when a drawn name tag sits ≥ 30 % inside the gauges rect; (c) place.ts: the place block
+  (shard + timer) rides at 0.75 while cruising, snaps to full size in 0.1 s for 2.5 s after GO, on every place change and
+  during a BUSTED ticket stop, then eases back. Not done: tucking the diamonds under the HP/SP rows (with the 0.85 scale a
+  rival 2–10 m ahead in the right lane already projects above the diamond row: t6 sweep op=1, no tag over the gauges).
+  t6-cluster.mjs (coast s4 1080p): .cl box 612×323, plw 'none' after a place change → 'scale(0.75)' 3.4 s later; rivals
+  alongside / behind in the right lane dim the gauges (op 0.40); errors [] (sheet-g6.jpg). Full sandbox suite 36/36 PASS.
+- Band anchor: .ci-band hangs from the screen top (calc((1080px − 100vh / k) / 2)), so 16:10 does not push it down with the
+  centred stage: lowest point 1920×1200 14.9 % (was 19.9 % before the anchor), 2560×1440 16.6 %, 1280×720 16.6 %.
+- Verification (final tree): tsc 0 errors. Sandbox `node sandbox/hud.shots.mjs` 36/36 PASS (stub). Real-race audit
+  (fix2/t/audit.mjs coast s2 720p, 339 samples): zone 1, bubble/callout 1, hud/tag 1, max plates 3, errors []. Perf
+  (acc1/t/t9-perf-ab.mjs, autopilot coast s6 1080p, prompts on): ui.update avg 0.20 ms, p99 0.5, max 1.4 (the ~23 ms
+  one-off spikes seen in other runs show up with prompts off too: machine load). Sizes checked: 1280×720, 1920×1080,
+  1920×1200, 2560×1440 (sheet-sizes.jpg).
+- How to test (acceptance r1): shots/ui-hud/acc1/t/ — t1-hints.mjs [size] (prompts + pad glyphs), t3-skip.mjs [size] (intro
+  skip chip), t4-band.mjs [size] (band height / duration, cast tag), t5-wreck.mjs [track size ko|wrecked] (stamp vs HUD
+  overlap frames), t6-cluster.mjs [size] (cluster box, place scale, occlusion sweep; DS / DX env lists), t9-perf-ab.mjs
+  (RACES=0|5 restarts with prompts on / off), sheet.py (contact sheets).
+
+### Requests (acceptance r1)
+- core (optional): a persistent per-prompt counter (e.g. `SaveData.hints?: Record<string, number>`) so the first-race
+  prompts can count shows across sessions; until then they run during the profile's first 2 races (stats.races < 2),
+  ≤ 2 shows per prompt per app session, never again once the player has done the action.
+- content / ui-screens (interaction critic): device-neutral copy outside the HUD ('攒满 SP 就按 P' in HOWTO_BASICS, the menu
+  blurb 'J 往左扇，L 往右扇'); the HUD itself now shows pad glyphs live.

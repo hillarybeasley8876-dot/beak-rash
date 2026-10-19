@@ -27,18 +27,20 @@ async function run(h, mode, endAt) {
   await h.step(420);
   await h.eval(`(${stage})(${JSON.stringify(mode)})`);
   let ultMin = 1;
+  let ultMax = 1;
   let windows = 0;
   for (let f = 0; f < 240; f++) {
     await h.step(1);
     const st = await h.eval('(() => { const b = window.__br; return { t: b.app.clock.realTime - window.__t0, ult: b.app.clock.getScale("ult"), ko: b.fx.stats().cine.ko }; })()');
     ultMin = Math.min(ultMin, st.ult);
+    ultMax = Math.max(ultMax, st.ult);
     if (st.ko) windows++;
     if (endAt !== null && st.t >= endAt) {
       endAt = null;
       await h.eval('window.__br.app.bus.emit("race:end", { results: [] })');
     }
   }
-  return { log: await h.eval('window.__flow'), ultMin: +ultMin.toFixed(2), koWindowFrames: windows, errors: await h.errors() };
+  return { log: await h.eval('window.__flow'), ultMin: +ultMin.toFixed(2), ultMax: +ultMax.toFixed(2), koWindowFrames: windows, errors: await h.errors() };
 }
 
 const at = (log, key) => Number((log.find((e) => e.startsWith(key)) ?? '@NaN').split('@')[1]);
@@ -49,7 +51,8 @@ await withPage(async (page, h) => {
   const off = await run(h, 'off', null);
   const ended = await run(h, 'full', 0.5);
   const cases = {
-    full: { impact: at(full.log, 'ult/impact'), pass: at(full.log, 'ult/impact') > 1700 && full.ultMin < 0.3 },
+    // Full: deep slow-mo under the cut-in, then the static top rushes by (acceptance r1: apex hang <= 0.3 s).
+    full: { impact: at(full.log, 'ult/impact'), ultMax: full.ultMax, pass: at(full.log, 'ult/impact') > 1350 && at(full.log, 'ult/impact') < 1700 && full.ultMin < 0.3 && full.ultMax > 1.2 },
     short: { impact: at(short.log, 'ult/impact'), pass: at(short.log, 'ult/impact') < 1350 && short.ultMin >= 0.7 },
     off: { impact: at(off.log, 'ult/impact'), ultMin: off.ultMin, pass: at(off.log, 'ult/impact') < 1000 && off.ultMin === 1 },
     ended: { log: ended.log.join(' '), koWindowFrames: ended.koWindowFrames, pass: !ended.log.some((e) => e.startsWith('ult/impact')) && ended.koWindowFrames === 0 },

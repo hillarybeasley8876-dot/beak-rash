@@ -17,8 +17,8 @@ export interface SkillView {
   field: number;
 }
 
-/** Back on the bike after a crash (racing again for < 3 s, well after the start). */
-const fresh = (v: SkillView): boolean => v.time > 10 && v.me.modeTime < 3;
+/** Back on the bike after a crash for less than 12 s (the same window as the pace's no-catch-up rule). */
+const recovering = (v: SkillView): boolean => v.me.modeTime < 12 && v.time - v.me.modeTime > 5;
 
 type Rule = (v: SkillView) => boolean;
 
@@ -30,11 +30,16 @@ const threatened = (v: SkillView): boolean =>
   riders(v).some((b) => dist(b, v.me) < 3 && b.rider?.action !== null && (b.rider?.action?.kind === 'attack' || b.rider?.action?.kind === 'heavy'));
 
 // Speed skills (slide, flash, doge, ghost) need a purpose, never fired on cooldown: an overtake (a rider 3–25 m
-// ahead in my lane), defence (threatened), or a comeback (behind the player or in the bottom half). The race
-// leader and anyone more than 20 m ahead of the player keep them holstered (defence aside), so a speed skill is
-// a way back into the race, not a lead that grows every cooldown.
+// ahead in my lane), defence (threatened), or a comeback (behind the player or in the bottom half). Riders on the
+// podium places, anyone more than 20 m ahead of the player and a rider back from a crash for < 12 s keep them
+// holstered (defence only when hurt), so a speed skill is a way back into the race, not what decides the podium,
+// and a KO still buys a real gap.
 const LEAD_FREE = 20;
-const holstered = (v: SkillView): boolean => v.me.place === 1 || v.me.s - v.player.s > LEAD_FREE;
+const PODIUM = 3;
+const holstered = (v: SkillView): boolean => v.me.place <= PODIUM || v.me.s - v.player.s > LEAD_FREE || recovering(v);
+const hurt = (v: SkillView): boolean => v.me.hp < v.me.maxHp * 0.5;
+/** Shield / slide under attack: always when hurt, otherwise only off the podium places. */
+const defend = (v: SkillView): boolean => threatened(v) && (hurt(v) || !holstered(v));
 const overtaking = (v: SkillView): boolean => riders(v).some((b) => b.ds > 3 && b.ds < 25 && Math.abs(b.x - v.me.x) < 1.6);
 const comeback = (v: SkillView): boolean => v.player.s > v.me.s || v.me.place > v.field / 2;
 const purpose = (v: SkillView): boolean => !holstered(v) && (overtaking(v) || comeback(v));
@@ -43,15 +48,15 @@ const SIG: Record<string, Rule> = {
   'goose.honk': (v) => riders(v).some((b) => ahead(b, v.me, 2, 14, Math.PI / 6)),
   'capybara.chill': (v) => riders(v).filter((b) => dist(b, v.me) < 10).length >= 2,
   'cat.spin': (v) => riders(v).some((b) => dist(b, v.me) < 2.4),
-  'shiba.doge': (v) => threatened(v) || (v.me.hp < v.me.maxHp * 0.5 && riders(v).some((b) => dist(b, v.me) < 5))
+  'shiba.doge': (v) => defend(v) || (hurt(v) && !holstered(v) && riders(v).some((b) => dist(b, v.me) < 5))
     || (purpose(v) && v.straight > 80 && riders(v).some((b) => b.ds > 5 && b.ds < 30)),
   'pigeon.ghost': (v) => !holstered(v) && (v.blocked || riders(v).filter((b) => dist(b, v.me) < 5).length >= 2
     || (v.player.s - v.me.s > 5 && v.player.s - v.me.s < 30)),
-  'penguin.slide': (v) => threatened(v) || (purpose(v) && v.straight > 90),
+  'penguin.slide': (v) => defend(v) || (purpose(v) && v.straight > 90),
   'seagull.steal': (v) => riders(v).some((b) => dist(b, v.me) < 6 && b.rider !== null && ((b.rider.weapon !== 'none' && v.me.weapon === 'none') || b.rider.sp >= 20)),
-  // A lazy comeback tool: only from the bottom 3 or trailing the player.
-  'sloth.flash': (v) => v.time > 8 && !holstered(v) && (v.me.place > v.field - 3 || v.player.s - v.me.s > 10) && v.straight > 100
-    && (riders(v).some((b) => b.ds > 3 && b.ds < 40) || (fresh(v) && v.me.speed < 10)),
+  // A lazy comeback tool: only from the bottom 3 (trailing the player too made the sloth a podium regular).
+  'sloth.flash': (v) => v.time > 8 && !holstered(v) && v.me.place > v.field - 3 && v.straight > 100
+    && riders(v).some((b) => b.ds > 3 && b.ds < 40),
 };
 
 /** Pelican autopilot: torpedo, gulp, wing dash, SHOWTIME. */

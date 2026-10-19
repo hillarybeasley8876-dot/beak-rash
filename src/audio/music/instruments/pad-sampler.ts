@@ -12,7 +12,7 @@ import { filter } from '../../dsp/env';
 import type { Band } from '../band';
 
 /** Voices alternate left / right (width without a delay line). */
-const VOICE_PAN = [-0.45, 0.45, -0.45, 0.45];
+const VOICE_PAN = [-0.6, 0.6, -0.6, 0.6];
 const HELD = 4.2;
 
 const SPEC: BankSpec = {

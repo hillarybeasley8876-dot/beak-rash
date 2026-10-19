@@ -44,6 +44,8 @@ export class ParticlePool {
   private writeStart = 0;
   private lastDeath = -1;
   private lastDeathReal = -1;
+  /** Frames left to draw with nothing alive (program compile during the race intro, not on the GO burst). */
+  private warmFrames = 0;
 
   constructor(capacity: number, additive: boolean, atlas: Texture, shared: SharedUniforms) {
     this.capacity = capacity;
@@ -112,7 +114,13 @@ export class ParticlePool {
       this.buffer.needsUpdate = true;
       this.written = 0;
     }
-    this.mesh.visible = now < this.lastDeath || nowReal < this.lastDeathReal;
+    this.mesh.visible = this.warmFrames > 0 || now < this.lastDeath || nowReal < this.lastDeathReal;
+    this.warmFrames = Math.max(0, this.warmFrames - 1);
+  }
+
+  /** Draw the (all parked, invisible) pool for the next frames so its program links now. */
+  warm(): void {
+    this.warmFrames = 2;
   }
 
   /** Number of live particles (debug only: scans the pool). */

@@ -12,7 +12,7 @@ import { B } from '../rig/skeleton';
 export interface BeakColors { beak: number; lower: number; hook: number; pouch: number }
 
 /** Beak base / tip z (bind pose, before the head offset) and the hook start (fraction of the length). */
-const Z0 = -0.555, Z1 = -1.035, HOOK = 0.9;
+const Z0 = -0.555, Z1 = -1.105, HOOK = 0.9;
 
 const zAt = (t: number): number => Z0 + (Z1 - Z0) * t;
 /** Rounds the last 14 % of the beak to the tip. */
@@ -37,8 +37,8 @@ function lowerAt(t: number, v: number, o: V3, out: Vector3): Vector3 {
   return out.set(w * Math.cos(a) + o[0], y + o[1], zAt(t) + o[2]);
 }
 
-/** Pouch sack: u = 0 at the throat (z −0.43) → 1 near the tip (z −0.97); widest/deepest at u ≈ 0.2. */
-const PZ0 = -0.43, PZ1 = -0.97;
+/** Pouch sack: u = 0 at the throat (z −0.43) → 1 near the tip (z −1.03); widest/deepest at u ≈ 0.2. */
+const PZ0 = -0.43, PZ1 = -1.03;
 const sackShape = (u: number): number => Math.sin(Math.PI * u ** 0.45) ** 0.6;
 
 function sackTop(z: number): number {

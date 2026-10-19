@@ -64,7 +64,14 @@ export const TUNING = {
   driftCurveCancel: 1.35, // a drift cancels the curve push only up to this × steerAuthHigh × handling × v/top
                           // (turn authority ×1.35): beyond ≈ R32 at top speed a drift runs wide
   driftExitTime: 0.35,    // s after a release over which grip steering takes over from the drift's lateral speed …
-  driftExitGuard: 0.5,    // … and |vx| ≤ v·tan(driftMaxAngle) for this long (a release mistake bounces, never wrecks)
+  driftExitGuard: 1.0,    // … and |vx| ≤ v·tan(driftMaxAngle) for this long (a release mistake bounces, never wrecks)
+  // Exit carve (carve.ts): after a mini-turbo release mid-bend the bike keeps the drift's bite for the rest of
+  // that bend: the curve push beyond driftCarveHold × grip authority is cancelled (never more than the drift's own
+  // cancel), so a hairpin needs ~70 % steer instead of running wide at full lock; |vx| stays ≤ v·tan(driftMaxAngle).
+  driftCarveHold: 0.7,
+  driftCarveEndKappa: 1 / 150, // m⁻¹: the carve fades once the bend turning the drift's way relaxes below this …
+  driftCarveFade: 0.3,    // … over this many s …
+  driftCarveMax: 4,       // … or this many s after the release at the latest
   driftBleed: 0.04,       // 1/s speed bleed while drifting
   // Charge by commitment: rate lerp(low, high, u) × (straight … 1 as the bend into the drift tightens to
   // 1/250 m⁻¹), where `low` rises to lowBend on that bend. Full commitment: R ≤ 250 → L3 in 1.74 s, R319

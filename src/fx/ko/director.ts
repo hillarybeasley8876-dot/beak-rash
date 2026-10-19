@@ -4,8 +4,9 @@
 // impact window: player KOs during the rise are announced at once and peak with the impact.
 import { Vector3 } from 'three';
 import { Rng } from '../../core/rng';
+import { fillCast, fillOccluders } from './cast';
 import { KoCine } from './cine';
-import { FRAMINGS, makeConfine, pickFraming, ULT_WIDE } from './framing';
+import { FRAMINGS, makeConfine, pickFraming, ULT_WIDE, ultOverShoulder } from './framing';
 import { FULL, LITE, shortVariant, ULT_IMPACT, WRECKED, type CineKind, type Timeline } from './look';
 import { UltRise, type SlowmoMode } from './rise';
 import { heroIndex, subjectSphere, type Anchors } from './subject';
@@ -50,6 +51,8 @@ export class KoDirector implements FxPart {
   /** race:end seen: no new cinematic until the next attach (late impacts / KOs behind the results). */
   private ended = false;
   private pending: Pending | null = null;
+  /** Subject-mask warm-up: every rider in the cast for one frame after attach (its programs compile in the intro). */
+  private warm: 'fill' | 'clear' | null = null;
   private readonly live = new Map<RiderId, { head: Vector3; body: Vector3; bike: Vector3; ground: number }>();
   private readonly scores: string[] = [];
   private readonly rng = new Rng(0x6b0);
@@ -61,6 +64,13 @@ export class KoDirector implements FxPart {
       rig: app.rig, clock: app.clock, bus: app.bus, camera: app.camera, post,
       subject: (id: RiderId) => this.anchors(id),
       debris: { mark: () => particles.nowReal, cull: (from: number) => particles.cull(from) },
+      cast: (out: Parameters<typeof fillCast>[0], victims: readonly RiderId[], attackers: readonly RiderId[]) => {
+        const s = this.session();
+        if (!s) return;
+        fillCast(out, s, victims, attackers);
+        // The SHOWTIME pelican stays in its own impact shot; a KO attacker in front of the victim steps aside.
+        fillOccluders(post.cine.hide, s, app.camera.position, victims, this.cine.kind === 'ult' ? attackers : []);
+      },
     };
     this.cine = new KoCine(host, (kind) => this.onCineEnd(kind));
     this.rise = new UltRise(ctx);
@@ -186,8 +196,10 @@ export class KoDirector implements FxPart {
       .map((o) => tracker.get(o.id))
       .filter((e) => !!e)
       .map((e) => ({ pos: e.body, vel: e.vel }));
+    others.push(...this.vehicles(s, r.s));
     const focusVel = (hero?.vel.clone() ?? new Vector3()).multiplyScalar(point ? 0 : 0.7);
-    const defs = kind === 'ult' ? (hero ? FRAMINGS.ult : [ULT_WIDE]) : undefined;
+    const ots = point && hero ? ultOverShoulder(point, focus, heading, fitRadius) : null;
+    const defs = kind === 'ult' ? (hero ? [...(ots ? [ots] : []), ...FRAMINGS.ult] : [ULT_WIDE]) : undefined;
     const { framing, id } = pickFraming({
       kind, track: s.track, focus, ground, s: r.s, heading, duration, others, focusVel, prefer, defs, fitRadius,
       avoid: this.lastFraming, rand: () => this.rng.next(), trace: (this.scores.length = 0, this.scores),
@@ -195,6 +207,20 @@ export class KoDirector implements FxPart {
     this.lastFraming = id;
     const followId = r.id;
     return { framing, confine: makeConfine(s.track, () => s.rider(followId)?.s ?? r.s) };
+  }
+
+  /** Traffic / police vehicles near the subject as occluders (centre at half height, bounding radius). */
+  private vehicles(s: Session, at: number): Array<{ pos: Vector3; vel: Vector3; r: number }> {
+    return s.obstacles
+      .filter((o) => o.active && o.solid && Math.abs(o.s - at) < 30)
+      .map((o) => {
+        const tan = s.track.frameAt(o.s).tangent;
+        return {
+          pos: s.track.toWorld(o.s, o.x, o.height / 2, new Vector3()),
+          vel: new Vector3(tan.x, tan.y, tan.z).multiplyScalar(o.speed),
+          r: Math.max(o.halfWidth, Math.min(o.halfLength, 2.5), o.height / 2),
+        };
+      });
   }
 
   private onUltStart(rider: RiderId): void {
@@ -209,7 +235,9 @@ export class KoDirector implements FxPart {
     const s = this.session();
     if (!s) return;
     const t = this.ctx.tracker.get(rider);
-    this.ctx.burst('shockwave', pos, { ground: t?.ground ?? pos.y });
+    const r = s.rider(rider);
+    const dir = r ? s.track.frameAt(r.s).tangent : undefined;
+    this.ctx.burst('shockwave', pos, { ground: t?.ground ?? pos.y, dir });
     // Only a running player rise opens the impact window, so cine:ult stays start -> impact -> end.
     if (rider !== s.player.id || !this.rise.open) return;
     this.ctx.app.bus.emit('cine:ult', { phase: 'impact', riderId: rider });
@@ -243,13 +271,23 @@ export class KoDirector implements FxPart {
     this.ended = false;
     this.lastStart = -1e9;
     this.lastFraming = null;
+    this.warm = 'fill';
   }
 
   update(_dtSim: number, dtReal: number): void {
+    this.warmCast();
     if (this.ctx.app.clock.getScale('pause') === 0) return;
     this.rise.update(dtReal);
     if (this.pending && !this.rise.open) this.flushPending();
     this.cine.update(dtReal);
+  }
+
+  private warmCast(): void {
+    const s = this.session();
+    if (!this.warm || !s || this.cine.active) return;
+    if (this.warm === 'fill') fillCast(this.ctx.post.cine.cast, s, [], []);
+    else this.ctx.post.cine.cast.clear();
+    this.warm = this.warm === 'fill' ? 'clear' : null;
   }
 
   /** Debug summary for __br.fx.stats(). */

@@ -49,3 +49,15 @@
 .wp-x { font: 400 30px/1 "Anton", sans-serif; color: var(--red); }
 .wp.is-last .wp-pip:not(.off) { animation: brh-low 0.4s steps(2, end) infinite; }
 .wp-flash { position: absolute; inset: 0; background: var(--paper); opacity: 0; pointer-events: none; }
+
+/* Repeat casts (casttag.ts): compact tag just above the diamond row, right-aligned with the ult diamond,
+   below the player's quip bubble (css/quip.css .qp bottom 374). */
+.ct {
+  position: absolute; right: 262px; bottom: 318px; display: flex; align-items: center; gap: 10px; padding: 5px 16px 4px 6px;
+  background: var(--ink); color: var(--paper); white-space: nowrap; transform-origin: 100% 100%; visibility: hidden;
+  box-shadow: 0 0 0 3px var(--paper), 6px 6px 0 3px var(--red);
+}
+.ct-g { width: 40px; height: 40px; display: grid; place-items: center; background: var(--paper); color: var(--ink); font: 400 28px/1 "ZCOOL QingKe HuangYou", sans-serif; }
+.ct-t { display: flex; flex-direction: column; gap: 3px; }
+.ct-t b { font: 400 28px/0.95 "Anton", sans-serif; letter-spacing: 1px; }
+.ct-t i { font: 400 18px/1 "ZCOOL QingKe HuangYou", sans-serif; font-style: normal; color: var(--hot); }

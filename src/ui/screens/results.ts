@@ -1,13 +1,15 @@
 // results: RESULTS slam, standings table, podium, grade stamp + meme title, coin count-up (saved once),
 // achievements (unlocked + saved by gameplay/achievements), buttons 再来一局 / 下一站 / 车库 / 主菜单 (巡回赛
-// after a career race). The button row slides in (armed) only after the show (stamp + count-up) and a
-// quiet beat with no key / pad press, so finish-line hop or swing rhythms never pick a button; presses
-// before that only skip the show. Without race props the screen shows demo data (no save).
+// after a career race; 下一站 becomes 通关! after the career's last event). A top-3 finish on a cup's last
+// event stamps CUP CLEAR / CAREER CLEAR in the title row. The button row slides in (armed) only after the
+// show (stamp + count-up) and a quiet beat with no key / pad press / click, so finish-line hop or swing
+// rhythms never pick a button; presses before that (or a click anywhere) only skip the show. Without race
+// props the screen shows demo data (no save).
 import './results.css';
 import { TRACKS } from '../../data/tracks';
-import { Nav, type NavItem } from '../nav';
-import { HINT_BACK, HINT_LR, HINT_OK, backdrop, button, h } from '../p5';
-import { applyRewards } from '../progress';
+import { Nav, isDirection, type NavItem } from '../nav';
+import { HINT_BACK, HINT_LR, HINT_OK, backdrop, button, h, reducedMotion } from '../p5';
+import { applyRewards, careerEvent, cupName, isCareerFinal, type Reward } from '../progress';
 import { frame, type ScreenFactory } from '../screen';
 import { achievementChips, achievementPanel } from './results-achievements';
 import { DEMO_ACHIEVEMENTS, demoResults, leaveRace, nextRace } from './results-flow';
@@ -17,8 +19,11 @@ const LOCK_MS = 900;   // after the reveal: the RESULTS slam lands before the ro
 const QUIET_MS = 700;  // the row arms only after this long without a key / pad press (a 450 ms hop rhythm
                        // or 220 ms swing mash never arms it; a deliberate choice comes after a pause)
 const STAMP_AT = 1.22; // s after mount: the grade stamp lands (results.css: br-stamp-in at 0.95 s)
-const UNLOCK_AT = 1.5; // s after mount: the "unlocked" tag pops (results.css .br-res-unlock)
-const DIRECTIONS = new Set(['up', 'down', 'left', 'right']);
+const UNLOCK_AT = 1.5; // s after mount: the "unlocked" / CLEAR tag pops (results.css .br-res-unlock)
+const CLICK_ARM_MS = 350; // clicks on the row wait for its slide-in after arming
+const HOP_CONFIRM_GAP = 1000; // the first Space / pad A (hop twin) confirm after arming needs this long since
+                              // the last press before arming (else it is the finish-line hop rhythm)
+const HOP_RETRY_MS = 350;     // after that one ignored hop-twin confirm, the next one this much later counts
 
 export const resultsScreen: ScreenFactory = (ctx) => {
   const demo = !ctx.props.results?.length;
@@ -38,13 +43,15 @@ export const resultsScreen: ScreenFactory = (ctx) => {
   const sub = `${career ? `CAREER · TIER ${config.level}` : 'QUICK RACE'} · ${track.name}`;
   const best = reward.newBest ? '新纪录 NEW BEST!' : reward.firstFinish ? '首次完赛 FIRST FINISH' : null;
   const unlock = reward.unlocked ? `解锁 ${TRACKS[reward.unlocked.trackId].name} · TIER ${reward.unlocked.tier}` : null;
+  const clear = clearText(reward);
   const ach = achievementChips(unlocked);
   const panel = ach.more ? achievementPanel(unlocked) : null;
   f.stage.append(
     h('div', { class: 'br-res-title' }, h('span', { class: 'br-res-word', text: 'RESULTS' }),
-      h('div', { class: `br-res-tags${unlock && best ? ' is-three' : ''}` },
-        unlock ? h('span', { class: 'br-tag is-white br-res-unlock', text: unlock }) : null,
-        best ? h('span', { class: 'br-tag is-red br-res-best', text: best }) : null,
+      h('div', { class: `br-res-tags${clear ? ' has-clear' : unlock && best ? ' is-three' : ''}` },
+        clear ? h('span', { class: 'br-tag is-red br-res-unlock br-res-clear', text: clear }) : null,
+        !clear && unlock ? h('span', { class: 'br-tag is-white br-res-unlock', text: unlock }) : null,
+        !clear && best ? h('span', { class: 'br-tag is-red br-res-best', text: best }) : null,
         h('span', { class: 'br-tag is-white br-res-sub', text: sub }))),
     standingsTable(results),
     podium(results, seed),
@@ -54,10 +61,15 @@ export const resultsScreen: ScreenFactory = (ctx) => {
   if (demo) f.stage.append(h('div', { class: 'br-tag is-yellow br-res-demo', text: 'DEMO 示例数据' }));
 
   const next = nextRace(ctx, config);
+  const ev = careerEvent(config);
+  const finalEvent = ev !== null && isCareerFinal(ev);
   const actions = [
     { label: '再来一局', sub: 'RETRY', run: () => ctx.app.bus.emit('flow:restartRace', {}) },
-    { label: '下一站', sub: 'NEXT', run: () => next && ctx.app.bus.emit('flow:startRace', { config: next }),
-      disabled: () => next === null, onDenied: () => ctx.toast('前三名才能解锁下一站', 'warn') },
+    reward.clear?.career
+      ? { label: '通关！', sub: 'FINALE', run: () => leaveRace(ctx, config, 'finale') }
+      : { label: '下一站', sub: 'NEXT', run: () => next && ctx.app.bus.emit('flow:startRace', { config: next }),
+        disabled: () => next === null,
+        onDenied: () => ctx.toast(finalEvent ? '已经是最后一站了：前三名即可通关' : '前三名才能解锁下一站', 'warn') },
     { label: '车库', sub: 'GARAGE', run: () => leaveRace(ctx, config, 'garage') },
     career
       ? { label: '巡回赛', sub: 'CAREER', run: () => leaveRace(ctx, config, 'career') }
@@ -82,21 +94,29 @@ export const resultsScreen: ScreenFactory = (ctx) => {
     f.stage.append(panel);
   }
   f.stage.append(row);
-  // Default focus 再来一局: the first accepted press never sends the player to a different track.
-  const nav = ctx.nav(new Nav(items, { layout: 'horizontal', start: 0, sfx: ctx.sfx }));
+  // Default focus moves on (下一站 / 通关! / 巡回赛 in a career, 主菜单 after a quick race), never RETRY:
+  // a stray press does not throw the result screen away for a reload of the same race.
+  const nav = ctx.nav(new Nav(items, { layout: 'horizontal', start: (career && next !== null) || reward.clear?.career ? 1 : 3, sfx: ctx.sfx }));
   let enteredAt = Infinity;
   let armed = false;
+  let armedAt = Infinity;
   let counting = true;
+  let hopTwin = false;
+  let quietFrom = -Infinity;    // the last press before the row armed
+  let hopFirst = true;          // no hop-twin confirm (and no menu move) since arming yet
+  let hopIgnoredAt = -Infinity; // when the first hop-twin confirm was ignored
   const shellGate = nav.gate;
-  nav.gate = () => shellGate() && armed && !panelOpen;
+  nav.gate = () => shellGate() && armed && !panelOpen && performance.now() - armedAt >= CLICK_ARM_MS;
   const arm = (): void => {
     armed = true;
+    armedAt = performance.now();
+    quietFrom = armedAt - ctx.sincePress();
     row.classList.add('is-armed');
     ctx.sfx('ui.move');
   };
   let elapsed = 0;
   let stamped = false;
-  let unlockSounded = unlock === null;
+  let unlockSounded = unlock === null && clear === null;
   const stamp = (): void => {
     if (stamped) return;
     stamped = true;
@@ -117,8 +137,28 @@ export const resultsScreen: ScreenFactory = (ctx) => {
     stamp();
     soundUnlock();
   };
+  /** Space / pad A send hop + confirm. The first such confirm right after arming may still be the finish-line
+   * hop rhythm: unless the player had paused HOP_CONFIRM_GAP, it is ignored with a deny + a nudge of the focused
+   * button (the row is live), and the next one HOP_RETRY_MS later goes through. */
+  const hopConfirmOk = (): boolean => {
+    const now = performance.now();
+    if (hopFirst) {
+      hopFirst = false;
+      if (now - quietFrom >= HOP_CONFIRM_GAP) return true;
+      hopIgnoredAt = now;
+    } else if (now - hopIgnoredAt >= HOP_RETRY_MS) return true;
+    ctx.sfx('ui.deny');
+    if (!reducedMotion()) nav.current?.el.animate([{ scale: 1 }, { scale: 1.12, offset: 0.35 }, { scale: 1 }], { duration: 240, easing: 'ease-out' });
+    return false;
+  };
+  // The overlay lets clicks on bare stage through to the canvas: listen on the window to skip the show.
+  const onPointer = (): void => {
+    if (!armed) skipShow();
+  };
+  window.addEventListener('pointerdown', onPointer);
   return {
     root: f.root,
+    dispose: () => window.removeEventListener('pointerdown', onPointer),
     entered: () => {
       enteredAt = performance.now();
     },
@@ -132,10 +172,10 @@ export const resultsScreen: ScreenFactory = (ctx) => {
     onAction: (a) => {
       if (panelOpen) {
         if (a === 'back' || a === 'confirm' || a === 'pause') setPanel(false);
-        return a === 'back' || a === 'confirm' || a === 'pause' || a === 'up' || a === 'down' || a === 'left' || a === 'right';
+        return a === 'back' || a === 'confirm' || a === 'pause' || isDirection(a);
       }
       if (!armed) {
-        if (!DIRECTIONS.has(a)) skipShow();
+        if (!isDirection(a)) skipShow();
         return true;
       }
       if (a === 'back') {
@@ -143,7 +183,24 @@ export const resultsScreen: ScreenFactory = (ctx) => {
         leaveRace(ctx, config, home);
         return true;
       }
+      if (a === 'hop') {
+        hopTwin = true;
+        queueMicrotask(() => (hopTwin = false));
+        return false;
+      }
+      if (a === 'confirm' && hopTwin && !hopConfirmOk()) return true;
+      if (isDirection(a)) {
+        hopFirst = false; // a deliberate menu move: no rhythm guard after it
+        hopIgnoredAt = -Infinity;
+      }
       return nav.handle(a);
     },
   };
 };
+
+/** Title-row stamp for a top-3 finish on a cup's last event. */
+function clearText(reward: Reward): string | null {
+  const c = reward.clear;
+  if (!c) return null;
+  return c.career ? '★ 巡回赛通关 CAREER CLEAR!' : `★ ${cupName(c.tier)} CUP CLEAR!`;
+}

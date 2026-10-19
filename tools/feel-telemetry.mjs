@@ -90,6 +90,14 @@ const CHECKS = [
     ['driftRelease', `R${R}_neutral_crashed`, false, false], ['driftRelease', `R${R}_full_runWide`, 0, 2],
     ['driftRelease', `R${R}_full_yawOutDeg`, 0, 10], ['driftRelease', `R${R}_half_yawOutDeg`, 0, 10],
   ]),
+  // acceptance r1: an L3 release halfway round a hairpin keeps the drift's bite for the rest of the bend (exit carve):
+  // full lock holds the line, half lock and neutral hands run wide below the wall-crash angle and never wreck
+  ...[26, 28, 30].flatMap((R) => [
+    ['driftRelease', `R${R}_full_crashed`, false, false], ['driftRelease', `R${R}_half_crashed`, false, false],
+    ['driftRelease', `R${R}_neutral_crashed`, false, false], ['driftRelease', `R${R}_full_runWide`, 0, 2],
+    ['driftRelease', `R${R}_full_yawOutDeg`, 0, 10], ['driftRelease', `R${R}_half_yawOutDeg`, 0, 10],
+    ['driftRelease', `R${R}_half_runWide`, 0, 6], ['driftRelease', `R${R}_neutral_yawOutDeg`, 0, 20],
+  ]),
   ['press', 'sideBumps', 1, 1], ['pressYaw', 'bumps_60', 1, 1], ['pressYaw', 'bumps_144', 1, 1],
   ['pressYaw', 'playerYawStepDeg_60', 0, 5.2], ['pressYaw', 'rivalYawStepDeg_60', 0, 5.2],
   // (144 fps: <= 2.6 deg = 375 deg/s, the heading rate of a full-lock steering onset; the stub race AI steers the rival

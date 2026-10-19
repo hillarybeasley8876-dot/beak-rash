@@ -1,12 +1,14 @@
 // P5 battle-style cluster (bottom-right): tilted portrait card with mood swaps, name plate, HP bar
-// with a trailing damage chunk, SP bar that glows "SHOWTIME READY [P]", skill diamonds, weapon slot.
+// with a trailing damage chunk, SP bar that glows "SHOWTIME READY [P / R3]", skill diamonds, weapon slot.
 import './css/cluster.css';
 import { approach, clamp01 } from '../../core/math';
 import { ROSTER } from '../../data/roster';
 import type { CharacterId, RiderState } from '../../core/types';
 import { shake } from './anim';
 import { PortraitCard } from './badge';
+import { CastTag } from './casttag';
 import { el, w, type W } from './dom';
+import { keyGlyphs } from './glyphs';
 import { setRansom } from './ransom';
 import { SkillRow } from './skills';
 import { WeaponSlot } from './weapon';
@@ -20,6 +22,7 @@ export class Cluster {
   readonly root: HTMLDivElement;
   readonly skills: SkillRow;
   readonly weapon: WeaponSlot;
+  private cast: CastTag;
   private rootW: W;
   private card: PortraitCard;
   private cardWrap: W;
@@ -47,8 +50,9 @@ export class Cluster {
     this.sp = this.makeBar(bars, 'cl-sp', 'SP', false);
     const ready = el('div', 'cl-ready', this.sp.row);
     setRansom(el('span', '', ready), 'SHOWTIME READY', { seed: 5, scheme: 'mix', tilt: 7 });
-    el('kbd', '', ready, 'P');
+    keyGlyphs(el('kbd', '', ready), 'ult');
     this.weapon = new WeaponSlot(this.root);
+    this.cast = new CastTag(this.root);
     const wrap = el('div', 'cl-pc-wrap', this.root);
     this.cardWrap = w(wrap);
     el('div', 'cl-pc-shadow', wrap);
@@ -78,6 +82,11 @@ export class Cluster {
   hurt(): void {
     this.hitT = 0;
     this.chunkHold = 0.45;
+  }
+
+  /** A repeat cast of one of the player's skills (the band played on the first): the compact tag. */
+  castTag(skillId: string): void {
+    this.cast.show(skillId);
   }
 
   /** The player knocked someone out. */
@@ -117,6 +126,7 @@ export class Cluster {
     this.hurtW.op(this.hitT < 0.3 ? 0.55 * (1 - this.hitT / 0.3) : down ? 0.35 : 0);
     this.skills.update(r, dt);
     this.weapon.update(r, dt);
+    this.cast.update(dt);
   }
 
   /** A rider alongside sits behind the gauges: fade bars, diamonds and weapon slot (not the portrait) to

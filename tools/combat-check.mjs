@@ -3,6 +3,7 @@
 //   node tools/combat-check.mjs [--only <substring>] [--seed 7] [--full | --stub a,b] [--keep-going]
 // Default isolates fx/audio/ui/actors with core stubs (no slow-mo cinematics changing sim time, no breakage
 // from views being edited); --full runs every real unit; --stub picks the stubbed units explicitly.
+import { acc1 } from './combat-check/acc1.mjs';
 import { fixes } from './combat-check/fixes.mjs';
 import { fixes2 } from './combat-check/fixes2.mjs';
 import { fixes3 } from './combat-check/fixes3.mjs';
@@ -20,7 +21,7 @@ const LINEUP = 'goose,cat,capybara,shiba,pigeon,penguin,seagull,sloth,corgi';
 const stubs = a.full ? '' : typeof a.stub === 'string' ? a.stub : 'fx,audio,ui,actors';
 const stub = stubs ? `&stub=${stubs}` : '';
 const url = `/?race=coast&seed=${a.seed ?? 7}&traffic=0&police=0&manual=1&rivals=${LINEUP}${stub}`;
-const all = [...melee, ...items, ...skills, ...sigs, ...fixes, ...fixes2, ...fixes3, ...fixes4, ...finish].filter(([name]) => !a.only || name.includes(String(a.only)));
+const all = [...melee, ...items, ...skills, ...sigs, ...fixes, ...fixes2, ...fixes3, ...fixes4, ...acc1, ...finish].filter(([name]) => !a.only || name.includes(String(a.only)));
 
 // Every console error fails the run unless it is clearly another unit's (its [tag] or a stack in its files);
 // those are listed but don't fail (isolate them with --stub).

@@ -1,5 +1,6 @@
 // Tiny DOM builders for the UI (no framework). Text goes through textContent; SVG markup is only ever
 // built from our own constants, numbers and roster colours (never from user or save data).
+import { motionPref } from './motion-pref';
 
 export type Child = Node | string | number | null | undefined | false;
 
@@ -55,8 +56,12 @@ export function svg(markup: string, cls?: string): SVGSVGElement {
 
 export const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
-export const reducedMotion = (): boolean =>
-  typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+/** In-game 动态效果 setting first (减弱 / 完整), else the OS prefers-reduced-motion flag. */
+export function reducedMotion(): boolean {
+  const pref = motionPref();
+  if (pref !== 'system') return pref === 'reduced';
+  return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
 
 /** Await a Web Animation without throwing when it is cancelled (screen torn down mid-flight). */
 export async function settle(anim: Animation): Promise<void> {

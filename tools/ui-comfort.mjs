@@ -65,7 +65,8 @@ async function resetLockChecks(page) {
   await page.locator('.br-pz-list .br-btn').nth(2).click();
   await idle(page);
   expect((await screen(page)) === 'settings', 'pause > 设置 opens settings');
-  for (let i = 0; i < 8; i++) await page.keyboard.press('ArrowDown');
+  const resetAt = await page.evaluate(() => [...document.querySelectorAll('.br-set-row')].findIndex((r) => r.classList.contains('is-action')));
+  for (let i = 0; i < resetAt; i++) await page.keyboard.press('ArrowDown');
   await page.waitForTimeout(150);
   const locked = await page.evaluate(() => document.querySelector('.br-set-row.is-action')?.classList.contains('is-disabled'));
   expect(locked === true, 'the reset row is marked disabled mid-race');
@@ -79,7 +80,7 @@ async function resetLockChecks(page) {
   await idle(page);
   await page.locator('.br-pz-list .br-btn').nth(2).click();
   await idle(page);
-  expect((await focusIndex(page, '.br-set-row')) !== 8, `settings do not reopen on the reset row (${await focusIndex(page, '.br-set-row')})`);
+  expect((await focusIndex(page, '.br-set-row')) !== resetAt, `settings do not reopen on the reset row (${await focusIndex(page, '.br-set-row')})`);
   await page.keyboard.press('Escape');
   await idle(page);
   await resume(page);
@@ -136,14 +137,17 @@ async function keyRepeatChecks(page) {
       for (const m of list) if (m.target.classList.contains('is-focus') && !(m.oldValue ?? '').includes('is-focus')) window.__moves += 1;
     }).observe(document.querySelector('.br-screens'), { subtree: true, attributes: true, attributeFilter: ['class'], attributeOldValue: true });
   });
+  const t0 = Date.now();
   await page.keyboard.down('ArrowDown');
   for (let i = 0; i < 14; i++) {
     await page.waitForTimeout(40);
     await page.keyboard.down('ArrowDown'); // Playwright sends repeat: true for a held key
   }
   await page.keyboard.up('ArrowDown');
+  const held = Date.now() - t0; // ~0.6 s, longer on a loaded machine: judge the rate, not a fixed count
   const moves = await page.evaluate(() => window.__moves);
-  expect(moves >= 4 && moves <= 8, `holding ↓ ~0.6 s moves the menu focus several times (${moves})`);
+  const most = 2 + Math.ceil(held / 110);
+  expect(moves >= 4 && moves <= most, `holding ↓ ${held} ms moves the menu focus every ~110 ms (${moves}, max ${most})`);
 }
 
 async function qualityChecks(page) {

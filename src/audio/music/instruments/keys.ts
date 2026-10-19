@@ -1,9 +1,9 @@
-// Keyboards: pooled electric piano, a persistent funk clavinet (narrow pulse through an envelope
-// wah, plus a muted "chicken scratch"), and a persistent legato saw pad.
+// Keyboards, the live voices: pooled electric piano, a persistent funk clavinet (narrow pulse
+// through an envelope wah) and a persistent legato saw pad, with their per-note shapes exported for
+// the note banks the sampled versions play from (keys-sampler, clav-sampler, pad-sampler).
 import { adsr, anchor, filter, holdAt, perc, settle } from '../../dsp/env';
 import { pulseWave } from '../../dsp/curves';
 import { midiToHz } from '../theory';
-import { playSample } from './drum-samples';
 import { Pool, osc, type Gate } from './voice';
 import type { Band } from '../band';
 
@@ -98,15 +98,34 @@ export class Rhodes {
   }
 }
 
+/** The clav's narrow pulse (22 % duty) at its level into the wah. */
+export const CLAV_DUTY = 0.22;
+export const CLAV_LEVEL = 0.52;
+/** Hits last at most this long (s) before their release. */
+export const CLAV_MAX = 0.5;
+export const CLAV_RELEASE = 0.05;
+
+/** The envelope wah: 550 Hz → a velocity peak in 45 ms → 850 Hz at 220 ms. */
+export function clavWah(w: AudioParam, t: number, vel: number): void {
+  holdAt(w, t);
+  w.setValueAtTime(550, t);
+  w.exponentialRampToValueAtTime(2300 + 900 * vel, t + 0.045);
+  w.exponentialRampToValueAtTime(850, t + 0.22);
+}
+
+/** The pluck; returns when the hit has died away. */
+export function clavAmp(g: AudioParam, t: number, dur: number, vel: number): number {
+  return adsr(g, t, Math.min(dur, CLAV_MAX), 0.3 * vel, 0.002, 0.12, 0.35, CLAV_RELEASE, true);
+}
+
+/** Funk clavinet, persistent (clav-sampler.ts plays pre-rendered hits; this covers the time before its bank exists). */
 export class Clav {
   private oscs: OscillatorNode[] = [];
   private wah: BiquadFilterNode;
   private amp: GainNode;
   private gate: Gate;
-  private input: AudioNode;
-  private mutes = 0;
 
-  constructor(private b: Band) {
+  constructor(b: Band) {
     const ctx = b.ctx;
     // The envelope band-pass alone shapes it (the pulse has no DC and plays above 300 Hz).
     this.wah = filter(ctx, { type: 'bandpass', frequency: 900, Q: 1.6 });
@@ -114,8 +133,8 @@ export class Clav {
     this.wah.connect(this.amp);
     this.gate = b.gate(this.amp, b.input('clav'));
     // Funk double-stops: the voicing's two guide tones (3rd + 7th of the rootless voicings).
-    const wave = pulseWave(ctx, 0.22);
-    const level = new GainNode(ctx, { gain: 0.52 });
+    const wave = pulseWave(ctx, CLAV_DUTY);
+    const level = new GainNode(ctx, { gain: CLAV_LEVEL });
     level.connect(this.wah);
     for (let i = 0; i < 2; i++) {
       const o = osc(b, 'sine', 330, jitter(b) * 6);
@@ -123,7 +142,6 @@ export class Clav {
       o.connect(level);
       this.oscs.push(o);
     }
-    this.input = b.input('clav');
   }
 
   hit(t: number, midis: number[], dur: number, vel: number): void {
@@ -133,16 +151,8 @@ export class Clav {
       holdAt(o.frequency, t);
       o.frequency.setValueAtTime(midiToHz(m), t);
     });
-    const w = this.wah.frequency;
-    holdAt(w, t);
-    w.setValueAtTime(550, t);
-    w.exponentialRampToValueAtTime(2300 + 900 * vel, t + 0.045);
-    w.exponentialRampToValueAtTime(850, t + 0.22);
-    this.gate.open(adsr(this.amp.gain, t, Math.min(dur, 0.5), 0.3 * vel, 0.002, 0.12, 0.35, 0.05, true));
-  }
-
-  mute(t: number, vel: number): void {
-    playSample(this.b.ctx, 'clavMute', this.mutes++, t, 0.16 * vel, this.input);
+    clavWah(this.wah.frequency, t, vel);
+    this.gate.open(clavAmp(this.amp.gain, t, dur, vel));
   }
 }
 

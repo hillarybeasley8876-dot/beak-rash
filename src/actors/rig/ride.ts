@@ -22,6 +22,8 @@ export interface RideInput {
   look: Vector3 | null;
   /** The bike's bell in character space (null = no bell marker): the right paw's target while ringing. */
   bell: Vector3 | null;
+  /** Head carriage side −1..1 (+ = the head turns to the rider's left), smoothed by the view (meta.carry). */
+  carry: number;
 }
 
 const e = new Euler(0, 0, 0, 'YXZ');
@@ -45,6 +47,9 @@ export class RidePose {
   private readonly unsquash = new Vector3(1, 1, 1);
   private headYaw = 0;
   private headPitch = 0;
+  /** Pouch spring (meta.pouchJiggle): bulge offset and velocity, kicked by the pedalling bounce and speed changes. */
+  private jig = 0;
+  private jigV = 0;
   /** Bind-space wing normals (left, right): spread wings fan their primaries about them. */
   private readonly wingN: [Vector3, Vector3];
 
@@ -121,18 +126,24 @@ export class RidePose {
 
   private neckAndHead(inp: RideInput, cue: CueOut, crank: number, pedalling: number, dt: number): void {
     const ps = this.ps, m = this.def.meta;
-    const n = cue.neck, tuck = this.tuck;
-    rot(ps.lq[B.neck1] as Quaternion, -0.42 * n - tuck * 0.18, 0, 0);
-    rot(ps.lq[B.neck2] as Quaternion, 0.18 * n + tuck * 0.06, 0, 0);
+    const n = cue.neck, tuck = this.tuck, bend = (m.carry?.shift ?? 0) * inp.carry;
+    rot(ps.lq[B.neck1] as Quaternion, -0.42 * n - tuck * 0.18, 0, bend * 0.6);
+    rot(ps.lq[B.neck2] as Quaternion, 0.18 * n + tuck * 0.06, 0, bend * 0.4);
     rot(ps.lq[B.neck3] as Quaternion, 0.16 * n, 0, 0);
     if (m.headBob) (ps.lp[B.neck3] as Vector3).z += Math.sin(crank * 2) * 0.028 * pedalling;
     ps.fkChain([B.neck1, B.neck2, B.neck3]);
     // Look: absolute (character-space) head orientation, so the head stays level over a leaning body.
-    let yaw = 0, pitch = 0;
+    const carry = Math.abs(inp.carry);
+    let yaw = (m.carry?.yaw ?? 0) * inp.carry, pitch = (m.carry?.pitch ?? 0) * carry;
     if (inp.look) {
       v.subVectors(inp.look, ps.mp[B.head] as Vector3);
       yaw = clamp(Math.atan2(-v.x, -v.z), -1.0, 1.0);
       pitch = clamp(Math.atan2(v.y, Math.hypot(v.x, v.z)), -0.45, 0.45);
+      // The hero keeps its bill clear of the helmet: a look (nearly) straight ahead still turns the head at least
+      // carry.yaw toward the look's side (the eyes do the rest), with half the chin-up.
+      const minYaw = (m.carry?.yaw ?? 0) * carry;
+      if (Math.abs(yaw) < minYaw) yaw = (Math.abs(yaw) > 0.05 ? Math.sign(yaw) : Math.sign(inp.carry)) * minYaw;
+      pitch = Math.max(pitch, (m.carry?.pitch ?? 0) * carry * 0.5);
     }
     this.headYaw = damp(this.headYaw, yaw, 7, dt);
     this.headPitch = damp(this.headPitch, pitch, 7, dt);
@@ -142,8 +153,21 @@ export class RidePose {
     ps.setModelRot(B.head, q2);
     rot(ps.lq[B.jaw] as Quaternion, -0.75 * cue.jaw, 0, 0);
     const p = cue.pouch; // the pouch balloons sideways first, so a gulp shows on both sides of the neck from behind
-    (ps.lsv[B.pouch] as Vector3).set(1 + p * 1.05, 1 + p * 0.5, 1 + p * 0.35);
+    const j = this.pouchJiggle(inp, crank, pedalling, dt);
+    (ps.lsv[B.pouch] as Vector3).set(1 + p * 1.05 + j, 1 + p * 0.5 - j * 0.6, 1 + p * 0.35);
     ps.fkChain([B.jaw, B.pouch, B.hat]);
+  }
+
+  /** Pouch bulge: sloshes once per crank turn at speed (with the hip rock), plus a damped spring kicked by speed
+   *  changes and air time (reads from behind as the pink lobes breathing beside the neck). */
+  private pouchJiggle(inp: RideInput, crank: number, pedalling: number, dt: number): number {
+    const amp = this.def.meta.pouchJiggle ?? 0;
+    if (amp <= 0 || dt <= 0) return 0;
+    const kick = inp.accel * 0.6 + (inp.airborne ? -6 : 0);
+    this.jigV += (-this.jig * 120 - this.jigV * 6 + kick) * dt;
+    this.jig = clamp(this.jig + this.jigV * dt, -0.6, 0.6);
+    const slosh = Math.sin(crank + 0.6) * 0.55 * pedalling * clamp01(inp.speed / 10);
+    return (slosh + this.jig) * amp;
   }
 
   private arm(c: Chain, grip: Vector3, ac: ArmCue, cue: CueOut, tuck: number, bell: Vector3 | null): void {

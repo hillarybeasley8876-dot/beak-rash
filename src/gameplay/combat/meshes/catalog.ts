@@ -1,9 +1,6 @@
 // Every combat prop geometry by key, so the PropLibrary can build them all at session start (a skill's first
 // cast never builds geometry mid-race). Unit-size primitives are scaled by the visuals that use them.
-import {
-  CircleGeometry, CylinderGeometry, IcosahedronGeometry, Shape, ShapeGeometry, TorusGeometry, WireframeGeometry,
-  type BufferGeometry,
-} from 'three';
+import { CircleGeometry, CylinderGeometry, Shape, ShapeGeometry, SphereGeometry, TorusGeometry, type BufferGeometry } from 'three';
 import type { WeaponId } from '../../../core/types';
 import { WEAPONS } from '../../../data/weapons';
 import { canGeometry, coinGeometry, crateGeometry, fishGeometry, shadowGeometry } from './pickup-props';
@@ -32,8 +29,7 @@ const FIXED = {
   'aura:disc': () => new CircleGeometry(1, 48),
   'aura:rim': () => new TorusGeometry(1, 0.012, 4, 72),
   'aura:ripple': () => new TorusGeometry(1, 0.008, 4, 64),
-  'aura:shell': () => new IcosahedronGeometry(1.35, 1),
-  'aura:wire': () => new WireframeGeometry(new IcosahedronGeometry(1.35, 1)), // the shell's edges
+  'aura:shell': () => new SphereGeometry(1, 48, 32),
   'aura:arc': () => new TorusGeometry(1, 0.035, 4, 20, Math.PI * 0.55),
   'pickup:coin': coinGeometry,
   'pickup:fish': fishGeometry,

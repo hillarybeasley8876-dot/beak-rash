@@ -26,6 +26,7 @@ export class RaceSession implements Session {
   player!: RiderState;
   private pos = new Vector3();
   private quat = new Quaternion();
+  private stopped = false;
   private disposed = false;
 
   private constructor(readonly app: AppContext, readonly config: RaceConfig, readonly track: Track) {
@@ -70,7 +71,9 @@ export class RaceSession implements Session {
       r.x = ((slot % 3) - 1) * 3.2;
       this.riders.push(r);
       this.controls.set(id, emptyControls());
-      const view = this.app.modules.createRiderView(this.app, entry.character, entry.bike, { isPlayer: entry.isPlayer, quality: this.app.quality });
+      const view = this.app.modules.createRiderView(this.app, entry.character, entry.bike, {
+        isPlayer: entry.isPlayer, quality: this.app.quality, track: this.track,
+      });
       this.views.set(id, view);
       this.world.add(view.root);
     });
@@ -82,7 +85,7 @@ export class RaceSession implements Session {
 
   /** Advance one rendered frame. */
   step(dtSim: number, dtReal: number): void {
-    if (this.disposed) return;
+    if (this.stopped) return;
     const { count, dt } = Clock.substeps(dtSim);
     const input = this.app.input;
     const playerControls = this.controls.get(this.player.id) ?? emptyControls();
@@ -108,12 +111,20 @@ export class RaceSession implements Session {
     this.track.update(dtSim, dtReal, this.app.camera);
   }
 
-  dispose(): void {
-    if (this.disposed) return;
-    this.disposed = true;
+  /** Stop the gameplay systems (AI, combat, physics). The world (track + rider views) stays until dispose(),
+   *  so the next race can share its shader programs (core/game.ts hands races over this way). */
+  stopSystems(): void {
+    if (this.stopped) return;
+    this.stopped = true;
     this.logic.dispose();
     this.combat.dispose();
     this.physics.dispose();
+  }
+
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.stopSystems();
     for (const v of this.views.values()) v.dispose();
     this.track.dispose();
     this.app.scene.remove(this.world);

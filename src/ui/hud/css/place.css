@@ -1,4 +1,6 @@
 /* Place block (top-left) + race timer + KO/coin counters (top-right). 1080p reference sizes. */
+/* The whole block (shard + timer) scales from its top-left corner: 0.75 while cruising (place.ts). */
+.plw { transform-origin: 0 0; }
 .pl { position: relative; width: 330px; height: 176px; transform: skewX(-10deg); }
 .pl-shadow, .pl-shard {
   position: absolute; left: -16px; top: 12px; width: 300px; height: 150px;

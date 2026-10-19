@@ -1,6 +1,8 @@
 #!/usr/bin/env node
-// Input regression checks (ui-screens fix rounds 1-2): confirm modal with Space / pad A / pad B, results
-// ignore finish-line mashing (Space 180 / 450 ms, fake pad B 220 ms), back keys never leave the title,
+// Input regression checks (ui-screens fix rounds 1-2, acceptance 1-2): confirm modal with Space / pad A / pad B,
+// results ignore finish-line mashing (Space 180 / 450 ms, fake pad B 220 ms; the first Space after arming only
+// nudges) yet Space / pad A every 0.8 s leave within 2 presses, the records sheet closes with pad B / A / Space,
+// click mashing (clicks skip the show and delay arming), back keys never leave the title,
 // double-click on pause > 设置 keeps the race, settings pills / ticks pick what you click, reduced motion
 // parks the shards, a parked pointer does not steal focus, locked items explain themselves to mouse
 // users. Other units run as core stubs. Exits 1 on any failure.
@@ -76,6 +78,28 @@ async function settingsChecks(page) {
   await go(page, 'settings');
   const focus = await page.evaluate(() => [...document.querySelectorAll('.br-set-row')].findIndex((r) => r.classList.contains('is-focus')));
   expect(focus === 1, `settings reopens on the last row used (got ${focus})`);
+  await rows.nth(0).locator('.br-meter i').nth(0).click();
+  expect(Math.abs((await settings()).master - 0.1) < 1e-6, 'clicking the 1st master tick sets 10 %');
+  await rows.nth(0).locator('.br-meter i').nth(0).click();
+  expect((await settings()).master === 0, 'clicking the lit 1st tick again mutes (0 %)');
+  await rows.nth(4).locator('.br-pill').nth(2).click();
+  await page.keyboard.press('ArrowRight');
+  expect((await settings()).quality === 'high', `→ on 画质 高 stays 高 (ordered rows do not wrap) (${(await settings()).quality})`);
+  await rows.nth(7).locator('.br-pill').nth(2).click();
+  await page.keyboard.press('ArrowRight');
+  expect((await settings()).slowmo === 'off', `→ on 慢镜头 关闭 stays 关闭 (${(await settings()).slowmo})`);
+  await page.keyboard.press('ArrowLeft');
+  expect((await settings()).slowmo === 'short', '← on 慢镜头 关闭 steps to 简短');
+  await rows.nth(6).locator('.br-pill').nth(1).click();
+  await page.keyboard.press('ArrowRight');
+  expect((await settings()).autoPedal === false, '→ on 自动踩踏 开 wraps to 关 (2-option toggle)');
+  await rows.nth(8).locator('.br-pill').nth(1).click();
+  expect(await page.evaluate(() => document.querySelector('.br-ui').classList.contains('is-reduced')), '动态效果 减弱 puts .is-reduced on the UI root');
+  await page.keyboard.press('ArrowRight');
+  expect(await page.evaluate(() => document.querySelector('.br-ui').classList.contains('is-full-motion')), '→ 完整 puts .is-full-motion on the UI root');
+  await rows.nth(8).locator('.br-pill').nth(0).click();
+  expect(await page.evaluate(() => document.querySelector('.br-ui').className === 'br-ui'), '跟随系统 clears both');
+  await page.evaluate(() => window.__br.app.save.update((d) => Object.assign(d.settings, { master: 1, slowmo: 'full', autoPedal: false })));
 }
 
 async function startRace(page) {
@@ -146,10 +170,105 @@ async function mashChecks(page) {
   const wait = Date.now() - t0;
   expect(wait >= 450 && wait < 1600, `the row arms after a quiet beat (${wait} ms)`);
   const focus = await page.evaluate(() => document.querySelector('.br-res-actions .is-focus')?.textContent ?? '');
-  expect(focus.includes('再来一局'), `default focus is 再来一局 (${focus})`);
-  await page.keyboard.press('Enter');
+  expect(focus.includes('主菜单'), `default focus after a quick race is 主菜单, not RETRY (${focus})`);
+  await space();
+  const nudged = await page.evaluate(() => (document.querySelector('.br-res-actions .is-focus')?.getAnimations() ?? [])
+    .some((an) => an instanceof Animation && an.effect?.getKeyframes().some((k) => 'scale' in k)));
+  await page.waitForTimeout(150);
+  expect((await screen(page)) === 'results', 'Space right after the row arms (< 1 s since the last hop) does nothing');
+  expect(nudged, 'that ignored Space nudges the focused button (the row is live)');
+  await page.waitForTimeout(500);
+  await space();
   await page.waitForTimeout(400);
-  expect((await screen(page)) !== 'results', 'a deliberate Enter after mashing acts');
+  expect((await screen(page)) !== 'results', 'the next Space 0.8 s later acts');
+  await page.waitForFunction(() => window.__br.app.ui.screen === 'menu' && !window.__br.app.ui.busy, null, { timeout: 30000 });
+}
+
+/** Acceptance r2 int#0: Space / pad A every 0.8 s from the moment results appear leave within 2 presses after arming. */
+async function steadyChecks(page) {
+  console.log('[ui-input] results: Space / pad A every 0.8 s');
+  await installPad(page);
+  const taps = [['Space', () => page.keyboard.press('Space')], ['pad A', () => padTap(page, 0)]];
+  for (const [label, tap] of taps) {
+    await endRace(page);
+    let after = 0;
+    let left = false;
+    for (let i = 0; i < 16 && !left; i++) {
+      const t0 = Date.now();
+      if (await armed(page)) after++;
+      await tap();
+      await page.waitForTimeout(Math.max(0, 790 - (Date.now() - t0)));
+      left = (await screen(page)) !== 'results';
+    }
+    expect(left && after >= 1 && after <= 2, `${label} every 0.8 s leaves results within 2 presses after arming (left ${left}, ${after})`);
+    await page.waitForFunction(() => window.__br.app.ui.screen === 'menu' && !window.__br.app.ui.busy, null, { timeout: 30000 });
+  }
+}
+
+/** Acceptance r2 int#1: the records sheet closes with pad B / pad A / Space (their attackR / hop twins fall through). */
+async function recordsChecks(page) {
+  console.log('[ui-input] career records sheet: pad LB / B / A, TAB / Space, then the d-pad');
+  await go(page, 'career');
+  await installPad(page);
+  const open = () => page.evaluate(() => document.querySelector('.br-rec.is-open') !== null);
+  const focus = () => page.evaluate(() => [...document.querySelectorAll('.br-car-ev')].findIndex((e) => e.classList.contains('is-focus')));
+  const tapWait = async (btn) => {
+    await padTap(page, btn);
+    await page.waitForTimeout(160);
+  };
+  await tapWait(4);
+  expect(await open(), 'pad LB opens the records sheet');
+  await tapWait(1);
+  expect(!(await open()) && (await screen(page)) === 'career', 'pad B closes it (career stays)');
+  await tapWait(4);
+  await tapWait(0);
+  expect(!(await open()) && (await screen(page)) === 'career', 'pad A closes it (no race starts)');
+  const before = await focus();
+  await tapWait(15);
+  expect((await focus()) !== before, `the d-pad then moves the ladder focus (${before} -> ${await focus()})`);
+  await page.keyboard.press('Tab');
+  await page.waitForTimeout(160);
+  expect(await open(), 'TAB opens the sheet');
+  await page.keyboard.press('Space');
+  await page.waitForTimeout(160);
+  expect(!(await open()) && (await screen(page)) === 'career', 'Space closes it (no race starts)');
+}
+
+/** Start a stub race and end it at once; resolves on the results screen. */
+async function endRace(page) {
+  await page.evaluate(() => window.__br.start({ trackId: 'coast' }));
+  await page.waitForFunction(() => window.__br.app.ui.screen === 'race' && !window.__br.app.ui.busy, null, { timeout: 30000 });
+  await page.evaluate(() => window.__br.app.bus.emit('race:end', { results: window.__br.session().logic.results() }));
+  await page.waitForFunction(() => window.__br.app.ui.screen === 'results', null, { timeout: 10000 });
+}
+
+async function clickChecks(page) {
+  console.log('[ui-input] results: clicks skip the show, delay arming, and wait for the slide-in');
+  await endRace(page);
+  await page.waitForTimeout(500);
+  await page.mouse.click(900, 300);
+  await page.waitForTimeout(120);
+  const done = await page.evaluate(() => document.querySelector('.br-cc')?.classList.contains('is-done') ?? false);
+  expect(done, 'a click on bare stage skips the show (count-up finished)');
+  // Where 再来一局 lands once armed (the hidden row waits 160 stage px to the left).
+  const spot = await page.evaluate(() => {
+    const r = document.querySelector('.br-res-actions .br-btn').getBoundingClientRect();
+    const k = Number(getComputedStyle(document.querySelector('.br-ui')).getPropertyValue('--s')) || 1;
+    return { x: r.left + r.width / 2 + 160 * k, y: r.top + r.height / 2 };
+  });
+  const clicker = setInterval(() => void page.mouse.click(spot.x, spot.y).catch(() => undefined), 230);
+  await page.waitForTimeout(2600);
+  const st = { s: await screen(page), armed: await armed(page) };
+  clearInterval(clicker);
+  expect(st.s === 'results' && !st.armed, `clicking every 230 ms keeps the row unarmed (${JSON.stringify(st)})`);
+  await page.waitForFunction(() => document.querySelector('.br-res-actions.is-armed') !== null, null, { timeout: 3000 });
+  await page.mouse.click(spot.x, spot.y);
+  await page.waitForTimeout(150);
+  expect((await screen(page)) === 'results', 'a click within 350 ms of arming does not fire a button');
+  await page.waitForTimeout(900);
+  await page.mouse.click(spot.x, spot.y);
+  await page.waitForTimeout(400);
+  expect((await screen(page)) !== 'results', 'a later click fires the button under the cursor (再来一局)');
   await page.waitForFunction(() => window.__br.app.ui.screen === 'race' && !window.__br.app.ui.busy, null, { timeout: 30000 });
 }
 
@@ -169,6 +288,24 @@ async function titleBackChecks(page) {
   await page.waitForTimeout(600);
   await idle(page);
   expect((await screen(page)) === 'menu', 'pad A on the title still opens the menu');
+  await go(page, 'title');
+  await page.waitForTimeout(300);
+  await padTap(page, 9);
+  await page.waitForTimeout(600);
+  await idle(page);
+  expect((await screen(page)) === 'menu', 'pad START on the title opens the menu');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(600);
+  await idle(page);
+  expect((await screen(page)) === 'title', 'keyboard Esc on the menu still backs out to the title');
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(600);
+  expect((await screen(page)) === 'title', 'keyboard Esc on the title stays on the title');
+  await go(page, 'menu');
+  await padTap(page, 9);
+  await page.waitForTimeout(600);
+  await idle(page);
+  expect((await screen(page)) !== 'menu', `pad START on the menu picks the focused entry (${await screen(page)})`);
 }
 
 async function reducedChecks(page) {
@@ -221,6 +358,9 @@ await withPage(async (page, h) => {
   await settingsChecks(page);
   await pauseChecks(page);
   await mashChecks(page);
+  await steadyChecks(page);
+  await recordsChecks(page);
+  await clickChecks(page);
   await titleBackChecks(page);
   await reducedChecks(page);
   await pointerChecks(page);

@@ -2,11 +2,12 @@
 // Quality presets; low keeps only grade + vignette (+ cheap cinematic tints) in a single pass.
 import {
   DepthTexture, HalfFloatType, LinearFilter, NoToneMapping, PerspectiveCamera, Vector2, WebGLRenderTarget,
-  type Camera, type Scene, type WebGLRenderer,
+  type Camera, type Object3D, type Scene, type WebGLRenderer,
 } from 'three';
 import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 import { Bloom } from './bloom';
 import { Composite } from './composite';
+import { SubjectMask } from './mask';
 import type { GpuTimer } from './timer';
 import type { Quality } from '../../core/types';
 import type { PostState } from '../state';
@@ -19,11 +20,11 @@ const PRESETS: Record<Quality, Preset> = {
   high: { samples: 4, bloom: true, blur: true, taps: 8, bloomLevels: 5 },
 };
 
-/** Debug/sandbox switches (all on by default). */
-export interface PostToggles { enabled: boolean; bloom: boolean; blur: boolean }
+/** Debug/sandbox switches (all on by default; castView = KO cast roles as flat colours). */
+export interface PostToggles { enabled: boolean; bloom: boolean; blur: boolean; castView: boolean }
 
 export class PostPipeline {
-  readonly toggles: PostToggles = { enabled: true, bloom: true, blur: true };
+  readonly toggles: PostToggles = { enabled: true, bloom: true, blur: true, castView: false };
   /** Set by the debug bench to time scene / bloom / composite on the GPU. */
   timer: GpuTimer | null = null;
   /** Draw stats of the scene pass alone (the post passes add ~10 tiny draws). */
@@ -32,6 +33,9 @@ export class PostPipeline {
   private readonly sceneRT: WebGLRenderTarget;
   private readonly bloom: Bloom | null;
   private readonly composite: Composite;
+  private readonly mask = new SubjectMask();
+  /** Draw the cast mask on the next frame even without a KO look (compiles its programs during the intro). */
+  private warmMask = false;
   private readonly quad: FullScreenQuad;
   private readonly size = new Vector2(1, 1);
 
@@ -54,7 +58,13 @@ export class PostPipeline {
     const h = Math.max(1, Math.floor(height * dpr));
     this.size.set(w, h);
     this.sceneRT.setSize(w, h);
+    this.mask.setSize(w, h);
     this.bloom?.setSize(w, h);
+  }
+
+  /** Compile the subject-mask programs on the next frame that has a cast (call when a race is attached). */
+  warm(): void {
+    this.warmMask = true;
   }
 
   render(scene: Scene, camera: Camera, state: PostState, timeReal: number): void {
@@ -66,6 +76,23 @@ export class PostPipeline {
       this.recordSceneStats();
       return;
     }
+    const hidden = this.hide(state);
+    try {
+      this.passes(scene, camera, state, timeReal);
+    } finally {
+      for (const o of hidden) o.visible = true;
+    }
+  }
+
+  /** Riders the KO look skips this frame (they stand between the lens and a victim). */
+  private hide(state: PostState): Object3D[] {
+    const out: Object3D[] = [];
+    if (state.cine.ko > 0.001) for (const o of state.cine.hide) if (o.visible) { o.visible = false; out.push(o); }
+    return out;
+  }
+
+  private passes(scene: Scene, camera: Camera, state: PostState, timeReal: number): void {
+    const r = this.renderer;
     const t = this.timer;
     r.setRenderTarget(this.sceneRT);
     t?.begin('scene');
@@ -83,7 +110,17 @@ export class PostPipeline {
       tonemap: r.toneMapping === NoToneMapping ? 0 : 1,
     });
     const lens = camera instanceof PerspectiveCamera ? camera : null;
-    this.composite.sync(state, this.sceneRT.texture, bloomTex, this.sceneRT.depthTexture, lens, this.size, timeReal);
+    const cast = state.cine.cast;
+    const useMask = lens !== null && cast.size > 0 && (state.cine.ko > 0.001 || this.warmMask);
+    if (useMask) {
+      t?.begin('mask');
+      this.mask.render(r, scene, camera, cast);
+      t?.end();
+      this.warmMask = false;
+    }
+    const maskTex = useMask && state.cine.ko > 0.001 ? this.mask.texture : null;
+    this.composite.castView = this.toggles.castView;
+    this.composite.sync(state, this.sceneRT.texture, bloomTex, this.sceneRT.depthTexture, maskTex, lens, this.size, timeReal);
     r.setRenderTarget(null);
     t?.begin('composite');
     this.quad.render(r);
@@ -97,6 +134,7 @@ export class PostPipeline {
 
   dispose(): void {
     this.sceneRT.dispose();
+    this.mask.dispose();
     this.bloom?.dispose();
     this.composite.dispose();
     this.quad.dispose();

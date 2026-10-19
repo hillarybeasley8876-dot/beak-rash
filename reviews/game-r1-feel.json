@@ -1,0 +1,70 @@
+{
+ "pass": false,
+ "score": 6.8,
+ "summary": "Whole-game feel, acceptance round 1: 6.8/10, fail (2 majors). Core handling is good. feel-telemetry passes 152/152: 0-60 km/h 4.42 s, top 20.0 m/s, brake 12.5 m/s^2, tau63 0.083 s, input visible in 1 sim frame (3 frames / 17-19 ms with real keys at 120 Hz), no release overshoot, hop 0.375 s, drift L1/L2/L3 0.53/1.15/1.92 s, +35 % boost for 1.3 s. On the real tracks with every unit live: crests give 0.8 s of air and ramps 0.62 s (0.78-0.82 s if you hop at the lip). PERFECT needs calm hands. Hitting a wall at full lock gives one impact and then a scrape (no HP loss, 30-45 % speed loss). A side bump on a real AI rival fires once per approach with the yaw step capped at 5 deg/frame (larger snaps of about 11 deg come only from combat knocks). Melee reads well: light hit 5 frames after the press, heavy 11 frames, hit-stop .045/.1 s, shake .25/.5, knock 1.15/1.33 m, a black-and-white crit frame, and the impact lands on the frame the wing makes contact. KO pacing matches the spec: 1.33 s real time (0.125x by 200 ms, peak at 433 ms), 0.58 s for a repeat KO, 0.88 s for WRECKED. SHOWTIME chain-KOs 2 of 3 riders, and a KO during the rise no longer aborts it. race-soak passes on coast, city and mountain. Realtime at 1080p runs at about 117 fps. Majors: (1) releasing an L3 drift mid-hairpin on the mountain or city always ends on the outside wall, and with neutral hands it crashes (the r3 fix holds only for R >= 46); (2) the predictable podium is still there: if the player does not fight, the pigeon wins 6 of 9 races and finishes top-2 in 9 of 9. Minors: the KO cinematic is illegible for its first half; traffic and police never bite (0 AI traffic crashes and 0 natural busts in 31 races); the hero hides any rival straight ahead; skill cut-in bands cover the road; SHOWTIME is long and soft at the payoff; the first crash hitches; skill presses made during another skill are dropped. Evidence: shots/accept/r1-feel/ (fair-*.json, drift-release.json, telemetry/metrics.json, combat/combat.json, sheet-*.jpg).",
+ "issues": [
+  {
+   "severity": "major",
+   "owner": "sim",
+   "title": "Releasing an L3 drift mid-hairpin always ends on the outside wall, and with neutral hands it crashes (mountain and city hairpins)",
+   "detail": "Repro: shots/accept/r1-feel/probe-drift.mjs (all units live, seed 1). Enter at 19.5 m/s, drift into the bend, and release when L3 is reached (2.1-2.2 s, mid-bend). Mountain R27 (s 626-720) and R26 (s 1084-1176): full lock and an ideal line-holder both run 7.3-7.6 m wide and hit the outer rail 3-5 times. Neutral hands give rider:crash on both hairpins: yaw 25 deg out at 25.7 m/s boosted, and the wall arrives after the 0.5 s driftExitGuard has expired, so wallCrashSpeed 18 / wallCrashAngle 24 deg apply. City R28 (s 2726-2822): 8.3 m wide with full lock or line, 1-12 wall contacts. Coast R46 is fine (0 m with full lock or line). Cause: grip holds only about R43 at bike top (push k*min(v,top)^2*0.8 vs 7.5 m/s authority), and the drift's curve cancel vanishes at release. feel-telemetry driftRelease only checks R46/R60/R90, so it stays green. Players release at the pink sparks, which is mid-bend on every mountain hairpin (the arcs last 4-5 s; L3 comes at 2.0 s). Evidence: drift-release.json, drift.log, drift-mountain-626-hold.png.",
+   "fix": "steering.ts / drift.ts: after a release, keep cancelling the curve push. Decay driftCurveCancel from 1.35x to 0 over ~0.8 s, or hold it until |curvature| < 1/45, so full lock can hold the rest of the bend. Keep |vx| <= v*tan20 and treat wall contacts as scrapes (no crash) for 1 s after a release. Add R26/R28/R30 release cases (full/half/neutral) to feel-scenarios-r3 driftRelease."
+  },
+  {
+   "severity": "major",
+   "owner": "race",
+   "title": "Predictable podium persists: if the player does not fight, the pigeon wins",
+   "detail": "27 full races (shots/accept/r1-feel/fair.mjs; coast/city/mountain x seeds 1-3 x autopilot/passive/decent; traffic and police on). Passive player (holds a line, brakes for hairpins, never attacks): the pigeon wins 6/9 and finishes top-2 in 9/9, and the cat is 2nd in all 3 mountain runs (+0.1/+0.1/+1.2 s). Rival podiums over all 27 races: pigeon 19, cat 15, sloth 13, shiba 11, capybara 10, seagull 9, goose 4. When the player fights, the sloth takes over as the best rival (8 of 18 races). Cause: personality.ts gives the pigeon the top skill 0.85 (risk = 0.68 + 0.2*skill, so more corner speed), the top drafter value 0.8 and low aggression 0.25, while PACE_SPREAD is only +-2 % and mostly dice; brawlers like the goose (0.95) lose time in fights. Evidence: fair-coast/city/mountain.json.",
+   "fix": "ai/index.ts + personality.ts: let per-race form dominate. Roll skill/risk dice of +-0.15 and pace offsets of +-3-4 %, plus a per-race favourite drawn from the field. Narrow the species corner-risk spread (risk 0.72-0.78). Make rivals target the race leader so a runaway leader gets hit. Acceptance: across 9 passive races no rival wins more than 3, and the goose reaches the podium at least twice."
+  },
+  {
+   "severity": "minor",
+   "owner": "fx",
+   "title": "The KO cinematic is illegible for its first half: attacker and victim merge into one white clump, then the peak frame washes out",
+   "detail": "Coast seed 3, KO the cat with a light swing (probe-combat.mjs, sheet-ko.jpg). At +250 ms the pelican rides inside the victim's silhouette: both are white halftone cut-outs on the red rays with two bikes interleaved, so you cannot tell who got hit. The orange tabby cat reads as a plain white shape, losing its identity. The peak frame (+450 ms) is a pale grey/pink wash over everything. WRECKED at +330 ms has the same overlap and pink wash (sheet-wrecked.jpg). The second half (KNOCK OUT banner with both portraits, victim tumbling clear of the bike) reads well, and the timing is right: 1.33 s, repeat 0.58 s, WRECKED 0.88 s.",
+   "fix": "fx/ko camera.ts: choose the side that puts at least 1 m of screen separation between attacker and victim, or ghost/hide the attacker for the first 400 ms. look.ts: keep the victim's own toon colours with a black outline and desaturate only the background. Replace the full-frame wash at the peak with a 2-frame white flash."
+  },
+  {
+   "severity": "minor",
+   "owner": "race",
+   "title": "Traffic and police never bite: 0 AI traffic crashes and 0 natural busts in 31 races",
+   "detail": "27 bot races plus 4 race-soak runs: every rider:crash cause is 'ko'. No AI rider ever hits a car; only the player can. Police: 0 natural BUSTED in 27 races. On city seed 2 the corgi never spawned (heat peaked at 0.47 < 0.5) despite constant fighting. On coast seed 1 it chased for ~53 s, was on screen ~24 s, then 'lost' twice (police-coast-1.json, police-city-2.json). Busts only happen when race-soak forces heat 0.95 and brakes the player.",
+   "fix": "traffic: give rivals in view a small skill-scaled chance to clip traffic (max 1 per race, never while unseen). police-heat: count hits on rivals in view so every track spawns the corgi. police-chase: bust a player who is wrecked, respawning or below 60 % of top speed alongside the corgi, and require a >= 60 m gap before 'lost'."
+  },
+  {
+   "severity": "minor",
+   "owner": "sim",
+   "title": "The hero hides any rival straight ahead for the whole slipstream window",
+   "detail": "Chase cam on the coast straight at 1920x1080 (probe-occlude.mjs): the pelican's head sits at y=541, dead centre. A rival in the same lane is completely hidden up to 6 m ahead, and only the top 9/17/26/34 px of its 67/58/48/39 px height shows at 7/9/12/16 m. In sheet-rskill.jpg, a goose HONK and a cat OIIA SPIN cast 5 m ahead show only as rings around the pelican.",
+   "fix": "camera/chase.ts: raise the eye/look-at so the hero's head sits at ~58-62 % of screen height (y 630-670 at 1080p) at speed, or dither the hero to ~50 % opacity when a rival is within 12 m ahead and |dx| < 1.2 m."
+  },
+  {
+   "severity": "minor",
+   "owner": "ui-hud",
+   "title": "Player skill cut-in bands cover the road ahead as the skill resolves",
+   "detail": "BIG GULP: the band (~0.6 s) runs from the left edge across the screen centre at the horizon, hiding the bitten rival and the road (sheet-combat.jpg, gulp-f25). FISH TORPEDO's band sits over the upper left while the fish flies. Open since combat r1/r3.",
+   "fix": "Keep player skill bands in the top 15 % strip or the left third, show them for at most 0.45 s, and never put them over the centre third at the horizon."
+  },
+  {
+   "severity": "minor",
+   "owner": "fx",
+   "title": "SHOWTIME is long and soft at the payoff: 1.83 s to impact, a static apex, victims as specks",
+   "detail": "Coast seed 3 with 3 rivals 12/20/28 m ahead (sheet-ult.jpg, combat.json): 1.83 s from P to impact and 3.4-3.7 s in total. The apex hang (+1.2 to 1.7 s) is a small static pelican. At impact the victims are small white/ink figures (one tiny one top right) in a grey halftone frame, so the 45-damage shockwave, the payoff, is the least legible beat. The chain KO itself works (2 KOs).",
+   "fix": "fx/ko rise.ts: cut the apex hang to <= 0.3 s. cluster/camera: frame the impact low behind the pelican with the victims >= 15 % of frame height, and keep them in colour."
+  },
+  {
+   "severity": "minor",
+   "owner": "species",
+   "title": "The first crash of a session hitches 43-183 ms",
+   "detail": "Realtime 1920x1080, coast seed 4 (probe-rt.mjs): P50 8.3 ms, P99 10-25 ms. The first traffic crash produced a 183 ms frame (cold) and 43-90 ms frames (warm), 0.3 s after rider:crash. This matches the integrator's note that the actors/fade.ts material clones and the fx particle programs compile lazily mid-race. A freeze exactly at a crash reads as a stutter.",
+   "fix": "actors/fade.ts: build and compile the fade variants when the view is created (renderer.compile on a hidden clone). fx: pre-warm the particle programs on attach."
+  },
+  {
+   "severity": "minor",
+   "owner": "combat",
+   "title": "A skill pressed during another skill is dropped instead of buffered",
+   "detail": "probe-deny.mjs: WING DASH pressed 0.67 s into BIG GULP returns skill:denied 'state'. It is never cast after the gulp ends at 1.2 s, and there is no visible feedback. Same class as the airborne SHOWTIME denial (combat r3).",
+   "fix": "Queue a denied 'state' press for up to 0.35 s and fire it when the active skill ends. Flash the HUD diamond on a real denial."
+  }
+ ]
+}

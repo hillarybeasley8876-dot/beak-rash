@@ -1,66 +1,14 @@
-// Visuals that follow a rider: chill aura disc, doge shield bubble, OIIA spin swirl.
-import {
-  LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial, Quaternion, Vector3, type BufferGeometry, type ColorRepresentation,
-  type Material,
-} from 'three';
+// Visuals that follow a rider: chill aura disc, OIIA spin swirl (the doge shield lives in shield.ts).
+import { Mesh, MeshBasicMaterial, Quaternion, Vector3, type ColorRepresentation } from 'three';
 import type { RiderState } from '../../../core/types';
+import { Follower } from './follower';
 import { frameQuat } from './frame';
-import type { Visual, VisualSystem } from './visuals';
+import type { VisualSystem } from './visuals';
 
 const FLAT = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), -Math.PI / 2);
 const SPIN = new Quaternion();
 const AXIS_Y = new Vector3(0, 1, 0);
 const OFF = new Vector3();
-
-type AuraProp = 'disc' | 'rim' | 'ripple' | 'shell' | 'wire' | 'arc';
-
-/** Base: owns meshes (shared geometry, pooled materials), follows a rider, fades in and out over `dur`. */
-abstract class Follower implements Visual {
-  protected t = 0;
-  protected pos = new Vector3();
-  protected quat = new Quaternion();
-  protected owned: Array<Mesh | LineSegments> = [];
-
-  constructor(protected vs: VisualSystem, protected r: RiderState, protected dur: number, private fade = 0.25) {}
-
-  protected own<T extends Mesh | LineSegments>(o: T): T {
-    this.owned.push(o);
-    this.vs.ctx.root.add(o);
-    return o;
-  }
-
-  /** 0..1 envelope (fade in, hold, fade out). */
-  protected get env(): number {
-    return Math.max(0, Math.min(1, this.t / this.fade, (this.dur - this.t) / this.fade));
-  }
-
-  update(dt: number): boolean {
-    this.t += dt;
-    if (this.t >= this.dur || this.r.mode === 'crashed') return false;
-    this.vs.pose(this.r, this.pos, this.quat);
-    this.place(dt);
-    return true;
-  }
-
-  protected abstract place(dt: number): void;
-
-  /** Unit-size geometry shared through the session prop library (never disposed by the visual). */
-  protected geo(key: AuraProp): BufferGeometry {
-    return this.vs.ctx.lib.get(`aura:${key}`);
-  }
-
-  /** Pooled tinted material for one of this visual's meshes (returned to the pool on dispose). */
-  protected mat(color: ColorRepresentation, opacity: number, additive = false): MeshBasicMaterial {
-    return this.vs.materials.glow(color, opacity, { additive });
-  }
-
-  dispose(): void {
-    for (const o of this.owned) {
-      o.removeFromParent();
-      this.vs.materials.release(o.material as Material);
-    }
-  }
-}
 
 /** Capybara CHILL ZONE: warm translucent disc + rim on the road, with calm ripples. */
 export class AuraDisc extends Follower {
@@ -70,9 +18,9 @@ export class AuraDisc extends Follower {
 
   constructor(vs: VisualSystem, r: RiderState, private radius: number, dur: number, color: ColorRepresentation, rimColor: ColorRepresentation) {
     super(vs, r, dur, 0.35);
-    this.disc = this.own(new Mesh(this.geo('disc'), this.mat(color, 0.16, true)));
-    this.rim = this.own(new Mesh(this.geo('rim'), this.mat(rimColor, 0.9)));
-    const ripple = this.geo('ripple');
+    this.disc = this.own(new Mesh(this.geo('aura:disc'), this.mat(color, 0.16, true)));
+    this.rim = this.own(new Mesh(this.geo('aura:rim'), this.mat(rimColor, 0.9)));
+    const ripple = this.geo('aura:ripple');
     for (let i = 0; i < 3; i++) this.ripples.push(this.own(new Mesh(ripple, this.mat(rimColor, 0.5))));
     for (const m of [this.disc, this.rim, ...this.ripples]) m.renderOrder = 1;
   }
@@ -99,33 +47,6 @@ export class AuraDisc extends Follower {
   }
 }
 
-/** Doge shield: golden faceted bubble + white wire, slowly turning and pulsing. */
-export class ShieldBubble extends Follower {
-  private shell: Mesh;
-  private wire: LineSegments;
-
-  constructor(vs: VisualSystem, r: RiderState, dur: number, color: ColorRepresentation) {
-    super(vs, r, dur, 0.2);
-    this.shell = this.own(new Mesh(this.geo('shell'), this.mat(color, 0.22)));
-    this.wire = this.own(new LineSegments(this.geo('wire'), vs.materials.line('#fff6c8', 0.8)));
-    this.shell.renderOrder = this.wire.renderOrder = 2;
-  }
-
-  protected place(): void {
-    const e = this.env;
-    const up = OFF.set(0, 1.05, 0).applyQuaternion(this.quat);
-    const s = (0.85 + 0.15 * e) * (1 + Math.sin(this.t * 9) * 0.035);
-    SPIN.setFromAxisAngle(AXIS_Y, this.t * 0.8);
-    for (const m of [this.shell, this.wire]) {
-      m.position.copy(this.pos).add(up);
-      m.quaternion.copy(this.quat).multiply(SPIN);
-      m.scale.setScalar(s);
-    }
-    (this.shell.material as MeshBasicMaterial).opacity = 0.24 * e;
-    (this.wire.material as LineBasicMaterial).opacity = 0.8 * e;
-  }
-}
-
 /** OIIA spin: speed arcs whirling flat around the rider at two heights. */
 export class SpinSwirl extends Follower {
   private arcs: Mesh[] = [];
@@ -133,7 +54,7 @@ export class SpinSwirl extends Follower {
   constructor(vs: VisualSystem, r: RiderState, private radius: number, dur: number, colors: [ColorRepresentation, ColorRepresentation]) {
     super(vs, r, dur, 0.12);
     for (let i = 0; i < 6; i++) {
-      const arc = new Mesh(this.geo('arc'), this.mat(colors[i % 2] as ColorRepresentation, 0.9));
+      const arc = new Mesh(this.geo('aura:arc'), this.mat(colors[i % 2] as ColorRepresentation, 0.9));
       arc.renderOrder = 3;
       this.arcs.push(this.own(arc));
     }

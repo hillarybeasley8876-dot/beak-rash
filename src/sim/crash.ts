@@ -8,6 +8,7 @@
 import { clamp, damp } from '../core/math';
 import { TUNING as T } from './tuning';
 import { endDrift } from './drift';
+import { stopCarve } from './carve';
 import { dropStatus, isRiding, trackEnd, worldPos, type SimCtx, type SimRider } from './state';
 import type { CrashCause, Obstacle, RiderId } from '../core/types';
 
@@ -111,6 +112,7 @@ export function respawnRider(ctx: SimCtx, sr: SimRider): void {
   sr.slip = sr.pitch = 0;
   sr.onRamp = false;
   sr.carryTime = sr.yawEase = sr.driftExit = sr.crashBack = sr.landPitch = sr.scrape = sr.scrapePose = 0;
+  stopCarve(sr);
   sr.wallSide = 0;
   sr.swipeLatch = -1;
   dropStatus(r, 'oiled');

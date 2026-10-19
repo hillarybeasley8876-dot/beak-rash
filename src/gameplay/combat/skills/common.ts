@@ -1,6 +1,6 @@
 // Helpers shared by skill files: damaging skill hits, debuff-only hits, cone and radius queries.
 import type { RiderState, StatusId } from '../../../core/types';
-import { finished, others, targetable, type CombatCtx } from '../ctx';
+import { clampToRoad, finished, others, targetable, type CombatCtx } from '../ctx';
 import { applyHit, credit, type HitOutcome } from '../damage';
 import type { ImpactKind } from '../feedback';
 import { addStatus } from '../statuses';
@@ -56,4 +56,23 @@ export function inCone(ctx: CombatCtx, r: RiderState, range: number, halfAngle: 
 /** Targetable riders within `radius` metres of `r` (track-space distance, height ignored below 2 m). */
 export function inRadius(ctx: CombatCtx, r: RiderState, radius: number): RiderState[] {
   return others(ctx, r, (o, ds, dx) => targetable(ctx, o) && Math.hypot(ds, dx) <= radius && Math.abs(o.y - r.y) < 2);
+}
+
+/** Lateral offsets tried, in order, when a skill puts a rider down somewhere new (ghost reappearing, SHOWTIME landing). */
+const LANES = [0, 1.6, -1.6, 3.2, -3.2] as const;
+/** Clearance kept from traffic / obstacles and other riders at that spot. */
+const CLEAR = { obstacleDs: 4, obstacleDx: 0.9, riderDs: 2.2, riderDx: 1 } as const;
+
+/** First lateral offset near `x` at `s` with no solid obstacle or rider (except `self`, `ignore`) on it (falls back to x). */
+export function clearLane(ctx: CombatCtx, self: RiderState, s: number, x: number, ignore: RiderState | null = null): number {
+  const { obstacles, riders } = ctx.session;
+  for (const dx of LANES) {
+    const cx = clampToRoad(ctx, s, x + dx, 1);
+    const blocked = obstacles.some((o) => o.active && o.solid && Math.abs(o.s - s) < o.halfLength + CLEAR.obstacleDs &&
+      Math.abs(o.x - cx) < o.halfWidth + CLEAR.obstacleDx) ||
+      riders.some((o) => o !== self && o !== ignore && o.mode !== 'crashed' && Math.abs(o.s - s) < CLEAR.riderDs &&
+        Math.abs(o.x - cx) < CLEAR.riderDx);
+    if (!blocked) return cx;
+  }
+  return clampToRoad(ctx, s, x, 1);
 }

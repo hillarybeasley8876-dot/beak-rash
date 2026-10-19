@@ -8,6 +8,11 @@ export const HEAVY_PHASES = { windup: 0.16, active: 0.12, recover: 0.24 } as con
 export const INPUT_BUFFER = 0.18;
 /** A buffered press (swing, bell, skill) waits this long for the swing / hit stagger (0.28 s) blocking it. */
 export const PRESS_HOLD = 0.32;
+/** A skill pressed while another of the rider's skills keeps it busy queues if that lock ends within this many
+ *  seconds (it casts the moment the lock ends); a press with more lock left is denied at once. */
+export const SKILL_QUEUE = 0.6;
+/** The player's SHOWTIME press waits for a running KO cinematic to end (cap in real seconds if no end arrives). */
+export const ULT_KO_LATCH = 3;
 
 export const MELEE = {
   minLateral: 0.4,      // m, closer than this is a bump, not a swing hit

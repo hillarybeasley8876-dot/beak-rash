@@ -1,9 +1,9 @@
 // title: key art + ransom-note logo, prompt-joke subtitle, pulsing PRESS ANY KEY. Any key/click → menu
-// (the shell unlocks audio on that same gesture). Back keys (Esc / Backspace / pad B) are not "any key":
-// nothing lies behind the title, and mashing back on the menu must not bounce menu <-> title.
+// (the shell unlocks audio on that same gesture), pad START included. Back keys (Esc / Backspace / pad B)
+// are not "any key": nothing lies behind the title, and mashing back on the menu must not bounce menu <-> title.
 import './title.css';
 import { ART } from '../../data/assets';
-import { artImage, backdrop, h, pelicanSvg, ransom, starSvg, svg } from '../p5';
+import { artImage, artReady, backdrop, h, pelicanSvg, ransom, starSvg, svg } from '../p5';
 import { frame, type ScreenFactory } from '../screen';
 
 const BACK_KEYS = new Set(['Escape', 'Backspace']);
@@ -18,13 +18,21 @@ export const titleScreen: ScreenFactory = (ctx) => {
   });
   const f = frame({ id: 'title', bg });
   // The key art sits in the stage (not the full-bleed bg), so the crop that keeps the whole pelican, red
-  // beak hook included, and its distance to the logo are the same at 16:9 and 16:10.
-  const art = artImage(ART.title, 'br-title-art', () => f.stage.prepend(drawnHero()));
-  if (art) f.stage.prepend(h('div', { class: 'br-title-artbox' }, art));
-  else f.stage.append(drawnHero());
+  // beak hook included, and its distance to the logo are the same at 16:9 and 16:10. The drawn hero stands
+  // in until the art is decoded (a slow cold start), and stays if the file is broken.
+  const hero = drawnHero();
+  const art = artImage(ART.title, 'br-title-art', undefined, hero);
+  f.stage.prepend(...(art ? [h('div', { class: 'br-title-artbox' }, art)] : []), hero);
+  const cn = ransom('暴力鹈鹕', { seed: 'logo-cn', slam: true, fonts: 'block', first: 'wb', styles: ['bw', 'wb', 'wr', 'bw'], rot: 7, className: 'br-title-cn' });
+  // The last glyph sits where the logo's -7° tilt lifts it most: normal size, a touch lower and tilted the
+  // other way, so its box clears the top edge of the stage.
+  const last = cn.lastElementChild;
+  if (last instanceof HTMLElement) {
+    for (const [k, v] of [['--k', '1'], ['--dy', '0.05em'], ['--r', '1.5deg']]) last.style.setProperty(k, v);
+  }
   f.stage.append(
     h('div', { class: 'br-title-logo' },
-      ransom('暴力鹈鹕', { seed: 'logo-cn', slam: true, fonts: 'block', first: 'wb', styles: ['bw', 'wb', 'wr', 'bw'], rot: 7, className: 'br-title-cn' }),
+      cn,
       ransom('BEAK RASH', { seed: 'logo-en7', slam: true, styles: ['wb', 'bw', 'wr', 'rw'], className: 'br-title-en' })),
     h('div', { class: 'br-title-sub' },
       h('span', { class: 'br-title-prompt', text: 'Generate an SVG of a pelican riding a bicycle' }),
@@ -52,9 +60,11 @@ export const titleScreen: ScreenFactory = (ctx) => {
   });
   return {
     root: f.root,
+    ready: artReady(art),
     onAction(a) {
-      // Pad B also fires attackR first: isDown('back') tells that twin apart from a real attack key.
-      if (a === 'back' || a === 'pause' || ctx.app.input.isDown('back')) return false;
+      // Pad B also fires attackR first, Esc fires pause first: isDown('back') tells those twins apart from a
+      // real attack key or pad START (pause alone), which does proceed.
+      if (a === 'back' || ctx.app.input.isDown('back')) return false;
       proceed();
       return true;
     },

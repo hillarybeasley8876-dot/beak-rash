@@ -82,3 +82,103 @@
 - env-city (r2 limit; art 7, tech 7): fix r2 addressed but unverified: the wet-road overlay is depth-occluded at grade changes (hard seams, the reflection pops off ~2 s at the underpass); trees and the roundabout statue sit in the unlit, outline-less glow batch (flat faceted blobs); neon arcade right-side shophouse fronts render as a flat black wall from the right lane (s≈850-1060).
 - env-mountain (r2 limit; art 6, tech 8 pass): fix r2 addressed but unverified: rock faces read as flat plywood (planar walls, plank strata, pinstriped slopes); the waterfall looks like a flat blue camouflage card from the bridge; the three hairpins look identical at speed and the roadside is sparse.
 - species (r2 limit; art 7, anim 6.5): fix r2 addressed but unverified: the hero pelican shows neither beak nor pouch from the chase cam at rest; signature skill poses last ~0.3 s in the real game (8 of 12 crushed).
+
+## Integration 10-19
+Applied (all additive / optional; every importer still typechecks):
+- audio (t6): events-map `police:whistle {riderId, pos}` + `police:knock {riderId, weapon, pos}` (a player swing knocks
+  the corgi back). race/police.ts still calls app.audio.sfx → race: emit these instead (audio places / rate-limits them).
+- race 6: `npc:say {obstacleId, character, text}`: a line from a non-session speaker riding an Obstacle (corgi = id 900);
+  listeners follow session.obstacles by id and drop it when gone. race: emit it instead of ui.toast; ui-hud: bubble it.
+- ui-hud 3/4: `race:introFocus {riderId | null}` and `police:busted.hold?` (s). race: emit / fill them.
+- combat + sim: `RiderMods.pushImmune: boolean` (defaultMods false). combat's applyMods does not reset it yet, so combat
+  must set AND reset it; sim: no speed loss for a pushImmune rider in contacts; combat: then drop wing.ts's contact copy.
+- species: `RiderViewOpts {isPlayer, quality, track?}` exported from contracts.ts; Modules.createRiderView takes it and
+  session passes `track` (absent in menus / sandboxes). actors stub uses the type.
+Deferred:
+- track T9 shader precompile: measured (shots/core/i1019/probe-warm.mjs, probe-keys.mjs; coast seed 3): a culling-off
+  warm-up render through fx compiles 0 extra programs (57 → 57, 5 ms): every rider/bike program is already compiled on
+  the grid. The 8 programs compiled mid-race (~36 s) are lazily created variants: actors/fade.ts clones
+  (`actors-rider|fade`, `|fade-depth`, `bikes-body|fade`, `bikes-hull|fade-hull`), fx.particles.solid/add and 2 unnamed
+  ShaderMaterials. Owners must pre-warm them (species: build the fade variants at view creation; fx: warm particle
+  programs on attach). Note: compileAsync with the null target compiles the wrong keys (fx renders into a HalfFloat RT).
+- bikes: stepped cool rim in toon(): obsolete for riders (actors/kit/material.ts has its own rim); putting it in toon()
+  would restyle every world prop and traffic mesh, which no art critic asked for.
+- sim: SPEC §6 wording + rider contact distance 0.75 → 0.9 m: SPEC.md is outside this agent's edit scope, and the contact
+  distance is one decision for sim + combat (wing.ts CONTACT.dx) + species together → main session.
+- combat: optional stacked boost API in sim: needs a sim design; combat's mods.speedMul workaround works.
+- env-mountain tech#7 per-track env hook: LayoutDef lives in src/world (track-owned) and Track.look already carries the
+  EnvLook, so no core contract is needed. env-city's / env-mountain's other "core requests" are addressed to track.
+- Older core TODOs: rubber (sim forces.ts), achievements (game.ts), UI sfx (hud/sfx.ts) are done. The acceptance-pass
+  list above is unit-owned (no core files) and stays open.
+Verification: tsc 0 errors (whole project) · test-core-guard OK · core-check 5/5 PASS · full autopilot races (seed 3,
+no stubs, 0 console errors, results screen reached): coast 11400 frames, city 12600, mountain 12000
+(shots/core/i1019/race3.mjs; sheet.jpg = mid-race on all 3 tracks; coast-end.jpg = results).
+- audio (r3 limit; music 6, tech 7): fix r3 addressed but unverified: tonal balance is lead-dominated (honky ~1 kHz, bright top, thin low end) in every song; the audio thread is still over the 5 % CPU budget (music alone 4.2–6.6 %).
+- bikes (r2 limit; art 7): fix r2 addressed but unverified: the tandem's salted-fish passenger reads as a grey plank from the chase camera and covers the hero's back.
+
+## Acceptance round 1 (core fixer, 10-19)
+Core-owned issues (reviews/game-r1-*.json): perf#2 save/URL validation (major) · interaction#0 d-pad steer (major) ·
+perf#0 race-start shader freeze (major) · interaction#9 Tab/right-click (minor) · perf#6 Retina/MSAA backbuffer (minor) ·
+interaction#13 quit/desktop menu (minor).
+Plan: perf#2 → interaction#0 → perf#0 → interaction#9 → perf#6 → interaction#13. Checkpoints below.
+- [done] perf#2 save/URL validation: new src/core/save-sanitize.ts (pure; field-by-field: quality/slowmo enums, bikes must
+  exist in BIKES — unknown equipped bike → roadbike, equipped bike always owned, numbers finite + clamped, booleans,
+  career best places 1..99, unique string achievements; one `[save] repaired invalid fields: …` warning). SaveStore.load
+  uses it. New src/core/race-config.ts (buildRaceConfig moved out of game.ts): track/bike/rival/rival-bike ids validated
+  against TRACKS/BIKES/ROSTER (warn + default), finite seed/level (level 1..10). game.ts validates ?quality, main.ts ?race
+  and ?screen (contracts.ts now exports the runtime list SCREEN_IDS; ScreenId = its element type, same union).
+  Test: node tools/test-core-save.mjs (new). Browser: shots/accept/r1-perf/badsave.mjs → all 3 bad saves reach the race,
+  0 errors, 0 stubs; badparams.mjs → quality=ultra races on 'high', race=nowhere races coast, corrupt save repaired.
+- [done] interaction#0 d-pad steer: input.ts digitalSteer() merges arrows/A-D with the pad d-pad (PADMAP 14/15) and ramps
+  with the same STEER_RISE/FALL incl. instant reversal; the stick still wins when deflected. core-check case 3 (fake
+  stickless pad, RT pedals): d-pad right steer 1.00 / dx +6.4 m, left −1.00 / −6.5 m (was 0 / 0.00).
+- [done] perf#0 race-start shader freeze: new src/core/warmup.ts + game.ts warmUp() between the attaches and
+  show('race'), sim time frozen (clock layer 'warmup') and frame rendering paused while compiling:
+  1. compileScene(): renderer.compileAsync per light-free subtree (no double-counted lights), with a 1×1 HalfFloat RT bound
+     so keys match fx's off-screen scene target (null target when fx is stubbed); 12 ms slices, a frame yielded between;
+     hidden (LOD/fog-culled/pooled) objects included. Loading bar gets flow:loading 0.92 → 0.97 '鹈鹕热身 WARM-UP'.
+  2. drawEverything(): one hidden frame with visible + frustumCulled forced for the call (restored after): shadow-depth
+     programs, texture + geometry uploads (loading screen is opaque — checked shots/core/a1/loading-cover.jpg).
+  3. restart handover: detachSession() stops the old race's systems (RaceSession.stopSystems(): logic/combat/physics) and
+     takes its world out of the scene; its track + views are disposed only after the new race compiled, so shared
+     programs survive. renderer.debug.checkShaderErrors = import.meta.env.DEV.
+  Measured (shots/core/a1/warm-probe.mjs, 1920×1080 high; before = shots/core/a1/cold-start-before.json): programs compiled
+  in the race screen cold 50–73 → 13, restart 25–45 → 12; worst intro frame cold coast 460 → ~110–250 ms, city 1300+1133 →
+  ~110–230 ms, restart city 915+442 → ~90–220 ms (machine shared with other agents, noisy). The 12–13 left are species'
+  lazily created fade variants (`|fade`, `|fade-depth`, `|fade-hull`; shots/core/a1/race-progs.mjs) → species request.
+  Restart warm-up: 6 new programs (combat/traffic visuals), track + rider programs reused. 0 console errors.
+- [done] interaction#9 Tab / right-click: input.ts attach() now prevents Tab (focus stays in the game), prevents the
+  context menu and maps right-click and the mouse back button (MouseEvent.button 3; forward 4 is only prevented) to the
+  'back' action, which every menu screen already handles (race view ignores 'back'). Verified
+  (shots/core/a1/input-mouse.mjs): Tab defaultPrevented, focus BODY; right-click settings → menu; mouse-back howto → menu.
+- [done] perf#6 Retina / MSAA backbuffer: canvas antialias off (fx renders into its own multisampled target; kept only
+  when fx runs on its stub); drawing buffer capped by a pixel budget per quality (high ≈ 2560×1440, medium/low ≈
+  1920×1080; dpr caps 2/1.5/1 kept; floor 0.5), recomputed on resize (game.ts renderDpr). Verified
+  (shots/core/a1/dpr-probe.mjs): 1280×720@1 → 1280×720 (unchanged); 1920×1080@2 → 2560×1440 (was 3840×2160);
+  1512×982@2 → 2382×1547 (was 3024×1964); antialias false; 0 errors; shots/core/a1/dpr2-sheet.jpg looks clean.
+  Not done: dynamic-resolution governor (needs hysteresis + fx target re-allocation; the static budget removes the 4K
+  worst case) and half-res bloom (fx-owned) → fx request.
+- [partial] interaction#13 quit / macOS app menu: core side done — `AppContext.quit?()` (contracts.ts) is set only when the
+  game runs in the desktop shell (location.protocol 'app:') and calls window.close(); verified with a throwaway Electron 44
+  app (sandbox + contextIsolation, app:// page): window.close() closes the window → window-all-closed → app.quit().
+  The menu entry (ui-screens) and the macOS app menu (desktop/main.cjs, outside this fixer's files) → Requests below.
+Requests (acceptance round 1, from the core fixer):
+- species (perf#1): after core's warm-up the only programs still compiled in the race are your lazily created fade variants
+  (`|fade`, `|fade-depth`, `|fade-hull`: 12–13 programs, one 100–250 ms frame when the intro camera first nears a rider;
+  shots/core/a1/race-progs.mjs). Create the variant materials at view creation and keep them reachable from view.root
+  (e.g. hidden proxy meshes of the same kind — SkinnedMesh for skinned parts): core's warm-up (src/core/warmup.ts)
+  compiles every material in the scene graph, hidden objects included, with fx's render-target keys, behind the loading screen.
+- ui-screens (interaction#13): show 退出游戏 QUIT (with your confirm) in the main menu only when `app.quit` is set; call it.
+  Loading bar: core now emits flow:loading 0.92 → 0.97 '鹈鹕热身 WARM-UP' while it compiles; the final hidden frame is one
+  60–400 ms task (a CSS-driven runner, perf#8, would keep moving through it).
+- main session / desktop shell (desktop/main.cjs is outside this fixer's files): on macOS replace
+  Menu.setApplicationMenu(null) with a minimal menu ({role:'appMenu'}, {role:'editMenu'}, {role:'windowMenu'}) so Cmd+Q/H/M
+  work; repackage so app.quit appears in the desktop build.
+- sim: physics.dispose() sets `__br.sim.riders = noRows` unconditionally; guard it by identity (`if (dbg.riders === rows)`).
+  Core now stops the old race's systems before it builds the next race, so restarts keep the live rows anyway.
+- fx: perf#3 (particle programs compiling in the GO frame) is covered by core's warm-up (fx.particles.solid/add compile on
+  the loading screen; 0 compiles at GO in a 14 s probe). perf#6 leftovers: bloom from a half-res copy (fx-owned).
+Verification (round 1 end): tsc 0 errors (whole project) · test-core-guard OK · test-core-save OK (new) · core-check 8/8 PASS
+(new d-pad case) · full autopilot coast race to results, 0 errors (shots/core/a1/race-full.mjs) · handover coast → city →
+quit → city: one world in the scene, old track freed, 0 errors (flow-probe.mjs) · ?stub=all / ?stub=fx start + restart OK
+(stub-probe.mjs) · `__br.sim.riders()` keeps live rows after an in-page restart (sim-rows.mjs).

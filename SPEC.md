@@ -1,5 +1,7 @@
 # 暴力鹈鹕 BEAK RASH — game bible
 
+> **DESIGN DECISION (integrator, 10-19): the player always rides the pelican 阿鹕. There is no character select; the other seven species are rivals.** SPEC §10 lists no character-select screen, and the menu/HUD/results are built around the pelican. Critics: don't report the missing character select as a defect. Fixers: skip such issues.
+>
 > **IMAGE BUDGET (applies to everyone).** Six critics died today with "Request timed out" after they had Read 30–45 full-size screenshots, because the request grows with every image. Before you Read a screenshot, convert it (`sips -Z 1280 -s format jpeg -s formatOptions 70 in.png --out in.jpg`) or combine several into one contact sheet. Read at most ~15 images in total for your whole task.
 
 A 3D arcade combat racer in the spirit of Road Rash (暴力摩托): a pelican on a bicycle races seven

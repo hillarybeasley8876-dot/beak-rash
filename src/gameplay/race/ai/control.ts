@@ -11,7 +11,7 @@ const BIAS_MAX = 0.75;
 
 /** Flat-road top speed estimate: bike × character speed stat (SPEC §6 ratings). */
 export const topOf = (r: RiderState): number => BIKES[r.bike].topSpeed * (1 + 0.025 * (ROSTER[r.character].stats.speed - 4));
-const handlingOf = (r: RiderState): number => BIKES[r.bike].handling * (1 + 0.04 * (ROSTER[r.character].stats.handling - 4));
+export const handlingOf = (r: RiderState): number => BIKES[r.bike].handling * (1 + 0.04 * (ROSTER[r.character].stats.handling - 4));
 
 export class Driver {
   steer = 0;

@@ -25,8 +25,9 @@ function grow(p: Vector3): void {
   hi.max(p);
 }
 
-/** Bounding sphere of head + headroom, body and the bike (faded out as it flies off); returns the radius. */
-export function subjectSphere(a: Anchors, out: Vector3): number {
+/** Bounding sphere of head + headroom, body and the bike (faded out as it flies off, from `bikeNear` m to
+ *  2.5 m further); returns the radius. */
+export function subjectSphere(a: Anchors, out: Vector3, bikeNear = 3.5): number {
   lo.copy(a.body);
   hi.copy(a.body);
   if (a.head) {
@@ -34,7 +35,7 @@ export function subjectSphere(a: Anchors, out: Vector3): number {
     grow(tmp.copy(a.head).setY(a.head.y + HEADROOM));
   } else grow(tmp.copy(a.body).setY(a.body.y + 0.6 + HEADROOM));
   if (a.bike) {
-    const w = 1 - smoothstep(3.5, 6, a.body.distanceTo(a.bike));
+    const w = 1 - smoothstep(bikeNear, bikeNear + 2.5, a.body.distanceTo(a.bike));
     if (w > 0) grow(tmp.copy(a.body).lerp(a.bike, w));
   }
   out.addVectors(lo, hi).multiplyScalar(0.5);

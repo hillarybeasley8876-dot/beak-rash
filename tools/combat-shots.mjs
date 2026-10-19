@@ -34,6 +34,11 @@ const SHOTS = [
   ['whistle', () => { const cc = window.__cc; cc.C().pin(9, 6, -1.2); cc.step(2); cc.C().cast(9, 1); }, 10],
   ['chill', () => { const cc = window.__cc; cc.C().pin(3, 6, 1.5); cc.step(2); cc.C().cast(3, 1); }, 40],
   ['doge', () => { const cc = window.__cc; cc.C().pin(4, 5, 1.6); cc.step(2); cc.C().cast(4, 1); }, 30],
+  ['doge-bounce', () => {
+    const cc = window.__cc, c = cc.C(); c.force({ crit: false, block: false, loose: false });
+    c.pin(4, 3.2, 1.3); cc.step(2); c.cast(4, 1); cc.step(20); c.pin(4, 0.3, 1.2); cc.step(2); cc.press('attackR');
+    cc.until(() => cc.of('combat:hit').length > 0, 60);
+  }, 3],
   ['spin', () => { const cc = window.__cc; cc.C().pin(2, 4.5, 1.2); cc.step(2); cc.C().cast(2, 1); }, 18],
   ['flash', () => { const cc = window.__cc; cc.C().pin(8, 5, 1.4); cc.step(2); cc.C().cast(8, 1); }, 20],
   ['steal', () => { const cc = window.__cc; cc.C().give(0, 'leek'); cc.C().pin(7, 3.5, 1.6); cc.step(2); cc.C().cast(7, 1); }, 8],
@@ -46,6 +51,9 @@ const SHOTS = [
     const cc = window.__cc; const c = cc.C(); c.pin(1, 18, -2); c.pin(2, 30, 2); c.pin(3, 10, 3); cc.P().sp = 100; cc.press('ult');
     cc.until(() => cc.of('ult:impact').length > 0, 900);
   }, 14],
+  ['ult-homing', () => { // a lone pack 90 m ahead: the leap travels onto it (ult-aim.ts)
+    const cc = window.__cc; const c = cc.C(); c.pin(1, 90, 1.6); c.pin(2, 96, -1.6); cc.step(2); c.unpin(); cc.P().sp = 100; cc.press('ult');
+  }, 70],
   ['ult-wave', () => {
     const cc = window.__cc; const c = cc.C(); c.pin(1, 18, -2); c.pin(2, 30, 2); c.pin(3, 10, 3); cc.P().sp = 100; cc.press('ult');
     cc.until(() => cc.of('ult:impact').length > 0, 900);

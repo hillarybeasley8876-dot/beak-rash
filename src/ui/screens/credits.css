@@ -33,3 +33,13 @@
 .br-cr-name.is-latin { font-family: var(--f-bebas); font-size: 54px; letter-spacing: 0.03em; }
 .br-cr-outro { margin: 40px 0 30px; max-width: 900px; font-family: var(--f-cn-play); font-weight: 400; font-size: 36px; line-height: 1.4; color: rgba(255, 255, 255, 0.85); }
 .br-cr-logo { display: flex; flex-direction: column; gap: 18px; font-size: 96px; }
+/* Career-clear finale: trophy card heading the roll (yellow star = the one SP-yellow moment). */
+.br-cr-gap.is-short { height: 90px; }
+.br-cr-trophy { position: relative; margin: 0 0 70px 30px; padding: 30px 0 0 250px; min-height: 260px; }
+.br-cr-trophy-star { position: absolute; left: -20px; top: -10px; width: 260px; height: 260px; animation: br-spin 30s linear infinite; }
+.br-cr-trophy-star svg { width: 100%; height: 100%; display: block; filter: drop-shadow(8px 8px 0 var(--red)); }
+.br-cr-trophy-cn { font-size: 86px; }
+.br-cr-trophy-en { display: block; margin-top: 10px; font-family: var(--f-display); font-weight: 400; font-size: 64px; line-height: 1; color: var(--white); text-shadow: 6px 6px 0 var(--red); }
+.br-cr-trophy-line { margin: 16px 0 0; max-width: 560px; font-family: var(--f-cn-play); font-weight: 400; font-size: 32px; line-height: 1.35; color: var(--white); }
+.br-cr-cups { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 18px; }
+.br-cr-cups span { padding: 4px 14px 2px; background: var(--white); color: var(--red); font-family: var(--f-cn-block); font-weight: 400; font-size: 26px; rotate: -3deg; box-shadow: 5px 5px 0 var(--red); }

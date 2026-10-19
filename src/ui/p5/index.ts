@@ -11,4 +11,5 @@ export * from './portrait';
 export * from './widgets';
 export * from './backdrop';
 export * from './track-art';
+export * from './motion-pref';
 export { ShardWipe } from './transition';

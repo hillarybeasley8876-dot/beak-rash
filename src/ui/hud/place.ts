@@ -1,8 +1,10 @@
 // Top-left place block ("3RD /8", P5 skew, slam + arrow on change), race timer, and the
-// top-right KO / 小鱼干 counters.
+// top-right KO / 小鱼干 counters. The place block rides at 0.75 while cruising and slams to full size for
+// a while after GO, on every place change and during a BUSTED ticket stop.
 import './css/place.css';
 import { el, w, type W } from './dom';
-import { envelope, slam } from './anim';
+import { approach } from '../../core/math';
+import { envelope, reducedMotion, slam } from './anim';
 
 export const ordinal = (n: number): string => {
   const t = n % 100;
@@ -20,9 +22,14 @@ export function fmtTime(sec: number): string {
 
 /** s the place-change slash takes to wipe across the shard. */
 const FLASH = 0.16;
+/** Cruising scale of the block, and how long it stays full size after GO / a place change. */
+const QUIET = 0.75;
+const LOUD_HOLD = 2.5;
 
 export class PlaceBlock {
   readonly root: HTMLDivElement;
+  private rootW: W;
+  private size = 1;
   private block: W;
   private num: W;
   private suf: W;
@@ -41,6 +48,7 @@ export class PlaceBlock {
   /** `onTick(n)` runs as the BUSTED ticket counts down to n (3, 2, 1): its sound cue. */
   constructor(parent: HTMLElement, private onTick: (n: number) => void = () => {}) {
     this.root = el('div', 'plw', parent);
+    this.rootW = w(this.root);
     const pl = el('div', 'pl', this.root);
     el('div', 'pl-shadow', pl);
     el('div', 'pl-shard', pl);
@@ -85,6 +93,7 @@ export class PlaceBlock {
     this.updateTicket(ticket, dt);
     this.flashT += dt;
     const t = this.flashT;
+    this.updateSize(t < LOUD_HOLD || time < LOUD_HOLD || ticket > 0, dt);
     this.num.tf(t < 0.3 ? `scale(${slam(t, 0.2, 1.55).toFixed(3)})` : 'none');
     const wipe = t / FLASH;
     this.flashW.show(wipe < 1);
@@ -92,6 +101,13 @@ export class PlaceBlock {
     const a = envelope(t, 0, 0.08, 0.9, 1.2);
     this.arrow.op(a);
     this.arrow.tf(a > 0 ? `translateY(${((1 - a) * (this.up ? 18 : -18)).toFixed(1)}px)` : 'none');
+  }
+
+  /** Full size snaps in fast (slam-like), the shrink back to QUIET is slow. */
+  private updateSize(loud: boolean, dt: number): void {
+    const want = loud ? 1 : QUIET;
+    this.size = reducedMotion() ? want : approach(this.size, want, (dt * (1 - QUIET)) / (loud ? 0.1 : 0.45));
+    this.rootW.tf(this.size >= 0.999 ? 'none' : `scale(${this.size.toFixed(3)})`);
   }
 
   private updateTicket(ticket: number, dt: number): void {

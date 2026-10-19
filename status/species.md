@@ -194,3 +194,47 @@ Plan ([x] = done + verified; majors first):
   7050, penguin 5866; view.update 0.019 ms; 0 console errors (sandbox + races). tsc clean for src/actors + sandbox/actors.
 - How to test (new): `__actors.skill(id)` / `__actors.skillCheck()`; `node tools/actors-tiles.mjs holds <out.png>`;
   `__actors.weaponClearance()` → {head, grip, pop}.
+
+## Acceptance round 1 (game-r1 critics: e2e major, perf major + minor, feel minor, aesthetic minor) — checkpoints
+Plan ([x] = done + verified; [ ] = open):
+- [x] B1 perf major + feel minor: NEW src/actors/warmup.ts (ShaderWarmup, race-session views only = opts.track set):
+  stage 1 draws the view as-is with frustum culling off + every hidden extra (shrunken stand-in saltfish when unarmed,
+  glint/steam sprites at opacity 0, dizzy stars at scale 1e-4, empty smear); stage 2 draws it faded (RiderFade α 0.99:
+  clones, depth proxies, faded hulls); each stage holds 3 rendered frames (three.js keys the shadow pass on the PREVIOUS
+  frame's light setup, so frame 1 compiles unlit depth variants); waits only count frames that rendered (a throwing
+  frame no longer makes it give up). view.update → updateRide/updateCrash then warm.update(). NEW tools/actors-programs.mjs
+  (race, then respawn fade, 7 skills, swings, stun, player skills, KO cinematic, wreck; prints programs compiled after
+  GO with the object path): rider-owned after GO 11 → 0 (coast high/low ×3, city high, mountain medium). Cost: the
+  intro's first frames compile ~24 more programs (two frames of ~110–125 ms, coast high). Remaining after-GO compiles
+  are fx-owned (subjectMask ×5) + zero-light shadow variants caused by the mask pass (see Requests → fx).
+- [x] A1 e2e major + aesthetic minor (bill invisible from the chase cam): NEW meta.carry (species/types.ts) used by
+  rig/ride.ts: with nothing to look at the hero turns its head 0.5 rad toward the road centre (view.ts: side from state.x
+  with ±0.8 m hysteresis, damped λ 2.5), chin up 0.2 rad, S-neck bent 0.28 rad sideways; a look nearly straight ahead
+  still turns ≥ carry.yaw to its side (half the chin-up); the eyes stay on the road (FaceRig gets a far point ahead →
+  side-eye down the bill). Bill 15 % longer (pelican-beak Z1 −1.035 → −1.105, pouch to −1.03, beak anchor moved).
+  Solo glances every 2.6–3.8 s for the hero (also between rival looks in packs), alternating sides. NEW pouch spring
+  (meta.pouchJiggle 0.09: pedalling bounce, accel, landing) on the pouch bulge. Measured from a game-like chase cam
+  (shots/species/acc1/proj.mjs): bill tip 4–9 px → 38–44 px from the head centre (helmet radius 25 px at 1080p);
+  in-game crops coast/city/mountain (acc1/c5-zoom.jpg, c5-crops.jpg): orange bill + pink pouch beside the helmet in
+  most frames. actors-check OK (IK 0.0/0.0 everywhere, weapon tip↔head 60 cm, all 12 skills read).
+- [x] C1 perf minor (riders never culled, no LOD): NEW src/actors/lod.ts — cullable(): body + hull share one static
+  bounding sphere (body space, centre (0, 0.25, −0.2), r 1.45 m: spread wings, swings, reaching neck) and culling is
+  on (species/index.ts instantiate); fade proxies share it (no per-swap skinned bounds). RiderLod (view.update): culling
+  off while crashed (tumble/helmet leave the sphere), hull hidden + body castShadow off beyond 60 m (back under 52 m).
+  shots/species/acc1/cull.mjs (7 rivals vs removed): 400 m behind 21 calls/163k tris → coast 2/336, city 0/0; at 70 m
+  ahead coast 36 calls/202k tris (bikes are most of it: their LOD is the bikes unit's), at 20 m 50/310k.
+- Pouch slosh retuned (rig/ride.ts pouchJiggle): once per crank turn at speed (±5.5 % width) + a spring kicked by speed
+  changes / air time (the first spring-only version was ~0.3 %, invisible).
+
+- Verified (acceptance round 1): tsc clean for src/actors (remaining errors are combat/ui-hud WIP files); actors-check OK
+  (IK 0.0/0.0 cm, weapon tip↔head ≥ 52 cm, 12 skills read); pelican 8984 tris; lineup of all 10 on default bikes
+  (shots/species/acc1/lineup.jpg) unchanged except the hero's head carriage; coast race + KO cinematic: 0 errors.
+- How to test (new): `node tools/actors-programs.mjs [track] [quality]` (programs compiled after GO; RIDER lines must be
+  0; DUMP=<program name> prints cache keys); shots/species/acc1/{chase.mjs,count.py,proj.mjs,cull.mjs} (chase stills
+  + bill/pouch pixel counts around the projected head, bill-tip projection from a game-like chase cam, far-rival cost).
+
+### Requests (acceptance round 1)
+- fx: SubjectMask.render (fx/post/mask.ts) sets camera.layers = 30, which also filters the LIGHTS out, so setupLights()
+  leaves app.scene's render state at 0 lights; three.js renders the NEXT frame's shadow pass before setupLights(), so
+  every shadow caster compiles a zero-light depth variant at the first KO/wreck ('?|depth' ×4, 'bikes:depth' ×2 in
+  tools/actors-programs.mjs). Fix: enable layer 30 on the scene lights for the mask draw (or warm the mask at attach).

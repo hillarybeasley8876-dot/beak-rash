@@ -31,7 +31,9 @@ export class Barks {
     const id = text !== undefined ? this.voices.idFor(text) : voiced.length ? this.rng.pick(voiced) : null;
     const follow = (): { gain: number; pan: number } | null => this.place(riderId);
     const at = follow();
-    if (id && at && this.voices.play(id, { channel: 'bark', pan: at.pan, gain: at.gain, follow, wait }) !== 'none') return;
+    // The pelican's own lines outrank the rivals' (they cut a rival line that is playing).
+    const priority = this.h.isPlayer(riderId) ? 2 : 1;
+    if (id && at && this.voices.play(id, { channel: 'bark', pan: at.pan, gain: at.gain, follow, wait, priority }) !== 'none') return;
     if (this.h.cooldown(`call${riderId}`, 2)) this.h.play(`animal.${r.character}`, riderId, { volume: 0.85 });
   }
 

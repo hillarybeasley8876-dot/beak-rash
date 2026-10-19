@@ -1,5 +1,6 @@
 /* P5 battle-style cluster (bottom-right): tilted portrait, HP/SP bars, skill diamonds, weapon slot. */
-.cl { position: relative; width: 720px; height: 380px; }
+/* Drawn at 0.85 toward the screen corner (quiet while cruising); world/zones.ts CL_SCALE mirrors it. */
+.cl { position: relative; width: 720px; height: 380px; scale: 0.85; transform-origin: 100% 100%; }
 .cl-pc-wrap { position: absolute; right: 6px; bottom: 34px; width: 214px; height: 254px; rotate: -7deg; transform-origin: 50% 100%; }
 .cl-pc-shadow, .cl-pc-frame {
   position: absolute; inset: 0;

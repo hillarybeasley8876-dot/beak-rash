@@ -40,9 +40,11 @@ export const PADMAP: Partial<Record<Action, number[]>> = {
 const EDGE_ACTIONS = ['hop', 'attackL', 'attackR', 'heavy', 'skill1', 'skill2', 'skill3', 'ult', 'bell'] as const;
 type EdgeAction = (typeof EDGE_ACTIONS)[number];
 
-const STEER_RISE = 6.5;   // /s, keyboard steer ramp toward full lock
+const STEER_RISE = 6.5;   // /s, digital (keyboard / d-pad) steer ramp toward full lock
 const STEER_FALL = 11;    // /s, ramp back to centre
 const STICK_DEADZONE = 0.14;
+const MOUSE_BACK = 3;     // MouseEvent.button of the side "back" button
+const MOUSE_FORWARD = 4;
 
 export class Input {
   steer = 0;
@@ -64,9 +66,10 @@ export class Input {
   private detach: (() => void) | null = null;
 
   attach(target: Window): void {
-    const gameCodes = new Set(Object.values(KEYMAP).flat());
+    // Tab would move focus to the browser chrome (the race auto-pauses on blur and menus stop hearing keys).
+    const captured = new Set([...Object.values(KEYMAP).flat(), 'Tab']);
     const onDown = (e: KeyboardEvent): void => {
-      if (gameCodes.has(e.code)) e.preventDefault();
+      if (captured.has(e.code)) e.preventDefault();
       this.lastDevice = 'keyboard';
       if (e.repeat) return;
       this.keys.add(e.code);
@@ -76,13 +79,27 @@ export class Input {
       this.keys.delete(e.code);
     };
     const onBlur = (): void => this.keys.clear();
+    // Right-click and the mouse back button mean 'back' (no browser menu over the game, no history navigation).
+    const onContextMenu = (e: MouseEvent): void => {
+      e.preventDefault();
+      this.press('back');
+    };
+    const onMouseUp = (e: MouseEvent): void => {
+      if (e.button !== MOUSE_BACK && e.button !== MOUSE_FORWARD) return;
+      e.preventDefault();
+      if (e.button === MOUSE_BACK) this.press('back');
+    };
     target.addEventListener('keydown', onDown);
     target.addEventListener('keyup', onUp);
     target.addEventListener('blur', onBlur);
+    target.addEventListener('contextmenu', onContextMenu);
+    target.addEventListener('mouseup', onMouseUp);
     this.detach = () => {
       target.removeEventListener('keydown', onDown);
       target.removeEventListener('keyup', onUp);
       target.removeEventListener('blur', onBlur);
+      target.removeEventListener('contextmenu', onContextMenu);
+      target.removeEventListener('mouseup', onMouseUp);
     };
   }
 
@@ -116,12 +133,12 @@ export class Input {
   /** Per rendered frame: poll gamepads and ramp analog values. */
   update(dtReal: number): void {
     this.pollPad();
-    const kbSteer = (this.isKeyDown('right') ? 1 : 0) - (this.isKeyDown('left') ? 1 : 0);
+    const digital = this.digitalSteer();
     if (Math.abs(this.padSteer) > 0) {
       this.steer = this.padSteer;
-    } else if (kbSteer !== 0) {
-      if (Math.sign(this.steer) === -kbSteer) this.steer = 0; // instant reversal through centre
-      this.steer = approach(this.steer, kbSteer, STEER_RISE * dtReal);
+    } else if (digital !== 0) {
+      if (Math.sign(this.steer) === -digital) this.steer = 0; // instant reversal through centre
+      this.steer = approach(this.steer, digital, STEER_RISE * dtReal);
     } else {
       this.steer = approach(this.steer, 0, STEER_FALL * dtReal);
     }
@@ -166,6 +183,13 @@ export class Input {
 
   private isKeyDown(action: Action): boolean {
     return KEYMAP[action].some((code) => this.keys.has(code));
+  }
+
+  /** Digital steering (arrows / A-D and the pad's d-pad, for pads without a stick) in -1..1. */
+  private digitalSteer(): number {
+    const right = this.isKeyDown('right') || this.padDown.has('right');
+    const left = this.isKeyDown('left') || this.padDown.has('left');
+    return (right ? 1 : 0) - (left ? 1 : 0);
   }
 
   private actionsForKey(code: string): Action[] {

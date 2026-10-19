@@ -19,7 +19,7 @@ const LIFE = 2.2;
 const PRIORITY: Record<QuipKind, number> = { taunt: 1, skill: 1, hurt: 2, ko: 3 };
 /** Box anchor inside the bottom-right corner (css/quip.css .qp) and that corner's offsets (css/base.css). */
 const RIGHT = 26 + 30;
-const BOTTOM = 374 + 24;
+const BOTTOM = 318 + 24;
 const FALLBACK_H = 58;
 /** s between skill quips (skills come every few seconds; KO / respawn lines are rare and always speak). */
 const SKILL_GAP = 9;

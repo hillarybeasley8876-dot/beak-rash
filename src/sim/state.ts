@@ -20,6 +20,9 @@ export interface SimRider {
   driftLock: number;                 // s until another drift may start (after a release)
   driftExit: number;                 // s left of the release ramp (drift lateral speed → grip steering) …
   driftExitVx: number;               // … starting from this lateral speed
+  carve: number;                     // exit carve strength 0..1 after a mini-turbo release (carve.ts) …
+  carveDir: -1 | 0 | 1;              // … for the bend turning this way (0 = no carve) …
+  carveTime: number;                 // … s since that release
   slip: number;                      // visual slip angle (rad, signed)
   // air
   airKind: AirKind;
@@ -77,7 +80,7 @@ export interface SimRider {
 export function createSimRider(r: RiderState): SimRider {
   return {
     r, tune: bikeTune(r.bike, r.character), frame: emptyFrame(),
-    driftDir: 0, driftLevel: 0, driftLock: 0, driftExit: 0, driftExitVx: 0, slip: 0,
+    driftDir: 0, driftLevel: 0, driftLock: 0, driftExit: 0, driftExitVx: 0, carve: 0, carveDir: 0, carveTime: 0, slip: 0,
     airKind: 'hop', airPeak: 0, airOwn: false,
     wobblePhase: r.id * 1.7, pitch: 0, landPitch: 0, scrape: 0, scrapePose: 0, vxTarget: 0, vxWant: 0,
     carryTime: 0, carrySteer: 1, carryTau: 0, carryDir: 0, yawEase: 0, slidePhase: 0,

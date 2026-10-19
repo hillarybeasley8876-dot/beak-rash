@@ -29,6 +29,11 @@ export class Director {
     return this.splash?.kind ?? null;
   }
 
+  /** The splash on stage belongs to a KO cinematic (CutIn.cine): the static HUD waits until it has left. */
+  get cineSplashUp(): boolean {
+    return this.splash?.cut.cine === true;
+  }
+
   /** The player's skill band is on stage. */
   get bandUp(): boolean {
     return this.band !== null;
@@ -49,11 +54,12 @@ export class Director {
     if (this.queue.length > 2) this.queue.shift();
   }
 
-  /** Player skill band: replaces the previous band; never shown under a WRECKED-or-higher splash. */
-  bandIn(make: () => CutIn): void {
-    if (this.splash && PRIORITY[this.splash.kind] >= BAND_BLOCK) return;
+  /** Player skill band: replaces the previous band; never shown under a WRECKED-or-higher splash (false). */
+  bandIn(make: () => CutIn): boolean {
+    if (this.splash && PRIORITY[this.splash.kind] >= BAND_BLOCK) return false;
     this.retire(this.band);
     this.band = this.mount('skill', make(), 'band');
+    return true;
   }
 
   /** The moment this splash belongs to is over (e.g. the KO cinematic ended): if one of `kinds` is up,

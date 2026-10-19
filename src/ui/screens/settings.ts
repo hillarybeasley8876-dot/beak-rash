@@ -1,10 +1,11 @@
-// settings: volumes, quality, shake, auto-pedal, slow-mo, reset save. ↑↓ row, ←→ value, Enter cycles /
-// confirms; changes save at once (volumes and auto-pedal apply live). Esc → menu (or pause mid-race).
+// settings: volumes, quality, shake, auto-pedal, slow-mo, motion, reset save. ↑↓ row, ←→ value (ordered
+// scales stop at their ends), Enter cycles / confirms; changes save at once (volumes, auto-pedal and motion
+// apply live). Esc → menu (or pause mid-race).
 // Quality needs a restart: leaving the menu-side settings with a new quality offers one. Mid-race the
 // reset row is locked (the race would keep the old bike and its rewards would land on the fresh save).
 import './settings.css';
 import { Nav } from '../nav';
-import { HINT_BACK, HINT_LR, HINT_NAV, backdrop, h, jagged, portrait } from '../p5';
+import { HINT_BACK, HINT_LR, HINT_NAV, backdrop, h, jagged, portrait, setMotionPref } from '../p5';
 import { frame, type ScreenFactory } from '../screen';
 import { recall, remember } from './memory';
 import { ROWS, applySettings, rowWidget, type RowWidget } from './settings-rows';
@@ -43,17 +44,19 @@ export const settingsScreen: ScreenFactory = (ctx) => {
     }
     ctx.go(backTo);
   };
-  const pick = (i: number, dir: -1 | 1): void => {
+  const pick = (i: number, dir: -1 | 1 | 'cycle'): void => {
     nav.focus(i, true);
-    if (widgets[i]?.step(dir)) {
+    const w = widgets[i];
+    if (w && (dir === 'cycle' ? w.cycle() : w.step(dir))) {
       ctx.sfx('ui.move');
       changed(i);
-    }
+    } else if (ROWS[i]?.kind !== 'action') ctx.sfx('ui.deny');
   };
   const reset = async (): Promise<void> => {
     const ok = await ctx.confirm('重置存档？', '小鱼干、车辆和进度都会消失，无法撤销。', '清空', '算了');
     if (!ok) return;
     app.save.reset();
+    setMotionPref('system');
     applySettings(app);
     widgets.forEach((w) => w.sync());
     ctx.toast('存档已重置。重新做回一只普通鹈鹕。', 'meme');
@@ -84,7 +87,7 @@ export const settingsScreen: ScreenFactory = (ctx) => {
     el: widgets[i]!.el,
     left: () => pick(i, -1),
     right: () => pick(i, 1),
-    confirm: () => (def.kind === 'action' ? void reset() : pick(i, 1)),
+    confirm: () => (def.kind === 'action' ? void reset() : pick(i, 'cycle')),
     disabled: def.kind === 'action' ? () => live : undefined,
     onDenied: () => ctx.toast('比赛中不能重置存档，先退出比赛', 'warn'),
     onFocus: () => {

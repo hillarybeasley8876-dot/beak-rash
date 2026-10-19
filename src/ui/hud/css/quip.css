@@ -1,7 +1,7 @@
 /* Player quip: jagged speech bubble from the cluster portrait (bottom-right corner box, 720×380 stage px).
-   Bottom-right anchored above the portrait card, clear of the skill diamonds and their deny labels; the tail
-   points down at the card. */
-.qp { position: absolute; right: 26px; bottom: 374px; transform-origin: 88% 100%; pointer-events: none; }
+   Bottom-right anchored above the portrait card (the cluster is drawn at 0.85: 374 × 0.85), clear of the skill
+   diamonds, their deny labels and the cast tag; the tail points down at the card. */
+.qp { position: absolute; right: 26px; bottom: 318px; transform-origin: 88% 100%; pointer-events: none; }
 .qp-box {
   position: relative; max-width: 420px; padding: 12px 24px 11px 22px; background: var(--paper); color: var(--ink);
   font: 400 30px/1.15 "ZCOOL KuaiLe", "Noto Sans SC", sans-serif; white-space: nowrap;

@@ -1,0 +1,77 @@
+{
+  "pass": true,
+  "score": 8,
+  "summary": "Acceptance r2, whole-game look, all real units, 1920x1080, tsc 0 errors, __br.errors [] in every run. Evidence in shots/accept/r2-aesthetic/: a keyboard tour of every screen (ui/), one full autopilot race per track, seed 3 (trk/<id>/: intro flyover, countdown, GO, pack, a chase frame every ~20 s, results), real KO / WRECKED / SHOWTIME cinematics (cine/), teleports to the r1 trouble spots plus Doge casts at 3 distances (tgt/), the city roundabout approach (statue/), and pixel checks (road.py, beak2.py, edge.py). Sheets: s1..s14. R1 MAJORS, ALL FIXED: (1) env-mountain floating granite slabs: none at s 1459-1607 (tgt/mountain-slabs-*), boulders sit on the slope and the new bevelled rocks match the toy look. (2) combat Doge shield: now a ~1 m smooth gold rim bubble with a clear centre, halftone ring and star glints, faint up close and clear at 6-10 m; it reads as a toon VFX, not a gizmo (tgt/*-doge-*). (3) fx SHOWTIME impact: on coast the victims hold 25-35 % of the frame height in colour with a paper rim and ink line (cine/coast-ult/07-1700ms..09-2200ms), so it reads. City is weaker, see issue 1. R1 MINORS: fixed = hero bill + pouch now show beside the helmet in most chase frames (beak orange 266-990 px in 7 of 8 coast frames, was ~0 outside glances); intro flyover presents each rival at ~30 % of the frame height with its card; garage kid bike fills the stand; HUD cluster at 0.85 with occlusion dimming; WRECKED stamp no longer overlaps the returning HUD; waterfall is four white strands over a wet-rock lip with mist; mountain switchback legs are dressed (flags, fences, signposts, boulders); orange/tan KO victims are now in colour with a sticker rim (cat, shiba). Improved = KO traffic is ghosted and counted in the framing (city release still loses the victim, issue 4); track-select stills got a posterise/halftone/ink-frame print treatment (Neon Night is still the murkiest card, not re-raised). Still open = WRECKED pink wash (the cause is ui-hud's full-screen tint, issue 3), blank asphalt (the track unit ran no acceptance-r1 round, issue 6), mountain key light (env-mountain's request to track not applied, issue 8). Not reproduced: KO head crop at the top bar (no victim pixels under the bar from 0.45 to 1.3 s), arcade black fronts, cutting acne in stills. Not re-run: the frame-diff pop scan (r1 was clean). OVERALL: the 2D layer (title, menu, career, records, track select, garage, settings, how-to, loading calendar, pause, GO / countdown bursts, SHOWTIME cut-in, KNOCK OUT splash, results) is commercial-grade P5 and consistent. The three tracks have distinct grades and readable riders. The KO cast look (victim in colour, attacker muted, bystanders as ink ghosts) is a strong money shot on all three tracks. What keeps it at 8 is a polish tail on pillar 3 and on detail density: the impact frame of SHOWTIME is muddied by combat's red ring wall; the city SHOWTIME and KO release lose their subject; WRECKED turns the hero pink; glossy blob trees in the city; flat road, rock walls and tunnels. No blocker or major remains.",
+  "issues": [
+    {
+      "severity": "minor",
+      "owner": "fx",
+      "title": "City SHOWTIME hold: victims clump small in the upper half, and the lower ~45 % of the frame is empty floor",
+      "detail": "Repro: node shots/accept/r2-aesthetic/cine.mjs city ult (the r1 scenario: sloth / pigeon / capybara pinned 7/13/19 m ahead, SP 100, cast slot 4). From 1.55 to 2.6 s (cine/city-ult/06-1550ms.png .. 10-2600ms.png, sheet s14-tails.jpg) the victims overlap in one clump about 15-20 % of the frame height in the upper middle. Two more riders tumble as ~40 px specks in the top-right corner, and the lower ~45 % of the frame is empty dark-red floor with ghost streaks. The coast run of the same scenario reads well (07-1700ms, 08-1900ms: hero >= 30 %), so the framing holds only when the landing is on an open road.",
+      "fix": "framing.ultOverShoulder: fit the hero plus the nearest second victim (not the hero alone), and drop the bias to <= 0 after impact so the pair sits on the lower third. Let the eye climb with victims that rise > 1.5 m (heightFollow ~0.6) instead of holding 1.1 m. Leave victims more than 8 m from the hero out of the fit. Gate it with the fx.cine.mjs size check on city as well as coast."
+    },
+    {
+      "severity": "minor",
+      "owner": "combat",
+      "title": "SHOWTIME red ring wall sweeps through the victims and tints them red in the impact frame",
+      "detail": "skills/ult.ts adds FlatRing {color '#ff1e3c', wall '#ff1e3c', to ULT.ahead, dur 0.75}. At 1.55 s (cine/coast-ult/06-1550ms.png; crop 'ult-impact-1550' in s12-detail2.jpg) the victims are pink-red mush inside the translucent red wall. Its arc still crosses the frame at 1.7-1.9 s on coast and city (07-1700ms). The impact frame, which should read best, reads worst. fx asked for this in its acceptance-r1 requests; unchanged.",
+      "fix": "While cine:ult runs, drop the `wall` and keep the flat ground rings. Or make the wall an opaque inked ground ring that stays under 0.3 m. Or fade the wall to 0 within 1.5 m of any victim."
+    },
+    {
+      "severity": "minor",
+      "owner": "ui-hud",
+      "title": "WRECKED splash still washes the screen red: the paper-white pelican turns pink, then the fading stamp sits on the respawned rider",
+      "detail": "Repro: node shots/accept/r2-aesthetic/cine.mjs mountain wrecked. At 0.25 s the pelican is clean paper-white manga (cine/mountain-wrecked/02-250ms.png). At 0.5 and 0.75 s the whole figure is pale pink (03-500ms, 04-750ms; s6-ko-b.jpg). Cause: cutins/splashes.ts sets tint: true on the WRECKED spec, which draws .sx-tint rgba(229,25,28,0.28) over the whole screen. fx already renders the hero paper-white and asked ui-hud to change this; not applied. At 1.0 s (05-1000ms) the half-transparent 'WRECKED 被打下车了' stamp is centred on the respawned rider while racing resumes.",
+      "fix": "Set tint: false for WRECKED, or turn .sx-tint into a radial edge vignette that is transparent over the central 60 %. Slide the stamp up and out in <= 0.15 s before the chase view returns, instead of fading it in place over the rider."
+    },
+    {
+      "severity": "minor",
+      "owner": "fx",
+      "title": "City KO release loses the victim behind a vehicle ghost",
+      "detail": "Repro: VICTIM=cat node shots/accept/r2-aesthetic/cine.mjs city ko '' -cat. The peak is excellent (0.2-0.75 s: cat in colour with a sticker rim). At 1.0 s the cat is against the top bar. At 1.3 s (cine/city-ko-cat/06-1300ms.png, s5-ko-a.jpg) it is a ~40 px speck at the top edge while a dark-red vehicle ghost fills the centre half of the frame. Cause: ko/cast.ts fillOccluders() only hides rider views between the lens and the victim (s.views), never session.obstacles, and the shot does not climb with the flung victim.",
+      "fix": "Extend fillOccluders to traffic and police meshes: skip them, or draw them at <= 15 % ink, when they are nearer than the victim and overlap its screen rect. In the release, use the victim body as the subject with followY >= 10 and heightFollow ~0.5, so the tumble stays inside the bars until the whoosh."
+    },
+    {
+      "severity": "minor",
+      "owner": "env-city",
+      "title": "City street trees read as glossy shapeless blobs; one fills a third of the frame on the hairpin and hides the roundabout statue",
+      "detail": "Repro: /?race=city&seed=3&autopilot=1, s~2704, x~6.8 (trk/city/16-chase-7.png; crop 'city-yellow-blob-2704' in s8-detail.jpg). A ginkgo canopy (planterTree in scenery/props/city-street.ts) beside the outer kerb fills ~1/3 of the frame as a lumpy yellow mass with white fairy-light specks. It reads as a floating blob, not a tree. The cherry trees look like pink cotton candy (tgt/city-doge-far.png, crop 'city-pink-tree' in s12): the emissive share (aux 5, 0.36-0.42) flattens the cel ramp, so the lobes merge. From the racing line at s 2690-2717 (statue/x4-07-s2705.png), the gilded pelican-on-a-bicycle statue, the game's own benchmark joke, is half hidden behind a canopy.",
+      "fix": "Cut the canopy emissive share to ~0.15 so the cel bands and the ink outline separate the lobes. On curves with R < 60 m, keep trees >= 2.5 m from the drivable edge. Plant none on the inside of the R28 hairpin within +-30 m of the roundabout mark, so the statue has a clear sightline. Cap the lobe radius at ~1.0 m."
+    },
+    {
+      "severity": "minor",
+      "owner": "track",
+      "title": "Asphalt is still a near-blank grey sheet (r1 issue, no acceptance-r1 work)",
+      "detail": "status/track.md has no acceptance-r1 section (last edited 04:22, before the r1 review). road.py on clean 100x60 px road patches: luma std-dev 3.5-7.9 on coast and 2.8-5.0 on mountain (r1: 2-5). Hairline cracks and faint seams show only in crops (crop 'coast-asphalt-427' in s8-detail.jpg). At play size, ~40 % of every coast and mountain chase frame is one flat grey (s2-coast.jpg, s4-mountain.jpg).",
+      "fix": "As in r1: a +-6 % two-tone low-frequency tint, a darker racing-line band, flat-colour patch squares / manholes / painted arrows or meme words every 80-150 m, and a per-track asphalt tint (warm grey on coast, cool violet-grey on mountain)."
+    },
+    {
+      "severity": "minor",
+      "owner": "env-mountain",
+      "title": "Large rock walls and the tunnel headwall are flat planes (plywood look)",
+      "detail": "At s~1437 (trk/mountain/13-chase-4.png; crop 'mtn-wall-1437' in s8-detail.jpg) the left cliff is a few big flat facets with fine parallel pinstripe hatching. The new bevelled slabs sit well, but the wall itself reads as cut plywood (open-list item). At s~1590-1607 (tgt/mountain-slabs-1590.png) the headwall above the tunnel portal is one flat dark-brown rectangle with straight edges.",
+      "fix": "Break the wall cross-section into 3-5 stepped ledges, each with a darker crevice band and an ink line. Replace the hatch stripes with 2-3 tone cel bands. Give the portal headwall a jagged top silhouette with bevelRock caps and grass tufts on the ledges."
+    },
+    {
+      "severity": "minor",
+      "owner": "track",
+      "title": "Sunset key light is still salmon: env-mountain's MOUNTAIN_LOOK request was not applied",
+      "detail": "looks.ts MOUNTAIN_LOOK keeps sun #ffb46e x2.3 and ambient sky #b48ad8. env-mountain's cool sky fill fixed the shadow side, but the sunlit pelican still reads salmon/peach on the climbs (trk/mountain/12-chase-3.png, 13-chase-4.png in s4-mountain.jpg).",
+      "fix": "Apply the requested values (sun ~#ffc79a, ambient sky ~#a6a2e6), or add the per-track env hook so env-mountain owns them. Check that the pelican's sunlit back stays at <= 0.2 HLS saturation."
+    },
+    {
+      "severity": "minor",
+      "owner": "track",
+      "title": "Billboard art is dropped for the whole race when it decodes late",
+      "detail": "In 6 of 10 coast/mountain page loads in this session (machine under load) the log shows '[track] billboard art not ready after 2500 ms, skipped this build: billboards/coast_1..6.webp' (or mountain_1..6). Those races show the text fallback boards instead of the meme art for the whole race (scenery/signs/art.ts loadBillboardArt: each image waits 2.5 s, and late art is never repainted in-build).",
+      "fix": "Keep the fallback, but repaint the board faces when the late image arrives (as the sign atlas already does on document.fonts.ready). Or await the decode promises that world preload() already started, behind core's warm-up, instead of a fixed 2.5 s per image."
+    },
+    {
+      "severity": "minor",
+      "owner": "track",
+      "title": "Tunnel interiors are bare grey tubes",
+      "detail": "Coast tunnel at s~2040 (trk/coast/14-chase-5.png) and mountain tunnel at s~1830 (trk/mountain/14-chase-5.png): a flat grey vault and flat walls with one red band, unchanged for the whole bore. The coast one adds a hard dark band across the road. Next to the dense neon underpass in the city, these read as unfinished.",
+      "fix": "features/tunnel.ts: lamp strips every 8-10 m with warm light pools on the road, a contrasting dado band with hazard chevrons near the portals, wall signage (exit arrows, one or two meme signs) and cable trays. env-mountain's dressing/mountain/tunnel.ts can reuse them with a rough-rock vault."
+    }
+  ]
+}

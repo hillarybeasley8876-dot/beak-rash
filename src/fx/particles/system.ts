@@ -90,6 +90,12 @@ export class Particles {
     return { solid: this.solid.alive(this.clock, this.clockReal), add: this.add.alive(this.clock, this.clockReal) };
   }
 
+  /** Compile both pool programs on the next frames (race intro) instead of at the first burst. */
+  warm(): void {
+    this.solid.warm();
+    this.add.warm();
+  }
+
   clear(): void {
     this.solid.clear();
     this.add.clear();

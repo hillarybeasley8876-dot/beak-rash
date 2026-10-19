@@ -1,7 +1,7 @@
 // RiderView: one rider on one bike. Composes the bike model (bikes unit), the skinned character
 // (species kit), and the animation layers: ride (IK to bars/pedals) → cues → face; crash tumble.
 import { Color, Group, Matrix4, Quaternion, Vector3 } from 'three';
-import type { AnchorName, AppContext, RiderView, ViewCue } from '../core/contracts';
+import type { AnchorName, AppContext, RiderView, RiderViewOpts, ViewCue } from '../core/contracts';
 import { clamp, damp, lerp, smoothstep } from '../core/math';
 import { ROSTER } from '../data/roster';
 import type { BikeId, CharacterId, Quality, RiderId, RiderState, Side, WeaponId } from '../core/types';
@@ -22,11 +22,16 @@ import { RidePose, type RideInput } from './rig/ride';
 import { B } from './rig/skeleton';
 import { StateCues } from './rig/state-cues';
 import { instantiate, type CharacterInstance } from './species';
+import { ShaderWarmup } from './warmup';
+import { RiderLod } from './lod';
 
-export interface ViewOpts { isPlayer: boolean; quality: Quality }
+/** Race-session views (with `track`) warm their shader variants in their first frames (warmup.ts). */
+export type ViewOpts = RiderViewOpts;
 
 const tmp = new Vector3(), tmp2 = new Vector3(), mInv = new Matrix4(), FWD = new Vector3(0, 0, -1);
 const GHOST = new Color('#7fe8ff'), FLASH = new Color('#ffffff');
+/** A point far down the road at eye height (character space). */
+const AHEAD = new Vector3(0, 0.85, -12);
 
 function safeBike(id: BikeId, quality: Quality, tint: string | undefined): BikeModel {
   try {
@@ -54,12 +59,16 @@ export class RiderViewImpl implements RiderView {
   readonly fade: RiderFade;
   /** Toy rods from the pedals to the feet for short-legged species (corgi, penguin). */
   private readonly extenders: PedalExtenders | null;
+  private readonly warm: ShaderWarmup | null;
+  private readonly lod: RiderLod;
   private ghost = 0;
   /** Bike markers in character space + motion inputs of the last update (read by tests). */
   readonly input: RideInput = {
     gripL: new Vector3(), gripR: new Vector3(), pedalL: new Vector3(), pedalR: new Vector3(),
-    speed: 0, lean: 0, accel: 0, slope: 0, boost: 0, draft: 0, airborne: false, look: null, bell: null,
+    speed: 0, lean: 0, accel: 0, slope: 0, boost: 0, draft: 0, airborne: false, look: null, bell: null, carry: 0,
   };
+  /** Head carriage side target (meta.carry): toward the road centre, switching only well past it. */
+  private carrySide = 1;
   private readonly bellPos = new Vector3();
   private readonly look = new Vector3();
   private lookUntil = 0;
@@ -107,6 +116,8 @@ export class RiderViewImpl implements RiderView {
     this.offCine = app.bus.on('cine:ko', (e) => {
       this.cine = e.phase !== 'end';
     });
+    this.lod = new RiderLod(this.inst.mesh, this.inst.hull);
+    this.warm = opts.track ? new ShaderWarmup(this.root, this.inst.mesh, this.fade, this.extras, app.renderer.info) : null;
     this.crash = new CrashController({
       root: this.root, body: this.body, mesh: this.inst.mesh, bike: this.bike, bikeHome: this.bike.root.position.clone(), ps: this.ps,
       headScale: this.inst.def.meta.headScale ?? 1,
@@ -144,10 +155,14 @@ export class RiderViewImpl implements RiderView {
     this.root.visible = !state.statuses.some((s) => s.id === 'gulped' && s.time > 0); // inside the pelican's pouch
     this.updateFade(state, dtSim);
     this.stateCues.update(state, dtSim);
-    if (state.mode === 'crashed' && state.crash) {
-      this.updateCrash(state, pos, quat, dtSim);
-      return;
-    }
+    const crashed = state.mode === 'crashed' && state.crash !== null;
+    if (crashed) this.updateCrash(state, pos, quat, dtSim);
+    else this.updateRide(state, quat, dtSim);
+    if (this.app.camera) this.lod.update(this.root, this.app.camera.position, crashed);
+    this.warm?.update();
+  }
+
+  private updateRide(state: RiderState, quat: Quaternion, dtSim: number): void {
     if (this.crash.active) this.crash.stop();
     const steerTarget = clamp(state.lean * 0.45 + state.yaw * 0.7, -0.5, 0.5) * (1 - clamp(state.speed / 30, 0, 0.6));
     this.steer = damp(this.steer, steerTarget, 10, dtSim);
@@ -167,6 +182,9 @@ export class RiderViewImpl implements RiderView {
     inp.boost = state.boostTime > 0 ? 1 : 0;
     inp.slope = tmp.copy(FWD).applyQuaternion(quat).y;
     inp.look = this.chooseLook(state);
+    if (state.x > 0.8) this.carrySide = 1;
+    else if (state.x < -0.8) this.carrySide = -1;
+    inp.carry = damp(inp.carry, this.carrySide, 2.5, dtSim);
     clearCue(this.cueOut);
     this.cues.update(state, this.cueOut, dtSim);
     const sq = clamp(this.cueOut.squash, -0.35, 0.45);
@@ -174,7 +192,8 @@ export class RiderViewImpl implements RiderView {
     this.ride.update(inp, this.cueOut, dtSim);
     this.idle.update(inp.speed, inp.accel, dtSim);
     const stunned = state.statuses.some((s) => s.id === 'stun');
-    this.face.update(this.cueOut, inp.look, stunned, dtSim);
+    // A carried head (meta.carry) keeps its eyes on the road: side-eye down the bill.
+    this.face.update(this.cueOut, inp.look ?? (this.inst.def.meta.carry ? AHEAD : null), stunned, dtSim);
     this.ps.apply();
     this.inst.mesh.scale.set(1 + sq * 0.5, 1 - sq, 1 + sq * 0.5);
     this.inst.mesh.updateMatrix();
@@ -259,14 +278,15 @@ export class RiderViewImpl implements RiderView {
     return this.soloGlance();
   }
 
-  /** Riding alone: every 4–7 s a 0.5–0.8 s glance 30–40° to the side (the sea, a billboard), so the hero's beak and
-   *  pouch clear the head outline from the chase camera now and then. */
+  /** No one to look at: every 4–7 s (the hero: 2.6–3.8 s, also between looks in a pack) a 0.5–0.8 s glance 30–40° to
+   *  alternating sides (the sea, a billboard), so the hero's bill sweeps across the head outline from the chase cam. */
   private soloGlance(): Vector3 | null {
     if (this.clock >= this.soloAt) {
       const r = (this.seed * 7.31 + this.clock * 0.618) % 1;
       this.soloSide = this.soloSide === 1 ? -1 : 1;
       this.soloUntil = this.clock + 0.5 + 0.3 * r;
-      this.soloAt = this.soloUntil + 4 + 3 * ((r * 3.7) % 1);
+      const [gap, span] = this.inst.def.meta.carry ? [2.6, 1.2] : [4, 3];
+      this.soloAt = this.soloUntil + gap + span * ((r * 3.7) % 1);
     }
     if (this.clock >= this.soloUntil) return null;
     const yaw = (0.52 + 0.17 * ((this.soloAt * 0.37) % 1)) * this.soloSide;

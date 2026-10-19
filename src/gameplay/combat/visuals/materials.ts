@@ -3,10 +3,11 @@
 // one material per blend mode. warmUp() draws one sub-pixel instance of every variant on the first rendered
 // frame, so the first cast of a race doesn't compile shaders mid-race either.
 import {
-  AdditiveBlending, BufferAttribute, BufferGeometry, DoubleSide, FrontSide, LineBasicMaterial, LineSegments, Mesh,
-  MeshBasicMaterial, NormalBlending, type ColorRepresentation, type Material, type Object3D, type Side,
+  AdditiveBlending, BufferAttribute, BufferGeometry, DoubleSide, FrontSide, Mesh, MeshBasicMaterial, NormalBlending,
+  type ColorRepresentation, type Material, type Object3D, type Side,
 } from 'three';
 import { toonMesh } from '../meshes/build';
+import { makeRimMaterial, setRim, type RimMaterial } from './rim';
 
 export interface GlowOpts { additive?: boolean; side?: Side }
 
@@ -40,13 +41,10 @@ export class MaterialPool {
     return m;
   }
 
-  /** Per-visual line material (wireframes); hand it back with release(). */
-  line(color: ColorRepresentation, opacity: number): LineBasicMaterial {
-    const m = (this.free.get('line')?.pop() as LineBasicMaterial | undefined) ??
-      this.track('line', new LineBasicMaterial({ transparent: true, depthWrite: false }));
-    m.color.set(color);
-    m.opacity = opacity;
-    return m;
+  /** Per-visual rim-lit bubble material (rim.ts); hand it back with release(). */
+  rim(color: ColorRepresentation, opacity: number): RimMaterial {
+    const m = (this.free.get('rim')?.pop() as RimMaterial | undefined) ?? this.track('rim', makeRimMaterial());
+    return setRim(m, color, opacity);
   }
 
   /** Shared ribbon material: colour and alpha live in the vertices, so every ribbon can use the same one. */
@@ -78,13 +76,13 @@ export class MaterialPool {
 
   /** Add one invisible (sub-pixel, transparent) instance of each variant under `root` for the next render. */
   warmUp(root: Object3D, frame: number): void {
-    // glows: tori / discs (normals) · wireframe lines and ribbons: no normals · props: vertex colours + normals
-    const geos = [triangle(0, true), triangle(0, false), triangle(4, false), triangle(3, true)];
-    const [solid, bare, rgba, rgb] = geos as [BufferGeometry, BufferGeometry, BufferGeometry, BufferGeometry];
-    const mats: Material[] = [this.glow('#ffffff', 0), this.glow('#ffffff', 0, { side: DoubleSide }), this.line('#ffffff', 0)];
-    const [front, double, line] = mats as [MeshBasicMaterial, MeshBasicMaterial, LineBasicMaterial];
+    // glows, shield rim: tori / discs / spheres (normals) · ribbons: colours + alphas · props: vertex colours + normals
+    const geos = [triangle(0, true), triangle(4, false), triangle(3, true)];
+    const [solid, rgba, rgb] = geos as [BufferGeometry, BufferGeometry, BufferGeometry];
+    const mats: Material[] = [this.glow('#ffffff', 0), this.glow('#ffffff', 0, { side: DoubleSide }), this.rim('#ffffff', 0)];
+    const [front, double, rim] = mats as [MeshBasicMaterial, MeshBasicMaterial, RimMaterial];
     const objects: Object3D[] = [
-      new Mesh(solid, front), new Mesh(solid, double), new LineSegments(bare, line),
+      new Mesh(solid, front), new Mesh(solid, double), new Mesh(solid, rim),
       new Mesh(rgba, this.ribbon(false)), toonMesh(rgb, 0.03), toonMesh(rgb, 0.035), // drops / projectiles
     ];
     for (const o of objects) {

@@ -16,12 +16,15 @@ export async function barksCheck(args) {
     await h.eval(() => window.__br.audio.unlock());
     await h.realtime();
     await h.controls({ throttle: 1 });
-    await page.waitForFunction(() => window.__br.snapshot().phase === 'racing', null, { timeout: 30000 });
-    // Every clip decoded (they stream in two at a time after unlock).
-    await page.waitForFunction(() => {
-      const v = window.__br.app.audio.rt.voices;
-      return v.loading.size === 0 && v.clips.size >= v.byText.size;
-    }, null, { timeout: 30000 });
+    const ready = await page.waitForFunction(() => window.__br.snapshot().phase === 'racing', null, { timeout: 60000 })
+      // Every clip decoded (they stream in after unlock, a few at a time).
+      .then(() => page.waitForFunction(() => {
+        const v = window.__br.app.audio.rt.voices;
+        return v.loading.size === 0 && v.clips.size >= v.byText.size;
+      }, null, { timeout: 90000 }))
+      .then(() => true, () => false);
+    expect(ready, 'race running and every voice clip decoded');
+    if (!ready) return;
     await h.eval(() => {
       window.__cine = [];
       window.__br.app.bus.on('cine:ko', (e) => window.__cine.push({ phase: e.phase, ms: performance.now() }));
@@ -55,7 +58,7 @@ export async function barksCheck(args) {
     const reset = () => h.eval(() => {
       const a = window.__br.app.audio;
       a.cool.delete('pelicanLine');
-      a.rt.voices.barkGate = -Infinity;
+      a.rt.voices.barkUntil = -Infinity;
     });
 
     // 1. A long rival bark is cut by ann_ko at the peak: the pelican's quip still follows the cinematic.
@@ -73,7 +76,7 @@ export async function barksCheck(args) {
       return r ? { id: r.id, c: r.c } : null;
     });
     if (victim) {
-      await h.eval(() => { window.__br.app.audio.rt.voices.barkGate = -Infinity; });
+      await h.eval(() => { window.__br.app.audio.rt.voices.barkUntil = -Infinity; });
       const second = await ko(victim.id, 0);
       const groan = second.barks.find((b) => b.id.startsWith(`${victim.c}_hurt_`));
       expect(groan !== undefined && groan.after <= 1300, `repeat KO (short cinematic) → ${victim.c}'s hurt line (${show(second)})`);

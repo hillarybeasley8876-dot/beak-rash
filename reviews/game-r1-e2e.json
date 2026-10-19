@@ -1,0 +1,70 @@
+{
+ "pass": false,
+ "score": 7,
+ "summary": "Whole-game e2e round 1: 7/10, fail (5 major). Played as a first-time player on a cleared profile, with a keyboard-driving bot that sent real key events and read the race state. Path: title -> menu -> HOW TO -> settings (music 50, shake 60) -> garage (bought 儿童滑步车, re-equipped 风之翼) -> career coast T1, 1st in 2:34.42 (2 KOs) -> career city T1 with pause>restart and pause>settings>back>resume, 1st in 2:40.50 -> settings auto-pedal ON + garage 死飞 (1500) -> quick race mountain, pause>quit (coins unchanged) then again, 1st in 2:48.14 (4 KOs, 4 traffic/wall crashes) -> reload. What works: boot to title 2.8 s, 0 console errors in every session, tsc clean. Every menu works by keyboard and by mouse. Settings apply live and persist; changing quality offers a restart and reloads; slow-mo OFF is respected (clock.scale stays 1); reset-save is locked mid-race and works from the menu. Garage buy/equip works, with a 'not enough coins' toast. Pause works in intro, countdown and racing, blur auto-pauses, Enter skips the intro. Retry from results works. Rewards add up (500 + 50/KO + pickups). Career unlocks the next event on a top-3 finish. After a reload the save is byte-identical (coins 779, bests, stats, settings, 21 achievements). Music follows screen/track (race-city etc.) and pause muffles it. Mountain traffic spawns >= 95 m ahead (fair; the bot's crashes came from cutting corners into oncoming lanes). Drift releases (L2 in an R45 bend, L3 in an R30 hairpin) no longer fling the bike: yaw returns to the tangent within ~0.25 s and overshoots by 7 degrees at most. The P5 UI is commercial grade. Blocking the pass: no in-race onboarding for attacks/drift/hop; KO and SHOWTIME cinematics render victims as unreadable grey halftone or black figures; SHOWTIME hit nobody in 3 of 5 casts but still played its full cinematic; the hero pelican shows no beak or pouch from the chase camera; there is no character select, so 'different characters' was impossible. Scratch scripts and shots: shots/accept/r1-e2e/.",
+ "issues": [
+  {
+   "severity": "major",
+   "owner": "ui-hud",
+   "title": "First race never teaches attacks, drift or hop: no in-race control prompts",
+   "detail": "Fresh profile (localStorage cleared) -> title -> 巡回赛 (top item) -> 鹈鹕湾海滨公路 T1. The intro (rival cards), the countdown (3/2/1/冲！GO!) and the whole race show no control hint. The only key glyphs are U/I/O/P on the skill diamonds. J/L swing, K heavy, SHIFT drift, SPACE hop and B bell appear only on the HOW TO screen (5th menu item) and in the pause sheet. A player who follows the on-screen prompts can finish their first race of a combat racer without ever learning to attack. The countdown also never says to hold up/W, although the game then shows GOOD START! (launch boost). Confirmed in src/ui/hud/cutins/{intro,countdown}.ts (only 冲！/一/二/三/GO! strings) and over 3 played races.",
+   "fix": "Add first-race contextual key chips in the HUD, gated on app.save.data.stats.races < 2 or a per-prompt seen flag: '按住 ↑/W 起步加速' during the countdown; 'J ◀扇 · L 扇▶ · K 重击' the first time a rival is in swing reach; 'SHIFT+方向 漂移' before the first bend with R < 90 m; 'SPACE 跳' before the first jumpCrest/ramp; 'P SHOWTIME' when SP first reaches 100. Use the glyphs of app.input.lastDevice, show each prompt at most twice, bottom centre, and hide them during cut-ins/cinematics."
+  },
+  {
+   "severity": "major",
+   "owner": "fx",
+   "title": "KO / SHOWTIME cinematics: the victim is an unreadable grey halftone (or black) figure among bystanders",
+   "detail": "Across all 3 races plus a coast KO timeline probe (shots/accept/r1-e2e/sheetE-kocoast.jpg, ko-coast-1..6.jpg), the hold renders every rider, victim included, as desaturated grey/white halftone on a grey halftone road under red rays (coast r1-ko1/r1-ko2, mountain r3-ult). In the city the victim is a solid black silhouette (r2-ko1.jpg). KOs usually happen in a pack, so 3-5 grey bikes overlap: you can't tell who went down or follow the tumble. Only the right-hand portrait in the KNOCK OUT splash tells you. SHOWTIME impact frames (r1-ult, r3-ult) are a clump of speckled grey figures. Timing: clock.scale hits 0.1 at ~210 ms but rises again from ~400 ms (0.17 @520 ms, 0.33 @760 ms, 0.68 @1350 ms, 1.0 @1750 ms), so the 0.1x hold lasts ~0.2 s instead of ~1.1 s (SPEC §8) on the first KO of a race.",
+   "fix": "Keep the victim (and attacker) in full colour with their outline plus a bright rim/back light. Desaturate/halftone only the environment and uninvolved riders, and fade or cull uninvolved riders within ~4 m of the victim during the hold. For SHOWTIME, frame the 1-2 victims nearest the impact large and in colour. Hold 0.1x until ~1.1 s for the first KO (SPEC §8) and keep the short variant for repeats within 10 s."
+  },
+  {
+   "severity": "major",
+   "owner": "combat",
+   "title": "SHOWTIME usually hits nobody but still plays the full ~3.5 s cut-in and dive and spends 100 SP",
+   "detail": "The keyboard bot pressed P whenever the HUD showed 'SHOWTIME READY [P]'. In 3 races, 3 of 5 ults had ult:impact victims [] (race 1: 2nd ult at t~81 s; race 2: both, t~82 s and t~139 s). Each still ran the whole cine:ult (start -> impact ~1.9 s -> end ~3.5 s; r2-ult.jpg shows a lone pelican diving into empty red rays). Cause: the shockwave only reaches 40 m ahead / 12 m behind (gameplay/combat/skills/ult.ts ULT.ahead/behind). Once you've earned 100 SP from KOs you are usually leading by more than that, and the HUD advertises READY whatever is in range.",
+   "fix": "Add target assist: on cast, choose the nearest racing rival within ~120 m ahead / 30 m behind and make the leap travel to it (dive lands on the pack). If nobody is in that window, deny the cast with a 'NO TARGET 无目标' shake and keep the SP (ui-hud greys the P diamond from the same window check, exposed as a combat flag). Never play the full cinematic for zero victims."
+  },
+  {
+   "severity": "major",
+   "owner": "species",
+   "title": "From the chase camera the hero reads as a white blob in a red helmet: no beak, no pouch",
+   "detail": "Crops of mid-race chase-cam frames on all 3 tracks (shots/accept/r1-e2e/sheetH-crops.jpg from r1-racing.jpg, r3-final.jpg, r2a-racing.jpg) show the pelican from behind as a white body, a red helmet with a tuft and dark wing tips. The huge orange beak and pink pouch never break the silhouette; it could be any white bird. For ~95 % of play time the game's premise (a pelican on a bicycle) is invisible; the beak only appears in cut-ins and portraits. The species r2 open item is still unfixed.",
+   "fix": "Make the bill read from 4-6 m behind and ~2 m above: lengthen and drop it so the tip and pouch stick out past the helmet outline (or carry the head slightly off-centre, bill resting on the neck like a real pelican). Add a periodic glance/head-turn cue (every 3-5 s, ~0.4 s) and pouch wobble at speed. Verify with chase-cam crops on coast/city/mountain."
+  },
+  {
+   "severity": "major",
+   "owner": "ui-screens",
+   "title": "No character select: 7 fully built racers can never be played",
+   "detail": "No screen sets RaceConfig.playerCharacter: only core/game.ts sets it, defaulting to 'pelican'. So '3 races with different characters' is impossible for a player, and the roster (intro cards, portraits, signature skills) is only ever seen on rivals. Debug start as the goose (__br.start({playerCharacter:'goose'})) runs with 0 errors: U fires goose.honk, I/O show 现在不行, and at 100 SP the HUD shows 'SHOWTIME READY P' but P is denied (skill:denied reason 'state'). So rival kits are not player-ready either.",
+   "fix": "Add a 选手 step before the race (QUICK RACE and CAREER): a carousel with <id>_main portrait, epithet, signature skill blurb and stats. It sets playerCharacter and remembers the pick (core: SaveData.character). Combat: give non-pelican players a playable kit (sig on U plus shared moves, a generic ult, or no P), and make the HUD hide the P diamond when the kit has no ult. Pelican stays default/story hero. SPEC has no select screen, so core must sign off the scope."
+  },
+  {
+   "severity": "minor",
+   "owner": "combat",
+   "title": "Pressing P during a KO cinematic cuts the KO money shot to ~0.5 s",
+   "detail": "Race 1: torpedo KO cine:ko start t=78845 ms -> peak 79287 -> end 79393 (548 ms in total). The P press latched during the slow-mo fired ult:start at 79394, replacing the KO shot, and that ult then hit nobody. The KO's +20 SP often fills the meter at exactly this moment, so a player who presses P on READY cuts their own KO cinematic.",
+   "fix": "While a cine:ko is running (start..end), keep the player's ult press latched and cast it on cine:ko end, or at splash peak + 0.6 s. The HUD can pulse READY meanwhile."
+  },
+  {
+   "severity": "minor",
+   "owner": "ui-hud",
+   "title": "Player skill cut-in band covers the horizon on every cast",
+   "detail": "Every U/I/O cast slams a full-width band (eye close-up + BIG GULP / FISH TORPEDO) over roughly the top 8-33 % of the screen for ~0.6 s (r1-combat.jpg, r3-combat.jpg, r2a-racing.jpg). That hides the road's vanishing point, where oncoming traffic and the next bend appear. With 6-12 s cooldowns the bot cast 19-28 skills per race (one band every ~6-8 s), on top of the rival-skill chips stacking on the right edge.",
+   "fix": "Play the full band only for the first cast of each skill per race and for SHOWTIME. After that, use a compact chip next to the skill diamonds (bottom right, <= 20 % width). If the band stays, keep its lower edge above 20 % of the screen height."
+  },
+  {
+   "severity": "minor",
+   "owner": "ui-screens",
+   "title": "Garage: starting coins can only buy downgrades, and nothing compares stats",
+   "detail": "Fresh save (300 小鱼干): the only affordable bikes are 共享单车 (99, top 17 m/s) and 儿童滑步车 (66, top 16.5 m/s), both slower than the starter 风之翼 (20 m/s). The stat bars show only the focused bike, with no delta against the equipped one, and the buy modal is silent too. A new player's first purchase (I bought the kid bike) is a silent downgrade.",
+   "fix": "Draw +/- delta segments (green/red) against the equipped bike on every stat bar and repeat them in the buy modal. Tag joke bikes 整活/娱乐向. Optionally (content/sim) make one real sidegrade affordable from the start."
+  },
+  {
+   "severity": "minor",
+   "owner": "ui-screens",
+   "title": "Results: Space doubles as hop and confirm, so finish-line hop mashing can fire 再来一局",
+   "detail": "probe2 (shots/accept/r1-e2e/probe2.json): teleport 140 m before the finish and keep tapping Space/J/L/Space/K every ~0.25-0.4 s through the line. Results showed at 10.0 s. At 13.6 s a new race was loading: one >= 0.7 s lull armed the row (QUIET_MS 700), and the next Space confirmed the default focus 再来一局 before the grade and coins could be read. A strict 450 ms rhythm never arms (probe3), so the guard covers the regular case only.",
+   "fix": "On results, accept only Enter / pad A (not Space) as confirm for the first ~3 s, or raise QUIET_MS to ~1.2 s. Default the focus to 下一站 (career) / 主菜单 instead of RETRY so a stray press never throws the result away."
+  }
+ ]
+}

@@ -24,6 +24,8 @@ export interface ShotFraming {
   /** Vertical / horizontal focus follow rates (1/s, defaults 6 / 9); fast for a diving subject. */
   followY?: number;
   followXZ?: number;
+  /** SHOWTIME: share of the victims' centroid offset the aim pans toward (default 0.35; 0 = hero centred). */
+  pan?: number;
 }
 
 export interface ShotSpec extends ShotFraming {
@@ -35,6 +37,8 @@ export interface ShotSpec extends ShotFraming {
   frozen?(): boolean;
   /** Keep the eye inside the track's drivable bounds (moves `eye` in place). */
   confine?(eye: Vector3, focus: Vector3): void;
+  /** Push the eye out of the subject's near zone (moves `eye` in place; runs before confine). */
+  clear?(eye: Vector3): void;
   /** Radius (m) around the focus that must stay in frame (head, body, bike); the camera backs off to fit
    *  it inside FIT_NDC of the half-height, i.e. clear of the letterbox bars. */
   fit?(): number;
@@ -100,6 +104,7 @@ export function createShot(spec: ShotSpec): Shot {
     fitDist = first ? want : damp(fitDist, want, 5, dtReal);
     first = false;
     eyeAt(spec, focus, spec.ground(), t, cam.position, fitDist);
+    spec.clear?.(cam.position);
     spec.confine?.(cam.position, focus);
     // Look below the subject by `bias` of the half-height at its distance, so it rides higher in frame.
     look.copy(focus).addScaledVector(UP, (spec.lookUp ?? 0.1) - bias * cam.position.distanceTo(focus) * tanHalf);

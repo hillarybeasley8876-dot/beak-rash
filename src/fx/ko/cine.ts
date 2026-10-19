@@ -1,6 +1,6 @@
 // One KO-style cinematic window: hit-stop → slow-mo + orbit camera + comic post → peak → whoosh back.
 // Chains extend it once; `lite` (settings.slowmo = 'off') keeps only the events and a flash.
-import { Vector3, type PerspectiveCamera } from 'three';
+import { Vector3, type Object3D, type PerspectiveCamera } from 'three';
 import { clamp, smoothstep } from '../../core/math';
 import { applyLook, WINDOW_MAX, type CineKind, type Timeline } from './look';
 import { createShot, HANDBACK, type Shot, type ShotFraming } from './camera';
@@ -10,6 +10,7 @@ import type { CameraRig } from '../../core/contracts';
 import type { EventBus } from '../../core/events';
 import type { GameEvents } from '../../core/events-map';
 import type { RiderId, Vec3Like } from '../../core/types';
+import type { CastRole } from '../post/mask';
 import type { PostState } from '../state';
 
 /** What a cinematic window drives (narrow, so the fx sandbox can replay the real thing without a race). */
@@ -23,13 +24,20 @@ export interface CineHost {
   subject(id: RiderId): Anchors | undefined;
   /** Particle clock mark + fade of everything born since a mark (slow-mo debris must not litter the hand-back). */
   readonly debris?: { mark(): number; cull(from: number): void };
+  /** Fill the subject-mask cast (rider / vehicle roots by role) while the comic look is on. */
+  cast?(out: Map<Object3D, CastRole>, victims: readonly RiderId[], attackers: readonly RiderId[]): void;
 }
 
 type Confine = (eye: Vector3, focus: Vector3) => void;
 
-/** SHOWTIME: share (and cap, m) of the cluster centroid's sideways offset the aim pans toward. */
+/** Closest the eye may come to the subject's head / body / bike (actors fade a crashed rider within 1.9 m). */
+const CLEARANCE = 2.15;
+
+/** SHOWTIME: share (default, ShotFraming.pan) and cap (m) of the cluster centroid's sideways offset the aim pans toward. */
 const PAN = 0.35;
 const PAN_MAX = 2;
+/** SHOWTIME hero: its bike leaves the fitted sphere from this far (m), so the hero stays big while it tumbles. */
+const HERO_BIKE_NEAR = 1;
 
 export interface CineStart {
   kind: CineKind;
@@ -59,6 +67,8 @@ export class KoCine {
   t = 0;
   private tl!: Timeline;
   private victim: RiderId = 0;
+  /** Everyone this window knocked out (all of them keep their colours in the comic look). */
+  private victims: RiderId[] = [];
   private attacker: RiderId | null = null;
   private koStarted = false;
   private peaked = false;
@@ -78,6 +88,7 @@ export class KoCine {
   private hasPoint = false;
   private cluster: RiderId[] = [];
   private hero: RiderId | null = null;
+  private pan = PAN;
   private readonly bodies: Vector3[] = [];
   private readonly ndc = new Vector3();
   private readonly aim = new Vector3();
@@ -116,8 +127,10 @@ export class KoCine {
     this.continued = !!o.cutNow;
     if (o.point) this.point.set(o.point.x, o.point.y, o.point.z);
     this.cluster = o.cluster ?? [];
+    this.victims = this.cluster.length > 0 ? [...this.cluster] : [o.victim];
     this.hero = this.pickHero();
     this.fitRadius = 0;
+    this.pan = o.shot?.pan ?? PAN;
     this.debrisFrom = (this.host.debris?.mark() ?? 0) - 0.06;
     this.shot = o.shot && !o.lite ? this.makeShot(o.shot, o.confine) : null;
     if (o.cutNow && this.shot) rig.override(this.shot.override, HANDBACK);
@@ -144,6 +157,7 @@ export class KoCine {
   addKo(victim: RiderId, attacker: RiderId | null): boolean {
     if (!this.active || this.released) return false;
     this.chain++;
+    if (!this.victims.includes(victim)) this.victims.push(victim);
     if (!this.hasPoint && victim !== this.victim && (!this.koStarted || this.near(victim))) {
       this.victim = victim;
       this.prevY = Number.NaN;
@@ -190,6 +204,7 @@ export class KoCine {
       this.peaked = true;
       this.lastPeak = t;
       this.emitKo('peak');
+      if (!this.lite) post.flash(0.3, '#ffffff');
     }
     this.trackApex();
     this.releaseFrame = false;
@@ -203,6 +218,8 @@ export class KoCine {
     if (!this.lite) {
       applyLook(post.cine, this.kind, tl, t, this.lastPeak, this.release, handedBack, this.continued);
       this.updateFocus();
+      if (post.cine.ko > 0) this.host.cast?.(post.cine.cast, this.victims, this.attacker === null ? [] : [this.attacker]);
+      else post.cine.cast.clear();
     }
     if (this.released && t >= this.release + tl.fadeOut) {
       this.active = false;
@@ -298,8 +315,20 @@ export class KoCine {
   private makeShot(framing: ShotFraming, confine?: Confine): Shot {
     return createShot({
       ...framing, subject: () => this.subject(), ground: () => this.ground(),
-      frozen: () => this.host.clock.getScale('pause') === 0, confine, fit: () => this.fitRadius,
+      frozen: () => this.host.clock.getScale('pause') === 0, confine, fit: () => this.fitRadius, clear: (eye) => this.keepClear(eye),
     });
+  }
+
+  /** Move the eye straight out from any subject point closer than CLEARANCE. */
+  private keepClear(eye: Vector3): void {
+    const id = this.hasPoint ? this.hero : this.victim;
+    const a = id === null ? undefined : this.host.subject(id);
+    if (!a) return;
+    for (const p of [a.head, a.body, a.bike]) {
+      if (!p) continue;
+      const d = eye.distanceTo(p);
+      if (d < CLEARANCE && d > 1e-3) eye.sub(p).multiplyScalar(CLEARANCE / d).add(p);
+    }
   }
 
   /** Centre of the victim's head + body + bike sphere (fitRadius = its radius), or the SHOWTIME aim. */
@@ -322,14 +351,14 @@ export class KoCine {
       this.fitRadius = 0;
       return this.point;
     }
-    this.fitRadius = subjectSphere(hero, this.aim);
+    this.fitRadius = subjectSphere(hero, this.aim, HERO_BIKE_NEAR);
     // Pan (never dolly) toward the rest of the cluster: the centroid offset across the line of sight.
-    if (this.bodies.length > 1) {
+    if (this.bodies.length > 1 && this.pan > 0) {
       const c = this.centroid.set(0, 0, 0);
       for (const b of this.bodies) c.add(b);
       c.divideScalar(this.bodies.length).sub(this.aim).setY(0);
       const v = this.ndc.subVectors(this.aim, this.host.camera.position).setY(0).normalize();
-      c.addScaledVector(v, -c.dot(v)).multiplyScalar(PAN * smoothstep(0, 0.3, this.t)).clampLength(0, PAN_MAX);
+      c.addScaledVector(v, -c.dot(v)).multiplyScalar(this.pan * smoothstep(0, 0.3, this.t)).clampLength(0, PAN_MAX);
       this.aim.add(c);
     }
     return this.aim;

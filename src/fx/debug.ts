@@ -102,7 +102,7 @@ export function fxDebugPart(ctx: FxInternals, tester: KoTester, director: KoDire
       return timer.averages();
     },
     stats() {
-      return { scene: { ...ctx.pipeline.sceneStats }, particles: ctx.particles.alive(), cine: director.info(), post: { ...ctx.post.cine, focus: ctx.post.cine.focus.toArray() } };
+      return { scene: { ...ctx.pipeline.sceneStats }, particles: ctx.particles.alive(), cine: director.info(), post: { ...ctx.post.cine, focus: ctx.post.cine.focus.toArray(), cast: ctx.post.cine.cast.size } };
     },
   };
   let installed = false;

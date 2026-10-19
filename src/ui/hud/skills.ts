@@ -1,4 +1,4 @@
-// Skill diamonds (U/I/O with glyph, cooldown sweep, ready pop, denied shake) + the ult diamond (P)
+// Skill diamonds (U/I/O or LB/✚↑/✚↓ with glyph, cooldown sweep, ready pop, denied shake) + the ult diamond (P / R3)
 // that fills with SP, and the weapon slot (icon, name, uses).
 import './css/skills.css';
 import { approach, clamp01 } from '../../core/math';
@@ -6,8 +6,8 @@ import { SKILLS, type SkillDef } from '../../data/skills';
 import type { CharacterId, RiderState } from '../../core/types';
 import { shake, slam } from './anim';
 import { el, w, type W } from './dom';
+import { keyGlyphs, SLOT_KEYS, type HudKey } from './glyphs';
 
-const KEYS = ['U', 'I', 'O'];
 const DENY_TEXT: Record<'cooldown' | 'sp' | 'state', string> = { cooldown: '冷却中', sp: 'SP 不足', state: '现在不行' };
 
 /** Skills in the player's U/I/O slots and the ult, derived from data/skills.ts. */
@@ -27,13 +27,13 @@ class Diamond {
   protected popT = 9;
   private denyT = 9;
 
-  constructor(parent: HTMLElement, cls: string, glyph: string, key: string) {
+  constructor(parent: HTMLElement, cls: string, glyph: string, key: HudKey) {
     const d = el('div', `sk-d ${cls}`, parent);
     this.root = w(d);
     this.boxEl = el('div', 'sk-box', d);
     this.innerEl = el('div', 'sk-in', d);
     el('span', 'sk-g', this.innerEl, glyph);
-    el('span', 'sk-key', d, key);
+    keyGlyphs(el('span', 'sk-key', d), key);
     this.flash = w(el('div', 'sk-flash', d));
     this.denyW = w(el('div', 'sk-deny', d));
   }
@@ -62,7 +62,7 @@ class SkillDiamond extends Diamond {
   private full: number;
   private prev = 0;
 
-  constructor(parent: HTMLElement, readonly skill: SkillDef | null, key: string) {
+  constructor(parent: HTMLElement, readonly skill: SkillDef | null, key: HudKey) {
     super(parent, skill ? '' : 'is-empty', skill?.glyph ?? '—', key);
     this.full = Math.max(0.1, skill?.cooldown ?? 1);
     this.sweep = w(el('div', 'sk-sweep', this.boxEl));
@@ -88,8 +88,8 @@ class UltDiamond extends Diamond {
   /** Displayed fill; -1 = not drawn yet (snap to the real value on the first frame). */
   private shown = -1;
 
-  constructor(parent: HTMLElement, glyph: string, key: string) {
-    super(parent, 'ult', glyph, key);
+  constructor(parent: HTMLElement, glyph: string) {
+    super(parent, 'ult', glyph, 'ult');
     this.fillW = w(el('div', 'sk-ultfill', this.boxEl));
   }
 
@@ -114,9 +114,9 @@ export class SkillRow {
   constructor(parent: HTMLElement, character: CharacterId) {
     this.root = el('div', 'sk', parent);
     const kit = playerKit(character);
-    kit.slots.forEach((s, i) => this.diamonds.push(new SkillDiamond(this.root, s, KEYS[i] ?? '')));
+    kit.slots.forEach((s, i) => this.diamonds.push(new SkillDiamond(this.root, s, SLOT_KEYS[i] ?? 'skill1')));
     if (kit.ult) {
-      this.ult = new UltDiamond(this.root, kit.ult.glyph, 'P');
+      this.ult = new UltDiamond(this.root, kit.ult.glyph);
       this.ultCost = kit.ult.spCost > 0 ? kit.ult.spCost : 100;
     }
   }

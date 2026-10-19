@@ -20,7 +20,7 @@
 .br-tc::after { content: ''; position: absolute; inset: 0; background: var(--ink); clip-path: var(--clip); z-index: -2; transform: translate(14px, 14px); transition: background 0.12s, transform 0.16s var(--ease-out); }
 .br-tc.is-focus { transform: skewX(-6deg) translateY(-26px) scale(1.06); z-index: 2; }
 /* Unselected cards keep their white body; only the art dims. */
-.br-tc:not(.is-focus) .br-still-img { filter: brightness(0.55) saturate(0.7); }
+.br-tc:not(.is-focus) .br-still-img { filter: var(--still-fx) brightness(0.55) saturate(0.7); }
 .br-tc:not(.is-focus) .br-tc-num { -webkit-text-stroke-color: #2a2a32; color: #d6d6dc; }
 .br-tc.is-focus::after { background: var(--red); transform: translate(20px, 22px); }
 .br-tc-art { position: absolute; left: 14px; right: 14px; top: 14px; height: 320px; clip-path: var(--clip); background: var(--ink); overflow: hidden; }

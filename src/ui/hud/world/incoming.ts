@@ -47,6 +47,11 @@ export class IncomingWarning {
     this.shots.push({ id: e.id, owner: e.owner, skill: e.kind, s: at.s, x: at.x, speed: (owner?.speed ?? 0) + LAUNCH_BONUS, at: session.time });
   }
 
+  /** The chip is on screen (the bottom-centre prompt chip waits meanwhile). */
+  get up(): boolean {
+    return this.vis > 0.01;
+  }
+
   end(id: number): void {
     this.shots = this.shots.filter((s) => s.id !== id);
   }

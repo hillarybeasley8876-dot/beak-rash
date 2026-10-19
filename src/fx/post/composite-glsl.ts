@@ -1,6 +1,7 @@
 // The composite "uber" pass: HDR scene + bloom → speed/zoom blur, chroma, grade, KO comic look,
 // speed lines, damage pulse, impact frame, flash, vignette, letterbox → sRGB screen.
 // Defines: FX_BLUR (radial blur + chroma taps), FX_TAPS, FX_BLOOM, FX_TONEMAP (0 shoulder, 1 ACES).
+import { CAST_GLSL, CAST_VERT_GLSL } from './composite-cast';
 import { GLSL_COMMON } from './glsl-common';
 
 // Shared by both stages: tone map + grade, and linear view depth.
@@ -65,10 +66,12 @@ varying float vKoMid;
 varying float vKoRed;
 ${GLSL_COMMON}
 ${GRADE}
+${CAST_VERT_GLSL}
 void main() {
   vUv = uv;
   vKoMid = 0.45;
   vKoRed = 1.0;
+  vVicGain = uKo > 0.001 && uMask > 0.5 ? fxVictimGain(uFocus) : 1.0;
   if (uKo > 0.001) {
     float sum = 0.0;
     float red = 0.0;
@@ -193,9 +196,9 @@ vec3 fxKoLook(vec3 col, float bg, float behind, float ground) {
   float mid = smoothstep(0.12, 0.34, g) * (1.0 - smoothstep(0.62, 0.8, g));
   float dots = fxHalftone(gl_FragCoord.xy, g) * mid * (1.0 - redness);
   koc = mix(koc, FX_INK, dots * uHalftone * 0.75);
-  // The road in front is a screen-tone floor (paper + luma-sized dots, never solid ink or paper),
-  // so wet reflections and shadows never turn into hard stripes.
-  vec3 floorTone = mix(FX_PAPER, FX_INK, fxHalftone(gl_FragCoord.xy, 0.3 + 0.55 * g) * 0.85);
+  // The road in front is a dark screen-tone floor (ink-red with luma-sized red dots, never flat), so wet
+  // reflections never turn into hard stripes and the subject's paper rim reads against it.
+  vec3 floorTone = mix(mix(FX_INK, FX_RED_DEEP, 0.22), FX_RED_DEEP, fxHalftone(gl_FragCoord.xy, 0.85 - 0.5 * g) * 0.8);
   return mix(koc, floorTone, ground * (1.0 - max(bg, behind)) * (1.0 - redness));
 }
 
@@ -271,6 +274,7 @@ void main() {
 #endif
   vec3 col = fxGrade(hdr);
   float vr = length((uv - 0.5) * vec2(1.0, 0.9));
+  float victimPx = 0.0;
   if (uKo > 0.001) {
     float depth = fxViewDepth(uv);
     float bg = fxBgMaskD(depth);
@@ -278,13 +282,22 @@ void main() {
     // (wet reflections) past +0.4 m.
     float ground = fxGround(uv, depth);
     float behind = max(smoothstep(uSubjectDepth + uBehindAt, uSubjectDepth + uBehindAt + 1.5, depth), ground * smoothstep(uSubjectDepth + 0.4, uSubjectDepth + 1.2, depth));
-    col = mix(col, fxKoLook(col, bg, behind, ground), uKo);
+    vec3 koc = fxKoLook(col, bg, behind, ground);
+    vec3 burst = fxBurst(uv, asp);
     if (uBgBurst > 0.001) {
-      col = mix(col, fxBurst(uv, asp), bg * uBgBurst);
-      if (uRim > 0.001) col = mix(col, FX_PAPER, fxRim(uv, depth, bg) * uRim);
+      koc = mix(koc, burst, bg * uBgBurst);
+      if (uRim > 0.001 && uMask < 0.5) koc = mix(koc, FX_PAPER, fxRim(uv, depth, bg) * uRim);
     }
+    // With the subject mask: victim in colour inside a sticker border, attacker muted, bystanders ghosted.
+    if (uMask > 0.5) {
+      float role = fxCastRole(uv, depth);
+      victimPx = step(0.83, role) * uKo;
+      koc = fxCastLook(koc, col, uv, role, burst);
+    }
+    col = mix(col, koc, uKo);
   }
-  if (uRed > 0.001) col = mix(col, FX_RED, smoothstep(0.3, 0.78, vr) * uRed);
+  // WRECKED red edges stay off the victim (the pelican keeps its own colours).
+  if (uRed > 0.001) col = mix(col, FX_RED, smoothstep(0.3, 0.78, vr) * uRed * (1.0 - victimPx));
   col = mix(col, uLinesColor, fxSpeedLines(uv, uBlurCenter, uLines, 0.0, 1.0) * 0.5);
   col = mix(col, FX_INK, fxSpeedLines(uv, uFocus, uKoLines, 17.0, 0.0) * 0.92);
   if (uDamage > 0.001) col = fxDamage(col, uv, vr, asp);
@@ -297,4 +310,4 @@ void main() {
 }
 `;
 
-export const COMPOSITE_FRAG = HEADER + SHAPES + MAIN + FINISH;
+export const COMPOSITE_FRAG = HEADER + SHAPES + MAIN + CAST_GLSL + FINISH;

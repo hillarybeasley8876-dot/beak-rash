@@ -8,10 +8,10 @@ import { driveCurve } from '../dsp/curves';
 import { anchor, filter, holdAt, settle, steer } from '../dsp/env';
 import { noise } from '../dsp/noise';
 import { FilterSwitch } from '../dsp/switch';
-import { SampledBrass } from './instruments/brass-sampler';
+import { Brass } from './instruments/brass';
 import { DrumKit } from './instruments/drums';
-import { SlapBass } from './instruments/bass';
-import { Clav } from './instruments/keys';
+import { SampledBass } from './instruments/bass-sampler';
+import { SampledClav } from './instruments/clav-sampler';
 import { SampledPad } from './instruments/pad-sampler';
 import { SampledKeys } from './instruments/keys-sampler';
 import { Lead } from './instruments/lead';
@@ -21,18 +21,18 @@ import type { Channel, LeadVoice } from './types';
 
 // Melody on top: lead hooks ≈ −5 LU under the full mix, bass ≈ −8, drums ≈ −4 (audio-check stems).
 const DEFAULT_MIX: Record<Channel, number> = {
-  drums: 0.8, bass: 0.6, keys: 0.8, clav: 2.4, brass: 0.84, lead: 0.45, pad: 0.45, fx: 0.6,
+  drums: 0.8, bass: 0.6, keys: 0.8, clav: 2.4, brass: 1.05, lead: 0.45, pad: 0.45, fx: 0.6,
 };
 // Send levels come in a few shared values: channels with the same level feed one send gain.
-const VERB: Record<Channel, number> = { drums: 0.15, bass: 0, keys: 0.29, clav: 0.15, brass: 0.29, lead: 0.5, pad: 0.4, fx: 0.29 };
+const VERB: Record<Channel, number> = { drums: 0.15, bass: 0, keys: 0.29, clav: 0.15, brass: 0.29, lead: 0.38, pad: 0.4, fx: 0.29 };
 const DELAY: Record<Channel, number> = { drums: 0, bass: 0, keys: 0.09, clav: 0.09, brass: 0.09, lead: 0.22, pad: 0, fx: 0.09 };
 const DUCKED = new Set<Channel>(['bass', 'keys', 'pad', 'clav']);
 /** Comping parts and horns step back (−7.5 dB) while the lead plays, so the hook sits on top. */
 const UNDER_LEAD = new Set<Channel>(['keys', 'pad', 'clav', 'brass']);
 const UNDER_LEAD_GAIN = 0.42;
-/** Stereo image: brass and pad bake their spread into their pre-mixed chords, the keys auto-pan,
- *  the clav sits left, the drums are stereo samples, the reverb is decorrelated (the lead sends more). */
-const PAN: Partial<Record<Channel, number>> = { clav: -0.5 };
+/** Stereo image: the pad bakes its spread into its pre-mixed chords, the keys auto-pan, the horns
+ *  sit right and the clav left, the drums are stereo samples, the reverb is decorrelated. */
+const PAN: Partial<Record<Channel, number>> = { clav: -0.55, brass: 0.4 };
 /** Breakdown: bars 1–4 this far down (dB) behind a low-pass at BREAK_LP; the build climbs to BUILD_TOP dB. */
 const BREAK_DB = -6;
 const BUILD_TOP_DB = 2;
@@ -60,10 +60,10 @@ export class Band {
   private gates: Gate[] = [];
   private noiseSrc: AudioBufferSourceNode | null = null;
   private kit: DrumKit | null = null;
-  private slap: SlapBass | null = null;
+  private slap: SampledBass | null = null;
   private ep: SampledKeys | null = null;
-  private clavi: Clav | null = null;
-  private horns: SampledBrass | null = null;
+  private clavi: SampledClav | null = null;
+  private horns: Brass | null = null;
   private strings: SampledPad | null = null;
   private leads = new Map<string, Lead>();
   private lfos = new Map<number, OscillatorNode>();
@@ -170,20 +170,20 @@ export class Band {
     return (this.kit ??= new DrumKit(this));
   }
 
-  get bass(): SlapBass {
-    return (this.slap ??= new SlapBass(this));
+  get bass(): SampledBass {
+    return (this.slap ??= new SampledBass(this));
   }
 
   get keys(): SampledKeys {
     return (this.ep ??= new SampledKeys(this));
   }
 
-  get clav(): Clav {
-    return (this.clavi ??= new Clav(this));
+  get clav(): SampledClav {
+    return (this.clavi ??= new SampledClav(this));
   }
 
-  get brass(): SampledBrass {
-    return (this.horns ??= new SampledBrass(this));
+  get brass(): Brass {
+    return (this.horns ??= new Brass(this));
   }
 
   get pad(): SampledPad {

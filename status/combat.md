@@ -5,7 +5,8 @@
 - statuses.ts (status → mods) · feedback.ts (hit-stop/shake/rumble by player involvement) · damage.ts (one hit path)
 - melee.ts · armory.ts (loadouts/uses/steal/drop/break) · ko.ts · sp.ts · bell.ts · debug.ts (`__br.combat`)
 - pickups/{items,render,pickups}.ts · meshes/{build,catalog,library,pickup-props,weapon-props}.ts · projectiles/projectiles.ts
-- skills/{types,common,runner,registry}.ts + one file per skill (13) · visuals/{visuals,frame,ribbon,trail,waves,auras,bolts}.ts
+- skills/{types,common,runner,registry,swallow,ult-aim}.ts + one file per skill (13) · visuals/{visuals,frame,follower,ribbon,trail,
+  waves,auras,shield,rim,bolts,tell,materials}.ts
 - data/weapons.ts (+weight, block, ARMORY) · data/skills.ts (unchanged) · tools/combat-check.mjs + tools/combat-check/*.mjs
   · tools/combat-shots.mjs
 
@@ -40,8 +41,10 @@
 - combat:ko exactly once per wreck: hp ≤ 0 (cause 'ko') OR any crash within 3 s of a hit/debuff (cause = crash
   cause, e.g. knocked into traffic/wall); attacker null when nobody is credited.
 - skill:cast slot 1–3 (rivals' signature = slot 1); the ult emits ult:start (no skill:cast) and later ult:impact;
-  every skill (ult included) ends with skill:end. skill:denied slot 4 = ult; presses blocked only by a swing or
-  hit stagger are buffered 0.3 s and denied only if that expires. Boost skills emit rider:boost{kind:'skill'}.
+  every skill (ult included) ends with skill:end. skill:denied slot 4 = ult; presses blocked by a swing or hit
+  stagger are buffered 0.32 s, by another skill whose lock ends within 0.6 s (or the ult in a hop) 0.6 s, and denied
+  only if that expires; the player's ult press waits out a running KO cinematic (cine:ko start..end). SHOWTIME with
+  nobody to hit → skill:denied 'state' + a 无目标！ taunt (player quip). Boost skills emit rider:boost{kind:'skill'}.
 - combat:bell {riderId,pos,angered} on every ring (+ a 'taunt' 叮叮叮！ bubble); +5 SP only if angered ≠ [].
 - combat:weaponBreak before the breaker goes bare-winged; projectile:spawn / exactly one projectile:end per
   projectile (hit = victim id, or null for poof / swallowed / disposed).
@@ -72,6 +75,10 @@
 - Optional stacked boost API in sim (combat now keeps skill boosts in mods.speedMul to avoid merging durations).
 
 ## Requests to other units
+- ui-hud + core (acceptance r1, A2): grey the P diamond / "SHOWTIME READY" when SHOWTIME has no target. Needs a shared
+  flag, e.g. core `RiderState.ultTarget: boolean` (combat would write it every preStep from planUlt) or a
+  `CombatSystem.ultReady?(id)` query; optionally a 'target' skill:denied reason so the diamond says 无目标 instead of
+  现在不行 (combat already shouts 无目标！ through the player's quip line on such a denial).
 - species (owns src/actors/** now): hide 'gulped' riders completely. actors/view.ts visibleFor() flickers them 1/7
   frames like 'invisible' (combat maps gulped → mods.invisible and parks them grounded 0.4 m behind the pelican);
   return false while `state.statuses` has a live 'gulped' entry. (Both critics, r1 + r2.)
@@ -84,7 +91,7 @@
 - track: (done, track.md) a crate or can row about every 400 m on coast; rows inside halfWidth − 1 m.
 
 ## How to test
-- `node tools/combat-check.mjs` (54 scenarios + error gate, isolated; finish group restarts races) · `--full` (all real
+- `node tools/combat-check.mjs` (60 scenarios + error gate, isolated; finish group restarts races) · `--full` (all real
   units) · `--stub fx,audio,ui,actors,camera` if another unit is broken · `--only torpedo`
 - `node tools/combat-shots.mjs --stub audio [--only gallery]` → shots/combat/fx-*.png (props gallery, every skill)
 - In game: `/?race=coast&seed=3&traffic=0` — J/L/K swing, U/I/O skills, P ult (needs 100 SP), B bell.
@@ -141,3 +148,33 @@ Plan (critic issues r2 → fix; [x] = done + verified in the browser). Resume: s
   Real-time perf copy (shots/combat/r2fix/perf.json) ran at load average 21 (other agents' browsers): 0 errors,
   47 combat draw calls / 40k tris at the skill-heavy A/B, the 9-first-casts frame 8.3 ms combat (critic: 10.8);
   fps/hitch numbers are machine-load noise there, not comparable with the critic's run.
+
+## Acceptance round 1
+Issues owned by combat in reviews/game-r1-*.json (no "## Acceptance round 1" existed: fresh start). [x] = done + verified.
+- [x] A1 (major, aesthetic #1) Doge shield → visuals/shield.ts ShieldBubble: smooth unit sphere ('aura:shell' =
+  SphereGeometry 48×32, radius 1 m, centre 0.95 m up) with visuals/rim.ts RimMaterial (fresnel: clear centre, one hard
+  gold rim band, thin white edge, screen-space halftone ramp, a ripple ring from the hit direction) + 3 twinkling
+  star glints; opacity × smoothstep(2.5, 5, camera distance) (hidden < 2.5 m). Wireframe + MaterialPool.line() gone;
+  pool has rim() (warmed up with the other variants). Doge listens to the blocked half of a reflect (combat:hit,
+  victim = shiba, blocked) → bubble.bounce(dir): ripple + glint flare. Follower base moved to visuals/follower.ts.
+  Looked: shots/combat/acc1/doge-sheet.jpg (3.3 m: faint; 6.7 m: clear gold rim, rider visible; 10/17 m; bounce).
+- [x] A2 (major, e2e #2) SHOWTIME hits nobody → skills/ult-aim.ts planUlt(): rivals 120 m ahead … 30 m behind, each
+  scored by how many rivals its impact spot would catch (predicted at impact, 40 m ahead / 12 m behind, not past the
+  line); the natural landing wins ties, else the leap homes (homeStep, closed loop, ease-out) onto the best anchor and
+  lands 2.5 m behind it in a clear lane. No plan → skill:denied 'state' + 无目标！ quip (SkillImpl.noTarget, ≤ 1 per
+  1.5 s), SP kept. clearLane moved ghost.ts → common.ts. Checks acc1 ×3 pass (lone rival 90 m ahead: lands 2.4 m
+  behind it after 98 m; pack 70–90 m: all 3 hit; rival 25 m behind: hit; near-line rival that will have finished:
+  denied). Looked (real units): shots/combat/acc1/ult-sheet.jpg (cut-in → leap streaks 98 m onto the goose + cat,
+  both hit) and hand-sheet.jpg (camera back on the chase 4.5 m behind, no pop). HUD greying needs a core flag (below).
+- [x] A3 (minor, e2e #5) runner listens to cine:ko: the player's ult press is 'held' (buffered, never ages) from start to
+  end (cap ULT_KO_LATCH 3 s real if no end arrives), then casts. Check acc1 'SHOWTIME pressed during a KO cinematic…';
+  with real fx: KO cine start 9.62 → peak 10.07 → end 11.07 s (full length), ult:start 11.08 s.
+- [x] A4 (minor, feel #8) ActiveSkill.lockLeft(): a press while another skill is exclusive is buffered ('busy', hold
+  SKILL_QUEUE 0.6 s) when that lock ends within 0.6 s, else denied at once; also the combat-r3 minor: an ult press
+  in a hop/crest is buffered (0.6 s) and fires on landing. Checks acc1 'a skill pressed late…' (wing 0.67 s into
+  gulp casts at 1.20 s; 0.3 s in → denied at once) and 'SHOWTIME pressed in a hop…'.
+- Verified (10-19): tsc clean; combat-check 61/61 isolated and 61/61 --full (shots/combat/acc1/check-iso.txt,
+  check-full.txt; 6 new scenarios in tools/combat-check/acc1.mjs); combat-shots +doge-bounce, +ult-homing
+  (shots/combat/acc1/shots-sheet.jpg); autopilot soak 40 s, all real units: 12 casts, 21 hits, 6 KOs, 2 ults hitting
+  7 and 6 riders, 0 denials, 0 errors. Note: core added RiderMods.pushImmune but sim doesn't read it yet, so
+  skills/wing.ts keeps its contact mirror (core request stays open for sim).

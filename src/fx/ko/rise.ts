@@ -8,12 +8,13 @@ import type { FxContext } from '../context';
 
 export type SlowmoMode = 'full' | 'short' | 'off';
 
-/** Real-time beats per settings.slowmo: deep slow-mo while the leap still climbs (the end of it shows once
- *  the ~1 s cut-in is gone), then the hang and the dive at full speed. 'short' only eases the leap. */
-const BEATS: Record<SlowmoMode, { scale: number; resumeAt: number }> = {
-  full: { scale: 0.28, resumeAt: 1.35 },
-  short: { scale: 0.75, resumeAt: 0 },
-  off: { scale: 1, resumeAt: 0 },
+/** Beats per settings.slowmo: deep slow-mo while the leap climbs under the ~1 s cut-in (real seconds), then
+ *  the near-static top of the leap rushes by at `rush` until `rushSim` sim seconds into the skill (combat:
+ *  rise 0.5 + hang 0.18, dive from 0.68), and the dive plays at full speed. 'short' only eases the leap. */
+const BEATS: Record<SlowmoMode, { scale: number; resumeAt: number; rush: number; rushSim: number }> = {
+  full: { scale: 0.28, resumeAt: 1.0, rush: 1.6, rushSim: 0.6 },
+  short: { scale: 0.75, resumeAt: 0, rush: 1, rushSim: 0 },
+  off: { scale: 1, resumeAt: 0, rush: 1, rushSim: 0 },
 };
 const TIMEOUT = 3.2;
 
@@ -24,6 +25,8 @@ export class UltRise {
   private shot: Shot | null = null;
   private end: number | null = null;
   private resumed = false;
+  private rushing = false;
+  private simAt = 0;
   private mode: SlowmoMode = 'full';
   private readonly aim = new Vector3();
   private readonly ndc = new Vector3();
@@ -39,7 +42,7 @@ export class UltRise {
     const { app, tracker } = this.ctx;
     const session = this.ctx.session();
     const beats = BEATS[mode];
-    Object.assign(this, { active: true, t: 0, rider, end: null, resumed: beats.resumeAt <= 0, mode });
+    Object.assign(this, { active: true, t: 0, rider, end: null, resumed: beats.resumeAt <= 0, rushing: false, mode, simAt: app.clock.simTime });
     if (beats.scale < 1) app.clock.setScale('ult', beats.scale, 0.12);
     const r = session?.rider(rider);
     const tan = r && session ? session.track.frameAt(r.s).tangent : { x: 0, y: 0, z: -1 };
@@ -49,7 +52,7 @@ export class UltRise {
       ground: () => tracker.get(rider)?.ground ?? 0,
       heading: new Vector3(tan.x, 0, tan.z).normalize(),
       azimuth: 20 * DEG, orbit: 34 * DEG, dist: [6.2, 4.3], height: [0.5, 0.75], fov: [58, 50],
-      delay: mode === 'full' ? 0.8 : 0.3, duration: 0.8, lookUp: 0.15,
+      delay: mode === 'full' ? 0.6 : 0.3, duration: 0.6, lookUp: 0.15,
       heightFollow: 0.72, followY: 500, followXZ: 500, frozen: () => app.clock.getScale('pause') === 0,
     });
     if (this.shot) app.rig.override(this.shot.override, HANDBACK);
@@ -59,9 +62,16 @@ export class UltRise {
   update(dtReal: number): boolean {
     if (!this.active) return false;
     this.t += dtReal;
-    if (!this.resumed && this.t >= BEATS[this.mode].resumeAt) {
+    const beats = BEATS[this.mode];
+    const clock = this.ctx.app.clock;
+    if (!this.resumed && this.t >= beats.resumeAt) {
       this.resumed = true;
-      this.ctx.app.clock.setScale('ult', 1, 0.12);
+      this.rushing = beats.rush > 1 && this.end === null;
+      clock.setScale('ult', this.rushing ? beats.rush : 1, 0.08);
+    }
+    if (this.rushing && clock.simTime - this.simAt >= beats.rushSim) {
+      this.rushing = false;
+      clock.setScale('ult', 1, 0.05);
     }
     if (this.end === null && this.t >= TIMEOUT) this.stop();
     if (this.mode !== 'off') {
@@ -88,6 +98,7 @@ export class UltRise {
   stop(): void {
     if (!this.active || this.end !== null) return;
     this.end = this.t;
+    this.rushing = false;
     this.ctx.app.clock.setScale('ult', 1, 0.15);
     this.shot?.stop();
     this.ctx.app.bus.emit('cine:ult', { phase: 'end', riderId: this.rider });

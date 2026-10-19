@@ -21,37 +21,40 @@
 .ci-cd.go .cd-num { color: var(--red); -webkit-text-stroke-color: var(--ink); font-size: 380px; top: 170px; }
 .ci-cd.go .cd-cn { font: 400 110px/1 "Ma Shan Zheng", serif; background: var(--ink); color: var(--paper); padding: 6px 26px 0; box-shadow: 10px 10px 0 0 var(--red); }
 
-/* Player skill band: diagonal strip across the upper third with an eyes close-up. */
+/* Player skill band (first cast of each skill per race): a strip across the top of the screen, tilted −2°
+   (countdown.ts) and kept clear of the road: its lowest point (left edge, red/white stripes included) sits at
+   y ≈ 180 (17 % of 1080), ≈ 157 over the centre third. Content stays in the part of the strip that is on screen.
+   The band hangs from the top of the screen, not of the centred stage (taller-than-16:9 screens, e.g. 16:10). */
+.ci-band { top: calc((1080px - 100vh / var(--k)) / 2); }
 .bd-strip {
-  left: -400px; top: 210px; width: 2720px; height: 230px; background: var(--ink); transform-origin: 50% 50%;
-  box-shadow: 0 -14px 0 0 var(--red), 0 14px 0 0 var(--red), 0 -22px 0 0 var(--paper), 0 22px 0 0 var(--paper);
+  left: -200px; top: -10px; width: 2320px; height: 140px; background: var(--ink); transform-origin: 50% 50%;
+  box-shadow: 0 -10px 0 0 var(--red), 0 10px 0 0 var(--red), 0 -16px 0 0 var(--paper), 0 16px 0 0 var(--paper);
   overflow: hidden;
 }
 .bd-lines {
   position: absolute; inset: 0;
   background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.13) 0 3px, transparent 3px 46px, rgba(255, 255, 255, 0.07) 46px 120px, transparent 120px 170px);
 }
-.bd-eyes { position: absolute; left: 620px; top: 22px; width: 900px; height: 186px; clip-path: polygon(6% 0, 100% 0, 94% 100%, 0 100%); }
+.bd-eyes { position: absolute; left: 350px; top: 16px; width: 640px; height: 112px; clip-path: polygon(5% 0, 100% 0, 95% 100%, 0 100%); }
 .bd-eyes .eyes { position: absolute; inset: 0; }
-.bd-txt { position: absolute; left: 1500px; top: 26px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
-.bd-en { font: 400 112px/0.95 "Anton", sans-serif; color: var(--paper); letter-spacing: 1px; white-space: nowrap; -webkit-text-stroke: 4px var(--ink); paint-order: stroke fill; }
+.bd-txt { position: absolute; left: 1030px; top: 28px; display: flex; align-items: center; gap: 18px; transform-origin: 30% 50%; }
+.bd-en { font: 400 88px/0.95 "Anton", sans-serif; color: var(--paper); letter-spacing: 1px; white-space: nowrap; -webkit-text-stroke: 4px var(--ink); paint-order: stroke fill; }
 .bd-cn {
-  padding: 6px 16px 2px; background: var(--red); color: var(--paper); font: 400 50px/1 "ZCOOL QingKe HuangYou", sans-serif;
-  box-shadow: 0 0 0 4px var(--paper), 8px 8px 0 4px var(--ink);
+  padding: 6px 14px 2px; background: var(--red); color: var(--paper); font: 400 40px/1 "ZCOOL QingKe HuangYou", sans-serif; white-space: nowrap;
+  box-shadow: 0 0 0 4px var(--paper), 7px 7px 0 4px var(--ink);
 }
-.bd-key { position: absolute; left: 470px; top: 64px; font: 400 90px/1 "Anton", sans-serif; color: var(--red); -webkit-text-stroke: 3px var(--paper); paint-order: stroke fill; }
+.bd-key { position: absolute; left: 250px; top: 36px; font: 400 64px/1 "Anton", sans-serif; color: var(--red); -webkit-text-stroke: 3px var(--paper); paint-order: stroke fill; }
 
-/* Projectile skills: a slim corner band (upper left, ends before the centre) so the shot and its target
-   stay in view while it flies. Strip spans x -360…1200 at y ~270–390 (1080p stage). */
+/* Projectile skills (FISH TORPEDO): an even slimmer strip while the shot flies. */
 .ci-band.is-thin .bd-strip {
-  left: -360px; top: 268px; width: 1560px; height: 124px;
-  box-shadow: 0 -8px 0 0 var(--red), 0 8px 0 0 var(--red), 0 -13px 0 0 var(--paper), 0 13px 0 0 var(--paper);
+  height: 100px;
+  box-shadow: 0 -7px 0 0 var(--red), 0 7px 0 0 var(--red), 0 -12px 0 0 var(--paper), 0 12px 0 0 var(--paper);
 }
-.ci-band.is-thin .bd-key { left: 396px; top: 24px; font-size: 64px; }
-.ci-band.is-thin .bd-eyes { left: 470px; top: 12px; width: 470px; height: 100px; }
-.ci-band.is-thin .bd-txt { left: 960px; top: 10px; gap: 4px; }
+.ci-band.is-thin .bd-key { top: 24px; font-size: 50px; }
+.ci-band.is-thin .bd-eyes { top: 14px; width: 440px; height: 76px; }
+.ci-band.is-thin .bd-txt { left: 830px; top: 20px; gap: 12px; }
 .ci-band.is-thin .bd-en { font-size: 62px; -webkit-text-stroke-width: 3px; }
-.ci-band.is-thin .bd-cn { padding: 4px 10px 1px; font-size: 28px; box-shadow: 0 0 0 3px var(--paper), 5px 5px 0 3px var(--ink); }
+.ci-band.is-thin .bd-cn { padding: 4px 10px 1px; font-size: 30px; box-shadow: 0 0 0 3px var(--paper), 5px 5px 0 3px var(--ink); }
 
 /* Rival skill chips (top-right, under the counters). Positioned in viewport px by the chips module. */
 .chips { position: absolute; right: calc(var(--k) * 34px); top: calc(var(--k) * 150px); width: 0; height: 0; }

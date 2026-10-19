@@ -1,11 +1,12 @@
-// garage: bike shop. Live 3D turntable, bike list with price / owned / equipped, stat bars, meme blurb,
-// 小鱼干 balance. Enter buys (with confirm) or equips; saves to app.save. Esc → menu.
+// garage: bike shop. Live 3D turntable, bike list with price / owned / equipped (+ 整活 tag on joke bikes),
+// stat bars with ± deltas against the equipped bike (repeated in the buy modal), meme blurb, 小鱼干 balance.
+// Enter buys (with confirm) or equips; saves to app.save. Esc → menu.
 import './garage.css';
 import type { BikeId } from '../../core/types';
 import { ART } from '../../data/assets';
 import { BIKES, BIKE_ORDER } from '../../data/bikes';
 import { Nav } from '../nav';
-import { HINT_BACK, HINT_NAV, HINT_OK, artImage, backdrop, coinBadge, h, jagged, keyGlyph, ransom, riderIconSvg, statBar, svg } from '../p5';
+import { HINT_BACK, HINT_NAV, HINT_OK, artImage, artReady, backdrop, coinBadge, h, jagged, keyGlyph, ransom, riderIconSvg, statBar, svg } from '../p5';
 import { frame, type ScreenFactory } from '../screen';
 import { Turntable } from './garage-turntable';
 import { recall, remember } from './memory';
@@ -13,6 +14,17 @@ import { recall, remember } from './memory';
 const STATS: Array<[keyof typeof BIKES.roadbike.bars, string]> = [
   ['speed', '速度'], ['accel', '加速'], ['handling', '操控'], ['weight', '重量'], ['durability', '耐久'],
 ];
+/** Speed bar at or below this = a fun bike, not an upgrade (tagged 整活 in the list and the buy modal). */
+const JOKE_SPEED = 2;
+const isJoke = (id: BikeId): boolean => BIKES[id].bars.speed <= JOKE_SPEED;
+
+/** "对比 风之翼：速度 −3、操控 +2。" for the buy modal (only the stats that change). */
+function deltaLine(id: BikeId, current: BikeId): string {
+  const a = BIKES[id].bars;
+  const b = BIKES[current].bars;
+  const parts = STATS.filter(([k]) => a[k] !== b[k]).map(([k, label]) => `${label} ${a[k] > b[k] ? '+' : '−'}${Math.abs(a[k] - b[k])}`);
+  return parts.length ? `对比${BIKES[current].name}：${parts.join('、')}。` : '';
+}
 
 export const garageScreen: ScreenFactory = (ctx) => {
   const { save } = ctx.app;
@@ -38,7 +50,8 @@ export const garageScreen: ScreenFactory = (ctx) => {
   f.stage.append(nameBox, blurb, list, stats, action, coins.el);
 
   const rows = BIKE_ORDER.map((id, i) => {
-    const row = h('div', { class: 'br-gar-row', vars: { '--i': i } }, h('b', { text: BIKES[id].name }), h('span', { class: 'br-gar-tag' }));
+    const row = h('div', { class: 'br-gar-row', vars: { '--i': i } }, h('b', { text: BIKES[id].name }),
+      isJoke(id) ? h('i', { class: 'br-gar-joke', text: '整活' }) : null, h('span', { class: 'br-gar-tag' }));
     list.append(row);
     return row;
   });
@@ -57,7 +70,11 @@ export const garageScreen: ScreenFactory = (ctx) => {
     table.show(id);
     nameBox.replaceChildren(ransom(b.name, { seed: `bike-${id}`, fonts: 'block', first: 'wb', className: 'br-gar-rn' }));
     blurb.textContent = b.blurb;
-    stats.replaceChildren(...STATS.map(([k, label]) => statBar(label, b.bars[k])));
+    const cur = save.data.bike;
+    const ref = id === cur ? null : BIKES[cur].bars;
+    stats.replaceChildren(
+      h('span', { class: 'br-gar-vs', text: ref ? `对比当前：${BIKES[cur].name}` : '当前座驾' }),
+      ...STATS.map(([k, label]) => statBar(label, b.bars[k], 5, ref?.[k])));
     const st = state(id);
     const afford = save.data.coins >= b.price;
     action.className = `br-gar-action is-${st}${st === 'shop' && !afford ? ' is-poor' : ''}`;
@@ -71,7 +88,8 @@ export const garageScreen: ScreenFactory = (ctx) => {
       ctx.toast('小鱼干不够，再去赛道上撞几个吧。', 'warn');
       return;
     }
-    const ok = await ctx.confirm(`购买 ${b.name}？`, `花费 ${b.price} 小鱼干。${b.blurb}`, '买了', '再看看');
+    const joke = isJoke(id) ? '（整活向，比赛不一定更快）' : '';
+    const ok = await ctx.confirm(`购买 ${b.name}？`, `花费 ${b.price} 小鱼干${joke}。${deltaLine(id, save.data.bike)}${b.blurb}`, '买了', '再看看');
     if (!ok) return;
     save.update((d) => {
       d.coins -= b.price;
@@ -108,6 +126,7 @@ export const garageScreen: ScreenFactory = (ctx) => {
   });
   return {
     root: f.root,
+    ready: artReady(art),
     update: (dt) => table.update(dt),
     onAction: (a) => {
       if (a === 'back') {

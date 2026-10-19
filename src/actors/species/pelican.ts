@@ -70,7 +70,7 @@ export const pelican: SpeciesDef = {
   joints: J,
   meta: {
     wings: true, hat: 'helmet', eyeDir: EYE_DIR, lid: { open: -0.85, closed: 1.45 }, sleepy: 0.22, lidTilt: 0.32,
-    neckReach: 0.14, headScale: 1.12, headSway: 0.09, tail: 'feather', armUp: ARM_UP, gripDrop: 0.03, ankleLift: [0, 0.05, 0.05], beak: h([0.0, 0.683, -1.0448]), skin: WHITE, skillPose: 'spit',
+    neckReach: 0.14, headScale: 1.12, headSway: 0.06, carry: { yaw: 0.5, pitch: 0.2, shift: 0.28 }, pouchJiggle: 0.1, tail: 'feather', armUp: ARM_UP, gripDrop: 0.03, ankleLift: [0, 0.05, 0.05], beak: h([0.0, 0.683, -1.115]), skin: WHITE, skillPose: 'spit',
   },
   build(b, quality) {
     const fine = quality === 'low' ? 1.5 : 1;

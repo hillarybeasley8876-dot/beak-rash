@@ -16,34 +16,43 @@ export function button(label: string, opts: { sub?: string; className?: string; 
   return el;
 }
 
-/** 1..max rating as skewed segments. */
-export function statBar(label: string, value: number, max = 5): HTMLDivElement {
+/** 1..max rating as skewed segments. With `ref` (e.g. the equipped bike) the segments gained are solid red,
+ * the ones lost red-hatched ghosts, and a ±n badge follows the bar. */
+export function statBar(label: string, value: number, max = 5, ref?: number): HTMLDivElement {
   const bar = h('div', { class: 'br-stat' }, h('span', { class: 'br-stat-label', text: label }));
   const segs = h('span', { class: 'br-stat-segs' });
-  for (let i = 0; i < max; i++) segs.append(h('i', { class: i < value ? 'is-on' : '' }));
+  const base = ref ?? value;
+  for (let i = 0; i < max; i++) {
+    const cls = i < Math.min(value, base) ? 'is-on' : i < value ? 'is-on is-up' : i < base ? 'is-down' : '';
+    segs.append(h('i', { class: cls }));
+  }
   bar.append(segs);
+  if (ref !== undefined && ref !== value) {
+    const up = value > ref;
+    bar.append(h('b', { class: `br-stat-delta ${up ? 'is-up' : 'is-down'}`, text: `${up ? '+' : '−'}${Math.abs(value - ref)}` }));
+  }
   return bar;
 }
 
 export interface Meter { el: HTMLDivElement; set(v: number): void }
 
 /** Mouse picking for a row of parts: press (or drag across) a part picks it; the click never bubbles
- * to the row (whose own click cycles the value). */
-function pickable(el: HTMLElement, parts: HTMLElement[], onPick: (i: number) => void, drag: boolean): void {
+ * to the row (whose own click cycles the value). onPick's second argument tells a drag from a press. */
+function pickable(el: HTMLElement, parts: HTMLElement[], onPick: (i: number, drag: boolean) => void, drag: boolean): void {
   el.classList.add('is-pickable');
   parts.forEach((p, i) => {
     p.addEventListener('pointerdown', (e) => {
-      if (e.button === 0) onPick(i);
+      if (e.button === 0) onPick(i, false);
     });
     if (drag) p.addEventListener('pointerenter', (e) => {
-      if (e.buttons === 1) onPick(i);
+      if (e.buttons === 1) onPick(i, true);
     });
   });
   el.addEventListener('click', (e) => e.stopPropagation());
 }
 
-/** 0..1 value as 10 skewed ticks (volume, shake). `onPick(i)` makes ticks clickable / draggable. */
-export function meter(steps = 10, onPick?: (i: number) => void): Meter {
+/** 0..1 value as 10 skewed ticks (volume, shake). `onPick(i, drag)` makes ticks clickable / draggable. */
+export function meter(steps = 10, onPick?: (i: number, drag: boolean) => void): Meter {
   const el = h('div', { class: 'br-meter' });
   const ticks: HTMLElement[] = [];
   for (let i = 0; i < steps; i++) {

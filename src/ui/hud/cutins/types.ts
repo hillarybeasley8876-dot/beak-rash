@@ -6,6 +6,8 @@ export interface CutIn {
   readonly dur: number;
   /** Draw the cut-in at `t` seconds since it started. */
   frame(t: number): void;
+  /** Shown over a KO cinematic: the static HUD stays hidden until it has left the stage. */
+  readonly cine?: boolean;
 }
 
 /** Splash priorities: a new splash replaces the current one when its priority is >= the current. */

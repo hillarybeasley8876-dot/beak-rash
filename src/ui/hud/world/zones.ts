@@ -12,7 +12,9 @@ const set = (o: Rect, l: number, t: number, r: number, b: number): Rect => {
   return o;
 };
 
-/** Battle cluster box (css/cluster.css .cl) and its corner offsets (css/base.css .brh-corner.br). */
+/** Battle cluster box (css/cluster.css .cl, drawn at CL_SCALE from its bottom-right corner) and its corner
+ *  offsets (css/base.css .brh-corner.br). Keep CL_SCALE in sync with `.cl { scale }`. */
+export const CL_SCALE = 0.85;
 const CL_W = 720;
 const CL_H = 380;
 const CL_RIGHT = 30;
@@ -45,10 +47,11 @@ export class HudZones {
     set(this.counters, W - (34 + 240) * k, 0, W, (30 + 120) * k);
     // Speedometer 300×300 + the BOOST / SLIPSTREAM tag column to its right (css/speedo.css .spd-tags).
     set(this.speedo, 0, H - (26 + 330) * k, (30 + 570) * k, H);
-    const x0 = W - (CL_RIGHT + CL_W) * k;
-    const y0 = H - (CL_BOTTOM + CL_H) * k;
+    const c = CL_SCALE * k;
+    const x0 = W - CL_RIGHT * k - CL_W * c;
+    const y0 = H - CL_BOTTOM * k - CL_H * c;
     set(this.cluster, x0, y0, W, H);
-    set(this.gauges, x0 + 40 * k, y0 + 80 * k, x0 + 492 * k, y0 + 370 * k);
+    set(this.gauges, x0 + 40 * c, y0 + 80 * c, x0 + 492 * c, y0 + 370 * c);
     set(this.centre, W * 0.38, H * 0.25, W * 0.62, H * 0.5);
   }
 }

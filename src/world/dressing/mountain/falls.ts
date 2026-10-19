@@ -6,14 +6,14 @@
 import { Color, Vector3 } from 'three';
 import { buildWaterfall } from '../../env/mountain-waterfall';
 import { boulder } from '../../scenery/props/nature';
-import { crag } from '../../scenery/props/rocks';
+import { bevelRock } from '../../scenery/props/mountain-granite';
 import type { Dress } from '../dress';
 import { worldAt } from './util';
 
 const TURN = 0.55;      // sheet facing: from straight down the gorge toward the road (rad)
 const LIP_UP = 22;      // lip above the deck (m)
 const POOL_DOWN = 1.5;  // ledge pool below the deck (m)
-const WET = new Color('#3e3448');
+const WET = new Color('#4b3f5a');
 const GRANITE = [new Color('#b4846f'), new Color('#93695f'), new Color('#7d5f62')] as const;
 const UP = new Vector3(0, 1, 0);
 
@@ -41,17 +41,19 @@ export function waterfall(d: Dress, sWall: number, xc: number, width: number): v
   ctx.log(`waterfall at s=${Math.round(sWall)} x=${xc}: lip ${lip.y.toFixed(0)}, ledge pool ${poolY.toFixed(0)}, deck ${deckY.toFixed(0)}`);
 }
 
-/** Wet backing face behind the upper sheet, granite stacks on both sides, the ledge under the pool. */
+/** Wet backing behind the strands, a wet-rock lip, granite stacks on both sides, the ledge under the pool. */
 function notch(d: Dress, lip: Vector3, foot: Vector3, out: Vector3, right: Vector3, width: number, poolY: number): void {
   const { rng, b } = d;
   const yaw = Math.atan2(out.x, out.z);
   const rock = (p: Vector3, sx: number, sy: number, sz: number, col: Color, flat = true): void =>
-    crag(b.props.at(p.x, p.z), p.x, p.y, p.z, sx, sy, sz, yaw + rng.range(-0.25, 0.25), rng, col, flat);
+    bevelRock(b.props.at(p.x, p.z), p.x, p.y, p.z, sx, sy, sz, yaw + rng.range(-0.25, 0.25), rng, col, flat);
   // Backing: dark wet rock right behind the sheet, from below the ledge up to just under the lip.
   const h = lip.y - 1 - (poolY - 2);
   for (let k = 0; k < 4; k++) {
     rock(lip.clone().addScaledVector(out, -2.6).setY(poolY - 2 + (k + 0.5) * (h / 4)), width * 0.62, h / 6, 2.4, WET, false);
   }
+  // Dark wet-rock lip the strands pour over (it shows between them at the top of the fall).
+  rock(lip.clone().addScaledVector(out, -1.2).setY(lip.y - 1.3), width * 0.62, 1.3, 1.5, WET, false);
   // Notch walls: dense stacks of big granite masses on both sides, from deep in the gorge to above the lip.
   for (const side of [-1, 1]) {
     for (let y = poolY - 24; y < lip.y + 5; y += rng.range(4, 6)) {

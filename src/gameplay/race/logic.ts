@@ -1,6 +1,7 @@
 // Race logic (contract createRaceLogic): flow, AI, standings, results. Traffic and police plug in here.
 import type { RaceLogic, RaceResult, Session } from '../../core/contracts';
 import { createAi } from './ai';
+import { rollForm } from './ai/form';
 import { createRaceCtx } from './ctx';
 import { exposeRaceDebug } from './debug';
 import { createFlow, INTRO_TIME } from './flow';
@@ -15,10 +16,11 @@ import { createTraffic } from './traffic';
 export function createRaceLogic(session: Session): RaceLogic {
   const { app } = session;
   const { bus } = app;
-  regrid(session);
+  const form = rollForm(session);
+  regrid(session, form);
   const ctx = createRaceCtx(session);
   const standings = createStandings(ctx);
-  const ai = createAi(session);
+  const ai = createAi(session, form);
   const traffic = session.config.traffic ? createTraffic(session) : null;
   const police = session.config.police ? createPolice(ctx) : null;
   let finalResults: RaceResult[] | null = null;

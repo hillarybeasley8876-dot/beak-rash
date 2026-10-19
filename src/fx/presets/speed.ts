@@ -139,10 +139,13 @@ export const shockwave: Preset = (k, pos: Vec3Like, o: BurstOpts) => {
   k.p.colors(r, '#ffffff', '#ffe2b8');
   r.frame = FRAME.shock; r.mode = 2; r.life = 0.45; r.size0 = 1.5 * sc; r.size1 = 18 * sc; r.erode = true; r.realtime = true;
   k.p.emit(r);
+  // With a travel direction the clouds burst out to both sides (off the pelican and the victims ahead).
+  const side = o.dir ? Math.atan2(-o.dir.x, o.dir.z) : 0;
   const n = k.n(9, o);
   for (let i = 0; i < n; i++) {
-    const a = (i / n) * Math.PI * 2 + k.range(-0.3, 0.3);
-    const s = k.at({ x: pos.x + Math.cos(a) * 0.6, y: ground + 0.35, z: pos.z + Math.sin(a) * 0.6 });
+    const a = o.dir ? side + (i % 2 ? Math.PI : 0) + k.range(-0.6, 0.6) : (i / n) * Math.PI * 2 + k.range(-0.3, 0.3);
+    const r0 = o.dir ? 1.1 : 0.6;
+    const s = k.at({ x: pos.x + Math.cos(a) * r0, y: ground + 0.35, z: pos.z + Math.sin(a) * r0 });
     const shade = i % 3 === 0;
     k.p.colors(s, shade ? '#dccdb2' : '#f6efe2', shade ? '#a8977c' : '#d7cab3');
     s.frame = FRAME.puff;

@@ -10,6 +10,7 @@ import { CutinLayer } from './cutins/layer';
 import { el, w } from './dom';
 import { TICKET_HOLD, wireHudEvents } from './events';
 import { preloadHudFonts } from './fonts';
+import { Hints } from './hints';
 import { Counters, PlaceBlock } from './place';
 import { hudSfx } from './sfx';
 import { ProgressStrip } from './progress';
@@ -38,6 +39,7 @@ export function createHud(app: AppContext, layer: HTMLElement): Hud {
   const counters = new Counters(corner('tr'));
   const speedo = new Speedo(corner('bl'));
   const brCorner = corner('br');
+  const hints = new Hints(corner('bc'), () => cluster?.skills.ultCostSp ?? 100);
   const quip = new Quip(brCorner);
   const world = new WorldOverlay(proj, worldHost, edgesHost);
   const cutins = new CutinLayer(root, hudLayer, sfx);
@@ -58,7 +60,7 @@ export function createHud(app: AppContext, layer: HTMLElement): Hud {
 
   const unwire = wireHudEvents(app.bus, {
     session: () => session,
-    place, speedo, world, cutins, quip,
+    place, speedo, world, cutins, quip, hints,
     cluster: () => cluster,
     busted: () => (bustAt = session?.time ?? null),
   });
@@ -78,6 +80,7 @@ export function createHud(app: AppContext, layer: HTMLElement): Hud {
       cluster?.root.remove();
       cluster = s ? new Cluster(brCorner, s.player.character) : null;
       quip.reset(s?.player.character ?? null);
+      hints.attach(s, app.save.data.stats.races);
       progress.setRiders(s?.riders ?? []);
       alpha = 0;
       world.attach(s);
@@ -90,10 +93,11 @@ export function createHud(app: AppContext, layer: HTMLElement): Hud {
       const on = visible && session !== null;
       rootW.cls('is-off', !on);
       if (!on || !session) return;
+      rootW.cls('is-pad', app.input.lastDevice === 'gamepad'); // key badges follow the device in use
       world.measure(); // layout reads first, before this frame's writes
       resize();
       const p = session.player;
-      const quiet = session.phase === 'intro' || cutins.cinematic;
+      const quiet = session.phase === 'intro' || cutins.cinematic || cutins.holdHud;
       alpha = approach(alpha, quiet ? 0 : 1, dtReal / 0.16);
       for (const f of fadeW) f.op(alpha);
       proj.begin(app.size.width, app.size.height);
@@ -111,6 +115,7 @@ export function createHud(app: AppContext, layer: HTMLElement): Hud {
       world.update(dtReal, k, dyn);
       cluster?.occlude(world.gaugesCovered, dtReal);
       cutins.update(dtReal, k, proj);
+      hints.update(session, dtReal, quiet || alpha < 0.99 || cutins.screenBusy || world.bottomBusy);
     },
     dispose() {
       unwire();

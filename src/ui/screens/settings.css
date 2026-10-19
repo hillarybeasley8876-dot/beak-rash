@@ -3,8 +3,8 @@
   position: relative;
   display: flex;
   align-items: center;
-  height: 74px;
-  margin-bottom: 9px;
+  height: 66px;
+  margin-bottom: 8px;
   padding: 0 30px 0 34px;
   background: rgba(255, 255, 255, 0.06);
   transform: skewX(var(--skew));

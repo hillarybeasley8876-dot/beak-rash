@@ -63,6 +63,10 @@ export function createFxCore(app: AppContext): { fx: FxSystem; ctx: FxInternals 
       speed.reset();
       post.reset();
       snapGrade = true;
+      if (s) {
+        pipeline.warm();
+        particles.warm();
+      }
       for (const part of ctx.parts) part.attach?.(s);
     },
     update(dtSim, dtReal) {

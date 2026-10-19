@@ -3,13 +3,15 @@
 import { clamp01 } from '../../core/math';
 import type { Session } from '../../core/contracts';
 
-const HIT = 0.07;
-const KO = 0.2;
-const SKILL_HIT = 0.05;
+// A player who keeps fighting (a landed hit every few seconds) reaches the spawn heat within the first minute
+// on every track (acceptance r1: city seed 2 peaked at 0.47 with the old 0.07 per hit and 0.012/s cooling).
+const HIT = 0.09;
+const KO = 0.25;
+const SKILL_HIT = 0.07;
 const TRAFFIC_CRASH = 0.3;
 const OBSTACLE_HIT = 0.12;
 const WATCHED = 1.6;          // multiplier while the corgi is chasing within 60 m
-const COOL = 0.012;           // /s
+const COOL = 0.01;            // /s
 const CALM_AFTER = 10;        // s without an offence before cooling speeds up
 const CALM_MUL = 3;
 

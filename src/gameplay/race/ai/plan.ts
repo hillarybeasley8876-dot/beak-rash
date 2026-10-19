@@ -13,6 +13,7 @@ export interface PlanInput {
   asphalt: number;       // asphalt half-width
   horizon: number;       // s of look-ahead time
   ignore: RiderId | null; // hunted target: get close instead of avoiding
+  blind: number | null;   // obstacle id the rider has not seen (a blunder: rides straight into it)
   canHop: boolean;
 }
 
@@ -45,8 +46,9 @@ function timeTo(b: Blip, v: number): number {
 
 /** A rider (possibly the hunted one) slow enough to be a roadblock rather than traffic to race. */
 const stopped = (b: Blip): boolean => b.kind === 'rider' && b.vs < STOPPED;
-/** The hunted rider is ignored (we want to get close) unless it is stopped in the road. */
-const ignored = (b: Blip, inp: PlanInput): boolean => !!b.rider && b.rider.id === inp.ignore && !stopped(b);
+/** The hunted rider is ignored (we want to get close) unless it is stopped in the road; so is an unseen vehicle. */
+const ignored = (b: Blip, inp: PlanInput): boolean =>
+  (!!b.rider && b.rider.id === inp.ignore && !stopped(b)) || (b.oid !== null && b.oid === inp.blind);
 
 function blipCost(b: Blip, x: number, inp: PlanInput, out: { block: boolean }): number {
   if (ignored(b, inp)) return 0;

@@ -73,12 +73,21 @@
 .br-ui [data-nav] { cursor: pointer; outline: none; }
 .br-ui [data-nav].is-disabled { cursor: not-allowed; }
 
+/* Motion kill-switch: the OS flag (unless 设置 › 动态效果 = 完整 puts .is-full-motion on the root) or the
+   in-game 减弱 (.is-reduced, see p5/motion-pref.ts). */
 @media (prefers-reduced-motion: reduce) {
-  .br-ui *, .br-ui *::before, .br-ui *::after {
+  .br-ui:not(.is-full-motion) *, .br-ui:not(.is-full-motion) *::before, .br-ui:not(.is-full-motion) *::after {
     animation-duration: 0.001ms !important;
     animation-delay: 0s !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     transition-delay: 0s !important;
   }
+}
+.br-ui.is-reduced *, .br-ui.is-reduced *::before, .br-ui.is-reduced *::after {
+  animation-duration: 0.001ms !important;
+  animation-delay: 0s !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  transition-delay: 0s !important;
 }

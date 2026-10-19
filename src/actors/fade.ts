@@ -29,6 +29,7 @@ function proxyOf(mesh: Mesh, mat: Material): Mesh {
     const s = new SkinnedMesh(mesh.geometry, mat);
     s.bind(mesh.skeleton, mesh.bindMatrix);
     s.bindMode = mesh.bindMode;
+    s.boundingSphere = mesh.boundingSphere; // shared bounds (lod.ts): no per-swap skinned bounds computation
     p = s;
   } else {
     p = new Mesh(mesh.geometry, mat);

@@ -1,13 +1,15 @@
 // loading: P5 calendar date card (today, 宜/忌 of the day, track weather), track title, meme tip, road-shaped progress
-// bar with a pedalling pelican. Stays up ≥ 2 s so the tip can be read (leave()); the new race's sim
-// clock is held meanwhile, so its intro starts when the card goes.
+// bar with a pedalling pelican. Stays up ≥ 2 s so the tip can be read (leave()), 0.5 s when the same track
+// restarts (pause 重新开始 / results 再来一局); the new race's sim clock is held meanwhile, so its intro starts
+// when the card goes. Bar + runner glide on CSS transform transitions (compositor), so they keep moving
+// through the long main-thread tasks of the race build; JS only sets targets and the % text.
 import './loading.css';
 import type { TrackId } from '../../core/types';
 import { LOADING_ART } from '../../data/assets';
 import { calendarFor } from '../../data/strings';
 import { TIPS } from '../../data/tips';
 import { TRACKS, TRACK_ORDER } from '../../data/tracks';
-import { artImage, backdrop, h, jagged, ransom, riderIconSvg, svg, torn, wait } from '../p5';
+import { artImage, artReady, backdrop, h, jagged, ransom, riderIconSvg, svg, torn, wait } from '../p5';
 import { frame, type ScreenFactory } from '../screen';
 
 const WEEK_EN = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
@@ -29,6 +31,10 @@ const MIN_SHOW_MS = 2000;
 /** Clock layer that keeps the freshly built race (intro flyover, countdown) frozen behind the card. */
 const HOLD_LAYER = 'ui:loading';
 const MIN_SHOW_DIRECT_MS = 250;
+/** Restarting the track that was just loaded: the player has read this card already. */
+const MIN_SHOW_AGAIN_MS = 500;
+const GLIDE = 'cubic-bezier(0.2, 0.7, 0.3, 1)';
+let lastTrack: TrackId | null = null;
 
 export const loadingScreen: ScreenFactory = (ctx) => {
   const trackId: TrackId = ctx.props.config?.trackId ?? 'coast';
@@ -64,13 +70,13 @@ export const loadingScreen: ScreenFactory = (ctx) => {
     h('span', { class: 'br-tag is-red br-load-tip-tag', text: 'TIPS 小贴士' }),
     h('p', { text: tip }));
 
-  const rider = h('div', { class: 'br-road-rider' }, svg(riderIconSvg()));
+  const runner = h('div', { class: 'br-road-runner' }, h('div', { class: 'br-road-rider' }, svg(riderIconSvg())));
   const pctEl = h('b', { class: 'br-road-pct', text: '0%' });
   const label = h('span', { class: 'br-road-label', text: 'LOADING' });
   const road = h('div', { class: 'br-road' },
     h('div', { class: 'br-road-strip' }, h('i', { class: 'br-road-dash' }), h('i', { class: 'br-road-fill' })),
     h('div', { class: 'br-road-flag' }),
-    rider,
+    runner,
     h('div', { class: 'br-road-text' }, label, pctEl));
   const vignette = artImage(LOADING_ART[Math.floor(Math.random() * LOADING_ART.length)], 'br-load-art br-anim-pop');
   if (vignette) {
@@ -80,40 +86,47 @@ export const loadingScreen: ScreenFactory = (ctx) => {
   f.stage.append(card, title, tipBox, road);
 
   const fill = road.querySelector<HTMLElement>('.br-road-fill');
-  let shown = 0;
-  let target = 0.15;
-  let reported = false;
-  const setBar = (p: number): void => {
-    shown = p;
-    fill?.style.setProperty('transform', `scaleX(${p.toFixed(4)})`);
-    rider.style.left = `${(p * 100).toFixed(2)}%`;
-    pctEl.textContent = `${Math.round(p * 100)}%`;
+  let goal = 0;
+  let started = false;
+  /** Glide bar + runner to p over secs (a running transition restarts from where it is). */
+  const glide = (p: number, secs: number): void => {
+    goal = Math.max(goal, Math.min(1, p));
+    for (const el of [fill, runner]) {
+      if (el) el.style.transition = `transform ${secs}s ${GLIDE}`;
+    }
+    fill?.style.setProperty('transform', `scaleX(${goal.toFixed(4)})`);
+    runner.style.transform = `translateX(${(goal * 100).toFixed(2)}%)`;
   };
-  setBar(0);
   const off = ctx.app.bus.on('flow:loading', ({ progress, label: text }) => {
-    reported = true;
-    target = Math.max(target, Math.min(1, progress));
+    glide(progress, 0.5);
     if (text) label.textContent = text;
   });
   const t0 = performance.now();
-  const minShow = ctx.from === 'boot' ? MIN_SHOW_DIRECT_MS : MIN_SHOW_MS;
+  const again = trackId === lastTrack && (ctx.from === 'pause' || ctx.from === 'results');
+  lastTrack = trackId;
+  const minShow = ctx.from === 'boot' ? MIN_SHOW_DIRECT_MS : again ? MIN_SHOW_AGAIN_MS : MIN_SHOW_MS;
   return {
     root: f.root,
-    update(dt) {
-      if (!reported) target += (0.92 - target) * (1 - Math.exp(-dt * 1.6));
-      setBar(shown + (target - shown) * (1 - Math.exp(-dt * 10)));
+    ready: artReady(vignette, 300),
+    update() {
+      if (!started && f.root.isConnected) {
+        started = true;
+        void runner.offsetWidth; // resolve the 0 % start so the first glide animates
+        glide(0.9, 6); // creeps on the compositor until real progress or leave() moves it on
+      }
+      const shown = fill ? new DOMMatrixReadOnly(getComputedStyle(fill).transform).a : goal;
+      pctEl.textContent = `${Math.round(shown * 100)}%`;
     },
     async leave() {
       const left = minShow - (performance.now() - t0);
-      target = 1;
-      setBar(Math.max(shown, 0.98));
+      glide(0.98, 0.3);
       ctx.app.clock.setScale(HOLD_LAYER, 0);
       try {
         await wait(Math.max(120, left));
       } finally {
         ctx.app.clock.clearScale(HOLD_LAYER);
       }
-      setBar(1);
+      glide(1, 0.12);
     },
     dispose: () => {
       off();

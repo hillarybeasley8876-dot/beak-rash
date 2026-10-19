@@ -3,17 +3,17 @@
 // plus the weight / respawn / scrape / slipstream minors. Line-holding drift charge is reported, not checked.
 import { DEG, events, prep, r3, run } from './feel-steps.mjs';
 
-/** L3 release in a constant bend (κ = dir/R, walls at ±8.4 m), then `after` × full lock into it for 1.5 s. */
-async function releaseRun(page, R, after) {
+/** L3 release in a constant bend (κ = dir/R, walls at ±8.4 m), then `after` × full lock into it for `post` frames. */
+async function releaseRun(page, R, after, post) {
   const dir = -1; // left bend
   await prep(page, { v: 20, x: -dir * 5.8, kappa: dir / R, wall: 8.4 });
-  return page.evaluate(([d, aft]) => {
+  return page.evaluate(([d, aft, postN]) => {
     const f = window.__feel;
     const br = window.__br;
     const p = br.session().player;
     let rel = -1;
     const rows = [];
-    for (let i = 0; i < 420; i++) {
+    for (let i = 0; i < 300 + postN; i++) {
       const lvl = br.sim.riders()[p.id]?.driftLevel ?? 0;
       if (rel < 0 && lvl >= 3) rel = i;
       const drifting = rel < 0;
@@ -21,7 +21,7 @@ async function releaseRun(page, R, after) {
       br.step(1, 1 / 60);
       f.t += 1 / 60;
       if (rel >= 0) rows.push({ yaw: p.yaw * d, x: p.x * d, mode: p.mode });
-      if (rel >= 0 && i - rel >= 90) break;
+      if (rel >= 0 && i - rel >= postN) break;
     }
     if (!rows.length) return null;
     let step = 0;
@@ -31,16 +31,18 @@ async function releaseRun(page, R, after) {
       runWide: rows[0].x - Math.min(...rows.map((q) => q.x)),
       yawOut: -Math.min(0, ...rows.map((q) => q.yaw)), maxYawStep: step,
     };
-  }, [dir, after]);
+  }, [dir, after, post]);
 }
 
 const driftRelease = {
   name: 'driftRelease',
   async run({ page }) {
     const m = {};
-    for (const R of [46, 60, 90]) {
+    // Acceptance r1: hairpins (R26-R30, the mountain / city ones) hold the rest of the bend for 2.5 s after the release
+    // (the exit carve); the R46-R90 cases keep their 1.5 s window.
+    for (const R of [46, 60, 90, 26, 28, 30]) {
       for (const [tag, after] of [['full', 1], ['half', 0.5], ['neutral', 0]]) {
-        const res = await releaseRun(page, R, after);
+        const res = await releaseRun(page, R, after, R < 40 ? 150 : 90);
         const k = `R${R}_${tag}`;
         if (!res) {
           m[`${k}_crashed`] = 'no L3';

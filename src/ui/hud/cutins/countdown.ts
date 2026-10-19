@@ -1,10 +1,11 @@
-// Countdown (3-2-1-GO) and the player's skill band (diagonal strip, eyes close-up, nameEn + 中文名).
+// Countdown (3-2-1-GO) and the player's skill band (tilted top strip, eyes close-up, nameEn + 中文名).
 import '../css/cutins.css';
 import type { CharacterId } from '../../../core/types';
 import type { SkillDef } from '../../../data/skills';
 import { enter, exit, fadeOut, pop, reducedMotion, slam } from '../anim';
 import { eyesStrip } from '../badge';
 import { el } from '../dom';
+import { keyGlyphs, type HudKey } from '../glyphs';
 import { starClip } from '../shapes';
 import type { CutIn } from './types';
 
@@ -39,42 +40,44 @@ export function countdownCut(n: number): CutIn {
   };
 }
 
-/** The player's skill band. `thin()` turns it into a slim corner band (upper left) for skills whose
- *  projectile must stay in view: the shot and its target sit right where the full band would be. */
+/** The player's skill band (top strip, clear of the road; css/cutins.css). `thin()` slims it further for
+ *  skills whose projectile is in flight (combat's projectile:spawn in the same tick). */
 export interface BandCut extends CutIn {
   readonly skillId: string;
   thin(): void;
 }
 
-export function skillBand(def: SkillDef, character: CharacterId, key: string): BandCut {
+/** s on screen (acceptance r1: ≤ 0.45 s), slide-in and slide-out. */
+const BAND_DUR = 0.45;
+const BAND_IN = 0.09;
+const BAND_OUT = 0.1;
+const BAND_SWEEP = 2400;
+
+export function skillBand(def: SkillDef, character: CharacterId, key: HudKey): BandCut {
   const root = el('div', 'ci ci-band');
   const strip = el('div', 'bd-strip', root);
   el('div', 'bd-lines', strip);
   const eyesHost = el('div', 'bd-eyes', strip);
   const eyes = eyesStrip(character);
   eyesHost.append(eyes);
-  el('div', 'bd-key', strip, key);
+  keyGlyphs(el('div', 'bd-key', strip), key);
   const txt = el('div', 'bd-txt', strip);
   el('div', 'bd-en', txt, def.nameEn);
   el('div', 'bd-cn', txt, def.name);
-  const dur = 0.68;
-  let slim = false;
   return {
     root,
-    dur,
+    dur: BAND_DUR,
     skillId: def.id,
     thin() {
-      slim = true;
       root.classList.add('is-thin');
     },
     frame(t) {
-      // Full band: in from the right, out to the left. Thin band: in from the left edge and back out.
-      const sweep = slim ? 1700 : 2600;
-      const x = (slim ? -1 : 1) * (1 - enter(t, 0.11)) * sweep - exit(t, dur, 0.13) * sweep;
-      strip.style.transform = `rotate(${slim ? -5 : -7}deg) translateX(${x.toFixed(0)}px)`;
+      // In from the right, out to the left.
+      const x = (1 - enter(t, BAND_IN)) * BAND_SWEEP - exit(t, BAND_DUR, BAND_OUT) * BAND_SWEEP;
+      strip.style.transform = `rotate(-2deg) translateX(${x.toFixed(0)}px)`;
       eyes.style.transform = `translateX(${(reducedMotion() ? 0 : -t * 70).toFixed(1)}px) scale(1.12)`;
-      root.style.opacity = fadeOut(t, dur, 0.1).toFixed(3);
-      txt.style.transform = `scale(${slam(t - 0.05, 0.14, 1.35).toFixed(3)})`;
+      root.style.opacity = fadeOut(t, BAND_DUR, BAND_OUT).toFixed(3);
+      txt.style.transform = `scale(${slam(t - 0.04, 0.12, 1.3).toFixed(3)})`;
     },
   };
 }

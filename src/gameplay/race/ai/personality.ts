@@ -1,8 +1,11 @@
-// AI personalities: species temperament + roster stats + career level + a little per-rider dice.
+// AI personalities: species temperament + roster stats + career level + today's form (form.ts) and a little
+// per-rider dice. Temperament keeps the racers distinct (who fights, drafts, drifts, taunts); how well they drive
+// today (skill, corner risk, slipstream appetite) is mostly the form dice, so no species owns the podium.
 import { clamp, clamp01 } from '../../../core/math';
 import { ROSTER } from '../../../data/roster';
 import type { Rng } from '../../../core/rng';
 import type { CharacterId } from '../../../core/types';
+import type { Form } from './form';
 
 export interface Personality {
   aggression: number;   // 0..1 how eagerly they start fights and hunt targets
@@ -45,12 +48,22 @@ const TEMPER: Record<CharacterId, Temper> = {
 /** Species temperament aggression (0..1) before level and dice. */
 export const baseAggression = (character: CharacterId): number => TEMPER[character].aggression;
 
-export function makePersonality(character: CharacterId, level: number, rng: Rng): Personality {
+// Racecraft (skill, slipstream and drift appetite) is mostly today's form: species keep a third of their spread.
+const SKILL_MID = 0.68, SKILL_SPECIES = 0.3, SKILL_FORM = 0.15;
+const RISK_MID = 0.81, RISK_SPECIES = 0.01, RISK_FORM = 0.02;   // corner risk 0.78–0.84 (the old field average)
+
+/** Share of the steering authority used against curve push: mostly today's form, a little species skill. */
+const cornerRisk = (speciesSkill: number, drive: number): number =>
+  RISK_MID + RISK_SPECIES * clamp((speciesSkill - SKILL_MID) / 0.2, -1, 1) + RISK_FORM * drive;
+
+/** `form` = today's form of a rival (form.ts); the autopilot player rolls a milder one of its own. */
+export function makePersonality(character: CharacterId, level: number, rng: Rng, form?: Form): Personality {
   const t = TEMPER[character];
   const st = ROSTER[character].stats;
   const lv = clamp(level - 1, 0, 4);
   const dice = (spread: number): number => rng.range(-spread, spread);
-  const skill = clamp01(t.skill + 0.05 * lv + dice(0.08));
+  const drive = form?.drive ?? dice(0.5);
+  const skill = clamp01(SKILL_MID + SKILL_SPECIES * (t.skill - SKILL_MID) + 0.05 * lv + SKILL_FORM * drive);
   // Level 1 rivals are noticeably calmer; temperament reaches full strength at level 4.
   const aggression = clamp01(t.aggression * (0.7 + 0.1 * lv) + dice(0.08));
   return {
@@ -61,12 +74,12 @@ export function makePersonality(character: CharacterId, level: number, rng: Rng)
     wander: t.wander * (0.7 + rng.next() * 0.6),
     lateralRate: 1.6 + 1.6 * skill + 0.2 * st.handling,
     reaction: clamp((1.15 - 0.5 * aggression) * (1 - 0.08 * lv) + dice(0.1), 0.25, 1.4),
-    drafter: clamp01(t.drafter + dice(0.1)),
-    drifter: clamp01(t.drifter + dice(0.1)),
+    drafter: clamp01(0.35 + 0.3 * t.drafter + 0.15 * drive),
+    drifter: clamp01(0.35 + 0.3 * t.drifter + 0.2 * drive + dice(0.05)),
     heavyChance: clamp01(0.15 + 0.4 * aggression + 0.05 * (st.power - 3)),
     skillUse: clamp01(t.skillUse + dice(0.1)),
     taunty: t.taunty,
-    risk: 0.68 + 0.2 * skill,
+    risk: cornerRisk(t.skill, drive),
     launch: clamp01(0.2 + 0.5 * skill + 0.05 * lv),
     bell: t.bell,
     playerPull: 1.5 + 0.4 * Math.max(0, lv - 1),

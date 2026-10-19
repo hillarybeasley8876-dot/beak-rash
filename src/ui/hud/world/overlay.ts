@@ -26,7 +26,7 @@ export class WorldOverlay {
   /** Static HUD module rects + the keep-clear area above the vanishing point, for this viewport. */
   readonly zones = new HudZones();
   private occlusion = new GaugeOcclusion();
-  /** A rider alongside is behind the battle cluster's gauges this frame (the HUD dims them). */
+  /** A rider or a name tag is behind the battle cluster's gauges this frame (the HUD dims them). */
   gaugesCovered = false;
   private session: Session | null = null;
 
@@ -37,6 +37,11 @@ export class WorldOverlay {
     this.bubbles = new Bubbles(this.root);
     this.edges = new EdgeWarnings(edgesParent, this.root);
     this.incoming = new IncomingWarning(edgesParent);
+  }
+
+  /** A warning (incoming projectile, rear chevron) holds the bottom band between speedometer and cluster. */
+  get bottomBusy(): boolean {
+    return this.incoming.up || this.edges.rearUp;
   }
 
   attach(session: Session | null): void {
@@ -96,7 +101,7 @@ export class WorldOverlay {
     this.edges.update(s, this.proj, this.zones, k, dt);
     this.bubbles.update(s, this.proj, k, dt, [...this.tags.boxes(), ...this.edges.boxes()], this.zones, dyn);
     this.damage.update(this.proj, k, dt);
-    this.gaugesCovered = this.occlusion.covered(s, this.proj, this.zones.gauges);
+    this.gaugesCovered = this.occlusion.covered(s, this.proj, this.zones.gauges, this.tags.boxes());
     this.incoming.update(s, this.proj, k, dt);
   }
 }

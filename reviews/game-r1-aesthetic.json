@@ -1,0 +1,105 @@
+{
+  "pass": false,
+  "score": 7,
+  "summary": "Acceptance r1, whole-game look, all units live, 1920x1080, 0 __br.errors in every run. Evidence in shots/accept/r1-aesthetic/: a keyboard tour of every screen (ui/), one full autopilot race per track (trk/<id>/: intro, GO, pack, a chase frame every ~25 s, results), real KO / WRECKED / SHOWTIME cinematics (cine/), teleports to the open-list spots (tgt/), a far-band pop-in scan (pop/) and pixel checks (road.py, bars.py, beak2.py). Result: no pass, 7/10. STRONG: the 2D layer is commercial-grade P5. Title key art, the ransom-note logo, menu, career, track select, the garage (illustrated workshop with a live bike), settings, how-to, the GO! burst, the SHOWTIME cut-in (eye strip + portrait + ransom letters) and the results screen (podium stickers, S stamp) all read as one design. The three tracks have distinct grades and real landmarks: noon coast with limestone cuttings and the red arch bridge, a neon-night city with the neon tunnel and wet streaks, and a sunset pass with the red suspension bridge and lantern village. Outlines and toon shading match across riders, bikes, traffic and props. The KO hold at its peak (~0.45 s) is a striking manga/halftone money shot. The pop-in scan (coast + mountain, 1800 single frames, far band) showed only near-edge motion and no popping. OPEN-LIST CHECKS: fixed = orange/tan KO victims (cat and shiba now read as B/W manga with stripes / glasses). Not reproduced = KO head crop, SHOWTIME letterbox pop (bars cover 100 % of the top/bottom 9 % from 1.3 to 2.9 s), coast cutting acne at 1:1, city underpass reflection loss and black arcade fronts in my stills (centre lane only). Still open = SHOWTIME impact specks, the waterfall card, and sparse mountain roadside. BLOCKING: granite slabs floating in the sky over the mountain cliff road; a placeholder-looking wireframe doge-shield icosahedron that fills a quarter of the screen; an unreadable SHOWTIME impact. Then a polish tail: the hero beak is hidden from the chase cam, KO composition clutter (traffic is not in the framing score), blank asphalt, a monochrome mountain grade, a heavy HUD over the right lane, WRECKED tail frames, raw-screenshot track cards, a distant intro and loose garage framing.",
+  "issues": [
+    {
+      "severity": "major",
+      "owner": "env-mountain",
+      "title": "Granite slabs float in the sky above the mountain cliff road (s~1480-1560)",
+      "detail": "Repro: /?race=mountain&seed=3&autopilot=1, s~1522 (t~80 s): shots/accept/r1-aesthetic/trk/mountain/10-chase-3.png, crop in s11-detail.jpg. Two big faceted boulders (~150 px and ~60 px at 1080p) hang in open sky above the left wall lip, with pink sky between them and the rocks below. Cause: dressing/mountain/crags.ts faceRocks() puts the 'slab resting on the face' at edgeY + hy and lateral 0.4 + stepW*hy/h + 0.55*ss. That assumes an evenly leaning wall, but the real terrain (R-700 / R-150 bends, ledges, lower walls) falls away under the slab. The crag masses nearby are 8-12-facet lumps that look cruder than the smooth riders.",
+      "fix": "Seat every slab on the sampled surface: y = ctx.groundWorld(x, z) - 0.3*ss (hairpins.ts already does this). Skip the slab when that ground is more than 0.5*ss below edgeY + hy. Log the number of rocks whose base sits > 0.3 m above the ground (expect 0). Give the crag hulls a bevel or one subdivision so they sit closer to the vinyl-toy look."
+    },
+    {
+      "severity": "major",
+      "owner": "combat",
+      "title": "Doge shield is a 2.7 m faceted wireframe icosahedron that fills a quarter of the screen",
+      "detail": "Repro: city seed 3 autopilot, s~1509: trk/city/10-chase-3.png, crop in s11-detail.jpg. A shiba beside the chase camera casts Doge. visuals/auras.ts ShieldBubble draws IcosahedronGeometry(1.35, 1) (meshes/catalog.ts): flat translucent gold facets plus a white LineSegments wireframe. For 3 s it covers the lower-right ~25 % of the frame, swallows the player and two rivals, and reads as a debug gizmo, not a toon VFX.",
+      "fix": "Use a smooth sphere (detail >= 4) with a fresnel/rim shader: transparent centre, one toon rim band in shiba gold, and a few halftone or hex sparkles that ripple when a hit is reflected. Drop the wireframe. Fade opacity by camera distance (0 under 2.5 m, full at 5 m) so it never fogs the screen. Cap the radius near 1.0 m."
+    },
+    {
+      "severity": "major",
+      "owner": "fx",
+      "title": "SHOWTIME impact does not read: victims are specks and the pelican is lost in smoke",
+      "detail": "Repro: node shots/accept/r1-aesthetic/cine.mjs coast ult (pin 3 rivals 7/13/19 m ahead, set SP 100, combat.cast(0,4), unpin after 0.15 s). The cut-in (0.15-0.9 s) and the full-colour rise (1.3 s) are great. At impact (cine/coast-ult/06-1950ms.png, 07-2150ms.png) the victims are 30-60 px white spiky blobs or dark figures on the left/top edge. The pelican is a black shape inside white smoke puffs, and the bottom ~45 % of the frame is empty grey halftone road. One victim gets big only at 2.9 s. Open-list item, still present.",
+      "fix": "ko/cluster.ts: frame the nearest victim as the hero (>= 25 % of frame height) and let the others fall to the background instead of fitting them all. Lower the eye so victims silhouette against the red rays, not the grey road floor. Push the smoke puffs to the pelican's sides (< 15 % of the frame). Give victims the paper rim/ink outline from the KO hold, and scale up the stun stars so the chain reads."
+    },
+    {
+      "severity": "minor",
+      "owner": "species",
+      "title": "From the chase cam the hero reads as a white bird in a red helmet: the beak is hidden",
+      "detail": "In straight riding (coast s~1594, city s~2442, mountain s~1973: trk/*/1x-chase-*.png, crops in s11-detail.jpg) the huge orange-yellow bill hides behind the head and helmet. Only small pouch lobes show (~450-700 px of pouch pink at 1080p, beak2.py). The bill appears only during the solo glance (coast chase-5: ~1300 px of beak orange). Next to the white goose (coast s~643, trk/coast/08-chase-1.png) the player is hard to pick out at a glance. The species-defining feature is missing from most gameplay frames.",
+      "fix": "Pitch the head up 10-15 deg in the ride pose and hang the bill + pouch lower, so the bill tip and sack clear the helmet silhouette on both sides from the chase cam (5 m back, 2 m up). Or turn the head 8-10 deg toward the road centre, and glance every 3-4 s, in packs too."
+    },
+    {
+      "severity": "minor",
+      "owner": "fx",
+      "title": "KO hold composition: traffic and bystanders crowd the victim after the peak",
+      "detail": "VICTIM=cat node .../cine.mjs city ko: at 0.45 s a white van fills ~40 % of the frame (cine/city-ko-catv/03-450ms.png). At 1.0-1.3 s in the coast, city and mountain KOs, two bystanders sit at frame centre while the victim tumbles small at the top. It often turns into a solid black silhouette (cine/city-ko-cat/05-1000ms.png, cine/mountain-ko-shibav/06-1300ms.png), so the eye goes to the bystanders. Code: KoDirector.pick() passes only s.riders as `others`, so session.obstacles (traffic, police) never count.",
+      "fix": "Add session.obstacles to `others` (with their bounding radius) in pickFraming's occluder/clutter score. Draw non-subject riders and vehicles at ~35 % ink alpha (or merge them into the deep-red band) during the hold. Clamp the subject tone map so the victim stays paper-white manga with ink lines and never goes solid black."
+    },
+    {
+      "severity": "minor",
+      "owner": "track",
+      "title": "Asphalt is a blank grey sheet covering ~40 % of every chase frame",
+      "detail": "Clean road patches beside the bike on coast and mountain vary by only 2-5 luminance levels (std-dev) over 100x60 px (road.py on trk/coast/07-12, trk/mountain/09-13). There are no patches, wear, cracks, manholes, drains or painted words, only lane lines and START. Next to the detailed roadside and the loud UI it is the biggest prototype tell in chase view (s3-coast.jpg, s6-mountain.jpg).",
+      "fix": "Keep it toon but add macro detail in the shared road material: a +-6 % two-tone low-frequency noise, a darker racing-line band, flat-colour decals every 80-150 m (patch squares, crack lines, manholes, painted arrows / 慢 / 鹈鹕专用道 meme text), and a per-track asphalt tint."
+    },
+    {
+      "severity": "minor",
+      "owner": "env-mountain",
+      "title": "Waterfall still reads as a flat blotchy blue-white card from the gorge bridge",
+      "detail": "Mountain s~1975-2000 (trk/mountain/11-chase-4.png, crop in s11-detail.jpg). The fall is a planar sheet with a camouflage-like white/blue blotch texture: no thickness, no base foam, no mist. Open-list item, still present.",
+      "fix": "Build it from 3-4 stepped curved ribbons with scrolling toon-stripe UVs (white cores, pale-blue edges, ink outline), add a foam ring and drifting mist sprites at the base and a dark wet-rock lip at the top."
+    },
+    {
+      "severity": "minor",
+      "owner": "env-mountain",
+      "title": "Sunset grade collapses riders and road into one pink-brown family; the switchback legs are bare",
+      "detail": "The white pelican turns salmon-pink, brown rivals sit on a warm-grey road with little value or hue contrast, and distant riders melt into the asphalt (trk/mountain/09-chase-2.png, 12-chase-5.png, s14 mtn-pack). The legs between hairpins (s 715-855, 949-1089) are wide empty grass slopes with a few pines (open-list 'roadside sparse', still present).",
+      "fix": "env/mountain-grade.ts: push the shadow/ambient side toward blue-violet and keep the key warm. Keep character whites near neutral (exclude albedo above ~0.85 luma from the warm tint, or drive the bible's cool rim harder in this look). Dress the legs with scree fans, fence posts, prayer-flag lines, signposts and boulder clusters every 20-30 m."
+    },
+    {
+      "severity": "minor",
+      "owner": "ui-hud",
+      "title": "Bottom-right HUD cluster sits on the right lane and hides rivals while cruising",
+      "detail": "At 1080p the portrait + HP/SP + 4 skill diamonds take ~650x330 px and the place badge ~330x270 px, all at full size while cruising. At coast s~643 a rival and its name tag sit behind the diamonds (trk/coast/08-chase-1.png); the same happens in city chase-1. SPEC 10: 'Quiet while cruising; loud on events.'",
+      "fix": "Scale the cluster to ~0.85 at 1080p and tuck the diamonds under the HP/SP rows. Fade the cluster to ~55 % when a rider or name tag projects behind it. Shrink the place badge ~25 % while cruising and slam it to full size only on race:placeChange."
+    },
+    {
+      "severity": "minor",
+      "owner": "ui-hud",
+      "title": "WRECKED stamp fades out on top of the returning race HUD",
+      "detail": "Mountain, __br.fx.testWrecked(): at 1.0 s (cine/mountain-wrecked/05-1000ms.png) the half-transparent 'WRECKED 被打下车了' stamp overlaps the skill diamonds and HP/SP bars as the HUD fades back in. It reads as a layering glitch.",
+      "fix": "Finish the stamp exit before the HUD re-enters: hold the HUD until the stamp is gone, or slide the stamp up and out by the time cine:ko 'end' arrives."
+    },
+    {
+      "severity": "minor",
+      "owner": "fx",
+      "title": "WRECKED hold turns the pelican into a flat pale-pink cut-out by 0.5 s",
+      "detail": "At 0.25 s the WRECKED shot is excellent: B/W manga pelican with the beak visible (cine/mountain-wrecked/02-250ms.png). By 0.5 s it is a flat pale-pink silhouette on pink-red rays, with no ink lines or halftone. Head and beak can't be read and the body looks like a generic four-limbed blob (03-500ms.png).",
+      "fix": "Keep the KO subject tone map (paper white + ink + halftone) on the hero for the whole WRECKED hold, use red only as an edge tint, and re-measure subject luma each frame so the figure never flattens."
+    },
+    {
+      "severity": "minor",
+      "owner": "ui-screens",
+      "title": "Track-select thumbnails are raw 3D captures that clash with the sticker art",
+      "detail": "Quick race / career cards (ui/05-trackselect.png, 07-trackselect-3.png): the coast still is a plain grab, and Neon Night and Sunset Pass are dark and murky at card size. Every other screen uses illustrated ink-outlined art, so these cards look like placeholders.",
+      "fix": "Run the stills (tools/ui-track-stills.mjs) through a P5 treatment: posterise, halftone, red/black duotone accent, thick ink border, lifted exposure for the night and sunset shots. Or request illustrated track key art from assets."
+    },
+    {
+      "severity": "minor",
+      "owner": "race",
+      "title": "Intro flyover never brings a rider close to the camera",
+      "detail": "gameplay/race/intro-camera.ts opens 18 m in front of the grid at 6.2 m height, where riders are 30-60 px tall. It then passes the flank 7.8 m out at 2.6 m (trk/*/01-intro-a.png, 03-intro-c.png, s9-intros.jpg). The rival name cards present riders the camera never actually shows large.",
+      "fix": "Bring the flank pass closer (camM x -7.8 -> -3.5, y 2.6 -> 1.3) and ease through it with a ~0.3 s dwell on the rider each card presents (race:introFocus). Each rival then fills ~20-25 % of the frame once before the camera settles behind the pelican."
+    },
+    {
+      "severity": "minor",
+      "owner": "ui-screens",
+      "title": "Garage turntable does not frame small bikes",
+      "detail": "The kids' balance bike (儿童滑步车) shows at roughly half the screen size of the road bike on the same stage (ui/09-garage-2.png vs ui/08-garage.png), so the showroom is mostly empty.",
+      "fix": "Frame the turntable camera from each bike's bounding sphere, so every bike fills ~45 % of the stage height, instead of using a fixed distance."
+    }
+  ]
+}

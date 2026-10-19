@@ -28,7 +28,7 @@ const problems = [];
 /** Screen-state checks run after every step. */
 async function check(page, h, label) {
   const info = await page.evaluate(() => {
-    const ui = window.__br.app.ui.screen;
+    const ui = window.__br?.app?.ui.screen ?? 'boot'; // real units may still be loading on the boot shot
     const root = document.querySelector('.br-screen:last-of-type');
     const focus = root ? root.querySelectorAll('.is-focus').length : 0;
     const vw = innerWidth;
@@ -39,12 +39,12 @@ async function check(page, h, label) {
       if (r.width === 0 && r.height === 0) continue;
       if (r.left < -2 || r.top < -2 || r.right > vw + 2 || r.bottom > vh + 2) outside.push(`${el.className} @${Math.round(r.left)},${Math.round(r.top)},${Math.round(r.right)},${Math.round(r.bottom)}`);
     }
-    return { ui, focus, outside, errors: window.__br.errors.slice() };
+    return { ui, focus, outside, errors: window.__br?.errors.slice() ?? [] };
   });
   if (info.errors.length) problems.push(`${label}: console errors: ${info.errors.slice(-3).join(' | ').slice(0, 400)}`);
   if (FOCUS_SCREENS.has(info.ui) && info.focus === 0) problems.push(`${label}: no visible focus on ${info.ui}`);
   if (info.outside.length) problems.push(`${label}: outside viewport: ${info.outside.slice(0, 3).join('; ')}`);
-  await page.evaluate(() => { window.__br.errors.length = 0; });
+  await page.evaluate(() => { if (window.__br) window.__br.errors.length = 0; });
   return info.ui;
 }
 

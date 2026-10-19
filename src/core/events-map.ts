@@ -19,6 +19,7 @@ export interface GameEvents {
   'race:finishLine': { riderId: RiderId; place: number; time: number };
   'race:end': { results: RaceResult[] };          // all results final; game.ts shows results screen
   'race:finalStretch': { riderId: RiderId };       // player passes 85 % progress
+  'race:introFocus': { riderId: RiderId | null };  // intro flyover's current subject (null = scenery shot)
 
   // ---- riding (sim/) ----
   'rider:bump': { a: RiderId; b: RiderId; strength: number; pos: Vec3Like };
@@ -57,7 +58,12 @@ export interface GameEvents {
 
   // ---- police / traffic (gameplay/race) ----
   'police:alert': { riderId: RiderId; level: number; reason?: 'spawn' | 'lost' | 'busted' };
-  'police:busted': { riderId: RiderId; fine: number };
+  'police:busted': { riderId: RiderId; fine: number; hold?: number };   // hold = ticket-stop seconds (HUD assumes 4)
+  'police:whistle': { riderId: RiderId; pos: Vec3Like };               // the corgi whistles at riderId
+  'police:knock': { riderId: RiderId; weapon: WeaponId; pos: Vec3Like }; // riderId's swing knocked the corgi back
+  /** A line from a speaker that is not a session rider but rides an Obstacle (the police corgi): listeners follow
+   *  `session.obstacles` by id for the anchor and drop the line once that obstacle is gone. */
+  'npc:say': { obstacleId: number; character: CharacterId; text: string };
   'traffic:honk': { obstacleId: number; pos: Vec3Like };
 
   // ---- meta (gameplay/achievements) ----

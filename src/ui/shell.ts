@@ -7,14 +7,14 @@ import './screens/screens.css';
 import './shell.css';
 import type { Action } from '../core/input';
 import type { AppContext, ScreenId, ScreenProps, Session, Ui } from '../core/contracts';
-import { h, ShardWipe } from './p5';
+import { applyMotionPref, h, ShardWipe } from './p5';
 import { AudioUnlock } from './audio-unlock';
 import { AutoPause, type PauseReason } from './auto-pause';
 import { openConfirm, type Modal } from './confirm';
 import { isRaceView, musicFor, useWipe } from './flow-rules';
 import { KeyRepeat } from './key-repeat';
 import { createLazyHud } from './lazy-hud';
-import type { Nav } from './nav';
+import { isDirection, type Nav } from './nav';
 import { PadMenu } from './pad-menu';
 import { RaceTracker } from './race-tracker';
 import type { ScreenCtx, ScreenInstance } from './screen';
@@ -22,9 +22,8 @@ import { SCREENS, errorScreen } from './screens/registry';
 import { Toasts } from './toast';
 import type { Hud } from './hud/contract';
 
-/** Directional presses made while a screen leaves are replayed on the new one (type-ahead); confirm /
- * back are dropped until the new screen is fully revealed, so a double tap never acts on two screens. */
-const BUFFERED = new Set<Action>(['up', 'down', 'left', 'right']);
+// Directional presses made while a screen leaves are replayed on the new one (type-ahead); confirm /
+// back are dropped until the new screen is fully revealed, so a double tap never acts on two screens.
 const SOUND_HINT_SCREENS = new Set<ScreenId>(['title', 'menu']);
 
 interface Current {
@@ -73,6 +72,7 @@ class UiShell implements Ui {
     this.sound = new AudioUnlock(() => app.audio);
     this.root.append(hudLayer, this.screens, wipeLayer, toastLayer, this.sound.chip);
     app.uiRoot.append(this.root);
+    applyMotionPref();
     this.wipe = new ShardWipe(wipeLayer, () => app.audio.sfx('ui.slash', { volume: 0.5 }));
     this.toasts = new Toasts(toastLayer);
     this.hud = createLazyHud(app, hudLayer);
@@ -86,6 +86,10 @@ class UiShell implements Ui {
       const action = hint?.dataset.action;
       if (action === 'back' || action === 'confirm') this.onAction(action);
     });
+    // Clicks count as presses on menu screens (the results row waits for a quiet beat after clicks too).
+    window.addEventListener('pointerdown', () => {
+      if (!isRaceView(this.cur.id)) this.notePress();
+    }, { capture: true });
     app.bus.on('flow:screen', ({ screen }) => (this.announced = screen));
     app.bus.on('cine:ko', ({ phase }) => (this.cine = phase !== 'end'));
     const fit = (): void => this.fit();
@@ -259,10 +263,10 @@ class UiShell implements Ui {
     if (pad && !this.sound.unlocked) this.sound.attempt();
     if (pad && !isRaceView(this.cur.id) && this.pad.fromTrigger(a)) return;
     if (this.mounting) {
-      if (BUFFERED.has(a) && this.queued.length < 4) this.queued.push(a);
+      if (isDirection(a) && this.queued.length < 4) this.queued.push(a);
       return;
     }
-    if (this.settling && !BUFFERED.has(a)) return;
+    if (this.settling && !isDirection(a)) return;
     let used = false;
     try {
       if (this.modal) used = this.modal.handle(a);
@@ -279,7 +283,7 @@ class UiShell implements Ui {
     queueMicrotask(() => (this.swallow = false));
   }
 
-  /** One timestamp per key / pad press: core emits its actions (Space = hop + confirm) in one task. */
+  /** One timestamp per key / pad press / click: core emits its actions (Space = hop + confirm) in one task. */
   private notePress(): void {
     if (this.pressOpen) return;
     this.pressOpen = true;

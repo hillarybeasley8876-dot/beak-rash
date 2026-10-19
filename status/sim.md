@@ -7,6 +7,7 @@ src/sim/
 - forces.ts      longitudinal: pedal taper, brake, coast drag, slope, overspeed decay, boost, draft
 - steering.ts    lateral: target vx (speed-sensitive), grip lag, curve push, wobble/stun, yaw + lean
 - drift.ts       drift state machine, 3 mini-turbo levels, release boost, events
+- carve.ts       exit carve: after an L1+ release the rest of the bend keeps the drift's bite (acceptance r1)
 - air.ts         hop, crest launch (road-relative y'' = -g - v^2*k_v), ramps, air control, landings
 - surfaces.ts    surfaceAt effects, oil/puddle features, walls/drops via bounds()
 - contacts.ts    rider-rider contacts, slipstream/slingshot
@@ -372,3 +373,53 @@ Plan (issue -> fix; [x] = done + verified). Critic evidence: shots/review/sim/r3
   minors done (scrape pose, respawn push-off, weight pitch, drift lock), race's draft request done, feel-tour retargeted;
   F9 (contact width vs meshes) and the SPEC wording are filed as core requests. Note: critic wall.mjs counts every yaw
   wiggle as a reversal, so it will report the 13 Hz scrape shimmy (~26/s) that its own F3 fix asked for.
+
+## Acceptance round 1
+Issues owned by sim in reviews/game-r1-*.json (feel + perf):
+- [x] A1 major (feel) L3 release mid-hairpin runs wide / neutral crashes (mountain R27/R26, city R28) -> new sim/carve.ts
+      "exit carve": a release with L1+ arms it for the drift's direction; while the bend keeps turning that way the curve
+      push beyond 0.7 x grip authority is cancelled (never more than the drift's own 1.35 x cancel), fading over 0.3 s once
+      the bend relaxes below 1/150 m^-1 or reverses, or 4 s after the release (never carries into the next corner; a new
+      drift / respawn clears it). |vx| <= v tan 20 deg now holds 1.0 s after a release (driftExitGuard 0.5 -> 1.0) and while
+      the carve lasts, so walls only scrape. Critic probe-drift.mjs (copy in shots/sim/acc1/scripts, logs drift-before.log /
+      drift-after1.log): mountain R27 / R26 + city R28 full lock and line-holder out 0 m, 0 outer-wall hits (was 7.3-8.3 m,
+      1-5 hits); half 3.5 m (was 7.3-8.3, 10-11 hits); neutral no crash (was crash on both mountain hairpins), yaw out 12 deg,
+      runs wide and scrapes; coast R46 unchanged (0 m). Strip shots/sim/acc1/sheet-hairpin.jpg (line holds the centre,
+      neutral rides the outer curb). feel-scenarios-r3 driftRelease adds R26/R28/R30 x full/half/neutral (2.5 s after the
+      release): 42/42 pass (full 0 m wide, half 2.4-2.8 m / 3.9 deg, neutral 12-13 deg, no crash).
+- [x] A2 minor (feel) hero hides a rival straight ahead for the whole slipstream window (camera) -> chase.ts framing: eye
+      2.3 -> 2.8 m up (was 1.9 -> 2.2), 4.2 -> 4.7 m back (was 4.3 -> 5.1), look point 1.2 -> 1.5 m high (was 1.0 m), ranges via
+      span(); the horizon stays ~43 % from the top. Critic probe-occlude.mjs (copy in shots/sim/acc1/scripts, 1080p, v 19):
+      hero head y 541 -> 636 (58.9 %, critic's target 630-670), hero 253 -> 266 px (24.6 %); cat ahead visible px at
+      3/5/7/9/12/16 m: 19/49/69/84/99/113 of 103/82/69/59/49/40 (was 0/0/9/17/26/34) = whole from 7 m, 60 % at 5 m.
+      Looked at: sheet-occlude.jpg (before/after), sheet-views.jpg (grid, coast cruise among rivals, city): rivals ahead read
+      above the hero, composition fine. Regression: feel-telemetry 176/176 (then camera subset 57/57 after 4.8 -> 4.7 m);
+      critic cam scripts (copies in shots/sim/acc1/cam): t34 R27/R28 in/out 218-231 px (fix3 212-220), R26 drift 198-230;
+      release-size boost min -2.6 %, >= 187 px = 26 % (fix3 178); t32 chicane/hairpin 195-198 px; t30 laps city s7 / city s4 /
+      mountain s4: inObs 0, blendOff 0, size p5 184-192 px (fix3 179-184), maxFullRun 0 / 12 / 0 (the 12 frames = a gulped
+      rival popping out of the pouch at ds 0 then the spit arc; t30 now skips gulped / invisible riders, which it counted
+      as 48-frame full hides), rotation 'spikes' only inside KO hand-back blends (<= 4.5 deg/frame, under the 5 deg cut rule).
+- [x] A3 minor (perf) __br.sim.riders debug closure keeps the previous RaceSession alive at the menu -> debug.ts: the rows
+      hook is built by module-level riderRows(riders) (captures only the SimRider list) and dispose() resets it to the
+      module-level noRows (the old `() => []` made inside createPhysics kept that scope, and so the session, alive).
+      Critic retainer.mjs (copied to shots/sim/acc1/scripts): quit to menu -> "no live RaceSession" (was the sim path).
+Plan: A1 = post-release "exit carve" (drift's curve cancel kept while the mini-turbo burns + fade, only while the
+bend keeps turning the drift's way, |vx| <= v tan 20 deg for that window); add hairpin release cases to feel-scenarios-r3.
+A2 = chase framing (hero lower in frame at speed) and/or eye lift when a rider is ahead in line. A3 = debug holder.
+- Regression (after A1-A3): feel-telemetry 176/176 (shots/sim/acc1/tele/metrics.json; +24 hairpin release checks), camera
+  subset 57/57 after the last framing tweak; critic soak (copy shots/sim/acc1/feel/soak.mjs, TRACK env added) mountain s4 /
+  city s4 90 s all units: nan 0, oob 0, tunnel 0, bump loops 0, no wall crashes (only KOs), page errors 0 (ds/dx jumps =
+  pigeon ghost teleports); views.mjs: __br.errors [] on coast / city; npx tsc --noEmit: 0 errors in sim / camera.
+Notes for other units (acceptance round 1):
+- race AI: a drift released with L1+ now arms an exit carve for the rest of that bend (curve push capped at 0.7 x grip
+  authority while the bend keeps turning the drift's way, |vx| <= v tan 20 deg; fades when the bend relaxes / reverses or
+  after 4 s). AI riders that release mid-hairpin hold the line with ~70 % steer instead of running wide.
+- fx / race / ui / species: the chase eye is higher and a little closer (2.3 -> 2.8 m up, 4.2 -> 4.7 m back, look point
+  1.2 -> 1.5 m): the hero's head sits at ~59 % of the screen height (was dead centre), rivals ahead read above it, more of
+  the top of the hero's head and beak shows. CameraRig.chasePose() API unchanged (returns the new pose).
+Requests (core, SPEC wording; acceptance round 1):
+- SPEC section 6 camera: "distance 4.2->4.7 m, height 2.3->2.8 m, look 5->9 m ahead at 1.2->1.5 m" (hero head ~59 % of the
+  height so a rider ahead in the slipstream window is visible; hero still >= 24 %), replacing 4.3->5.1 / 1.9->2.2 / 1 m.
+- SPEC section 6 drift: "a release keeps |vx| <= v tan 20 deg for 1 s; a release with L1+ keeps the drift's bite for the
+  rest of that bend (exit carve: curve push capped at 0.7 x grip authority)".
+- Acceptance round 1 complete: A1 (major) and both minors fixed and verified.

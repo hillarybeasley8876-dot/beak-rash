@@ -5,7 +5,8 @@
 // pad, skill) never shrinks the radius full lock can hold (≈ R43). Drifting: the bike follows the bend
 // (the curve push is cancelled up to ×1.35 of the grip authority, so very tight bends still run wide) and
 // steering sets how fast it moves across the road; a release hands over to grip steering over 0.35 s and
-// keeps |vx| ≤ v·tan 20° for 0.5 s, so a mini-turbo leaves along the drift line and never wrecks. Knocks,
+// keeps |vx| ≤ v·tan 20° for 1 s (and while the exit carve lasts: carve.ts keeps the drift's bite for the rest
+// of the bend), so a mini-turbo leaves along the drift line and never wrecks. Knocks,
 // hard bumps, wall bounces and side swipes open a short carry window: steering that points back at the
 // hazard is weak and the grip pulling that way is slow, so the shove reads on screen, while steering away
 // keeps full authority.
@@ -14,6 +15,7 @@ import { TUNING as T } from './tuning';
 import { hasStatus, statusStrength, type SimRider } from './state';
 import type { Controls } from '../core/types';
 import { bikeTop, type SurfaceMods } from './forces';
+import { carvedPush, carving } from './carve';
 
 /** Combined grip: the lowest of statuses (combat mods), surface, oil and puddle. Never multiplied twice. */
 export function gripOf(sr: SimRider, surf: SurfaceMods): number {
@@ -58,11 +60,14 @@ export function driftTarget(sr: SimRider, steer: number): number {
   return d * lerp(T.driftLatOut, T.driftLatIn, u) * clamp01(sr.r.speed / sr.tune.top) * steerCtl(sr);
 }
 
-/** Outward curve push at min(v, bike top); a drift cancels it up to ×1.35 of the grip authority. */
-function curvePush(sr: SimRider, drifting: boolean): number {
+/**
+ * Outward curve push at min(v, bike top); a drift cancels it up to ×1.35 of the grip authority, and after a
+ * mini-turbo release the exit carve keeps part of that cancel for the rest of the bend (advanced by dt here).
+ */
+function curvePush(sr: SimRider, drifting: boolean, dt: number): number {
   const v = Math.min(sr.r.speed, bikeTop(sr));
   const push = sr.frame.curvature * v * v * T.curvePush;
-  if (!drifting) return push;
+  if (!drifting) return carvedPush(sr, push, dt);
   const cancel = T.driftCurveCancel * T.steerAuthHigh * sr.tune.handling * clamp01(sr.r.speed / sr.tune.top);
   return push - clamp(push, -cancel, cancel);
 }
@@ -91,7 +96,7 @@ export function lateral(sr: SimRider, c: Controls, surf: SurfaceMods, dt: number
   const want = drifting ? driftTarget(sr, steer) : clamp(steer * steerAuthority(sr), -cap, cap);
   let cmd = carry ? carried(sr, want) : want;
   if (r.airborne) cmd *= T.airControl;
-  const push = curvePush(sr, drifting);
+  const push = curvePush(sr, drifting, dt);
   let target = cmd - push;
   sr.vxWant = (r.airborne ? want * T.airControl : want) - push;
   const exiting = !drifting && sr.driftExit > 0;
@@ -115,7 +120,7 @@ export function lateral(sr: SimRider, c: Controls, surf: SurfaceMods, dt: number
   // The carry's slow grip only holds back motion toward the hazard; pulling away from it stays crisp.
   if (carry && (sr.carryDir === 0 || (target - r.vx) * sr.carryDir > 0)) tau = Math.max(tau, sr.carryTau);
   r.vx += (target - r.vx) * (1 - Math.exp(-dt / tau));
-  if (drifting || exiting) {
+  if (drifting || exiting || carving(sr)) {
     const lim = v * Math.tan(T.driftMaxAngle);
     r.vx = clamp(r.vx, -lim, lim);
   }

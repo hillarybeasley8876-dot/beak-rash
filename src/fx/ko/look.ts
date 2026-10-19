@@ -23,9 +23,11 @@ export interface Timeline {
 /** Longest a window may run (release + fade), chains included (SPEC §0: 1.2-1.8 s). */
 export const WINDOW_MAX = 1.8;
 
+/** First KO: the frozen 0.1x beat (SPEC §8) holds through the peak and the splash slam, then eases up so the
+ *  tumble still plays out (~0.25 s of sim) before the whoosh. */
 export const FULL: Timeline = {
-  hitStop: 0.09, slowAt: 0.09, peakAt: 0.45, holdAt: 0.45, releaseAt: 1.3, fadeOut: 0.32,
-  scale: 0.1, holdScale: 0.35, holdRamp: 0.4, rampIn: 0.12, rampOut: 0.25, extend: 0.3, apexWait: 0.18,
+  hitStop: 0.09, slowAt: 0.09, peakAt: 0.45, holdAt: 0.75, releaseAt: 1.3, fadeOut: 0.32,
+  scale: 0.1, holdScale: 0.4, holdRamp: 0.3, rampIn: 0.12, rampOut: 0.25, extend: 0.3, apexWait: 0.18,
 };
 
 /** Player wrecked: shorter, side camera, red edges; eases up early so ~0.45 s of the tumble plays on camera. */
@@ -88,7 +90,7 @@ export function applyLook(
   c.vignette = 0.3 * w;
   c.heroLines = 0;
   c.lines = (wrecked ? 0.35 : 0.5 + 0.4 * peak) * wc;
-  c.zoom = (wrecked ? 0.008 + 0.012 * start : 0.03 + 0.1 * start + 0.06 * peak) * wc;
+  c.zoom = (wrecked ? 0.008 + 0.012 * start : 0.03 + 0.1 * start + 0.03 * peak) * wc;
   const barIn = continued ? 1 : easeOutCubic(clamp01((t - tl.slowAt) / 0.22));
   const barOut = easeInCubic(clamp01((t - release) / tl.fadeOut));
   c.letterbox = barIn * (1 - barOut);

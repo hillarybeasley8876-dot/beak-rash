@@ -29,6 +29,10 @@
 .br-menu-item.is-focus { color: var(--ink); text-shadow: none; transform: skewX(var(--skew)) rotate(-5deg) translateX(18px) scale(1.08); }
 .br-menu-item.is-focus::before { opacity: 1; transform: none; }
 .br-menu-item.is-focus .br-menu-cn { animation: br-jitter 0.5s steps(6) infinite; display: inline-block; }
+/* Desktop shell: a 7th, smaller 退出游戏 step; the stair tightens so it still ends above the blurb and hints. */
+.br-menu-list.has-quit .br-menu-item { top: calc(var(--i) * 112px); }
+.br-menu-item.is-minor { margin-top: 10px; font-size: 62px; }
+.br-menu-item.is-minor .br-menu-en { font-size: 34px; }
 
 .br-menu-cursor {
   position: absolute;

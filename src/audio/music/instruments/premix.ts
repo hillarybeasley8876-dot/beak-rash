@@ -1,9 +1,9 @@
 // Pre-mixes notes from a note bank (bank.ts) into one stereo buffer, so a whole chord / stab plays
 // as one buffer source: each note resampled to pitch (linear interpolation, as a buffer source
 // would), panned (equal power, unity per channel at the centre like an up-mixed mono voice),
-// started at its offset, and released at `off` over `release` s (the live voices' exponential-
-// looking fall), optionally bending down during the release (brass falls). All-centred notes mix
-// to a mono buffer (half the work downstream).
+// started at its offset (optionally bending in: slides), and released at `off` over `release` s
+// (the live voices' exponential-looking fall). All-centred notes mix to a mono buffer (half the
+// work downstream).
 import { FLOOR } from '../../dsp/env';
 
 export interface MixNote {
@@ -16,14 +16,14 @@ export interface MixNote {
   pan: number;
   /** Offset (s) from the start of the mix (rolled chords). */
   at?: number;
+  /** Bend in: start at `from` × the rate and glide to it (exponentially) over `time` s (slides, scoops). */
+  bend?: { from: number; time: number };
 }
 
 export interface MixOpts {
   /** Note-off (s from the start of the mix). */
   off: number;
   release: number;
-  /** Semitones the notes fall over the release (0 = none). */
-  fall?: number;
 }
 
 export function premix(notes: MixNote[], o: MixOpts, sampleRate: number): AudioBuffer {
@@ -43,6 +43,7 @@ export function premix(notes: MixNote[], o: MixOpts, sampleRate: number): AudioB
     const gr = Math.sin(x) * Math.SQRT2 * n.gain;
     const start = Math.max(0, Math.round((n.at ?? 0) * sr));
     const step = n.rate * (n.buf.sampleRate / sr);
+    const bendEnd = n.bend ? start + n.bend.time * sr : start;
     let pos = 0;
     for (let i = start; i < len; i++) {
       const u = i < off ? 0 : Math.min(1, (i - off) / rel);
@@ -52,7 +53,8 @@ export function premix(notes: MixNote[], o: MixOpts, sampleRate: number): AudioB
       const v = (a + ((src[p + 1] ?? 0) - a) * (pos - p)) * (u === 0 ? 1 : Math.exp(k * u));
       left[i] = (left[i] ?? 0) + v * gl;
       if (right) right[i] = (right[i] ?? 0) + v * gr;
-      pos += o.fall && u > 0 ? step * Math.pow(2, (-o.fall * u) / 12) : step;
+      const bent = n.bend && i < bendEnd ? Math.pow(n.bend.from, 1 - (i - start) / (bendEnd - start)) : 1;
+      pos += step * bent;
     }
   }
   return out;

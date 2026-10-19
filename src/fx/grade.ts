@@ -1,12 +1,25 @@
 // Colour grade from the track look (eased in real time), and the speed sensation from the player.
 import { Color, NoToneMapping, type WebGLRenderer } from 'three';
-import { clamp01, damp, smoothstep } from '../core/math';
+import { clamp, clamp01, damp, smoothstep } from '../core/math';
 import { BIKES } from '../data/bikes';
 import type { EnvLook, RiderState } from '../core/types';
 import type { PostState } from './state';
 
 const MENU_GRADE: EnvLook['grade'] = { saturation: 1.05, contrast: 1.04, tint: '#ffffff', bloom: 0.25, night: false };
 const tint = new Color();
+const wb = new Color();
+const amb = new Color();
+
+/** Partial white balance against the track's key + fill light (sRGB-space factors): a white seagull under
+ *  the city's blue moon or a pelican in the mountain's orange sun reads white again in the KO cast look. */
+function whiteBalance(look: EnvLook | null, out: Color): Color {
+  if (!look) return out.setRGB(1, 1, 1);
+  out.set(look.sun.color).multiplyScalar(look.sun.intensity * 0.7);
+  out.add(amb.set(look.ambient.sky).multiplyScalar(look.ambient.intensity));
+  const l = 0.2126 * out.r + 0.7152 * out.g + 0.0722 * out.b;
+  const f = (c: number): number => clamp(Math.pow(l / Math.max(c, 1e-3), 0.85 / 2.2), 0.7, 1.4);
+  return out.setRGB(f(out.r), f(out.g), f(out.b));
+}
 
 /** Ease the grade toward the look (snap = jump straight there, e.g. on race start). */
 export function updateGrade(state: PostState, look: EnvLook | null, renderer: WebGLRenderer, dtReal: number, snap = false): void {
@@ -19,6 +32,7 @@ export function updateGrade(state: PostState, look: EnvLook | null, renderer: We
   s.threshold += ((g.night ? 0.85 : 1.0) - s.threshold) * k;
   tint.set(g.tint);
   s.tint.lerp(tint, k);
+  s.wb.lerp(whiteBalance(look, wb), k);
   const exposure = renderer.toneMapping === NoToneMapping ? 1 : renderer.toneMappingExposure;
   s.exposure += (exposure - s.exposure) * k;
 }

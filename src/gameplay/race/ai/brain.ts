@@ -2,6 +2,7 @@
 import { clamp, lerp, smoothstep } from '../../../core/math';
 import type { Rng } from '../../../core/rng';
 import type { Controls, RiderState } from '../../../core/types';
+import { Blunder, type BlunderGate } from './blunder';
 import { Driver, topOf } from './control';
 import { Fighter, type HuntToken } from './fight';
 import type { RacingLine } from './line';
@@ -21,6 +22,8 @@ export interface AiWorld {
   line: RacingLine;
   senses: Senses;
   bounds(s: number): { left: number; right: number; halfWidth: number };
+  /** The director's once-a-race, in-view traffic blunder (blunder.ts). */
+  blunder: BlunderGate;
 }
 
 const PLAN_EVERY = 0.05;
@@ -29,6 +32,8 @@ const SOFT_CLOSING = 2;     // m/s: closing on a rider faster than this brakes i
 const FOLLOW_DECEL = 4;     // m/s²: planned deceleration when closing on a rider ahead
 const CAP_SLACK = 0.5;      // m/s: aim this far above the pace cap (rubber makes the sim's top the cap itself)
 const DRAFT_TOP = 0.1;      // slipstream top-speed bonus (SPEC §6, sim tuning draftTop): a drafter may close on the wheel
+const RIVAL_PASS = 0.8;     // m/s: a hunted rival is fought in passing (never waited for)…
+const FIGHT_PACE = 0.9;     // …and never below this share of the hunter's own race speed, so a brawl costs little time
 
 /** Speed command of one step: target m/s and whether only easing off the pedals (never braking). */
 interface SpeedGoal { target: number; soft: boolean }
@@ -37,6 +42,7 @@ export class Brain {
   readonly driver = new Driver();
   readonly fighter: Fighter;
   private grip: GripModel;
+  private blunder: Blunder;
   private drift: DriftPlan = { active: false, dir: 0, goal: 0.6, cool: 0 };
   private plan: PlanOutput = { x: 0, followSpeed: null, followGap: Infinity, followKind: null, hopAt: null };
   private tx: number;
@@ -66,6 +72,7 @@ export class Brain {
   constructor(readonly r: RiderState, readonly c: Controls, readonly p: Personality, private rng: Rng, token: HuntToken) {
     this.fighter = new Fighter(r, p, rng, token);
     this.grip = new GripModel(p.risk * this.driver.authorityAtTop(r));
+    this.blunder = new Blunder(r, p.skill, rng.fork(0xb1));
     this.tx = r.x;
     this.planT = rng.range(0, PLAN_EVERY);
     this.skillT = rng.range(0, SKILL_EVERY);
@@ -157,9 +164,11 @@ export class Brain {
     this.fighter.chooseTarget(w.riders, w.player, w.time);
     const hunting = this.fighter.hunt;
     this.wantX = clamp(this.desiredX(w, hw), lo, hi);
+    const blind = this.blunder.update(PLAN_EVERY, w.senses.blips, w.blunder);
+    if (blind !== null) this.wantX = clamp(this.blunder.aimX, lo, hi);
     this.plan = planLateral({
       desiredX: this.wantX, prevX: this.plan.x, x: r.x, v: r.speed, lo, hi, asphalt: hw,
-      horizon: (1 + 1.4 * p.skill) * (hunting ? 0.75 : 1), ignore: hunting ? hunting.id : null,
+      horizon: (1 + 1.4 * p.skill) * (hunting ? 0.75 : 1), ignore: hunting ? hunting.id : null, blind,
       canHop: this.hopCd <= 0 && p.skill > 0.35,
     }, w.senses.blips);
     if (r.mode !== 'racing') return;
@@ -186,7 +195,7 @@ export class Brain {
       pace: Number.isFinite(this.paceTop) ? +this.paceTop.toFixed(2) : null, base: Number.isFinite(this.basePace) ? +this.basePace.toFixed(2) : null,
       top: +topOf(r).toFixed(2), rubber: +r.rubber.toFixed(3), aLat: +this.grip.aLat.toFixed(2), drift: this.drift.active,
       steer: +this.c.steer.toFixed(2), throttle: +this.c.throttle.toFixed(2), brake: +this.c.brake.toFixed(2),
-      fight: this.fighter.debug(),
+      fight: this.fighter.debug(), blind: this.blunder.oid,
     };
   }
 
@@ -267,14 +276,17 @@ export class Brain {
   }
 
   /**
-   * A hunter rides alongside its prey: match its speed, closing in from behind (brake on slow prey); ahead of
-   * the prey it only eases off, unless it owes the player a payback (then it brakes to let the player come up).
+   * A hunter rides alongside the player: match its speed, closing in from behind (brake on a slow player); ahead
+   * of it only ease off, unless it owes a payback (then brake to let the player come up). A rival is fought in
+   * passing: closing in from behind, then a slow overtake (RIVAL_PASS) while swinging, never waiting for it nor
+   * dropping below FIGHT_PACE of its own race speed (a slow rival gets one swing as the hunter goes by).
    */
   private huntLimit(g: SpeedGoal): void {
     const goal = this.fighter.huntGoal();
     const prey = this.fighter.hunt;
     if (!goal || !prey || Math.abs(goal.ds) >= 25) return;
-    const t = prey.speed + clamp(goal.ds * 0.8, -2.5, 5);
+    const close = clamp(goal.ds * 0.8, -2.5, 5);
+    const t = prey.isPlayer ? prey.speed + close : Math.max(prey.speed + Math.max(RIVAL_PASS, close), g.target * FIGHT_PACE);
     if (t < g.target) {
       g.target = t;
       g.soft = (goal.ds < 0 && !this.fighter.owes) || (goal.ds >= 0 && this.r.speed - prey.speed < SOFT_CLOSING);

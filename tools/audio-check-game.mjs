@@ -92,7 +92,7 @@ export async function gameCheck(args) {
     // start from a clean slate (this checks the wiring; the gaps have their own logic).
     await h.eval(() => {
       window.__br.app.audio.cool.delete('pelicanTaunt');
-      window.__br.app.audio.rt.voices.barkGate = -Infinity;
+      window.__br.app.audio.rt.voices.barkUntil = -Infinity;
       window.__br.app.bus.emit('combat:bell', { riderId: 0, pos: { x: 0, y: 0, z: 0 }, angered: [1] });
     });
     // The taunt follows the bell by 350 ms (later on a loaded machine): wait up to 3 s for it to start.

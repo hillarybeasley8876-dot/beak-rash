@@ -18,7 +18,7 @@ export interface ScreenCtx {
   go(screen: ScreenId, props?: ScreenProps): void;
   toast(text: string, kind?: 'info' | 'warn' | 'meme'): void;
   confirm(title: string, text: string, yes?: string, no?: string): Promise<boolean>;
-  /** Milliseconds since the latest key / pad press of any action on any screen (mash detection). */
+  /** Milliseconds since the latest key / pad press (or click on a menu screen) of any action (mash detection). */
   sincePress(): number;
   /** Make a Nav that the shell routes actions to while this screen is active. */
   nav<T extends Nav>(nav: T): T;

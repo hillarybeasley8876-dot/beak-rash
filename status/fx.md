@@ -50,13 +50,15 @@
 
 ## Files
 - src/fx/index.ts (entry) · system.ts (FxSystem core) · state.ts (PostState) · grade.ts · context.ts · debug.ts
-- post/{pipeline,bloom,composite,composite-glsl,glsl-common,timer}.ts (timer = GPU timer for `__br.fx.gpu`)
+- post/{pipeline,bloom,composite,composite-glsl,composite-cast,mask,glsl-common,timer}.ts (timer = GPU timer for
+  `__br.fx.gpu`; mask = KO cast mask pass, composite-cast = victim / attacker / bystander look)
 - particles/{atlas,atlas-shapes,atlas-shapes2,atlas-shapes3,shaders,pool,system}.ts
 - presets/{kit,impacts,ground,bodies,rewards,speed,skills,index}.ts
 - react/{tracker,bus,bus-combat,bus-ride,emitters,skills,species}.ts
-- ko/{director,cine,look,camera,framing,subject,rise,tester}.ts (framing = shot templates incl. SHOWTIME + picker +
+- ko/{director,cine,cast,look,camera,framing,subject,rise,tester}.ts (cast = who is who for the mask + occluders) (framing = shot templates incl. SHOWTIME + picker +
   bounds confine, subject = head/body/bike sphere + SHOWTIME hero pick)
-- sandbox/fx.{html,ts,stage.ts,replay.ts,check.mjs,cine.mjs,cine-sum.py,flow.mjs,sheet.py,grid.py,play.mjs,isolate.mjs}
+- sandbox/fx.{html,ts,stage.ts,replay.ts,check.mjs,cine.mjs,cine-sum.py,flow.mjs,sheet.py,grid.py,play.mjs,isolate.mjs,
+  accept.mjs,warm.mjs} (accept = the critics' cinematic probe with sizes/events + contact sheet; warm = shader link check)
 - particle modes: 0 billboard · 1 screen-stretched · 2 flat on the road · 3 flutter · 4 orbit anchor · 5 world line
 
 ## Event protocol (for ui/audio)
@@ -230,3 +232,55 @@ Cross-unit notes (fix round 2):
   peak + end come from the impact window (or one `end` if the rise is cancelled); `cine:ult` is always start -> impact
   -> end, and no cinematic starts after `race:end` until the next race.
 - env-city: wet-road reflections still read as vertical stripes in chase view at night (unchanged, not fx).
+
+## Acceptance round 1 (fixer 2026-10-19; reviews/game-r1-*.json, owner fx: 2 majors + 5 minors; DONE: all 7)
+- [x] M1 (e2e major + aesthetic minors 'bystanders crowd' / 'WRECKED pink cut-out' + feel minor 'white clump'): the KO
+      look now knows WHO is who. post/mask.ts draws the cast (ko/cast.ts: victims, attacker, every other rider + the
+      race:traffic / race:police groups as bystanders) with a role id + view depth into an RG16F target (layer 30 +
+      override material, layers/culling restored right after; only while the comic look is on). post/composite-cast.ts:
+      victim = spot colour (white-balanced against the track's sun + sky light, grade.wb; saturated parts keep their
+      colour, near-neutral parts go to clean 3-tone paper/grey/ink so sunset / neon light never tints white plumage;
+      lifted up to 1.8x when dark) inside a 4 px paper sticker rim + ink line; attacker muted (50 % colour, x0.78);
+      bystanders and vehicles = 30-55 % ink ghosts over the burst; riders between the lens and a victim are skipped for
+      the frame (fillOccluders; the SHOWTIME pelican is kept); MSAA fringe pixels adopt their neighbour's role; floor =
+      dark ink-red screen tone; WRECKED red edges never touch the victim; the shot keeps 2.15 m from the victim's head /
+      body / bike (actors fade a crashed rider within 1.9 m). Without a cast (sandbox) the old depth look stays.
+      Checked (sandbox/fx.accept.mjs = the critics' probe + sizes/events): coast capybara/goose/sloth, city cat + seagull,
+      mountain shiba, chain, WRECKED: victim in colour with a rim, bystanders dark, traffic dark; city seagull p90 paper
+      (246,244,239); WRECKED pelican paper white (247,245,240) at 250/500/750 ms with &stub=ui (the remaining pink in
+      game is ui-hud's red overlay, see Requests). Debug: __br.fx.toggles.castView (ghost red / victim green / attacker blue).
+- [x] M2 (aesthetic major + feel minor) SHOWTIME: framing.ultOverShoulder = eye 2.4 m behind the impact and 1.3 m to the
+      side, ~1.1 m up, FOV fitted so the hero victim's sphere fills 45 % of the half-height (bias 0.15), pan 0 (hero
+      centred), hero bike leaves the fit from 1 m; preferred (bonus) over ult34/ult34High, which stay for a hero < 3 m
+      from the impact. Victims stand against the rays, the pelican is a muted foreground edge; shockwave clouds burst out
+      to both sides of the travel direction. Rise: 0.28x under the cut-in until 1.0 s, then the near-static top rushes at
+      1.6x until 0.6 s of skill sim time, dive at 1x: impact 1.48 s (was 1.87), static apex ~0.29 s.
+      fx.cine.mjs ult: hero 0.26-0.35 of the frame height for the whole hold (x ~ -0.05), 2nd victim 0.18-0.24 at the
+      impact, barsMin 1, protocolOk; critics' scenario: hero 0.26-0.29, 2nd 0.27-0.39. fx.flow.mjs: full 1483 ms (rush
+      1.6x), short 1183, off 917, race-ended latch PASS (full criterion now 1350-1700 ms + rush).
+- [x] m3 traffic in the framing: director.vehicles() adds active solid session.obstacles within 30 m (centre at half
+      height, radius max(halfWidth, min(halfLength, 2.5), height/2), velocity along the tangent) to pickFraming's
+      occluders; framing.blocks() takes a per-occluder radius (riders keep 0.7 m).
+- [x] m4 FULL timeline: holdAt 0.45 -> 0.75 (0.1x from ~0.2 s through the peak + splash slam), holdScale 0.4 over 0.3 s,
+      release 1.3 s (+ apexWait). fx.cine.mjs ko (coast/city/mountain): scale 0.1 at +0.3/+0.5 s, 0.18 at +0.8, 0.4 at
+      +1.1; simToRelease 0.357 s, victim displacement 3.5-3.85 m, headClear 1, body/bike in frame 100 %. Not the full
+      1.1 s at 0.1x: that leaves ~0.11 s of sim and the victim never leaves the bike on camera (fx timing critic r1).
+- [x] m5 peak wash: zoom pulse at the peak 0.06 -> 0.03 (the radial smear) + a 2-frame 0.3 white flash on the first peak;
+      the B/W wash itself is gone with M1.
+- [x] m6 GO-frame compiles: ParticlePool.warm() draws both (parked) pools for 2 frames after attach; the pipeline renders
+      the cast mask once in the intro (5 variants). sandbox/fx.warm.mjs coast + city high: fx.particles / fx.subjectMask
+      link in the intro, nothing fx links at GO / first KO / WRECKED (fxLate 0).
+- Checks after the round: tsc clean for src/fx + sandbox/fx.*; fx.check.mjs bursts / ride / replay ko|ult|chain|wrecked
+  0 errors; fx.play.mjs mountain 60 fps, 216 calls, 0 errors; post at 1080p 0.39 ms plain / 1.46 ms during a KO hold
+  (mask pass + cast taps included; budget 3 ms). Files: post/mask.ts 136, post/composite-cast.ts ~110, ko/cast.ts 41,
+  ko/cine.ts 393 (split before it grows further), sandbox/fx.accept.mjs + fx.warm.mjs new.
+
+Requests (acceptance round 1):
+- ui-hud: the WRECKED splash brings a full-screen red overlay (~28 %; letterbox bars (11,11,15) -> (72,15,19)) that turns
+  the white pelican pink for the whole hold (the aesthetic critic's 'pale-pink cut-out'); fx renders it paper white.
+  Please keep that tint to the screen edges (or drop it while cine:ko kind=wrecked runs).
+- combat: the SHOWTIME translucent red ring / beam crosses the victims for ~0.2 s after the impact and tints them red
+  (transparent, so the cast colours show it); please hide it while cine:ult runs or make it an inked ground ring.
+- actors: stun stars are small in the SHOWTIME hold (critic: 'scale up the stun stars so the chain reads'); and the
+  near-camera fade of a crashed rider uses min(body, bike) distance, so a bike 1.9 m from a cinematic camera fades the
+  whole body (fx now keeps 2.15 m from head/body/bike, but a dedicated cinematic exemption would be safer).

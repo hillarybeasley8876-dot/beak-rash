@@ -65,8 +65,17 @@ const INK_FILTER = `<svg width="0" height="0" aria-hidden="true"><filter id="br-
 <feDisplacementMap in="speckled" in2="warp" scale="4" xChannelSelector="R" yChannelSelector="G"/>
 </filter></svg>`;
 
+/** Grade quotes that claim the win ('你最快') only fit a 1st place (content request: place-tagged lines). */
+const CLAIMS_WIN = /最快|第一|冠军/;
+
+function gradeQuote(reward: Reward, seed: number): string | null {
+  const all = GRADE_QUOTES[reward.grade.grade];
+  const fit = reward.place === 1 ? all : all.filter((q) => !CLAIMS_WIN.test(q));
+  return pickLine(fit, seed);
+}
+
 export function gradeBlock(reward: Reward, seed: number): HTMLDivElement {
-  const quote = pickLine(GRADE_QUOTES[reward.grade.grade], seed);
+  const quote = gradeQuote(reward, seed);
   return h('div', { class: `br-grade is-${reward.grade.grade.toLowerCase()}` },
     h('div', { class: 'br-grade-stamp' },
       svg(INK_FILTER, 'br-grade-defs'),

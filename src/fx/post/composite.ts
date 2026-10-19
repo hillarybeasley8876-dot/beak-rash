@@ -31,7 +31,7 @@ export class Composite {
       fragmentShader: COMPOSITE_FRAG,
       defines: this.defines(),
       uniforms: {
-        tScene: u<Texture | null>(null), tBloom: u<Texture | null>(null), tDepth: u<Texture | null>(null),
+        tScene: u<Texture | null>(null), tBloom: u<Texture | null>(null), tDepth: u<Texture | null>(null), tMask: u<Texture | null>(null), uMask: u(0), uMaskRes: u(new Vector2(1, 1)), uVicWB: u(new Color(1, 1, 1)), uCastView: u(0),
         uNear: u(0.1), uFar: u(1000), uTanHalf: u(new Vector2(1, 1)), uViewUp: u(new Vector3(0, 1, 0)), uSubjectDepth: u(4), uBgBurst: u(0), uBgMargin: u(3), uBehindAt: u(2), uBurstInk: u(0), uRim: u(0),
         uRes: u(new Vector2(1, 1)), uTime: u(0),
         uExposure: u(1), uSat: u(1), uContrast: u(1), uBloom: u(0), uTintN: u(new Color(1, 1, 1)),
@@ -60,13 +60,21 @@ export class Composite {
     this.material.needsUpdate = true;
   }
 
-  /** `camera` null = no depth-based effects (orthographic or unknown lens). */
-  sync(state: PostState, scene: Texture, bloom: Texture | null, depth: Texture | null, camera: PerspectiveCamera | null, res: Vector2, time: number): void {
+  /** `camera` null = no depth-based effects (orthographic or unknown lens); `mask` = this frame's cast mask. */
+  /** Debug: draw the cast roles (ghost red, victim green, attacker blue) instead of the KO look. */
+  castView = false;
+
+  sync(state: PostState, scene: Texture, bloom: Texture | null, depth: Texture | null, mask: Texture | null, camera: PerspectiveCamera | null, res: Vector2, time: number): void {
     const u = this.material.uniforms;
     const { grade, speed, cine, pulse } = state;
     u.tScene!.value = scene;
     u.tBloom!.value = bloom;
     u.tDepth!.value = camera ? depth : null;
+    u.tMask!.value = camera ? mask : null;
+    u.uMask!.value = camera && mask ? 1 : 0;
+    u.uCastView!.value = this.castView ? 1 : 0;
+    const img = mask?.image as { width?: number; height?: number } | undefined;
+    (u.uMaskRes!.value as Vector2).set(img?.width ?? res.x, img?.height ?? res.y);
     if (camera) {
       u.uNear!.value = camera.near;
       u.uFar!.value = camera.far;
@@ -87,6 +95,7 @@ export class Composite {
     u.uContrast!.value = grade.contrast;
     u.uBloom!.value = grade.bloom * BLOOM_NORMALISE;
     (u.uTintN!.value as Color).copy(this.normalisedTint(grade.tint));
+    (u.uVicWB!.value as Color).copy(grade.wb);
     // The release whoosh (rush) is never masked by the fading KO look, so it is on screen at the cut.
     u.uEdgeBlur!.value = speed.edgeBlur * (1 - cine.ko) + 0.04 * speed.rush;
     u.uChroma!.value = speed.chroma * (1 - cine.ko) + pulse.chroma;

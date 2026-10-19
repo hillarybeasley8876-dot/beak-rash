@@ -26,7 +26,7 @@ const SFX_LP_MIN = 2200;
 const DUCK_ATTACK = 0.005;
 const DUCK_RELEASE = 0.12;  // s time constant back to unity
 const VERB_TAIL = 4;        // s after the last music before the reverb loop is unplugged
-const VERB_RETURN = 0.18;   // reverb return: the tail level the 0.39 convolution plate had (±1 dB)
+const VERB_RETURN = 0.1;    // reverb return: ≈ 1 dB over the tail level the 0.39 convolution plate had
 
 export class Engine {
   readonly musicIn: GainNode;

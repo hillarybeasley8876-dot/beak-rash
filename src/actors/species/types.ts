@@ -29,6 +29,11 @@ export interface SpeciesMeta {
   headBob?: boolean;
   /** Head yaw sway (rad amplitude) once per crank turn while pedalling (the hero's beak swings into view). */
   headSway?: number;
+  /** Resting head carriage (hero): with nothing to look at, the head turns `yaw` rad toward the road centre, tips its
+   *  bill up `pitch` rad and the neck bends `shift` rad sideways, so the long bill clears the helmet from the chase cam. */
+  carry?: { yaw: number; pitch: number; shift: number };
+  /** Pouch jiggle amplitude at speed (fraction of its width; pelican). */
+  pouchJiggle?: number;
   /** Idle micro-motions (rig/idle.ts): ear flop amplitude (rad), loose-hat wobble (rad); blink length (s). */
   earFlop?: number;
   hatWobble?: number;
