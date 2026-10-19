@@ -8,3 +8,4 @@ desktop/electron
 desktop/build
 desktop/*.log
 desktop/*.ok
+dist-single
