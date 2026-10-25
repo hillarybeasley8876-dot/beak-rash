@@ -2,6 +2,7 @@
 import * as bodies from './bodies';
 import * as ground from './ground';
 import * as impacts from './impacts';
+import * as r4 from './r4';
 import * as rewards from './rewards';
 import * as skills from './skills';
 import * as speed from './speed';
@@ -52,6 +53,17 @@ export const PRESETS: Readonly<Record<string, Preset>> = {
   spin: skills.spin,
   zaps: skills.zaps,
   notes: skills.notes,
+  // r4 (fx unit): the air tricks, the pan parry, the throw release and the track events.
+  trickTrail: r4.trickTrail,
+  trickLand: r4.trickLand,
+  parry: r4.parry,
+  throwTrail: r4.throwTrail,
+  policeDown: r4.policeDown,
+  fishSplash: r4.fishSplash,
+  truckDust: r4.truckDust,
+  gooseFeathers: r4.gooseFeathers,
+  fruit: r4.fruit,
+  quack: r4.quack,
 };
 
 export const PRESET_NAMES = Object.keys(PRESETS);

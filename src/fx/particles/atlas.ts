@@ -3,6 +3,7 @@ import { CanvasTexture, LinearFilter, LinearMipmapLinearFilter, SRGBColorSpace, 
 import * as S from './atlas-shapes';
 import * as S2 from './atlas-shapes2';
 import * as S3 from './atlas-shapes3';
+import * as S4 from './atlas-shapes4';
 
 /** Atlas frame indices. glow / streak / spark are soft (for the additive pool). */
 export const FRAME = {
@@ -10,6 +11,8 @@ export const FRAME = {
   confetti: 8, scale: 9, coin: 10, ring: 11, glow: 12, streak: 13, spark: 14, smear: 15,
   burst: 16, rays: 17, heart: 18, note: 19, zap: 20, swirl: 21, keycap: 22, leaf: 23, fry: 24,
   shock: 25, hex: 26, plus: 27, glint: 28, dash: 29, shard: 30,
+  // r4 (fx unit): the police cap, the spilled fish, the market fruit and the rubber duck.
+  cap: 31, fish: 32, melon: 33, fruit: 34, duck: 35,
 } as const;
 export type FrameName = keyof typeof FRAME;
 
@@ -23,6 +26,7 @@ const DRAW: Record<FrameName, (c: S.Ctx) => void> = {
   burst: S2.burst, rays: S2.rays, heart: S2.heart, note: S2.note, zap: S2.zap, swirl: S2.swirl,
   keycap: S2.keycap, leaf: S2.leaf, fry: S2.fry,
   shock: S3.shock, hex: S3.hex, plus: S3.plus, glint: S3.glint, dash: S3.dash, shard: S3.shard,
+  cap: S4.cap, fish: S4.fish, melon: S4.melon, fruit: S4.fruit, duck: S4.duck,
 };
 
 let atlas: Texture | null = null;

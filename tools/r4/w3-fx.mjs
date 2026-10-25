@@ -34,12 +34,12 @@ await withPage(async (page, h) => {
     const d = await bump(name, payload);
     expect(d >= 8, `${label} → a burst of particles (+${d})`);
   }
-  // trick trails while a trick runs (sim sets RiderState.trick)
+  // trick trails while a trick runs (the sim announces it: rider:trick phase 'start')
   const trail = await page.evaluate(() => {
     const b = window.__br, p = b.session().player;
     b.step(90);
     const n0 = (({ solid, add }) => solid + add)(b.fx.stats().particles);
-    p.y = 1.5; p.vy = 6; p.airborne = true; p.trick = { kind: 'spin', t: 0.1, dur: 0.55, dir: 1 };
+    b.app.bus.emit('rider:trick', { riderId: p.id, phase: 'start', kind: 'spin', count: 1, points: 0 });
     b.step(8);
     return (({ solid, add }) => solid + add)(b.fx.stats().particles) - n0;
   });

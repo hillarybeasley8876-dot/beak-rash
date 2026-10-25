@@ -198,7 +198,7 @@ declare global {
   interface Window { fxSandbox?: unknown }
 }
 window.fxSandbox = {
-  fire, gallery, closeup, post, toggles: pipeline.toggles, particles,
+  fire, gallery, closeup, post, toggles: pipeline.toggles, particles, stage,
   replay: (kind: ReplayKind) => replay.play(kind),
   replayInfo: () => ({ ...replay.info(), log: replay.log.slice(), cine: { ...post.cine, focus: post.cine.focus.toArray() } }),
   step: (frames: number, dt = 1 / 60) => { for (let i = 0; i < frames; i++) step(dt); },
