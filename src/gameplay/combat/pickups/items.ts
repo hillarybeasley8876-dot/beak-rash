@@ -15,6 +15,7 @@ export interface Item {
   y: number;             // centre height above the road
   alive: boolean;
   respawnAt: number;     // combat time when a taken row item returns (Infinity = never)
+  takeAt: number;        // combat time before the item can be taken at all (a dropped weapon lies a moment)
   pop: number;           // 0..1 spawn pop-in
   phase: number;         // animation offset
   weapon: WeaponId;      // kind 'weapon'
@@ -28,7 +29,7 @@ export interface Item {
 /** A fresh item; ids come from the session's PickupSystem (same seed, same ids after a restart). */
 export function makeItem(id: number, kind: PickupKind, s: number, x: number, phase: number): Item {
   return {
-    id, kind, s, x, y: PICKUP.float, alive: true, respawnAt: Infinity, pop: 1, phase,
+    id, kind, s, x, y: PICKUP.float, alive: true, respawnAt: Infinity, takeAt: 0, pop: 1, phase,
     weapon: 'none', uses: 0, vel: null, life: Infinity, vacuumBy: null, home: kind === 'weapon' ? null : { s, x },
   };
 }

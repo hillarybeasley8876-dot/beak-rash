@@ -174,7 +174,7 @@ export class SkillRunner {
     const impl = SKILL_IMPLS[id];
     if (impl?.ready && !impl.ready(this.ctx, r)) return 'target';
     const a = r.action;
-    if (a && (a.kind === 'hit' || ((a.kind === 'attack' || a.kind === 'heavy') && !a.resolved))) return 'busy';
+    if (a && (a.kind === 'hit' || a.kind === 'throw' || ((a.kind === 'attack' || a.kind === 'heavy') && !a.resolved))) return 'busy';
     return null;
   }
 

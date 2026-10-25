@@ -63,6 +63,23 @@ export function checkKos(ctx: CombatCtx): void {
   }
 }
 
+/**
+ * A wreck with no attacker (SPEC §14): a police baton or an event hazard. combat:ko with that cause and
+ * the crash that follows it; nobody gets the credit, and the victim's last hit is forgotten.
+ */
+export function koExternal(ctx: CombatCtx, victim: RiderState, cause: CrashCause, weapon: WeaponId): void {
+  const d = ctx.rd(victim);
+  if (d.koFired) return;
+  d.koFired = true;
+  victim.wrecked += 1;
+  victim.lastHitBy = null; // a police baton is nobody's kill
+  d.hitByMirror = null;
+  d.koBy = null;
+  const pos = ctx.pos(victim, 0.9);
+  emitKo(ctx, victim, null, cause, pos, { skillId: null, weapon });
+  ctx.session.physics.crash(victim, cause, null);
+}
+
 /** Crash/respawn bookkeeping. Returns the unsubscribe function. */
 export function listenKo(ctx: CombatCtx, onCrash: (r: RiderState) => void): () => void {
   const { bus } = ctx;

@@ -6,15 +6,18 @@ import { armRivals } from './armory';
 import { requestBell } from './bell';
 import { active, CombatCtx } from './ctx';
 import { applyPin, installCombatDebug } from './debug';
+import { listenExternal } from './external';
 import { flushImpacts } from './feedback';
 import { checkKos, listenKo } from './ko';
 import { PropLibrary } from './meshes/library';
 import { requestSwing, resolveSwings, runBuffered, tickAction } from './melee';
 import { PickupSystem } from './pickups/pickups';
 import { ProjectileSystem } from './projectiles/projectiles';
+import { ThrownWeaponSystem } from './projectiles/thrown';
 import { SkillRunner } from './skills/runner';
 import { listenSp, tickSp } from './sp';
 import { applyMods, tickStatuses } from './statuses';
+import { tickThrow } from './throw';
 import { VisualSystem } from './visuals/visuals';
 
 function tickTimers(ctx: CombatCtx, r: RiderState, dt: number): void {
@@ -32,6 +35,7 @@ function tickTimers(ctx: CombatCtx, r: RiderState, dt: number): void {
 function onCrash(ctx: CombatCtx, r: RiderState): void {
   ctx.skills.interrupt(r);
   r.action = null;
+  ctx.rd(r).aim = null;
   ctx.rd(r).buffered = null;
   ctx.rd(r).skillBuf.length = 0;
   ctx.rd(r).bellBuf = null;
@@ -48,9 +52,10 @@ export function createCombat(session: Session): CombatSystem {
   ctx.visuals = new VisualSystem(ctx);
   ctx.skills = new SkillRunner(ctx);
   ctx.projectiles = new ProjectileSystem(ctx);
+  ctx.thrown = new ThrownWeaponSystem(ctx);
   ctx.pickups = new PickupSystem(ctx, ctx.lib);
   armRivals(ctx);
-  const offs = [listenSp(ctx), listenKo(ctx, (r) => onCrash(ctx, r)), installCombatDebug(ctx)];
+  const offs = [listenSp(ctx), listenKo(ctx, (r) => onCrash(ctx, r)), installCombatDebug(ctx), listenExternal(ctx)];
   let disposed = false;
   let visualDt = 0; // sim seconds stepped since the last rendered frame (visuals live in sim time)
 
@@ -63,6 +68,7 @@ export function createCombat(session: Session): CombatSystem {
         tickStatuses(r, dt);
         tickTimers(ctx, r, dt);
         tickAction(ctx, r, dt);
+        tickThrow(ctx, r, dt);
         const c = session.controls.get(r.id);
         if (ctx.racing && active(r) && c) {
           requestBell(ctx, r, c.bell, dt);
@@ -80,6 +86,7 @@ export function createCombat(session: Session): CombatSystem {
       resolveSwings(ctx);
       ctx.skills.post(dt);
       ctx.projectiles.update(dt);
+      ctx.thrown.update(dt);
       ctx.pickups.update(dt, ctx.racing);
       visualDt += dt;
       checkKos(ctx);
@@ -99,6 +106,7 @@ export function createCombat(session: Session): CombatSystem {
       for (const off of offs) off();
       ctx.skills.dispose();
       ctx.projectiles.dispose();
+      ctx.thrown.dispose();
       ctx.visuals.dispose();
       ctx.pickups.dispose();
       ctx.lib.dispose();

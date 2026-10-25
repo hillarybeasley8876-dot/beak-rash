@@ -7,7 +7,9 @@ import type { RiderId, RiderState, Side, StatusId, WeaponId } from '../../core/t
 import type { PropLibrary } from './meshes/library';
 import type { PickupSystem } from './pickups/pickups';
 import type { ProjectileSystem } from './projectiles/projectiles';
+import type { ThrownWeaponSystem } from './projectiles/thrown';
 import type { SkillRunner } from './skills/runner';
+import type { ThrowableId } from './throw';
 import type { VisualSystem } from './visuals/visuals';
 
 /** Phase lengths (s) of a swing. */
@@ -16,6 +18,8 @@ export interface SwingTiming { windup: number; active: number; recover: number; 
 /** Combat bookkeeping that is private to this unit (RiderState only carries the shared fields). */
 export interface RiderCombat {
   swing: SwingTiming;                             // timing of the current / last swing
+  swingChecked: boolean;                          // the current swing already had its throw decision
+  aim: { weapon: ThrowableId; t: number } | null; // a throw aim in progress (the weapon cocked back)
   buffered: { heavy: boolean; side: Side | 0; age: number } | null; // swing pressed during a swing tail / stagger
   skillBuf: Array<{ slot: number; age: number; hold: number }>; // skills pressed while busy (one per slot), retried
   bellBuf: number | null;                         // age of a bell press held while a swing / stagger finishes
@@ -45,6 +49,7 @@ export class CombatCtx {
   lib!: PropLibrary;
   pickups!: PickupSystem;
   projectiles!: ProjectileSystem;
+  thrown!: ThrownWeaponSystem;
   visuals!: VisualSystem;
   skills!: SkillRunner;
   private tmp = new Vector3();
@@ -58,7 +63,7 @@ export class CombatCtx {
     session.world.add(this.root);
     this.data = session.riders.map(() => ({
       swing: { windup: 0, active: 0, recover: 0, total: 0 }, buffered: null, skillBuf: [], bellBuf: null, bellCd: 0, bellPaid: session.riders.map(() => -Infinity),
-      spSpentAt: -Infinity, hitPaid: session.riders.map(() => -Infinity),
+      spSpentAt: -Infinity, hitPaid: session.riders.map(() => -Infinity), swingChecked: false, aim: null,
       nextCrit: false, koFired: false, hpAtCrash: 0, lastAttack: -999, hitByMirror: null, koBy: null, pin: null,
     }));
   }

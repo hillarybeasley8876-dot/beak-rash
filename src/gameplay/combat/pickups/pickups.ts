@@ -78,6 +78,7 @@ export class PickupSystem {
   }
 
   private tryCollect(it: Item, riders: RiderState[]): void {
+    if (this.time < it.takeAt) return; // a dropped weapon lies on the road a moment first
     for (const r of riders) {
       if (r.mode !== 'racing' || this.ctx.has(r, 'gulped')) continue;
       if (Math.abs(r.s - it.s) > PICKUP.takeDs || Math.abs(r.x - it.x) > PICKUP.takeDx || r.y > PICKUP.takeMaxY) continue;
@@ -176,14 +177,15 @@ export class PickupSystem {
     }
   }
 
-  /** Debug/test: place an item (weapon kind needs `weapon`). */
-  spawn(kind: PickupKind, s: number, x: number, weapon: WeaponId = 'saltfish'): Item {
+  /** Debug/test: place an item (weapon kind needs `weapon`; `grace` delays the first take). */
+  spawn(kind: PickupKind, s: number, x: number, weapon: WeaponId = 'saltfish', grace = 0): Item {
     const it = makeItem(this.nextId(), kind, s, x, this.ctx.rng.next() * 6);
     if (kind === 'weapon') {
       it.weapon = weapon;
       it.uses = WEAPONS[weapon].uses;
       it.life = PICKUP.dropLife;
     }
+    it.takeAt = this.time + grace;
     it.pop = 0;
     this.items.push(it);
     return it;

@@ -85,6 +85,36 @@ export const PICKUP = {
 export const SHIELD_IMMUNE = 1;
 export const SHIELD_REFLECT = 2;
 
+/** Thrown weapons (SPEC §15). A held heavy that outlives the swing windup becomes a throw aim. */
+export const THROW = {
+  aimTime: 1.5,          // s of holding before the weapon leaves the hand by itself
+  handHeight: 1.4,       // m above the road where the weapon starts
+  forwardSpeed: 16,      // m/s added to the rider's speed (forward throw)
+  backSpeed: 14,         // m/s subtracted from the rider's speed (backward throw)
+  launchVy: 3,           // m/s up at the release
+  gravity: 12,           // m/s² (a throw with no target in sight arcs down)
+  life: 1.6,             // s before the weapon gives up and lands
+  damageMul: 1.2,        // × the weapon's heavyDamage
+  turnRate: 1.2,         // rad/s of lateral turn while homing
+  lateralGain: 2,        // m/s of lateral speed wanted per metre of offset to the target
+  lateralMax: 8,         // m/s the homing may pull sideways
+  heightGain: 2.4,       // m/s of climb wanted per metre of height error
+  cone: 18,              // ± degrees the homing looks in
+  range: 35,             // m the homing reaches forward
+  backRange: 25,         // m the homing reaches backward
+  hitRadius: 1.0,        // m around the weapon a rider is hit by
+  hitHeight: 1.2,        // m around the rider's chest the weapon has to pass
+  spin: 12,              // rad/s the weapon tumbles at
+  sp: 6,                 // SP the thrower earns for a hit
+  dropGrace: 1,          // s before a dropped weapon can be grabbed again
+} as const;
+
+/** A strike from outside the riders (police baton, event hazard, SPEC §14). */
+export const NPC_STRIKE = {
+  wobble: 0.4,           // s of wobble on the victim
+  speedLoss: 0.08,       // fraction of the victim's speed lost
+} as const;
+
 export const STATUS_MODS = {
   stun: { steer: 0, accel: 0.25, speed: 0.92 },
   wobble: { steer: 0.7, grip: 0.8 },

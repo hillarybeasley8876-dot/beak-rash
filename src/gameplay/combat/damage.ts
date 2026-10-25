@@ -24,6 +24,7 @@ export interface Hit {
   impact: ImpactKind;
   stun?: number;
   wobble?: number;
+  sp?: number;            // SP the attacker earns for this hit (overrides the swing / skill SP)
   countCombo?: boolean;    // AoE skills count the combo once per cast
 }
 
@@ -64,10 +65,10 @@ function land(ctx: CombatCtx, h: Hit, pos: Vec3Like): void {
   ctx.session.physics.applyImpulse(v, { lateral: dir * h.knock, forward: -v.speed * h.speedLoss });
   addStatus(v, 'wobble', h.wobble ?? MELEE.wobble, 1, a.id);
   if (h.stun) addStatus(v, 'stun', h.stun, 1, a.id);
-  react(ctx, v, (dir === 1 ? -1 : 1) as Side, h.heavy || h.crit, Boolean(h.stun));
+  reactHit(ctx, v, (dir === 1 ? -1 : 1) as Side, h.heavy || h.crit, Boolean(h.stun));
   v.combo = 0;
   v.comboTimer = 0;
-  gainSp(a, hitSp(ctx, a, v, h.skillId));
+  gainSp(a, h.sp ?? hitSp(ctx, a, v, h.skillId));
   gainSp(v, SP.hurt);
   ctx.bus.emit('combat:hit', {
     attacker: a.id, victim: v.id, damage, side: h.side, weapon: h.weapon, heavy: h.heavy, crit: h.crit,
@@ -92,9 +93,9 @@ export function credit(ctx: CombatCtx, v: RiderState, a: RiderState, skillId: st
 }
 
 /** Victim reaction: a short 'hit' action cancels any swing; views get hit/stun cues. */
-function react(ctx: CombatCtx, v: RiderState, from: Side, big: boolean, stunned: boolean): void {
+export function reactHit(ctx: CombatCtx, v: RiderState, from: Side, big: boolean, stunned: boolean): void {
   const kind = v.action?.kind;
-  if (!kind || kind === 'attack' || kind === 'heavy' || kind === 'bell' || kind === 'hit') {
+  if (!kind || kind === 'attack' || kind === 'heavy' || kind === 'bell' || kind === 'hit' || kind === 'throw') {
     v.action = { kind: 'hit', side: from, t: 0, dur: MELEE.hitReaction, weapon: v.weapon, skillId: null, resolved: true };
     ctx.rd(v).buffered = null;
   }
@@ -114,7 +115,8 @@ function countCombo(ctx: CombatCtx, a: RiderState, skillId: string | null): void
   }
 }
 
-function weaponBlocks(ctx: CombatCtx, v: RiderState): boolean {
+/** The held weapon's block chance (a swing in progress cannot block). */
+export function weaponBlocks(ctx: CombatCtx, v: RiderState): boolean {
   const chance = WEAPONS[v.weapon].block;
   if (chance <= 0) return false;
   const swinging = v.action?.kind === 'attack' || v.action?.kind === 'heavy';

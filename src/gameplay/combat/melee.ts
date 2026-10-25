@@ -72,6 +72,7 @@ export function startSwing(ctx: CombatCtx, r: RiderState, heavy: boolean, sideIn
   const side = sideIn === 0 ? autoSide(ctx, r) : sideIn;
   const { ph, tell } = timing(ctx, r, heavy);
   ctx.rd(r).swing = ph;
+  ctx.rd(r).swingChecked = false; // the throw decision is taken once per swing
   r.invuln = 0; // attacking gives up respawn protection
   r.action = { kind: heavy ? 'heavy' : 'attack', side, t: 0, dur: ph.total, weapon: r.weapon, skillId: null, resolved: false };
   if (tell) ctx.visuals.add(new HeavyTell(ctx.visuals, r, side, ph.windup));
