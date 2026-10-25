@@ -35,6 +35,11 @@
 .br-gar-row.is-focus { background: var(--white); color: var(--ink); transform: skewX(var(--skew)) translateX(-18px); box-shadow: 8px 8px 0 var(--red); }
 .br-gar-row.is-focus .br-gar-tag { color: var(--ink); }
 .br-gar-row.is-focus.is-equipped .br-gar-tag { color: var(--white); }
+/* Nine rows (the Konami bike + the duck toggle) must still clear the stat bars below. */
+.br-gar-list.is-long .br-gar-row { height: 44px; margin-bottom: 5px; }
+.br-gar-list.is-long .br-gar-row b { font-size: 28px; }
+.br-gar-list.is-long .br-gar-tag { font-size: 22px; }
+.br-gar-list.is-long .br-gar-joke { font-size: 17px; padding: 0 6px; margin-left: 8px; }
 
 .br-gar-stats { position: absolute; left: 1170px; top: 690px; display: flex; flex-direction: column; gap: 8px; }
 .br-gar-stats .br-stat { font-size: 27px; gap: 14px; }
@@ -54,3 +59,8 @@
 .br-gar-stats .br-stat-segs i { height: 25px; }
 .br-gar-joke { margin-left: 12px; padding: 0 8px; background: var(--ink); color: var(--white); font-style: normal; font-family: var(--f-cn-block); font-size: 20px; rotate: -6deg; box-shadow: 3px 3px 0 var(--red); }
 .br-gar-row.is-focus .br-gar-joke { background: var(--red); color: var(--white); }
+/* The duck toggle row (SPEC §21 #1): a yellow passenger badge; the tag shows 开 / 关. */
+.br-gar-duck b { font-size: 30px; }
+.br-gar-duck .br-gar-tag { padding: 0 12px; background: var(--ink); color: var(--white); font-family: var(--f-cn-block); font-size: 26px; }
+.br-gar-duck.is-on .br-gar-tag { background: var(--yellow); color: var(--ink); }
+.br-gar-row.is-focus.br-gar-duck .br-gar-tag { background: var(--yellow); color: var(--ink); }

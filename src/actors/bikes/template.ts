@@ -2,7 +2,7 @@
 // Parts are authored in BIKE SPACE; each moving group declares its pivot (bike space) and becomes a bone.
 // bake() merges the whole bike into one rigidly skinned geometry (bind pose = bike space) and returns
 // the bone rest transforms and marker positions (local to their parent bone).
-import { Euler, Matrix4, Quaternion, Vector3 } from 'three';
+import { Euler, Matrix4, Quaternion, Vector3, type Object3D } from 'three';
 import type { BikeId, Quality } from '../../core/types';
 import { farSeg, segScale, type Seg } from './build/geo';
 import { PartSet, type BuiltGroup } from './build/partset';
@@ -35,6 +35,9 @@ export interface BikeDef {
   wheelbase: number;
   drive: DriveSpec;
   build(b: BikeBuilder): void;
+  /** Objects hung on the bike outside the merged geometry (the LLM chain to the rider's neck).
+   *  One per bike instance: the caller owns them and disposes them with the model. */
+  extras?(): Object3D[];
 }
 
 export interface TemplateGroup {

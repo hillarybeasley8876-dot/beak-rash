@@ -3,6 +3,9 @@
 import type { BikeId, Quality } from '../src/core/types';
 import { BIKE_ORDER, BIKES } from '../src/data/bikes';
 
+/** The Konami unlock (大模型限定款) is not in the shop list, but the sandbox can show it. */
+const ALL_BIKES: BikeId[] = [...BIKE_ORDER, 'llm'];
+
 export const VIEWS = ['turntable', 'close', 'side', 'front', 'back', 'top', 'lineup', 'chase', 'grid'] as const;
 export type View = (typeof VIEWS)[number];
 
@@ -32,7 +35,7 @@ export function mountPanel(el: HTMLElement, s: SandboxState, onChange: (rebuild:
   const opt = (v: string, label: string): string => `<option value="${v}">${label}</option>`;
   el.innerHTML = `
     <h1>BIKES 车库</h1>
-    <label>bike <select data-k="bike">${BIKE_ORDER.map((id) => opt(id, `${id} · ${BIKES[id].name}`)).join('')}</select></label>
+    <label>bike <select data-k="bike">${ALL_BIKES.map((id) => opt(id, `${id} · ${BIKES[id].name}`)).join('')}</select></label>
     <label>view <select data-k="view">${VIEWS.map((v) => opt(v, v)).join('')}</select></label>
     <label>quality <select data-k="quality">${['high', 'medium', 'low'].map((q) => opt(q, q)).join('')}</select></label>
     <label>tint <select data-k="tint">${TINTS.map(([c, n]) => opt(c, n)).join('')}</select></label>
@@ -64,8 +67,8 @@ export function mountPanel(el: HTMLElement, s: SandboxState, onChange: (rebuild:
   el.querySelector('[data-launch]')?.addEventListener('click', onLaunch);
   for (const btn of el.querySelectorAll<HTMLButtonElement>('[data-act]')) {
     btn.addEventListener('click', () => {
-      const i = BIKE_ORDER.indexOf(s.bike), n = BIKE_ORDER.length;
-      s.bike = BIKE_ORDER[(i + (btn.dataset.act === 'next' ? 1 : n - 1)) % n] as BikeId;
+      const i = ALL_BIKES.indexOf(s.bike), n = ALL_BIKES.length;
+      s.bike = ALL_BIKES[(i + (btn.dataset.act === 'next' ? 1 : n - 1)) % n] as BikeId;
       sync();
       onChange(true);
     });

@@ -35,4 +35,4 @@ export interface BikeModel {
   dispose(): void;
 }
 
-export type CreateBike = (id: BikeId, opts: { quality: Quality; tint?: string }) => BikeModel;
+export type CreateBike = (id: BikeId, opts: { quality: Quality; tint?: string; player?: boolean }) => BikeModel;

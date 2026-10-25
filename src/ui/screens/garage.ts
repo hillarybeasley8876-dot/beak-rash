@@ -1,6 +1,8 @@
 // garage: bike shop. Live 3D turntable, bike list with price / owned / equipped (+ 整活 tag on joke bikes),
 // stat bars with ± deltas against the equipped bike (repeated in the buy modal), meme blurb, 小鱼干 balance.
 // Enter buys (with confirm) or equips; saves to app.save. Esc → menu.
+// The Konami unlock (SPEC §21 #2) lists the 大模型限定款 last; finding every duck (SPEC §21 #1) adds the
+// 小黄鸭乘客 toggle row under the bikes.
 import './garage.css';
 import type { BikeId } from '../../core/types';
 import { ART } from '../../data/assets';
@@ -17,6 +19,8 @@ const STATS: Array<[keyof typeof BIKES.roadbike.bars, string]> = [
 /** Speed bar at or below this = a fun bike, not an upgrade (tagged 整活 in the list and the buy modal). */
 const JOKE_SPEED = 2;
 const isJoke = (id: BikeId): boolean => BIKES[id].bars.speed <= JOKE_SPEED;
+/** The duck toggle row (SPEC §21 #1): the rubber duck rides on the player's handlebar. */
+const DUCK_ROW = '小黄鸭乘客 DUCK RIDER';
 
 /** "对比 风之翼：速度 −3、操控 +2。" for the buy modal (only the stats that change). */
 function deltaLine(id: BikeId, current: BikeId): string {
@@ -49,19 +53,34 @@ export const garageScreen: ScreenFactory = (ctx) => {
   f.stage.prepend(...(art ? [art] : []), h('div', { class: 'br-gar-slab' }), show);
   f.stage.append(nameBox, blurb, list, stats, action, coins.el);
 
-  const rows = BIKE_ORDER.map((id, i) => {
+  // The Konami unlock (SPEC §21 #2) lists the 大模型限定款 last; finding every duck (SPEC §21 #1) adds
+  // the 小黄鸭乘客 toggle row under the bikes.
+  const bikeIds: BikeId[] = save.data.unlocks.includes('llm') ? [...BIKE_ORDER, 'llm'] : BIKE_ORDER;
+  const entries: Array<{ el: HTMLDivElement; bike: BikeId | null }> = bikeIds.map((id, i) => {
     const row = h('div', { class: 'br-gar-row', vars: { '--i': i } }, h('b', { text: BIKES[id].name }),
       isJoke(id) ? h('i', { class: 'br-gar-joke', text: '整活' }) : null, h('span', { class: 'br-gar-tag' }));
     list.append(row);
-    return row;
+    return { el: row, bike: id };
   });
+  if (save.data.unlocks.includes('duck')) {
+    const row = h('div', { class: 'br-gar-row br-gar-duck', vars: { '--i': entries.length } },
+      h('b', { text: DUCK_ROW }), h('span', { class: 'br-gar-tag' }));
+    list.append(row);
+    entries.push({ el: row, bike: null });
+  }
+  list.classList.toggle('is-long', entries.length > 7);
   const state = (id: BikeId): 'equipped' | 'owned' | 'shop' =>
-    save.data.bike === id ? 'equipped' : save.data.ownedBikes.includes(id) ? 'owned' : 'shop';
-  const refreshRows = (): void => rows.forEach((row, i) => {
-    const id = BIKE_ORDER[i] ?? 'roadbike';
-    const st = state(id);
+    save.data.bike === id ? 'equipped' : save.data.ownedBikes.includes(id) || (id === 'llm' && save.data.unlocks.includes('llm')) ? 'owned' : 'shop';
+  const refreshRows = (): void => entries.forEach((entry) => {
+    const row = entry.el;
     const tag = row.querySelector('.br-gar-tag');
-    if (tag) tag.textContent = st === 'equipped' ? '装备中' : st === 'owned' ? '已拥有' : `${BIKES[id].price}`;
+    if (!entry.bike) {
+      if (tag) tag.textContent = save.data.settings.duckRider ? '开' : '关';
+      row.classList.toggle('is-on', save.data.settings.duckRider);
+      return;
+    }
+    const st = state(entry.bike);
+    if (tag) tag.textContent = st === 'equipped' ? '装备中' : st === 'owned' ? '已拥有' : `${BIKES[entry.bike].price}`;
     row.classList.toggle('is-equipped', st === 'equipped');
     row.classList.toggle('is-shop', st === 'shop');
   });
@@ -82,6 +101,21 @@ export const garageScreen: ScreenFactory = (ctx) => {
     else action.replaceChildren(...keyGlyph('ENTER', 'A'), h('b', { text: st === 'owned' ? '装备' : '购买' }));
     if (st === 'shop') action.append(h('span', { text: `${b.price} 小鱼干${afford ? '' : '（不够）'}` }));
   };
+  /** The duck row: the rubber duck rides on the player's handlebar (SPEC §21 #1). */
+  const focusDuck = (): void => {
+    const on = save.data.settings.duckRider;
+    table.show(save.data.bike);
+    nameBox.replaceChildren(ransom('小黄鸭乘客', { seed: 'gar-duck', fonts: 'block', className: 'br-gar-rn' }));
+    blurb.textContent = '五只小黄鸭都找到了。鹈鹕的车头从此多了一位乘客。';
+    stats.replaceChildren(h('span', { class: 'br-gar-vs', text: on ? '乘客在车上' : '乘客不在车上' }));
+    action.className = 'br-gar-action is-owned';
+    action.replaceChildren(...keyGlyph('ENTER', 'A'), h('b', { text: on ? '关' : '开' }));
+  };
+  const toggleDuck = (): void => {
+    save.update((d) => { d.settings.duckRider = !d.settings.duckRider; });
+    ctx.sfx('ui.move');
+    ctx.toast(save.data.settings.duckRider ? '小黄鸭乘客已上车：哔。' : '小黄鸭乘客已下车。', 'info');
+  };
   const buy = async (id: BikeId): Promise<void> => {
     const b = BIKES[id];
     if (save.data.coins < b.price) {
@@ -99,9 +133,14 @@ export const garageScreen: ScreenFactory = (ctx) => {
     ctx.sfx('ui.coin');
     ctx.toast(`${b.name} 到手！已装备。`, 'meme');
   };
-  const nav = ctx.nav(new Nav(BIKE_ORDER.map((id, i) => ({
-    el: rows[i]!,
+  const nav = ctx.nav(new Nav(entries.map((entry, i) => ({
+    el: entry.el,
     confirm: () => {
+      const id = entry.bike;
+      if (!id) {
+        toggleDuck();
+        return;
+      }
       const st = state(id);
       if (st === 'shop') void buy(id);
       else if (st === 'owned') {
@@ -111,9 +150,10 @@ export const garageScreen: ScreenFactory = (ctx) => {
     },
     onFocus: () => {
       remember('garage', i);
-      focus(id);
+      if (entry.bike) focus(entry.bike);
+      else focusDuck();
     },
-  })), { layout: 'vertical', start: recall('garage', Math.max(0, BIKE_ORDER.indexOf(save.data.bike))), sfx: ctx.sfx }));
+  })), { layout: 'vertical', start: recall('garage', Math.max(0, bikeIds.indexOf(save.data.bike))), sfx: ctx.sfx }));
   refreshRows();
   action.addEventListener('click', () => {
     if (!action.classList.contains('is-equipped')) nav.pointerActivate();
@@ -121,8 +161,9 @@ export const garageScreen: ScreenFactory = (ctx) => {
   const offSave = save.onChange((d) => {
     coins.set(d.coins);
     refreshRows();
-    const id = BIKE_ORDER[nav.index];
-    if (id) focus(id);
+    const entry = entries[nav.index];
+    if (entry?.bike) focus(entry.bike);
+    else if (entry) focusDuck();
   });
   return {
     root: f.root,

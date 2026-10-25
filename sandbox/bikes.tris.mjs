@@ -7,7 +7,7 @@
 import { BASE, parseArgs, withPage } from '../tools/lib.mjs';
 
 const a = parseArgs(process.argv.slice(2));
-const bikes = String(a.bikes ?? 'roadbike,erba,shared,fixie,mtb,tandem,kidbike').split(',');
+const bikes = String(a.bikes ?? 'roadbike,erba,shared,fixie,mtb,tandem,kidbike,llm').split(',');
 await withPage(async (page, h) => {
   await page.goto(`${BASE}/sandbox/bikes.html?manual=1&spin=0`, { waitUntil: 'load' });
   await page.waitForFunction(() => window.__bikes?.ready === true, null, { timeout: 60000 });

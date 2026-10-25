@@ -8,7 +8,7 @@ import { MENU, MENU_QUIT } from '../copy';
 import { Nav } from '../nav';
 import { HINT_BACK, HINT_NAV, HINT_OK, artImage, artReady, backdrop, coinBadge, h, jagged, portrait, ransom, reducedMotion } from '../p5';
 import { frame, type ScreenCtx, type ScreenFactory } from '../screen';
-import { createSequence, eggBubble } from './eggs';
+import { createActionCode, createSequence, eggBubble, type CodeStep } from './eggs';
 import { recall, remember } from './memory';
 
 interface Entry { cn: string; en: string; blurb: string; padBlurb?: string; minor?: boolean; pick(): void }
@@ -17,6 +17,24 @@ interface Entry { cn: string; en: string; blurb: string; padBlurb?: string; mino
 const PELICAN_CODES = ['KeyP', 'KeyE', 'KeyL', 'KeyI', 'KeyC', 'KeyA', 'KeyN'];
 const EGG_SHOW_MS = 2500;   // bubble on screen
 const EGG_FADE_MS = 350;    // bubble fade-out after that
+
+/** 彩蛋 §21 #2: the Konami code (↑↑↓↓←→←→ B A) on the ACTION stream, so a pad types it too.
+ *  The pad's d-pad up/down arrive as skill2/skill3 (the shell maps them to up/down in menus) and
+ *  its B / A buttons send two actions (attackR+back, hop+confirm): the B and A steps eat the
+ *  action so the menu neither backs out to the title nor picks an entry. */
+const KONAMI: CodeStep[] = [
+  { actions: ['up', 'skill2'] },
+  { actions: ['up', 'skill2'] },
+  { actions: ['down', 'skill3'] },
+  { actions: ['down', 'skill3'] },
+  { actions: ['left'] },
+  { actions: ['right'] },
+  { actions: ['left'] },
+  { actions: ['right'] },
+  { actions: ['bell', 'back', 'attackR'], consume: true },
+  { actions: ['left', 'confirm', 'hop'], consume: true },
+];
+const LLM_TOAST = '大模型限定款已解锁：链条接在脖子上，这很合理。';
 
 async function askQuit(ctx: ScreenCtx, quit: () => void): Promise<void> {
   if (await ctx.confirm(MENU_QUIT.ask, MENU_QUIT.askText, MENU_QUIT.yes, MENU_QUIT.no)) quit();
@@ -133,10 +151,30 @@ export const menuScreen: ScreenFactory = (ctx) => {
   };
   window.addEventListener('keydown', onKey);
 
+  // 彩蛋 §21 #2: the Konami code unlocks the 大模型限定款. Typing it again only re-shows the toast.
+  const konami = createActionCode(KONAMI, 6000);
+  const unlockLlm = (): void => {
+    if (!app.save.data.unlocks.includes('llm')) {
+      app.save.update((d) => {
+        if (!d.unlocks.includes('llm')) d.unlocks.push('llm');
+        if (!d.ownedBikes.includes('llm')) d.ownedBikes.push('llm');
+      });
+      ctx.sfx('ui.unlock');
+    }
+    ctx.toast(LLM_TOAST, 'meme');
+  };
+
   return {
     root: f.root,
     ready: artReady(heroArt),
     onAction: (a) => {
+      // The code runs on every action; its B and A steps are eaten (the menu must not react).
+      const code = konami.push(a);
+      if (code.done) {
+        unlockLlm();
+        return true;
+      }
+      if (code.consume) return true;
       if (a === 'back') {
         ctx.sfx('ui.back');
         ctx.go('title');
