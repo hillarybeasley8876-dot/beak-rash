@@ -15,6 +15,7 @@ import { buildLayout } from './layout/build';
 import { TrackQuery } from './layout/query';
 import { layoutFor } from './layouts';
 import { reverseLayout } from './layout/reverse';
+import { routeLayout } from './layout/route';
 import { publishDebug } from './debug';
 import { installFogCull } from './lod';
 import { lookFor, roadLookFor } from './looks';
@@ -36,7 +37,10 @@ export async function createTrack(app: AppContext, id: TrackId, rng: Rng, opts?:
   warmBillboardArt();   // cached per page: downloads overlap the road / terrain stages
   const weather = resolveWeather(id, opts?.weather);   // SPEC §20: a track only builds the weathers it allows
   const reverse = !!opts?.reverse;                      // SPEC §20: the same road, driven the other way
-  const L = buildLayout(reverse ? reverseLayout(layoutFor(id)) : layoutFor(id));
+  const route = Math.max(0, Math.floor(Number.isFinite(opts?.route) ? (opts?.route as number) : 0));   // SPEC §20: a seeded route (0 = the authored layout)
+  // The route is drawn first, the mirrored road second: the same seed reversed is the same road backwards.
+  const def = route > 0 ? routeLayout(layoutFor(id), route) : layoutFor(id);
+  const L = buildLayout(reverse ? reverseLayout(def) : def);
   const q = new TrackQuery(L);
   const group = new Group();
   group.name = `track:${id}`;
@@ -113,7 +117,7 @@ export async function createTrack(app: AppContext, id: TrackId, rng: Rng, opts?:
     features: L.features,
     weather,
     reverse,
-    route: 0,
+    route,
     grip: gripFor(weather),
     frameAt: (s, out) => q.frameAt(s, out),
     toWorld: (s, x, y, out) => q.toWorld(s, x, y, out),

@@ -36,7 +36,7 @@ export interface BuiltLayout {
 const DEFAULT_EASE = 30;
 
 /** Piecewise-constant value per segment with smoothstep transitions centred on segment starts. */
-function ramped(segs: SegmentDef[], starts: number[], val: (g: SegmentDef) => number, ease: (g: SegmentDef) => number) {
+export function ramped(segs: SegmentDef[], starts: number[], val: (g: SegmentDef) => number, ease: (g: SegmentDef) => number) {
   const widths = segs.map((g, i) => {
     if (i === 0) return 0;
     const prev = segs[i - 1] as SegmentDef;

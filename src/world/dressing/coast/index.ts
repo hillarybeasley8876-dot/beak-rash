@@ -22,10 +22,20 @@ const BANNERS = ['暴力鹈鹕 BEAK RASH', '鹈鹕湾 欢迎你', '今日宜：�
 const TERRACE_ZONES = new Set(['promenade', 'beach', 'bay', 'chicane', 'crest', 'descent', 'hillside', 'village', 'sprint']);
 const HEDGE_ZONES = new Set(['promenade', 'beach', 'bay', 'chicane', 'crest', 'hillside', 'village', 'sprint']);
 
-function zone(ctx: WorldCtx, name: string): { s0: number; s1: number } | null {
-  const zs = ctx.L.zones.filter((z) => z.name === name);
-  if (!zs.length) return null;
-  return { s0: Math.min(...zs.map((z) => z.s0)), s1: Math.max(...zs.map((z) => z.s1)) };
+/**
+ * Every run of a zone name, in street order; consecutive runs of the same name are merged. A route
+ * may bring the same zone back later on the road (the cliff road runs twice), and the dressing has
+ * to follow the road it stands on, not the whole span between the two runs.
+ */
+function zones(ctx: WorldCtx, name: string): Array<{ s0: number; s1: number }> {
+  const out: Array<{ s0: number; s1: number }> = [];
+  for (const z of ctx.L.zones) {
+    if (z.name !== name) continue;
+    const last = out[out.length - 1];
+    if (last && Math.abs(last.s1 - z.s0) < 0.5) last.s1 = z.s1;
+    else out.push({ s0: z.s0, s1: z.s1 });
+  }
+  return out;
 }
 
 /** Layout marks → landmarks and signs; returns the hill-village sites and gull flocks they list. */
@@ -80,24 +90,21 @@ export async function dressCoast(ctx: WorldCtx, field: TerrainField): Promise<vo
   ctx.progress(0.08);
   // Festive start / finish: flags and banners behind the barriers.
   for (const name of ['start', 'finish']) {
-    const z = zone(ctx, name);
-    if (!z) continue;
-    for (const side of [-1, 1] as const) {
-      flags(d, side, z.s0, z.s1, 11, name === 'finish');
-      banners(d, side, z.s0 + 6, z.s1 - 6, d.rng.shuffle(BANNERS));
+    for (const z of zones(ctx, name)) {
+      for (const side of [-1, 1] as const) {
+        flags(d, side, z.s0, z.s1, 11, name === 'finish');
+        banners(d, side, z.s0 + 6, z.s1 - 6, d.rng.shuffle(BANNERS));
+      }
     }
   }
   // Palm boulevards on the land side through town, lamps along promenades and quays.
   for (const name of ['promenade', 'village', 'sprint', 'finish']) {
-    const z = zone(ctx, name);
-    if (z) palms(d, d.side(1), z.s0, z.s1, 0.9, 2.2, 15);
+    for (const z of zones(ctx, name)) palms(d, d.side(1), z.s0, z.s1, 0.9, 2.2, 15);
   }
   for (const name of ['promenade', 'village', 'sprint']) {
-    const z = zone(ctx, name);
-    if (z) lamps(d, d.side(1), z.s0, z.s1, 0.9, 30);
+    for (const z of zones(ctx, name)) lamps(d, d.side(1), z.s0, z.s1, 0.9, 30);
   }
-  const quay = zone(ctx, 'market');
-  if (quay) lamps(d, d.side(-1), quay.s0, quay.s1, QUAY_POST_U, 30, true);
+  for (const z of zones(ctx, 'market')) lamps(d, d.side(-1), z.s0, z.s1, QUAY_POST_U, 30, true);
   distanceMarkers(d);
   billboards(d, art);
   await breathe();
@@ -118,10 +125,9 @@ export async function dressCoast(ctx: WorldCtx, field: TerrainField): Promise<vo
     await breathe();
     ctx.progress(0.42);
   }
-  // zone() spans all zones of a name: 'cliff' covers both cliff runs and the calanque hairpin between them.
+  // The cliff road runs twice: each run of the zone gets its own rocks.
   for (const name of ['bay', 'hillside', 'cliff', 'crest', 'descent', 'chicane']) {
-    const z = zone(ctx, name);
-    if (z) rocks(d, d.side(-1), z.s0, z.s1);
+    for (const z of zones(ctx, name)) rocks(d, d.side(-1), z.s0, z.s1);
   }
   cragTops(d, L.sMin, L.sMin + L.n - 1);
   bridgeShores(d);

@@ -1,21 +1,41 @@
 #!/usr/bin/env node
-// Layout plan check without a browser: builds a layout with the game's own builder (layout/build.ts via
-// the tools/content-ts.mjs import hook) and reports length, corners (R, turn), self-proximity,
-// sea/land side conflicts and pickup rows off the asphalt; writes a top-down plan PNG. Exit 1 on failure.
+// Layout plan check without a browser: builds a layout with the game's own builder and reports
+// length, corners (R, turn), self-proximity, sea/land side conflicts and pickup rows off the
+// asphalt; writes a top-down plan PNG. Exit 1 on failure.
 //   node sandbox/track.plan.mjs [--file src/world/layouts/coast.ts] [--export COAST] [--out shots/track/plan.png]
+//     [--track coast] (a track by id) [--route 4821] (a seeded route, SPEC §20)
 //     [--gap 110] (min distance between road parts > 250 m apart along s) [--json]
 import fs from 'node:fs';
 import path from 'node:path';
-import { importTs, ROOT } from '../tools/content-ts.mjs';
+import { fileURLToPath } from 'node:url';
+import { createServer } from 'vite';
 import { writePlanPng } from './track.plan-png.mjs';
 
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, all) => (a.startsWith('--') ? [a.slice(2), all[i + 1]?.startsWith('--') || all[i + 1] === undefined ? true : all[i + 1]] : null)).filter(Boolean));
+const track = args.track ?? null;
 const file = args.file ?? 'src/world/layouts/coast.ts';
 const name = args.export ?? 'COAST';
+const route = Number(args.route ?? 0);
 const gap = Number(args.gap ?? 110);
-const { buildLayout } = await importTs('src/world/layout/build.ts');
-const def = (await importTs(file))[name];
-if (!def) throw new Error(`[track.plan] ${file} has no export ${name}`);
+
+// The game's own modules: vite loads the TypeScript (the layout files use syntax node's strip-only
+// mode does not know).
+const vite = await createServer({ server: { middlewareMode: true }, appType: 'custom', logLevel: 'error' });
+const { buildLayout } = await vite.ssrLoadModule('/src/world/layout/build.ts');
+let def;
+if (track) {
+  const { layoutFor } = await vite.ssrLoadModule('/src/world/layouts/index.ts');
+  def = layoutFor(track);
+  if (route > 0) {
+    const { routeLayout } = await vite.ssrLoadModule('/src/world/layout/route.ts');
+    def = routeLayout(def, route);
+  }
+} else {
+  const mod = await vite.ssrLoadModule(`/${file.replace(/\\/g, '/')}`);
+  def = mod[name];
+  if (!def) throw new Error(`[track.plan] ${file} has no export ${name}`);
+}
 const L = buildLayout(def);
 const i0 = Math.round(-L.sMin), iEnd = i0 + Math.round(L.length);
 const P = (s) => { const i = Math.min(L.n - 1, Math.max(0, Math.round(s - L.sMin))); return { x: L.px[i], y: L.py[i], z: L.pz[i], i }; };
@@ -105,4 +125,5 @@ const out = args.out ?? 'shots/track/plan.png';
 fs.mkdirSync(path.dirname(path.join(ROOT, out)), { recursive: true });
 writePlanPng(path.join(ROOT, out), L, bumps, i0, iEnd);
 console.log(`plan → ${out}`);
+await vite.close();
 process.exit(fails.length ? 1 : 0);
