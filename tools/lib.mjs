@@ -7,7 +7,7 @@ import { chromium, webkit } from 'playwright';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const LOCKS = path.join(ROOT, '.locks');
-const SLOTS = 5;
+const SLOTS = Number(process.env.BR_SLOTS ?? 8); // machine-wide headless browsers (RTX 3090 / 32 threads here)
 export const BASE = process.env.BR_BASE ?? 'http://127.0.0.1:5300';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
