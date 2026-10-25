@@ -115,6 +115,27 @@ export const TUNING = {
   hardLandLoss: 0.06,
   crashLandYaw: 45 * DEG,
   crashLandHeight: 2.5,
+  // ---- air tricks (SPEC §16)
+  tricks: {
+    minAir: 0.25,         // s of air before a trick can start
+    spinDur: 0.55,        // s for a full spin
+    flipDur: 0.65,        // s for a full flip (front or back)
+    snap: 0.85,           // a trick below this progress at touchdown crashes the rider
+    supermanHold: 0.2,    // s of drift before the superman starts
+    supermanMin: 0.3,     // s the superman must last to count (shorter = cancelled, no points)
+    predictMargin: 0.05,  // s: a trick starts only if the predicted air left covers it (snap point) plus this
+    sloppyLoss: 0.25,     // speed lost landing still in superman (no crash: a drift held into a landing is common)
+    steerMin: 0.6,        // |steer| that turns a drift press into a spin
+    brakeMin: 0.5,        // brake that turns a drift press into a backflip
+    pointsBase: 120,      // style points per trick in a chain
+    pointsExtra: 50,      // extra points per extra trick in the same air
+    boostPower: 0.2,      // the landing boost of a trick
+    boostTime: 0.6,       // … and its duration
+    boostStep: 0.2,       // +20 % boost time per extra trick in the chain
+  },
+  // ---- umbrella glide (SPEC §15)
+  glideGravity: 0.45,     // ×gravity while the umbrella is open
+  glideControl: 0.6,      // steering authority while gliding (the plain air gets airControl)
   // ---- slipstream
   draftRange: 12,
   draftMinGap: 0.8,

@@ -63,29 +63,45 @@ await withPage(async (page, h) => {
   ev = mine(await events(page, 'rider:trick'));
   expect(ev.some((x) => x.e.kind === 'superman' && x.e.phase === 'start') && ev.some((x) => x.e.phase === 'land'), `superman: drift alone, released in time (${JSON.stringify(ev.map((x) => [x.e.phase, x.e.kind]))})`);
 
-  // 5. superman still held at touchdown → crash 'trick'
+  // 5. superman still held at touchdown: a sloppy landing — fail, no points, speed lost, NO crash
   await clearEvents(page);
+  await hold(page, C, 30);
+  const v0 = await page.evaluate(() => window.__br.session().player.speed);
   await fly(page, 8, [[{}, 20], [{ drift: true }, 80]]);
   ev = mine(await events(page, 'rider:trick'));
   let crash = (await events(page, 'rider:crash')).filter((x) => x.e.riderId === 0);
-  expect(ev.some((x) => x.e.phase === 'fail') && crash.some((x) => x.e.cause === 'trick'), `superman held into the ground: fail + crash 'trick' (${JSON.stringify(crash.map((x) => x.e.cause))})`);
-  await hold(page, C, 260);
+  const v1 = await page.evaluate(() => window.__br.session().player.speed);
+  expect(ev.some((x) => x.e.phase === 'fail' && x.e.kind === 'superman') && !ev.some((x) => x.e.phase === 'land') && crash.length === 0,
+    `superman held into the ground: fail, no points, no crash (${JSON.stringify(ev.map((x) => [x.e.phase, x.e.kind]))}, crashes ${crash.length})`);
+  expect(v1 < v0 * 0.9, `superman held into the ground: speed lost (${v0.toFixed(1)} → ${v1.toFixed(1)} m/s)`);
 
-  // 6. unfinished spin at touchdown → crash 'trick'
+  // 6. a late Shift + steer with too little air left is a drift, not a trick (no start, no crash)
   await clearEvents(page);
-  await fly(page, 5, [[{}, 16], [{ drift: true, steer: -1 }, 4], [{ drift: false, steer: 0 }, 2]]);
+  await fly(page, 8, [[{}, 40], [{ drift: true, steer: 1 }, 4], [{ drift: false, steer: 0 }, 2]]);
+  ev = mine(await events(page, 'rider:trick'));
   crash = (await events(page, 'rider:crash')).filter((x) => x.e.riderId === 0);
-  expect(crash.some((x) => x.e.cause === 'trick'), `short air: an unfinished spin crashes with cause 'trick' (${JSON.stringify(crash.map((x) => x.e.cause))})`);
+  expect(!ev.some((x) => x.e.phase === 'start') && crash.length === 0, `late press 0.67 s into a 0.94 s air: no trick, no crash (${ev.length} events, ${crash.length} crashes)`);
+
+  // 7. a spin cut short by an early touchdown (the road rose to meet it) still crashes with cause 'trick'
+  await clearEvents(page);
+  await hold(page, C, 30);
+  await page.evaluate(AIR(8));
+  await hold(page, C, 20);
+  await hold(page, { ...C, drift: true, steer: 1 }, 4);
+  await page.evaluate(() => { const p = window.__br.session().player; p.vy = -9; });
+  await hold(page, { ...C, drift: false, steer: 0 }, 30);
+  crash = (await events(page, 'rider:crash')).filter((x) => x.e.riderId === 0);
+  expect(crash.some((x) => x.e.cause === 'trick'), `a spin cut short by an early touchdown crashes with cause 'trick' (${JSON.stringify(crash.map((x) => x.e.cause))})`);
   await hold(page, C, 260);
 
-  // 7. chain: two spins in one big air → count 2, points 120*2 + 50
+  // 8. chain: two spins in one big air → count 2, points 120*2 + 50
   await clearEvents(page);
   await fly(page, 13, [[{}, 16], [{ drift: true, steer: 1 }, 4], [{ drift: false, steer: 0 }, 30], [{ drift: true, steer: 1 }, 4], [{ drift: false, steer: 0 }, 4]]);
   ev = mine(await events(page, 'rider:trick'));
   const land2 = ev.find((x) => x.e.phase === 'land');
   expect(!!land2 && land2.e.count === 2 && land2.e.points === 290, `chain: two spins land {count 2, points 290} (${JSON.stringify(land2?.e)})`);
 
-  // 8. drift held from the ground never starts a trick
+  // 9. drift held from the ground never starts a trick
   await clearEvents(page);
   await hold(page, { ...C, drift: true }, 20);
   await page.evaluate(AIR(8));
@@ -95,7 +111,7 @@ await withPage(async (page, h) => {
   ev = mine(await events(page, 'rider:trick'));
   expect(!ev.some((x) => x.e.phase === 'start'), `drift held from the ground: no trick (${ev.length})`);
 
-  // 9. umbrella glide: drift in the air with an umbrella floats (longer air), no trick
+  // 10. umbrella glide: drift in the air with an umbrella floats (longer air), no trick
   const airTime = async (glide) => {
     await page.evaluate((u) => window.__br.combat.give(0, u ? 'umbrella' : 'none'), glide);
     await clearEvents(page);
@@ -110,7 +126,7 @@ await withPage(async (page, h) => {
   expect(glide.air > plain.air * 1.4 && glide.tricks === 0, `umbrella glide: air ${plain.air.toFixed(2)} s → ${glide.air.toFixed(2)} s, no trick (${glide.tricks})`);
   await page.evaluate(() => window.__br.combat.give(0, 'none'));
 
-  // 10. Track.grip scales lateral grip
+  // 11. Track.grip scales lateral grip
   const lateral = async (grip) => {
     await page.evaluate((g) => { window.__br.session().track.grip = g; }, grip);
     await hold(page, { ...C, steer: 0 }, 60);

@@ -4,5 +4,7 @@ import type { Session } from '../core/contracts';
 
 export interface SessionModuleLike {
   attach(session: Session | null): void;
+  /** Optional, once per rendered frame after the session stepped (timers that no bus event drives). */
+  update?(dtSim: number, dtReal: number): void;
   dispose(): void;
 }

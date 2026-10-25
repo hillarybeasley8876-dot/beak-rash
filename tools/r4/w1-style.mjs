@@ -8,7 +8,8 @@ const C = { throttle: 0.6 };
 
 await withPage(async (page, h) => {
   await race(page, h, { track: 'coast', seed: 3, extra: '&traffic=0&police=0&stub=combat' });
-  await page.evaluate(() => { const b = window.__br, s = b.session(); for (const r of s.riders) if (!r.isPlayer) b.teleport(r.id, Math.max(0, s.player.s - 300), (r.id % 3) - 1); });
+  // Rivals far AHEAD (they ride faster than this throttle): no draft, slingshot or rider near miss reaches the player.
+  await page.evaluate(() => { const b = window.__br, s = b.session(); for (const r of s.riders) if (!r.isPlayer) b.teleport(r.id, s.player.s + 500 + r.id * 12, (r.id % 3) - 1); });
   await hold(page, C, 30);
   await capture(page, ['style:chain', 'style:bank']);
   const emit = (name, payload) => page.evaluate(([n, p]) => window.__br.app.bus.emit(n, p), [name, payload]);

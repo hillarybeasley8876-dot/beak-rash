@@ -46,6 +46,10 @@ export function createPhysics(session: Session): PhysicsSystem {
     const r = sr.r;
     if (hasStatus(r, 'gulped')) return; // combat carries the rider while it is in the pouch
     const c = session.controls.get(r.id) ?? idle;
+    // A fresh drift press (false → true) is what starts an air trick or an umbrella glide (SPEC §16/§15);
+    // a drift held since before the take-off never does.
+    sr.driftPressed = c.drift && !sr.driftPrev;
+    sr.driftPrev = c.drift;
     const tr = session.track;
     tr.frameAt(Math.min(r.s, trackEnd(tr)), sr.frame);
     groundEffects(ctx, sr);
@@ -54,7 +58,7 @@ export function createPhysics(session: Session): PhysicsSystem {
     if (crashed(r)) return;
     updateDrift(ctx, sr, c, dt);
     longitudinal(sr, c, surf, dt);
-    lateral(sr, c, surf, dt);
+    lateral(ctx, sr, c, surf, dt);
     vertical(ctx, sr, c, dt);
     if (crashed(r)) return;
     // Inside lines are shorter: s advances faster on the inside of a curve.

@@ -12,17 +12,23 @@
 // keeps full authority.
 import { clamp, clamp01, lerp, smoothstep } from '../core/math';
 import { TUNING as T } from './tuning';
-import { hasStatus, statusStrength, type SimRider } from './state';
+import { hasStatus, statusStrength, type SimCtx, type SimRider } from './state';
 import type { Controls } from '../core/types';
 import { bikeTop, type SurfaceMods } from './forces';
 import { carvedPush, carving } from './carve';
 
-/** Combined grip: the lowest of statuses (combat mods), surface, oil and puddle. Never multiplied twice. */
-export function gripOf(sr: SimRider, surf: SurfaceMods): number {
-  let g = Math.min(sr.r.mods.gripMul, surf.grip);
+/** Combined grip: the lowest of statuses (combat mods), surface, oil and puddle, times the weather grip. Never multiplied twice. */
+export function gripOf(ctx: SimCtx, sr: SimRider, surf: SurfaceMods): number {
+  let g = Math.min(sr.r.mods.gripMul, surf.grip) * trackGrip(ctx);
   if (sr.oilTime > 0) g = Math.min(g, T.oilGrip);
   if (sr.wetTime > 0) g = Math.min(g, T.puddleGrip);
   return Math.max(0.05, g);
+}
+
+/** The weather grip of the track (SPEC §20): rain 0.85, snow 0.75 — read every step, the race may change it. */
+function trackGrip(ctx: SimCtx): number {
+  const g = ctx.session.track.grip;
+  return typeof g === 'number' && Number.isFinite(g) ? g : 1;
 }
 
 function steerCtl(sr: SimRider): number {
@@ -85,7 +91,7 @@ function carried(sr: SimRider, cmd: number): number {
   return sr.carryDir === 0 || cmd * sr.carryDir > 0 ? cmd * sr.carrySteer : cmd;
 }
 
-export function lateral(sr: SimRider, c: Controls, surf: SurfaceMods, dt: number): void {
+export function lateral(ctx: SimCtx, sr: SimRider, c: Controls, surf: SurfaceMods, dt: number): void {
   const r = sr.r;
   const v = r.speed;
   const steer = r.mode === 'finished' ? clamp(c.steer, -1, 1) * 0.5 : clamp(c.steer, -1, 1);
@@ -95,10 +101,12 @@ export function lateral(sr: SimRider, c: Controls, surf: SurfaceMods, dt: number
   const cap = T.maxSlipRatio * v;
   const want = drifting ? driftTarget(sr, steer) : clamp(steer * steerAuthority(sr), -cap, cap);
   let cmd = carry ? carried(sr, want) : want;
-  if (r.airborne) cmd *= T.airControl;
+  // The umbrella glide steers better than plain air (SPEC §15).
+  const airMul = r.gliding ? T.glideControl : T.airControl;
+  if (r.airborne) cmd *= airMul;
   const push = curvePush(sr, drifting, dt);
   let target = cmd - push;
-  sr.vxWant = (r.airborne ? want * T.airControl : want) - push;
+  sr.vxWant = (r.airborne ? want * airMul : want) - push;
   const exiting = !drifting && sr.driftExit > 0;
   if (exiting) {
     // Release ramp: hand over from the drift's lateral speed to grip steering instead of darting inward.
@@ -116,7 +124,7 @@ export function lateral(sr: SimRider, c: Controls, surf: SurfaceMods, dt: number
     target += slide * T.slideSway * Math.sin(sr.slidePhase);
   }
   sr.vxTarget = target;
-  let tau = (T.gripTau / gripOf(sr, surf)) * (r.airborne ? T.airTauMul : 1);
+  let tau = (T.gripTau / gripOf(ctx, sr, surf)) * (r.airborne ? T.airTauMul : 1);
   // The carry's slow grip only holds back motion toward the hazard; pulling away from it stays crisp.
   if (carry && (sr.carryDir === 0 || (target - r.vx) * sr.carryDir > 0)) tau = Math.max(tau, sr.carryTau);
   r.vx += (target - r.vx) * (1 - Math.exp(-dt / tau));

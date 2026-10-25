@@ -367,8 +367,10 @@ below are the starting point. Everything stays kind and cartoonish (pillar 5): n
   bars; held while drift is held; counts after 0.3 s; must be released ≥ 0.15 s before landing). After a trick
   finishes, a new fresh drift press starts the next (RiderState.trickChain + 1).
 - Visual only: the trick rotates the rider + bike view around its centre (actors reads RiderState.trick); physics yaw
-  and the landing alignment are unaffected. Landing with a trick < 85 % done, or still in superman, = crash cause
-  'trick'; ≥ 85 % snaps to done. Landing with ≥ 1 trick done: `rider:trick {phase:'land'}` → boost +20 % for
+  and the landing alignment are unaffected. A spin / flip starts only if the predicted air left covers 85 % of it (a
+  late Shift + steer before touchdown is just a drift). Landing with a spin / flip < 85 % done (the road came up early)
+  = crash cause 'trick'; ≥ 85 % snaps to done. Landing still in superman = a sloppy landing (fail, no points, −25 %
+  speed, no PERFECT) — never a crash, because holding Shift into a landing to drift is common. Landing with ≥ 1 trick done: `rider:trick {phase:'land'}` → boost +20 % for
   0.6 s × (1 + 0.2 · (count − 1)), SP +8 per trick (combat), STYLE points (§17). Fails emit `rider:trick {phase:'fail'}`.
 - AI show-offs (cat, shiba, seagull, pigeon) spin on airs ≥ 0.6 s 40 % of the time (race AI sets the controls).
 - Inputs: keyboard Shift + A/D (spin), Shift + S (backflip), Shift + Space (frontflip), Shift alone (superman);

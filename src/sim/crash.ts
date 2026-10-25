@@ -9,6 +9,7 @@ import { clamp, damp } from '../core/math';
 import { TUNING as T } from './tuning';
 import { endDrift } from './drift';
 import { stopCarve } from './carve';
+import { resetTrick } from './tricks';
 import { dropStatus, isRiding, trackEnd, worldPos, type SimCtx, type SimRider } from './state';
 import type { CrashCause, Obstacle, RiderId } from '../core/types';
 
@@ -77,6 +78,7 @@ export function crashRider(
   r.draft = 0;
   sr.draftLeader = -1;
   sr.nearMiss.clear();
+  resetTrick(sr); // a wreck ends the trick chain and closes the umbrella
   ctx.bus.emit('rider:crash', { riderId: r.id, cause, speed, pos: { ...origin }, attacker });
 }
 
@@ -115,6 +117,7 @@ export function respawnRider(ctx: SimCtx, sr: SimRider): void {
   stopCarve(sr);
   sr.wallSide = 0;
   sr.swipeLatch = -1;
+  resetTrick(sr);
   dropStatus(r, 'oiled');
   dropStatus(r, 'wet');
   ctx.bus.emit('rider:respawn', { riderId: r.id });

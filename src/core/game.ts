@@ -93,6 +93,10 @@ export class Game {
     const { dtReal, dtSim } = app.clock.advance(raw);
     app.input.update(dtReal);
     this.session?.step(dtSim, dtReal);
+    if (this.session) {
+      this.style.update?.(dtSim, dtReal);
+      this.secrets.update?.(dtSim, dtReal);
+    }
     app.rig.update(dtReal, dtSim);
     app.fx.update(dtSim, dtReal);
     if (!this.warming) app.fx.render();

@@ -129,4 +129,84 @@ const slope = {
   },
 };
 
-export const ABUSE = [driftWall, knock, snake, wallEvents, slope];
+/** Air tricks (SPEC §16), the umbrella glide (SPEC §15) and the weather grip (SPEC §20). */
+const trick = {
+  name: 'trick',
+  stub: 'world,actors,race,fx,ui,audio', // the combat stays live: the umbrella is a weapon
+  async run({ page }) {
+    const m = {};
+    await page.evaluate(() => {
+      window.__trickEv = [];
+      window.__br.app.bus.on('rider:trick', (e) => window.__trickEv.push({ ...e }));
+    });
+    const trickEv = () => page.evaluate(() => window.__trickEv ?? []);
+    const clear = () => page.evaluate(() => { window.__trickEv = []; });
+    const launch = (vy) => page.evaluate((v) => {
+      const p = window.__br.session().player;
+      p.y = 0.1;
+      p.vy = v;
+    }, vy);
+
+    // 1. a clean spin: a fresh drift press with a steer, landed before the trick ends.
+    await prep(page, { v: 18, x: 0 });
+    await clear();
+    await launch(8);
+    await run(page, [
+      { time: 0.35, controls: { throttle: 1 } },
+      { time: 0.1, controls: { throttle: 1, drift: true, steer: 1 } },
+      { time: 1.2, controls: { throttle: 1 } },
+    ]);
+    const land = (await trickEv()).find((e) => e.phase === 'land');
+    m.spinPoints = land?.points ?? 0;
+    m.spinCount = land?.count ?? 0;
+    m.spinCrashed = (await events(page)).some((e) => e.type === 'rider:crash');
+
+    // 2. a spin pressed with too little air left never starts (it is just a drift press): no trick, no crash.
+    await prep(page, { v: 18, x: 0 });
+    await clear();
+    await launch(5);
+    await run(page, [
+      { time: 0.27, controls: { throttle: 1 } },
+      { time: 0.1, controls: { throttle: 1, drift: true, steer: -1 } },
+      { time: 0.8, controls: { throttle: 1 } },
+    ]);
+    m.shortSafe = !(await events(page)).some((e) => (e.type === 'rider:trick' && e.phase === 'start') || e.type === 'rider:crash');
+
+    // 3. the umbrella glide floats longer than plain air and tricks nothing.
+    const airTime = async (umbrella) => {
+      await prep(page, { v: 18, x: 0 });
+      await clear();
+      await page.evaluate((u) => window.__br.combat.give(0, u ? 'umbrella' : 'none'), umbrella);
+      await launch(8);
+      await run(page, [
+        { time: 0.2, controls: { throttle: 1 } },
+        ...(umbrella ? [{ time: 1.8, controls: { throttle: 1, drift: true } }] : []),
+        { time: 1.2, controls: { throttle: 1 } },
+      ]);
+      const lands = (await events(page)).filter((e) => e.type === 'rider:land');
+      return { air: lands.length ? lands[lands.length - 1].airTime : 0, tricks: (await trickEv()).length };
+    };
+    const plain = await airTime(false);
+    const glide = await airTime(true);
+    m.glideRatio = r3(glide.air / plain.air);
+    m.glideTricks = glide.tricks;
+
+    // 4. the weather grip scales the lateral response (SPEC §20).
+    const vxWith = async (grip) => {
+      await prep(page, { v: 18, x: 0 });
+      await page.evaluate((g) => { window.__br.session().track.grip = g; }, grip);
+      await run(page, [
+        { time: 1, controls: { throttle: 1 } },
+        { time: 4 / 60, controls: { throttle: 1, steer: 1 } },
+      ]);
+      return page.evaluate(() => window.__br.session().player.vx);
+    };
+    const vx1 = await vxWith(1);
+    const vxHalf = await vxWith(0.5);
+    await page.evaluate(() => { window.__br.session().track.grip = 1; });
+    m.gripRatio = r3(vxHalf / vx1);
+    return { metrics: m };
+  },
+};
+
+export const ABUSE = [driftWall, knock, snake, wallEvents, slope, trick];

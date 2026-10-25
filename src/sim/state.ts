@@ -5,7 +5,7 @@ import type { Session, Track } from '../core/contracts';
 import type { EventBus } from '../core/events';
 import type { GameEvents } from '../core/events-map';
 import type { Rng } from '../core/rng';
-import type { RiderState, StatusId, TrackFrame, Vec3Like } from '../core/types';
+import type { RiderState, StatusId, TrackFrame, TrickKind, Vec3Like } from '../core/types';
 
 /** hop = Space; launch = ramp/crest/impulse; external = another unit flies the rider (ult, gulp spit). */
 export type AirKind = 'hop' | 'launch' | 'external';
@@ -70,6 +70,11 @@ export interface SimRider {
   // air (landing judgement)
   airCalm: number;                   // s the steering has stayed below perfectSteerMax in this air episode
   hopPressAt: number;                // air time of the last hop press while airborne (−1 none)
+  // air tricks (SPEC §16)
+  driftPrev: boolean;                // the previous step's drift input (false → true = a fresh press)
+  driftPressed: boolean;             // a fresh drift press this step (in the air it can start a trick)
+  supermanHold: number;              // s the drift has been held for the current superman (−1 = none)
+  lastTrick: TrickKind | null;       // the last trick of the current air (the land event's kind)
   // crash
   crashBack: number;                 // m/s the crashed body slides back along the road (bounced off a vehicle)
   pushOff: number;                   // s left of the respawn push-off (eases from 0 up to respawnSpeed)
@@ -89,6 +94,7 @@ export function createSimRider(r: RiderState): SimRider {
     draftLeader: -1,
     nearMiss: new Map(), nearMissCooldown: 0, touching: new Set(), wallCooldown: 0, wallHitCooldown: 0,
     wallSide: 0, wallFree: 0, swipeCooldown: 0, swipeLatch: -1, swipeFree: 0, airCalm: 0, hopPressAt: -1,
+    driftPrev: false, driftPressed: false, supermanHold: -1, lastTrick: null,
     crashBack: 0, pushOff: 0, prevS: r.s, accel: 0,
   };
 }

@@ -115,6 +115,11 @@ const CHECKS = [
   ['occlusion', 'gap18_fullHiddenRun', 0, 6], ['occlusion', 'gap18_minVisible', 2, 9], ['occlusion', 'gap25_minVisible', 5, 9],
   ['occlusion', 'gap35_minVisible', 7, 9], ['occlusion', 'gap25_fullHiddenRun', 0, 0], ['occlusion', 'gap35_fullHiddenRun', 0, 0],
   ['tightCam', 'L46in_distRatio', 0.92, 1.08], ['tightCam', 'L46out_distRatio', 0.92, 1.08], ['tightCam', 'releaseShrink', -1, 0.05],
+  // r4 (SPEC §16/§15/§20): a spin lands clean and pays 120, an unfinished one wrecks the rider (cause 'trick'),
+  // the umbrella glide floats far longer than plain air (and tricks nothing), the weather grip slows the grip
+  ['trick', 'spinPoints', 120, 120], ['trick', 'spinCount', 1, 1], ['trick', 'spinCrashed', false, false],
+  ['trick', 'shortSafe', true, true], ['trick', 'glideRatio', 1.4, 3], ['trick', 'glideTricks', 0, 0],
+  ['trick', 'gripRatio', 0, 0.8],
 ];
 
 function report(results) {
