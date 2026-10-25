@@ -1,7 +1,7 @@
 // One AI rider: perception → lane plan → steering/speed → drift/hop → fights/skills.
 import { clamp, lerp, smoothstep } from '../../../core/math';
 import type { Rng } from '../../../core/rng';
-import type { Controls, RiderState } from '../../../core/types';
+import type { Controls, RiderId, RiderState } from '../../../core/types';
 import { Blunder, type BlunderGate } from './blunder';
 import { Driver, topOf } from './control';
 import { Fighter, type HuntToken } from './fight';
@@ -11,6 +11,8 @@ import { planLateral, type PlanOutput } from './plan';
 import type { Senses } from './sense';
 import { useSkill } from './skills';
 import { cornerSpeed, GripModel, targetSpeed, updateDrift, type DriftPlan } from './speed';
+import { Showoff } from './tricks';
+import { Thrower } from './throw';
 
 export interface AiWorld {
   phase: 'intro' | 'countdown' | 'racing' | 'finished';
@@ -43,6 +45,8 @@ export class Brain {
   readonly fighter: Fighter;
   private grip: GripModel;
   private blunder: Blunder;
+  private thrower: Thrower;
+  private showoff: Showoff;
   private drift: DriftPlan = { active: false, dir: 0, goal: 0.6, cool: 0 };
   private plan: PlanOutput = { x: 0, followSpeed: null, followGap: Infinity, followKind: null, hopAt: null };
   private tx: number;
@@ -68,17 +72,30 @@ export class Brain {
   ringBell = false;
   /** Debug/test: seconds of forced braking (e.g. let the police catch the autopilot). */
   holdBrake = 0;
+  /** 宿敌: this rider is the nemesis of the race (SPEC §18). */
+  readonly nemesis: boolean;
+  /** 围剿: this rider is one of the rivals that gang up on the player (SPEC §18). */
+  ally = false;
 
-  constructor(readonly r: RiderState, readonly c: Controls, readonly p: Personality, private rng: Rng, token: HuntToken) {
-    this.fighter = new Fighter(r, p, rng, token);
+  constructor(readonly r: RiderState, readonly c: Controls, readonly p: Personality, private rng: Rng, token: HuntToken, nemesis = false) {
+    this.nemesis = nemesis;
+    this.fighter = new Fighter(r, p, rng, token, nemesis);
     this.grip = new GripModel(p.risk * this.driver.authorityAtTop(r));
     this.blunder = new Blunder(r, p.skill, rng.fork(0xb1));
+    this.thrower = new Thrower(r, rng.fork(0x7b), () => this.p.aggression);
+    this.showoff = new Showoff(rng.fork(0x5c));
     this.tx = r.x;
     this.planT = rng.range(0, PLAN_EVERY);
     this.skillT = rng.range(0, SKILL_EVERY);
     this.wanderPhase = rng.range(0, 6.28);
     this.firstSkillAt = rng.range(5, 15);
     this.launchAt = rng.next() < p.launch ? rng.range(2.05, 2.8) : rng.next() < 0.7 ? rng.range(0.4, 1.9) : 3.5;
+  }
+
+  /** The pack of this frame (SPEC §18): the allies hunt the player and never each other. */
+  setAlliance(members: readonly RiderId[], target: RiderId, feuds: ReadonlyMap<RiderId, RiderId>): void {
+    this.ally = members.includes(this.r.id);
+    this.fighter.setAlliance(members, target, feuds);
   }
 
   update(dt: number, w: AiWorld): void {
@@ -102,6 +119,10 @@ export class Brain {
     this.fighter.tick(dt);
     this.hopCd -= dt;
     this.planT -= dt;
+    // The throw is planned before the lane plan: the rider lines up on its target first.
+    this.thrower.update(dt, {
+      phase: w.phase, time: w.time, hunt: this.fighter.hunt,
+    }, c, this.nemesis || this.ally);
     if (this.planT <= 0) {
       this.planT += PLAN_EVERY;
       this.think(w);
@@ -113,6 +134,8 @@ export class Brain {
     else this.driver.steerTo(r, this.tx, urgency, dt, c);
     this.drive(w);
     this.grip.update(r, c.steer, r.x - w.line.x(r.s), w.line.curv(r.s), dt);
+    // The show-off species own the drift and the steer while they are in the air (a spin, SPEC §16).
+    this.showoff.update(r, c);
     this.unstick(dt, c);
     if (this.holdBrake > 0) {
       // Debug/test brake: a full stop with hands off everything (no skills, swings, hops or bell).
@@ -132,6 +155,9 @@ export class Brain {
     const x = lerp(own, lineX, clamp(p.lineFollow * (0.35 + 0.65 * bend), 0, 1));
     const goal = this.fighter.huntGoal();
     if (goal && Math.abs(goal.ds) < 25) return goal.x;
+    // A throw in the making: line up on the target, beside it and not on top of it.
+    const aim = this.thrower.aimX;
+    if (aim !== null) return aim;
     this.updateDraft(w, bend);
     return this.draft ? this.draft.x : x;
   }
@@ -178,7 +204,7 @@ export class Brain {
       this.skillT = SKILL_EVERY;
       const straight = this.straightAhead(w);
       const view = { me: r, blips: w.senses.blips, blocked: this.plan.followGap < 8, straight, player: w.player, time: w.time,
-        grudge: this.fighter.grudging, field: w.riders.length };
+        grudge: this.fighter.grudging, field: w.riders.length, prefer: this.nemesis || this.ally ? w.player : null };
       useSkill(view, this.c, p.skillUse, this.rng.next());
     }
     if (this.ringBell) {

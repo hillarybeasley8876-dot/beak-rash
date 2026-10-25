@@ -3,6 +3,7 @@
 // at most every ~8–14 s (longer when the pack is crowded), KO / respawn / signature-skill shouts ≥ 2 s after
 // any other line, and every rider draws its lines from a shuffled no-repeat bag.
 import { ROSTER } from '../../../data/roster';
+import { NEMESIS_LINES } from '../../../data/rival-lines';
 import type { Session } from '../../../core/contracts';
 import type { Rng } from '../../../core/rng';
 import type { RiderId, RiderState } from '../../../core/types';
@@ -17,7 +18,7 @@ const FORCE_GAP = 2;        // s after any line before a KO / respawn line
 const BURST = 3;            // s window: never be the third line inside it
 const SKILL_SHOUT = 0.6;    // chance a rival shouts its skillLines on a signature cast
 
-type Kind = 'taunts' | 'koLines' | 'hurtLines' | 'skillLines';
+type Kind = 'taunts' | 'koLines' | 'hurtLines' | 'skillLines' | 'nemesisLines';
 
 export class Taunts {
   private next = new Map<RiderId, number>();
@@ -30,7 +31,7 @@ export class Taunts {
   private shouts: RiderState[] = []; // signature casts waiting for their shout (next tick)
   private offs: Array<() => void> = [];
 
-  constructor(private session: Session, private rng: Rng, private taunty: (id: RiderId) => number) {
+  constructor(private session: Session, private rng: Rng, private taunty: (id: RiderId) => number, private nemesisId: RiderId | null = null) {
     const { bus } = session.app;
     // Any line (ours or a skill shout from combat) holds the idle chatter back for a moment.
     this.offs.push(bus.on('taunt', () => {
@@ -74,7 +75,7 @@ export class Taunts {
 
   /** Next line from this rider's shuffled bag (refilled without repeating the line just said). */
   private draw(r: RiderState, kind: Kind): string | null {
-    const lines = ROSTER[r.character][kind];
+    const lines = kind === 'nemesisLines' ? (NEMESIS_LINES[r.character] ?? []) : ROSTER[r.character][kind];
     if (lines.length === 0) return null;
     const key = `${r.id}:${kind}`;
     let bag = this.bags.get(key);
@@ -111,16 +112,25 @@ export class Taunts {
       if (r.isPlayer || r.mode !== 'racing') continue;
       const due = this.next.get(r.id);
       if (due === undefined) {
-        this.next.set(r.id, this.time + this.rng.range(2, 9));
+        // The nemesis has something to say early: its grudge is the story of this race.
+        this.next.set(r.id, this.time + this.rng.range(r.id === this.nemesisId ? 1 : 2, r.id === this.nemesisId ? 3 : 9));
         continue;
       }
       const ds = r.s - p.s;
       if (this.time < due || ds < BEHIND_CAM || !this.audible(r, NEAR)) continue;
+      if (r.id === this.nemesisId) { best = r; break; }   // 宿敌 first: it speaks for the race
       if (!best || Math.abs(ds) < Math.abs(best.s - p.s)) best = r;
     }
     if (!best) return;
-    this.say(best, 'taunts');
+    this.say(best, this.nemesisId === best.id ? 'nemesisLines' : 'taunts');
     this.idleAt = this.time + this.rng.range(IDLE_GAP[0], IDLE_GAP[1]);
+  }
+
+  /** Say a line right now (the nemesis, the betrayal): paced like the other lines, never stacked. */
+  sayNow(r: RiderState, text: string): void {
+    if (this.time - this.lastLine < FORCE_GAP || this.crowded()) return;
+    this.next.set(r.id, this.time + this.gap(r));
+    this.session.app.bus.emit('taunt', { riderId: r.id, text, character: r.character });
   }
 
   dispose(): void {

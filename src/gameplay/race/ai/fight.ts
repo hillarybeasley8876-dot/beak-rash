@@ -24,6 +24,8 @@ const CATCH_UP_TIME = 3;        // s of grudge catch-up (pace.ts paybackPace, al
 const CATCH_UP_GAP = 8;         // …only to close the last metres to the player ahead
 const LEADER_PULL = 2;          // hunt weight of a rival leading the race (the player has playerPull)
 const LEADER_FURY = 1;          // attack-chance multiplier on a rival race leader in reach (others 0.65)
+const NEMESIS_GRUDGE = 2;       // the nemesis holds its grudge twice as long (SPEC §18)
+const NEMESIS_CATCH = 6;        // …and its catch-up window is twice the usual one
 
 /** Who currently hunts the player (at most one rider; angry riders ignore it). */
 export interface HuntToken { holder: RiderId | null }
@@ -46,8 +48,20 @@ export class Fighter {
   private retaliateT = 0;                  // s left to swing back at the player on the next chance in reach
   private grudgeT = 0;                     // s left of a grudge hunt on the player
   private catchT = 0;                      // s of grudge catch-up left
+  private allies = new Set<RiderId>();     // the pack of this frame (围剿)
+  private allianceTarget: RiderId = -1;
+  private feud: RiderId | null = null;     // the ally this one is feuding with (plastic friendship)
 
-  constructor(private me: RiderState, private p: Personality, private rng: Rng, private token: HuntToken) {}
+  constructor(private me: RiderState, private p: Personality, private rng: Rng, private token: HuntToken, private nemesis = false) {}
+
+  /** The pack of this frame: the allies hunt the target and never each other. */
+  setAlliance(members: readonly RiderId[], target: RiderId, feuds: ReadonlyMap<RiderId, RiderId>): void {
+    this.allianceTarget = target;
+    this.feud = feuds.get(this.me.id) ?? null;
+    if (members.length !== this.allies.size || members.some((id) => !this.allies.has(id))) {
+      this.allies = new Set(members);   // the pack only changes when a new alliance forms
+    }
+  }
 
   tick(dt: number): void {
     this.attackT -= dt;
@@ -90,7 +104,8 @@ export class Fighter {
     if (this.graceT <= 0) this.attackT = Math.min(this.attackT, 0.1);
     if (player.hp < player.maxHp * LOW_HP || !targetable(player)) return;
     if (this.hunt !== player) this.setHunt(player);
-    this.grudgeT = this.rng.range(4, 6);
+    const windowMul = this.nemesis ? NEMESIS_GRUDGE : 1;
+    this.grudgeT = this.rng.range(4, 6) * windowMul;
     this.huntT = Math.max(this.huntT, this.grudgeT);
   }
 
@@ -121,6 +136,32 @@ export class Fighter {
         return;
       }
     }
+    // 塑料友谊: the two that hit each other settle it between themselves for a few seconds.
+    if (this.feud !== null) {
+      const f = riders.find((r) => r.id === this.feud) ?? null;
+      if (f && targetable(f) && Math.abs(f.s - me.s) < 25) {
+        if (this.hunt !== f) this.setHunt(f);
+        this.huntT = Math.max(this.huntT, 2);
+        return;
+      }
+    }
+    // 围剿: an ally of the pack hunts the player, never one of its own.
+    if (this.allies.has(me.id) && this.allianceTarget >= 0) {
+      const t = riders.find((r) => r.id === this.allianceTarget) ?? null;
+      if (t && targetable(t) && Math.abs(t.s - me.s) < 30 && this.playerFair(t, time)) {
+        if (this.hunt !== t) this.setHunt(t);
+        this.huntT = Math.max(this.huntT, 2);
+        return;
+      }
+    }
+    // 宿敌: the nemesis goes for the player whenever it can reach it (the calm start still applies).
+    if (this.nemesis) {
+      if (targetable(player) && Math.abs(player.s - me.s) < 30 && this.playerFair(player, time)) {
+        if (this.hunt !== player) this.setHunt(player);
+        this.huntT = Math.max(this.huntT, 2);
+        return;
+      }
+    }
     const h = this.hunt;
     if (h && (this.huntT <= 0 || !targetable(h) || Math.abs(h.s - me.s) > 30 || (h === player && !this.playerFair(player, time)))) this.setHunt(null);
     if (this.hunt || this.pickT > 0) return;
@@ -131,6 +172,7 @@ export class Fighter {
     let best: RiderState | null = null, bestScore = 0;
     for (const r of riders) {
       if (r === me || !targetable(r) || (r === player && !playerOk)) continue;
+      if (this.allies.has(r.id) && r.id !== this.feud) continue;   // no friendly fire in the pack
       const ds = r.s - me.s;
       if (ds < -8 || ds > 16) continue;
       const pull = r === player ? this.p.playerPull : r.place === 1 ? LEADER_PULL : 1;
@@ -151,6 +193,7 @@ export class Fighter {
     for (const b of blips) {
       const t = b.rider;
       if (!t || Math.abs(b.ds) > MELEE_DS || !targetable(t)) continue;
+      if (this.allies.has(t.id) && t.id !== this.feud) continue;   // the pack never hits itself
       if (t.isPlayer && !this.playerFair(t, time)) continue;
       const dx = t.x - me.x;
       const ad = Math.abs(dx);
@@ -183,6 +226,12 @@ export class Fighter {
    */
   paybackChase(player: RiderState, dt: number): boolean {
     const gap = player.s - this.me.s;
+    if (this.nemesis) {
+      // 复仇之心: the nemesis closes the last metres whenever the player is just ahead (twice the window).
+      if (gap < 0.5 || gap > CATCH_UP_GAP || this.hunt !== player) return false;
+      this.catchT = Math.max(this.catchT, NEMESIS_CATCH);
+      return true;
+    }
     if (this.retaliateT <= 0 || this.catchT <= 0 || this.hunt !== player || gap < 0.5 || gap > CATCH_UP_GAP) return false;
     this.catchT -= dt;
     return true;

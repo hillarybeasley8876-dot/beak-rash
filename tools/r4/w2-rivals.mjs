@@ -7,10 +7,12 @@ const C = { throttle: 1 };
 const FIELD = 'goose,cat,shiba,pigeon,penguin,seagull,sloth';
 
 /** Fresh page with a given save, a manual race on coast with the given field, stepped to GO. */
-async function start(page, h, save, extra = '') {
+async function start(page, h, save, extra = '', names = null) {
   await page.evaluate((s) => { localStorage.clear(); if (s) localStorage.setItem('beak-rash.save.v1', JSON.stringify(s)); }, save);
   await h.goto(`/?race=coast&seed=5&manual=1&traffic=0&police=0&rivals=${FIELD}${extra}`);
-  await page.evaluate(() => { const b = window.__br; b.manual(true); for (let i = 0; i < 40 && b.session()?.phase !== 'racing'; i++) b.step(30); });
+  await page.evaluate(() => window.__br.manual(true));
+  if (names) await capture(page, names); // listen from the intro on (announcements come before or at GO)
+  await page.evaluate(() => { const b = window.__br; for (let i = 0; i < 40 && b.session()?.phase !== 'racing'; i++) b.step(30); });
 }
 const idOf = (page, c) => page.evaluate((ch) => window.__br.session().riders.find((r) => r.character === ch)?.id ?? -1, c);
 /** Drive the player over the line; returns once race:end fired (max ~90 s of sim). */
@@ -40,8 +42,7 @@ await withPage(async (page, h) => {
   expect(rv.capybara === 22, `not in the race: capybara 30 − 8 = 22 (${rv.capybara})`);
 
   // 2. the nemesis: biggest grudge ≥ 50 in the field; intro event; KO pays 150 and resets the grudge to 20
-  await start(page, h, { rivalry: { goose: 80, cat: 55 } });
-  await capture(page, ['race:end', 'race:nemesis', 'race:nemesisDown', 'race:alliance', 'combat:throw', 'rider:trick']);
+  await start(page, h, { rivalry: { goose: 80, cat: 55 } }, '', ['race:end', 'race:nemesis', 'race:nemesisDown', 'race:alliance', 'combat:throw', 'rider:trick']);
   const cfg = await page.evaluate(() => window.__br.session().config.nemesis);
   const goose = await idOf(page, 'goose');
   let ev = await events(page, 'race:nemesis');
@@ -61,7 +62,7 @@ await withPage(async (page, h) => {
   // 3. an alliance against a runaway leader (3 rivals 112–118 m behind at 20 m/s: lead ≈ 5.6 s); friendly fire breaks it
   await start(page, h, null);
   await capture(page, ['race:alliance', 'combat:throw', 'rider:trick']);
-  await page.evaluate(() => { const b = window.__br, s = b.session(), p = s.player; b.teleport(0, p.s + 260, 0); const rs = s.riders.filter((r) => !r.isPlayer); rs.forEach((r, i) => b.teleport(r.id, p.s + (i < 3 ? 260 - 112 - i * 3 : 0), (i % 3) - 1)); s.player.speed = 20; });
+  await page.evaluate(() => { const b = window.__br, s = b.session(), base = s.player.s; b.teleport(0, base + 260, 0); const rs = s.riders.filter((r) => !r.isPlayer); rs.forEach((r, i) => b.teleport(r.id, base + (i < 3 ? 260 - 112 - i * 3 : 0), (i % 3) - 1)); s.player.speed = 20; });
   for (let i = 0; i < 30 && !(await events(page, 'race:alliance')).length; i++) await hold(page, C, 30);
   ev = await events(page, 'race:alliance');
   const form = ev.find((x) => x.e.phase === 'form');

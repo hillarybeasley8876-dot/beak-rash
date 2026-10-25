@@ -13,6 +13,8 @@ export interface SkillView {
   time: number;
   /** Hunting the player out of a grudge: a valid chance is taken three times as eagerly. */
   grudge: boolean;
+  /** 宿敌: the rider this one wants to hit first (the nemesis goes for the player). */
+  prefer: RiderState | null;
   /** Riders in the race (bottom half / bottom 3). */
   field: number;
 }
@@ -80,7 +82,19 @@ export function useSkill(v: SkillView, c: Controls, eager: number, roll: number)
   if (me.character === 'pelican') return roll < eager * 0.3 && pelican(v, c, roll / Math.max(0.01, eager * 0.3));
   const id = ROSTER[me.character].skill;
   const rule = SIG[id];
-  if (!rule || me.cooldowns[0] > 0 || (v.grudge && !PAYBACK.has(id)) || roll > eager * (v.grudge ? 0.75 : 0.25)) return false;
+  if (!rule || me.cooldowns[0] > 0) return false;
+  const gate = v.grudge ? 0.75 : v.prefer ? 0.5 : 0.25;
+  if (roll > eager * gate) return false;
+  // A shield or a slide would block the payback swing: a rider that owes the player one keeps it holstered.
+  if (v.grudge && !PAYBACK.has(id)) return false;
+  // 宿敌: the signature skill goes at the player first.
+  if (v.prefer) {
+    const only: SkillView = { ...v, blips: v.blips.filter((b) => b.kind === 'rider' && b.rider === v.prefer) };
+    if (rule(only)) {
+      c.skill1 = true;
+      return true;
+    }
+  }
   if (!rule(v)) return false;
   c.skill1 = true;
   return true;

@@ -29,6 +29,8 @@ const RUBBER_RATE = 0.1;              // 1/s: how fast rider.rubber moves (0.08 
 const PAYBACK_PACE = 1.06, PAYBACK_CLOSE = 1.5;
 const PAYBACK_RATE = 0.4;             // 1/s: rubber rate while closing in for a payback
 export const paybackPace = (pace: number, player: RiderState): number => Math.max(pace * PAYBACK_PACE, player.speed + PAYBACK_CLOSE);
+/** 复仇之心 (SPEC §18): the nemesis rides 3 % faster while it is behind the player, within 80 m. */
+const NEMESIS_BOOST = 1.03, NEMESIS_RANGE = 80;
 
 export interface PaceInput {
   rider: RiderState;
@@ -43,6 +45,8 @@ export interface PaceInput {
   recovering: boolean;
   /** A grudge closing the last metres to the player (Fighter.paybackChase): paybackPace(), also in view. */
   payback: boolean;
+  /** 宿敌: this rider is the nemesis of the race (SPEC §18). */
+  nemesis: boolean;
 }
 
 /** A rival's base pace (m/s): the level reference plus its per-rider offset. */
@@ -62,6 +66,8 @@ export function paceCap(i: PaceInput): number {
   if (i.chaseCam && -d > UNSEEN_BEHIND) cap = pace * (1 + CATCH_UP * smoothstep(UNSEEN_BEHIND, CATCH_FULL, -d));
   // A rider hunting the player from behind stops easing off (its own bike + draft decide); pulses stay unseen.
   if (i.huntingPlayer) cap = Math.max(cap, pace * (1.04 + 0.01 * (i.level - 1)));
+  // 复仇之心: the nemesis is a little faster while it chases the player from behind.
+  if (i.nemesis && d < 0 && -d < NEMESIS_RANGE) cap = Math.max(cap, pace * NEMESIS_BOOST);
   if (i.payback) cap = Math.max(cap, paybackPace(pace, p));
   return cap;
 }

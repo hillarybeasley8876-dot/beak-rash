@@ -18,9 +18,24 @@ const BLUNDERS = 1;         // in-view traffic blunders per race (blunder.ts)…
 const BLUNDER_FROM = 15;    // …not before this race time…
 const BLUNDER_AHEAD = [-4, 30] as const;  // …by a rival this far ahead of the player (close in the chase camera)
 
+/** r4 (SPEC §18): the pack that gangs up on the player (围剿) as the AI sees it. */
+export interface AllianceView {
+  members: readonly RiderId[];
+  target: RiderId;
+  /** member → the ally it is feuding with (5 s after a friendly fire). */
+  feuds: ReadonlyMap<RiderId, RiderId>;
+}
+
+/** 宿敌: the nemesis fights harder (SPEC §18). */
+export const NEMESIS_AGGRESSION = 1.5;
+
 export interface AiDirector {
   preStep(dt: number, countdownTime: number): void;
   brain(id: RiderId): Brain | undefined;
+  /** The alliance of this frame (the rivals gang up on the player). */
+  setAlliance(view: AllianceView): void;
+  /** A rival says a line right now (paced like the other taunts). */
+  taunt(riderId: RiderId, text: string): void;
   dispose(): void;
 }
 
@@ -31,14 +46,19 @@ export function createAi(session: Session, form: FormTable): AiDirector {
   const line = buildRacingLine(track);
   const token: HuntToken = { holder: null };
   const brains = new Map<RiderId, Brain>();
+  // 宿敌: the rival with the biggest grudge (≥ 50) in this field. It fights harder and hunts the player.
+  const nemesisId = config.nemesis === null || config.nemesis === undefined
+    ? null
+    : (session.riders.find((r) => r.character === config.nemesis)?.id ?? null);
   for (const r of session.riders) {
     const c = session.controls.get(r.id);
     if (!c) continue;
     const p = makePersonality(r.character, config.level, rng.fork(r.id + 1), form.get(r.id));
-    brains.set(r.id, new Brain(r, c, p, rng.fork(0x100 + r.id), token));
+    if (r.id === nemesisId) p.aggression = Math.min(1, p.aggression * NEMESIS_AGGRESSION);
+    brains.set(r.id, new Brain(r, c, p, rng.fork(0x100 + r.id), token, r.id === nemesisId));
   }
   const offsets = new Map(session.riders.filter((r) => !r.isPlayer).map((r) => [r.id, paceOffset(r, form.get(r.id))]));
-  const taunts = new Taunts(session, rng.fork(0x7a), (id) => brains.get(id)?.p.taunty ?? 1);
+  const taunts = new Taunts(session, rng.fork(0x7a), (id) => brains.get(id)?.p.taunty ?? 1, nemesisId);
   const lastDs = new Map<RiderId, number>();
   const respawnAt = new Map<RiderId, number>();
   let blunders = config.traffic ? BLUNDERS : 0;
@@ -82,7 +102,7 @@ export function createAi(session: Session, form: FormTable): AiDirector {
     const offset = offsets.get(r.id) ?? 0;
     const payback = !recovering && b.fighter.paybackChase(p, dt);
     b.basePace = basePace(config.level, offset);
-    b.paceTop = paceCap({ rider: r, player: p, level: config.level, offset, huntingPlayer, chaseCam, recovering, payback });
+    b.paceTop = paceCap({ rider: r, player: p, level: config.level, offset, huntingPlayer, chaseCam, recovering, payback, nemesis: b.nemesis });
     const inView = payback ? paybackPace(b.basePace, p) : b.basePace;
     easeRubber(r, b.paceTop, inView, unseenBehind(r, p, chaseCam, huntingPlayer), dt, payback);
   };
@@ -98,6 +118,13 @@ export function createAi(session: Session, form: FormTable): AiDirector {
 
   return {
     brain: (id) => brains.get(id),
+    setAlliance(view) {
+      for (const b of brains.values()) b.setAlliance(view.members, view.target, view.feuds);
+    },
+    taunt(riderId, text) {
+      const r = session.rider(riderId);
+      if (r) taunts.sayNow(r, text);
+    },
     preStep(dt, countdownTime) {
       world.phase = session.phase;
       world.countdownTime = countdownTime;
