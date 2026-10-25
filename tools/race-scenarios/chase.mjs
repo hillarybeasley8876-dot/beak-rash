@@ -143,6 +143,101 @@ export const chaseScenarios = {
     check('self-inflicted crash next to the corgi is BUSTED', near && busted.length === 1, { alongside: near, now: await police(h) });
     check('BUSTED alert carries reason busted', reasons.includes('busted'), reasons);
   },
+
+  /** Police 2.0 (SPEC §14): the wanted stars. ★1 keeps the old chase, ★2 arms the baton, ★3 sends a
+   *  backup and a roadblock, the officer can be fought back and the player can buy it off. */
+  async stars(page, h, { check, stub }) {
+    const RECORDER = `(() => { window.__pe = []; const bus = window.__br.app.bus;
+      for (const t of ['police:wanted', 'police:windup', 'police:swing', 'npc:strike', 'police:roadblock',
+        'police:hurt', 'police:down', 'police:bribe'])
+        bus.on(t, (e) => window.__pe.push({ t, e: JSON.parse(JSON.stringify(e)), time: +window.__br.session().time.toFixed(2) })); })()`;
+    /** A fresh race with the event recorder on, the rivals out of the way (the officer has to be able to
+     *  reach the player's tail) and the player at a pace it can hold. */
+    const start = async () => {
+      await openRace(h, `race=coast&seed=3&manual=1&intro=0&traffic=0${stub}`);
+      await h.eval('window.__throttle = 0.6');
+      await h.eval(RECORDER);
+      await h.eval(`window.__runHuman(60, ${DT}, 1000, 'passive')`);
+      await h.eval(`(() => { const b = window.__br, s = b.session();
+        for (const r of s.riders) if (!r.isPlayer) b.teleport(r.id, s.player.s + 600 + r.id * 12, 0); })()`);
+    };
+    const evs = () => h.eval('window.__pe');
+    const setHeat = (v) => h.eval(`window.__br.race.setHeat(${v})`);
+    const starsOf = (list) => list.filter((e) => e.t === 'police:wanted').map((e) => e.e.level);
+    /** Ride until the named event shows up (or `secs` run out); returns everything seen. */
+    const untilEvent = async (name, secs) => {
+      for (let i = 0; i < secs * 2; i++) {
+        await h.eval(`window.__runHuman(15, ${DT}, 1000, 'passive')`);
+        const list = await evs();
+        if (list.some((e) => e.t === name)) return list;
+      }
+      return evs();
+    };
+
+    // ★1: the old chase, no baton.
+    await start();
+    await setHeat(0.55);
+    await ride(h, 12, (p) => p.mode === 'chase' && Math.abs(p.gap) < 4);
+    let ev = await evs();
+    check('police 2.0: heat 0.55 → ★1', starsOf(ev).includes(1), { stars: starsOf(ev) });
+    check('police 2.0: ★1 never winds the baton up', !ev.some((e) => e.t === 'police:windup'), {});
+
+    // ★2: the baton winds up, swings, and a hit is an npc:strike the combat answers.
+    await start();
+    await setHeat(0.8);
+    ev = await untilEvent('police:swing', 25);
+    const wind = ev.find((e) => e.t === 'police:windup');
+    const swing = ev.find((e) => e.t === 'police:swing');
+    const strike = ev.find((e) => e.t === 'npc:strike');
+    check('police 2.0: heat 0.8 → ★2', starsOf(ev).includes(2), { stars: starsOf(ev) });
+    check('police 2.0: ★2 winds the baton up (0.45 s) and swings',
+      !!wind && wind.e.time >= 0.3 && wind.e.time <= 0.5 && !!swing
+      && swing.time - wind.time >= wind.e.time - 0.05 && swing.time - wind.time <= wind.e.time + 0.1,
+      { wind: wind?.e, swing: swing?.e });
+    check('police 2.0: a swing that hits is an npc:strike (baton, police)',
+      !swing || !swing.e.hit || (!!strike && strike.e.weapon === 'baton' && strike.e.cause === 'police'),
+      { hit: swing?.e.hit, strike: strike?.e });
+
+    // ★2: the bribe 「V我50」 is taken and the chase lets the player go.
+    await start();
+    await setHeat(0.8);
+    for (let i = 0; i < 60; i++) {
+      const near = await h.eval('(() => { const p = window.__br.race.police(); return p && p.mode === "chase" && Math.abs(p.gap) < 4; })()');
+      if (near) break;
+      await h.eval(`window.__runHuman(15, ${DT}, 1000, 'passive')`);
+    }
+    await h.eval('window.__br.session().player.coins = 120');
+    await h.eval('window.__br.press("bell")');
+    ev = await untilEvent('police:bribe', 4);
+    const bribe = ev.find((e) => e.t === 'police:bribe');
+    const coins = await h.eval('window.__br.session().player.coins');
+    check('police 2.0: 「V我50」 at ★2 is accepted (120 → 70) and the chase ends',
+      !!bribe && bribe.e.accepted && bribe.e.amount === 50 && coins === 70, { bribe: bribe?.e, coins });
+
+    // ★3: a backup corgi and a roadblock with one gap.
+    await start();
+    await setHeat(0.97);
+    ev = await untilEvent('police:roadblock', 25);
+    const block = ev.find((e) => e.t === 'police:roadblock');
+    const backup = await h.eval('window.__br.session().obstacles.some((o) => o.id === 901 && o.active)');
+    check('police 2.0: heat 0.97 → ★3 with a backup corgi', starsOf(ev).includes(3) && backup, { stars: starsOf(ev), backup });
+    check('police 2.0: the roadblock is a gap in a line of solid barriers',
+      !!block && block.e.gapWidth >= 3 && block.e.gapWidth <= 4.5, { block: block?.e });
+
+    // Fight back: a thrown weapon hurts the officer, at 0 HP it goes down.
+    await start();
+    await setHeat(0.97);
+    await untilEvent('police:roadblock', 25);
+    await h.eval(`window.__br.app.bus.emit('combat:obstacleHit', { obstacleId: 900, attacker: 0, weapon: 'pan', damage: 35, thrown: true, pos: { x: 0, y: 1, z: 0 } })`);
+    await h.eval(`window.__runHuman(15, ${DT}, 1000, 'passive')`);
+    await h.eval(`window.__br.app.bus.emit('combat:obstacleHit', { obstacleId: 900, attacker: 0, weapon: 'pan', damage: 35, thrown: true, pos: { x: 0, y: 1, z: 0 } })`);
+    await h.eval(`window.__runHuman(15, ${DT}, 1000, 'passive')`);
+    ev = await evs();
+    const hurt = ev.filter((e) => e.t === 'police:hurt').map((e) => e.e.hp);
+    check('police 2.0: the officer has 60 HP and goes down at 0',
+      hurt.length === 2 && hurt[0] === 25 && hurt[1] === 0 && ev.some((e) => e.t === 'police:down'),
+      { hp: hurt, down: ev.some((e) => e.t === 'police:down') });
+  },
 };
 
 /** New race on `seed`, heat 0.95 after 15 s; returns the police state once the corgi rides alongside. */

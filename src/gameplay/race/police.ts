@@ -7,43 +7,26 @@
 // up (left far behind before it ever arrived, it first takes one out-of-sight shortcut back). Only a real lead is
 // an escape ('lost' + toast): 60 m held for 2 s, built from its closest approach; every other end (stuck or trailing
 // out of sight, a cooled heat, the 25 s cap) is a let-go with its own line and toot. No escape in the first 8 s.
-// The corgi's lines, whistle, knocks and toot are bus events (npc:say / police:*): ui-hud and audio place them.
+// Police 2.0 (SPEC §14): the wanted stars (★0..3) drive the rest — at ★2 the officer arms its baton and swings,
+// at ★3 a second corgi (901) joins in and a roadblock goes up ahead, the officer can be fought back (60 HP) and the
+// player can buy the officer off with 「V我50」. The corgi's lines, whistle, knocks and toot are bus events
+// (npc:say / police:*): ui-hud and audio place them.
 import { Quaternion, Vector3 } from 'three';
-import { clamp } from '../../core/math';
-import { createRiderState } from '../../core/rider';
-import { POLICE_LINES, ROSTER } from '../../data/roster';
-import { WEAPONS } from '../../data/weapons';
-import type { Obstacle, Vec3Like, WeaponId } from '../../core/types';
+import { clamp, clamp01 } from '../../core/math';
+import { CORGI_LINES } from '../../data/police-lines';
+import { POLICE_LINES } from '../../data/roster';
+import type { Vec3Like } from '../../core/types';
 import { topOf } from './ai/control';
 import type { RaceCtx } from './ctx';
-import { createCorgi, knock, resetCorgi, resprint, ride, sprinting, tire, tired, WALK_BACK, type RideWorld } from './police-chase';
+import { resprint, ride, sprinting, tire, tired, WALK_BACK, type RideWorld } from './police-chase';
 import { createHeat } from './police-heat';
-import { PoliceView } from './police-view';
 import { trackPose } from './pose';
-
-const SPAWN_HEAT = 0.5;
-const SPAWN_BEHIND = 20;      // m: out of the chase camera, close enough to arrive in ~3 s
-const SPAWN_BEFORE = 0.9;     // no new chase in the last 10 % of the track
-const SLOW = 0.6;             // × the player's flat top: slower than this next to the corgi counts toward BUSTED
-const BUST_TIME = 2;
-const FINE = 100, PENALTY = 4; // the penalty is the ticket stop itself
-const WHISTLE_CD = 9;
-const COOLDOWN = 20;
-const LOSE_GAP = 60, LOSE_TIME = 2; // m held for s: the only escape ('lost')
-const FAR_GAP = 38, FAR_TIME = 3;   // a corgi this far back for this long (even mid-sprint) lets the player go
-const SHORTCUT_AFTER = 1;     // s far back before the corgi's one out-of-sight shortcut (never arrived yet)
-const LEAD_BUILT = 25;        // m the player must pull away from the corgi's closest approach to escape
-const MIN_CHASE = 8;          // s: no escape before the chase has really begun
-const REACHED = 6;            // m: the corgi has caught up with the player this chase
-const CALM_HEAT = 0.3, CALM_GAP = 15;
-const LET_GO_HEAT = 0.12;     // a model citizen alongside: the corgi lets it go (no 'lost' credit)
-const TRAIL_GAP = 4.5, TRAIL_TIME = 2; // behind the chase camera for this long: re-sprint once, then give up…
-const STUCK_TIME = 7;         // …or this long even while sprinting (blocked by traffic or a pack): give up
-const CHASE_MAX = 25;         // s: the chase ends (escape, or a let-go when still beside the player)
-const SIDE_CLEAR = 1.2;       // m clearance from other riders at the spot beside the player
-const LET_GO_LINES = ['算了，下不为例。', '今天心情好，放你一马。', '下次再让我看见……就算了。'];
-const KNOCK_HEAT = 0.05;      // knocking the officer about is an offence too
-const WING_TIME = 2.2;        // pelican.wing duration (SPEC §7)
+import { createCorgiUnit, disposeCorgiUnit, liftCorgi, placeCorgi, type PoliceCorgi } from './police/corgi';
+import { createField, type Field } from './police/field';
+import { listenFight, stepOfficer, tryKnock, type FightCtx } from './police/fight';
+import { inTunnel } from './police/roadblock';
+import { CHASE, LET_GO_LINES, T } from './police/tuning';
+import { createWanted } from './police/wanted';
 
 type Mode = 'off' | 'chase' | 'ticket' | 'leaving';
 type Reason = 'spawn' | 'lost' | 'busted';
@@ -63,187 +46,245 @@ export function createPolice(ctx: RaceCtx): Police {
   const player = session.player;
   const rng = session.rng.fork(0xc0601);
   const heat = createHeat(session);
-  const st = createRiderState(99, 'corgi', 'mtb', false);
-  st.name = ROSTER.corgi.name;
-  st.mode = 'racing';
-  const corgi = createCorgi(st);
+  const wanted = createWanted();
+  // Both officers are built (hidden) with the race, so core's warm-up compiles them behind the loading
+  // screen; a spawn only places and shows one.
+  const primary = createCorgiUnit(app, session.world, 900, 99);
+  const field: Field = createField({
+    app, session, player, wanted, rng,
+    officers: () => corgis,
+    lead: () => primary,
+    say: (c, text) => say(c, text),
+    at: (c) => at(c),
+  });
+  const corgis = [primary, field.backup];
   const rideWorld: RideWorld = { track, obstacles: session.obstacles, riders: session.riders, playerTop: topOf(player), playerSpeed: 0 };
-  const ob: Obstacle = { id: 900, kind: 'police', s: 0, x: 0, speed: 0, halfWidth: 0.45, halfLength: 0.9, height: 1.6, solid: false, active: false };
-  // Built (hidden) with the race, so core's warm-up compiles and uploads it behind the loading screen; a spawn
-  // only places and shows it.
-  const view = new PoliceView(app, session.world);
-  view.visible = false;
   let mode: Mode = 'off';
   let side: 1 | -1 = 1;
   let modeT = 0, bustT = 0, lostT = 0, whistleCd = 0, cooldown = 0, alertLevel = 0, simAcc = 0, lastReal = app.clock.realTime;
   let wingT = 0;                              // s left of the player's Wing Dash
   let minGap = Infinity;                      // closest approach (player.s − corgi.s) this chase
-  let trailT = 0;                             // s trailing more than TRAIL_GAP behind the player
-  let farT = 0;                               // s more than FAR_GAP behind the player
+  let trailT = 0;                             // s trailing more than CHASE.trailGap behind the player
+  let farT = 0;                               // s more than CHASE.farGap behind the player
   let resprinted = false;                     // the one re-sprint of this chase is used
   let shortcut = false;                       // the one out-of-sight catch-up of this chase is used
   let spoke = false;                          // the chase line (first time alongside) is said
+  let level = 0;                              // the wanted stars (the level the events report)
+  let pendingBust = false;                    // the player crashed because of the police
+  let bribes = 0;                             // bribe attempts this race
   const pos = new Vector3(), quat = new Quaternion();
 
-  // Corgi speech (content's POLICE_LINES): a bubble over the officer (ui-hud anchors it on obstacle 900).
-  const say = (text: string): void => app.bus.emit('npc:say', { obstacleId: ob.id, character: 'corgi', text });
+  /** Corgi speech: a bubble over the officer (ui-hud anchors it on its obstacle id), rate limited. */
+  const say = (c: PoliceCorgi, text: string): void => {
+    if (!text) return;
+    if (ctx.clock - c.lastSay < T.sayGap) return;
+    c.lastSay = ctx.clock;
+    app.bus.emit('npc:say', { obstacleId: c.id, character: 'corgi', text });
+  };
   /** Where the officer is (world, body height): whistle, knock and toot sounds come from here. */
-  const at = (): Vec3Like => track.toWorld(st.s, st.x, 1.1, new Vector3());
+  const at = (c: PoliceCorgi): Vec3Like => track.toWorld(c.st.s, c.st.x, 1.1, new Vector3());
   const alert = (level: number, reason?: Reason): void => {
     if (level === alertLevel) return;
     alertLevel = level;
-    app.bus.emit('police:alert', reason ? { riderId: player.id, level, reason } : { riderId: player.id, level });
+    app.bus.emit('police:alert', { riderId: player.id, level, reason });
   };
   const setMode = (m: Mode): void => { mode = m; modeT = 0; };
 
+  const fightCtx: FightCtx = {
+    app, session, player, wanted, rng,
+    get now(): number { return ctx.clock; },
+    state: { lastWindup: -99, why: 'none' },
+    pos: (c) => at(c),
+    say,
+    onDown: () => field.onDown(),
+    heat: (v) => heat.offence(v),
+    officers: () => corgis,
+    chasing: () => mode === 'chase',
+  };
+
+  /** The wanted stars changed: tell the world, arm the batons, call the backup, put up the block. */
+  const syncWanted = (): void => {
+    const next = wanted.level;
+    if (next === level) return;
+    const prev = level;
+    level = next;
+    app.bus.emit('police:wanted', { riderId: player.id, level: next, prev });
+    const armed = next >= 2;
+    for (const c of corgis) if (c.active) c.st.weapon = armed ? 'baton' : 'none';
+    if (next < 3 || prev >= 3) return;
+    field.onStars();
+  };
+
   const spawn = (): void => {
     setMode('chase');
-    resetCorgi(corgi);
-    st.s = Math.max(5, player.s - SPAWN_BEHIND);
-    st.x = clamp(player.x, -4, 4);
-    st.speed = Math.max(player.speed + 4, 12);
-    st.vx = 0;
+    placeCorgi(primary, session, CHASE.spawnBehind, clamp(player.x, -4, 4));
     bustT = lostT = trailT = farT = 0;
     resprinted = spoke = shortcut = false;
-    minGap = player.s - st.s;
+    minGap = player.s - primary.st.s;
     whistleCd = 2.5;
     rideWorld.playerTop = topOf(player);
-    view.visible = true;
-    ob.active = true;
-    if (!session.obstacles.includes(ob)) session.obstacles.push(ob);
     alert(1, 'spawn');
-    say(rng.pick(POLICE_LINES.alert));
+    say(primary, rng.pick(POLICE_LINES.alert));
   };
 
   const despawn = (): void => {
     setMode('off');
-    view.visible = false;
-    ob.active = false;
-    const i = session.obstacles.indexOf(ob);
-    if (i >= 0) session.obstacles.splice(i, 1);
-    cooldown = COOLDOWN;
+    for (const c of corgis) liftCorgi(c, session);
+    field.reset();
+    cooldown = CHASE.chaseCooldown;
     alert(0);
+    wanted.reset();
+    syncWanted();
   };
 
   /** The chase ends: an escape ('lost' alert + toast) or a let-go (its own line and toot, no escape credit). */
   const giveUp = (escaped: boolean): void => {
     setMode('leaving');
-    player.heat = Math.min(player.heat, CALM_HEAT);
+    field.reset();      // the block comes down and the backup goes home with the chase
+    player.heat = Math.min(player.heat, CHASE.calmHeat);
+    wanted.reset();
+    syncWanted();
     alert(0, escaped ? 'lost' : undefined);
     if (escaped) app.ui.toast(`甩掉了柯基警官！  “${rng.pick(POLICE_LINES.lost)}”`, 'meme');
     else if (player.finishTime === null) {
-      say(rng.pick(LET_GO_LINES));
-      app.bus.emit('police:horn', { riderId: player.id, pos: at() });
+      say(primary, rng.pick(LET_GO_LINES));
+      app.bus.emit('police:horn', { riderId: player.id, pos: at(primary) });
     }
   };
 
   const bust = (): void => {
-    app.bus.emit('police:busted', { riderId: player.id, fine: FINE });
-    player.coins -= FINE;
+    app.bus.emit('police:busted', { riderId: player.id, fine: CHASE.fine });
+    player.coins -= CHASE.fine;
     ctx.bustedCount.set(player.id, (ctx.bustedCount.get(player.id) ?? 0) + 1);
     player.heat = 0;
+    field.reset();
+    wanted.reset();
+    syncWanted();
     if (player.mode === 'racing') { player.mode = 'busted'; player.modeTime = 0; }
     setMode('ticket');
     alert(0, 'busted');
-    say(`${rng.pick(POLICE_LINES.busted)}  罚 ${FINE} 小鱼干，靠边 ${PENALTY} 秒`);
+    say(primary, `${rng.pick(POLICE_LINES.busted)}  罚 ${CHASE.fine} 小鱼干，靠边 ${CHASE.penalty} 秒`);
   };
 
   const whistle = (): void => {
-    whistleCd = WHISTLE_CD;
-    app.bus.emit('police:whistle', { riderId: player.id, pos: at() });
+    whistleCd = CHASE.whistleCd;
+    app.bus.emit('police:whistle', { riderId: player.id, pos: at(primary) });
     const slow = player.statuses.find((s) => s.id === 'slow');
     if (slow) slow.time = Math.max(slow.time, 1);
     else player.statuses.push({ id: 'slow', time: 1, strength: 0.15, source: null });
   };
 
-  /** A player swing (side = null: either side) or Wing Dash ram (weapon 'none') reaching the corgi knocks it
-   *  back. */
-  const tryKnock = (reach: number, sideSign: number | null, weapon: WeaponId): void => {
-    if (mode !== 'chase' || corgi.knockT > 0) return;
-    const ds = st.s - player.s, dx = st.x - player.x;
-    if (Math.abs(ds) > 1.6 || Math.abs(dx) > reach || (sideSign !== null && Math.sign(dx) !== sideSign)) return;
-    knock(corgi, Math.sign(dx) || 1);
-    heat.offence(KNOCK_HEAT);
-    app.bus.emit('police:knock', { riderId: player.id, weapon, pos: at() });
-  };
   const offs = [
-    app.bus.on('combat:swing', (e) => {
-      if (e.riderId === player.id) tryKnock(WEAPONS[e.weapon].reach, e.heavy ? null : e.side, e.weapon);
-    }),
-    app.bus.on('skill:cast', (e) => { if (e.riderId === player.id && e.skillId === 'pelican.wing') wingT = WING_TIME; }),
+    listenFight(fightCtx),
+    app.bus.on('skill:cast', (e) => { if (e.riderId === player.id && e.skillId === 'pelican.wing') wingT = CHASE.wingTime; }),
   ];
 
   /** Is the spot beside the player at lateral `x` taken by another rider? */
   const taken = (x: number): boolean => session.riders.some((r) => !r.isPlayer && (r.mode === 'racing' || r.mode === 'finished')
-    && Math.abs(r.s - player.s) < 2.5 && Math.abs(r.x - x) < SIDE_CLEAR);
+    && Math.abs(r.s - player.s) < 2.5 && Math.abs(r.x - x) < CHASE.sideClear);
 
   /** Side of the player to ride on: off the road → the other side; taken by a rival → the other side if it is free. */
   const chooseSide = (gap: number): void => {
-    if (Math.abs(gap) > 14) side = st.x <= player.x ? -1 : 1;
+    if (Math.abs(gap) > 14) side = primary.st.x <= player.x ? -1 : 1;
     const hw = track.bounds(player.s).halfWidth;
-    const here = player.x + side * 1.7, there = player.x - side * 1.7;
+    const here = player.x + side * 1.6, there = player.x - side * 1.6;
     const offRoad = (x: number): boolean => Math.abs(x) > hw - 0.6;
     if (offRoad(here) || (taken(here) && !offRoad(there) && !taken(there))) side = side === 1 ? -1 : 1;
   };
 
   /** Trailing behind the camera: one more sprint back (with a line), then the corgi gives up; stuck behind it
-   * (still out of sight after STUCK_TIME, sprinting or not) it gives up as soon as the chase may end. */
+   * (still out of sight after CHASE.stuckTime, sprinting or not) it gives up as soon as the chase may end. */
   const trail = (dt: number, gap: number): boolean => {
-    trailT = gap > TRAIL_GAP ? trailT + dt : 0;
-    if (trailT > STUCK_TIME) return true;
-    if (trailT < TRAIL_TIME || sprinting(corgi)) return false;
+    trailT = gap > CHASE.trailGap ? trailT + dt : 0;
+    if (trailT > CHASE.stuckTime) return true;
+    if (trailT < CHASE.trailTime || sprinting(primary.ride)) return false;
     trailT = 0;
-    if (resprinted || tired(corgi)) return true;
+    if (resprinted || tired(primary.ride)) return true;
     resprinted = true;
-    resprint(corgi);
-    say(rng.pick(POLICE_LINES.chase));
+    resprint(primary.ride);
+    say(primary, rng.pick(POLICE_LINES.chase));
     return false;
   };
 
+  /** Ride one officer: it tails the player at ★2+ (so its baton can reach), and it commits to a lunge
+   *  while it winds the baton up. */
+  const rideOfficer = (c: PoliceCorgi, dt: number, mySide: number): void => {
+    const st = c.st;
+    if (c.down) {
+      // the tumble: it slides to a stop, then it sits up, shakes its head and clocks off
+      st.speed = Math.max(0, st.speed - 6 * dt);
+      st.s += st.speed * dt;
+      c.downT += dt;
+      if (c.downT >= T.downTime) {
+        c.down = false;
+        c.leaving = true;
+        st.mode = 'racing';
+        st.crash = null;
+        say(c, rng.pick(CORGI_LINES.down));
+      }
+      return;
+    }
+    if (c.leaving) {
+      const hw = track.bounds(st.s).halfWidth;
+      ride(c.ride, rideWorld, dt, Math.max(0, st.speed - 6 * dt), mySide * (hw - 0.8), 3);
+      if (player.s - st.s > 45 || st.s - player.s > 120) liftCorgi(c, session);
+      return;
+    }
+    const gap = player.s - st.s;
+    const tx = Math.abs(gap) < 14 ? player.x + mySide * 1.6 : player.x;
+    const targetGap = wanted.level >= 2 ? T.tailGap : 0;
+    const want = gap < -3 && player.speed < 3 ? -WALK_BACK
+      : gap < 6 ? player.speed + (gap - targetGap) * 1.5
+      : player.speed + clamp(gap * 0.7, -5, 9);
+    if (c.baton.windup > 0) ride(c.ride, rideWorld, dt, 0, tx, T.lungeAccel, c.lunge);
+    else ride(c.ride, rideWorld, dt, want, tx, 5.5);
+    tire(c.ride, dt, gap);
+    stepOfficer(fightCtx, c, dt);
+  };
+
   const chase = (dt: number): void => {
+    const st = primary.st;
     const gap = player.s - st.s;
     const down = player.mode === 'crashed' || player.mode === 'respawning';
-    const slow = player.speed < SLOW * rideWorld.playerTop;
-    const want = gap < -3 && player.speed < 3 ? -WALK_BACK
-      : gap < 6 ? player.speed + gap * 1.5 : player.speed + clamp(gap * 0.7, -5, 9);
+    const slow = player.speed < CHASE.slow * rideWorld.playerTop;
     chooseSide(gap);
     rideWorld.playerSpeed = player.speed;
-    ride(corgi, rideWorld, dt, want, Math.abs(gap) < 14 ? player.x + side * 1.7 : player.x, 5.5);
+    rideOfficer(primary, dt, side);
+    if (field.backup.active) rideOfficer(field.backup, dt, side === 1 ? -1 : 1);
     const alongside = Math.abs(gap) < 4 && Math.abs(player.x - st.x) < 3.4;
-    tire(corgi, dt, gap);
-    if (alongside && !spoke) { spoke = true; say(rng.pick(POLICE_LINES.chase)); }
+    if (alongside && !spoke) { spoke = true; say(primary, rng.pick(POLICE_LINES.chase)); }
     const offending = down || slow;
     bustT = alongside && offending ? bustT + dt : Math.max(0, bustT - dt * 0.6);
-    if (bustT >= BUST_TIME) { bust(); return; }
+    if (bustT >= CHASE.bustTime) { bust(); return; }
     whistleCd -= dt;
-    if (gap > -1 && gap < 12 && whistleCd <= 0 && !tired(corgi) && player.mode === 'racing') whistle();
+    if (gap > -1 && gap < 12 && whistleCd <= 0 && !tired(primary.ride) && player.mode === 'racing') whistle();
     minGap = Math.min(minGap, Math.max(0, gap));
-    farT = gap > FAR_GAP ? farT + dt : 0;
+    farT = gap > CHASE.farGap ? farT + dt : 0;
     // Left far behind before it ever arrived (a SHOWTIME leap, a boost chain): once the gap has settled for a
     // second, one shortcut back to the spawn gap, out of sight, so the chase is seen instead of ending as a phantom.
-    if (!shortcut && minGap > REACHED && farT > SHORTCUT_AFTER) {
+    if (!shortcut && minGap > CHASE.reached && farT > CHASE.shortcutAfter) {
       shortcut = true;
-      st.s = player.s - SPAWN_BEHIND;
-      minGap = SPAWN_BEHIND;
+      st.s = player.s - CHASE.spawnBehind;
+      minGap = CHASE.spawnBehind;
       trailT = farT = 0;
       return;
     }
     // Escaping needs a real lead built during the chase (never just a corgi that has not arrived yet): 25 m
     // pulled from its closest approach and 60 m held for 2 s. Falling 38 m back for 3 s (out of sight), trailing
     // twice, a calm lead of 15 m after it rode alongside, the 25 s cap and a cooled-down heat end it as a let-go.
-    const settled = modeT > MIN_CHASE;
-    lostT = settled && gap - minGap > LEAD_BUILT && gap > LOSE_GAP ? lostT + dt : Math.max(0, lostT - dt);
-    if (lostT > LOSE_TIME) { giveUp(true); return; }
-    const calm = settled && ((minGap < REACHED && gap > CALM_GAP && player.heat < CALM_HEAT) || farT > FAR_TIME);
-    const outOfTime = modeT > CHASE_MAX || (player.heat < LET_GO_HEAT && modeT > 20);
+    const settled = modeT > CHASE.minChase;
+    lostT = settled && gap - minGap > CHASE.leadBuilt && gap > CHASE.loseGap ? lostT + dt : Math.max(0, lostT - dt);
+    if (lostT > CHASE.loseTime) { giveUp(true); return; }
+    const calm = settled && ((minGap < CHASE.reached && gap > CHASE.calmGap && player.heat < CHASE.calmHeat) || farT > CHASE.farTime);
+    const outOfTime = modeT > CHASE.max || (player.heat < CHASE.letGoHeat && modeT > 20);
     if (calm || (trail(dt, gap) && settled) || outOfTime || player.finishTime !== null) { giveUp(false); return; }
     alert(alongside || gap < 20 ? 2 : 1);
   };
 
-  /** The ticket stop is the time penalty: the player is held (also after a respawn) for PENALTY s. */
+  /** The ticket stop is the time penalty: the player is held (also after a respawn) for CHASE.penalty s. */
   const ticket = (dt: number): void => {
-    ride(corgi, rideWorld, dt, 0, player.x + side * 1.5, 5);
-    const holding = modeT < PENALTY;
+    for (const c of corgis) if (c.active) ride(c.ride, rideWorld, dt, 0, player.x + side * 1.5, 5);
+    const holding = modeT < CHASE.penalty;
     if (holding && player.mode === 'racing') { player.mode = 'busted'; player.modeTime = 0; }
     if (player.mode === 'busted') { player.speed = 0; player.vx = 0; }
     if (holding) return;
@@ -252,10 +293,44 @@ export function createPolice(ctx: RaceCtx): Police {
   };
 
   const leave = (dt: number): void => {
-    const hw = track.bounds(st.s).halfWidth;
-    ride(corgi, rideWorld, dt, Math.max(0, st.speed - 6 * dt), side * (hw - 0.8), 3);
-    if (player.s - st.s > 45 || st.s - player.s > 120 || modeT > 25) despawn();
+    for (const c of corgis) {
+      if (!c.active) continue;
+      const hw = track.bounds(c.st.s).halfWidth;
+      ride(c.ride, rideWorld, dt, Math.max(0, c.st.speed - 6 * dt), side * (hw - 0.8), 3);
+    }
+    if (player.s - primary.st.s > 45 || primary.st.s - player.s > 120 || modeT > CHASE.max) despawn();
   };
+
+  /** 「V我50」: the player rings the bell next to an officer and offers 50 coins. */
+  const bribe = (): void => {
+    const offer = field.offer(bribes);
+    if (!offer.officer) return;
+    bribes += 1;
+    const accepted = offer.verdict === 'accepted';
+    app.bus.emit('police:bribe', { riderId: player.id, obstacleId: offer.officer.id, amount: T.price, accepted });
+    say(offer.officer, offer.line);
+    if (accepted) {
+      player.coins -= T.price;
+      player.heat = T.heatAfter;
+      cooldown = Math.max(cooldown, T.noChaseTime);
+      wanted.reset();
+      syncWanted();
+      giveUp(false);   // a let-go, not an escape: no 'lost' credit
+      return;
+    }
+    player.heat = clamp01(player.heat + T.refuseHeat);
+    wanted.refuse();
+    syncWanted();
+  };
+
+  const offBell = app.bus.on('combat:bell', (e) => { if (e.riderId === player.id) bribe(); });
+  const offCrash = app.bus.on('rider:crash', (e) => {
+    if (e.riderId === player.id && e.cause === 'police') pendingBust = true;
+  });
+  const offBarrier = app.bus.on('rider:obstacleHit', (e) => {
+    if (e.riderId !== player.id || e.speed <= T.crashSpeed) return;
+    if (field.isBarrier(e.obstacleId)) pendingBust = true;
+  });
 
   return {
     setHeat: (v) => heat.set(v),
@@ -263,38 +338,60 @@ export function createPolice(ctx: RaceCtx): Police {
       simAcc += dt;
       cooldown -= dt;
       modeT += dt;
-      if (wingT > 0) { wingT -= dt; tryKnock(1.4, null, 'none'); }
+      wanted.update(player.heat);
+      syncWanted();
+      if (wingT > 0) { wingT -= dt; tryKnock(fightCtx, 1.4, null, 'none', false); }
       if (mode === 'chase') chase(dt);
       else if (mode === 'ticket') ticket(dt);
       else if (mode === 'leaving') leave(dt);
-      heat.update(dt, mode === 'chase' ? player.s - st.s : null);
+      field.update(dt, mode === 'chase');
+      syncWanted();   // a knock, a KO next to an officer or an officer going down can change the stars
+      // In a tunnel the heat cools twice as fast while every officer is far behind.
+      const far = corgis.every((c) => !c.active || player.s - c.st.s > T.tunnelGap);
+      const coolMul = inTunnel(session) && far ? T.tunnelCool : 1;
+      heat.update(dt, mode === 'chase' ? player.s - primary.st.s : null, coolMul);
+      // A police crash (the baton, the roadblock) busts the player as soon as they are back on the bike.
+      if (pendingBust && player.mode === 'racing') { pendingBust = false; bust(); }
       const canSpawn = session.config.police && session.phase === 'racing' && player.mode === 'racing'
-        && player.s < track.length * SPAWN_BEFORE;
-      if (mode === 'off' && cooldown <= 0 && canSpawn && player.heat > SPAWN_HEAT) spawn();
-      ob.s = st.s; ob.x = st.x; ob.speed = st.speed;
+        && player.s < track.length * CHASE.spawnBefore;
+      if (mode === 'off' && cooldown <= 0 && canSpawn && player.heat > CHASE.spawnHeat) spawn();
+      for (const c of corgis) { c.ob.s = c.st.s; c.ob.x = c.st.x; c.ob.speed = c.st.speed; }
     },
     sync() {
       const real = app.clock.realTime;
       if (mode === 'off') { simAcc = 0; lastReal = real; return; }
-      trackPose(track, st.s, st.x, 0, st.yaw, st.lean, pos, quat);
-      view.update(st, pos, quat, simAcc, Math.max(0, real - lastReal), mode !== 'leaving');
+      for (const c of corgis) {
+        if (!c.active) continue;
+        trackPose(track, c.st.s, c.st.x, 0, c.st.yaw, c.st.lean, pos, quat);
+        c.view.update(c.st, pos, quat, simAcc, Math.max(0, real - lastReal), mode !== 'leaving');
+      }
       simAcc = 0;
       lastReal = real;
     },
     summary: () => ({
-      mode, s: +st.s.toFixed(1), x: +st.x.toFixed(2), v: +st.speed.toFixed(1), gap: +(player.s - st.s).toFixed(1),
+      mode, s: +primary.st.s.toFixed(1), x: +primary.st.x.toFixed(2), v: +primary.st.speed.toFixed(1),
+      gap: +(player.s - primary.st.s).toFixed(1),
       heat: +player.heat.toFixed(2), bustT: +bustT.toFixed(2), cooldown: +Math.max(0, cooldown).toFixed(1),
-      tired: tired(corgi), knocked: corgi.knockT > 0, closeT: +corgi.closeT.toFixed(1),
-      minGap: Number.isFinite(minGap) ? +minGap.toFixed(1) : null, chaseT: +corgi.chaseT.toFixed(1),
+      tired: tired(primary.ride), knocked: primary.ride.knockT > 0, closeT: +primary.ride.closeT.toFixed(1),
+      minGap: Number.isFinite(minGap) ? +minGap.toFixed(1) : null, chaseT: +primary.ride.chaseT.toFixed(1),
       trailT: +trailT.toFixed(1), resprinted,
+      wanted: level, hp: primary.hp, backup: field.backup.active, roadblock: field.summary().roadblock,
+      windup: +primary.baton.windup.toFixed(2), cd: +primary.baton.cooldown.toFixed(2),
+      ds: +(player.s - primary.st.s).toFixed(2), lat: +(primary.st.x - player.x).toFixed(2), why: fightCtx.state.why,
     }),
     dispose() {
       for (const off of offs) off();
+      offBell();
+      offCrash();
+      offBarrier();
       heat.dispose();
       if (mode !== 'off') alert(0);
-      const i = session.obstacles.indexOf(ob);
-      if (i >= 0) session.obstacles.splice(i, 1);
-      view.dispose();
+      for (const c of corgis) {
+        const i = session.obstacles.indexOf(c.ob);
+        if (i >= 0) session.obstacles.splice(i, 1);
+      }
+      disposeCorgiUnit(primary);
+      field.dispose();
     },
   };
 }

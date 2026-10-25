@@ -16,8 +16,9 @@ const CALM_AFTER = 10;        // s without an offence before cooling speeds up
 const CALM_MUL = 3;
 
 export interface Heat {
-  /** Cool down; `chaseGap` = metres the player leads the active corgi by (null = no corgi). */
-  update(dt: number, chaseGap: number | null): void;
+  /** Cool down; `chaseGap` = metres the player leads the active corgi by (null = no corgi).
+   *  `coolMul` > 1 cools faster (a tunnel with the officers far behind, SPEC §14). */
+  update(dt: number, chaseGap: number | null, coolMul?: number): void;
   /** An offence the race itself detects (e.g. knocking the officer about). */
   offence(v: number): void;
   /** Debug/tests: set the heat as if an offence just happened. */
@@ -47,10 +48,10 @@ export function createHeat(session: Session): Heat {
     }),
   ];
   return {
-    update(dt, chaseGap) {
+    update(dt, chaseGap, coolMul = 1) {
       gap = chaseGap;
       calmT += dt;
-      player.heat = clamp01(player.heat - COOL * (calmT > CALM_AFTER ? CALM_MUL : 1) * dt);
+      player.heat = clamp01(player.heat - COOL * coolMul * (calmT > CALM_AFTER ? CALM_MUL : 1) * dt);
     },
     offence: add,
     set(v) {

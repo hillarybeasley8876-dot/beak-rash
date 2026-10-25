@@ -124,11 +124,15 @@ export interface RideWorld {
   playerSpeed: number;
 }
 
-/** Ride toward `wantSpeed` and lateral target `tx`; brakes behind traffic or a rival and squeezes past. */
-export function ride(c: Corgi, w: RideWorld, dt: number, wantSpeed: number, tx: number, accel: number): void {
+/** Ride toward `wantSpeed` and lateral target `tx`; brakes behind traffic or a rival and squeezes past.
+ *  `commit` > 0 = a committed burst (the baton wind-up): the officer keeps that speed whatever the
+ *  player does and holds its line, so braking out of its reach works. */
+export function ride(c: Corgi, w: RideWorld, dt: number, wantSpeed: number, tx: number, accel: number, commit = 0): void {
   const st = c.st;
-  let want = clamp(wantSpeed, -WALK_BACK, topSpeed(c, w));
+  const hold = commit > 0;
+  let want = hold ? commit : clamp(wantSpeed, -WALK_BACK, topSpeed(c, w));
   let lat = 4;
+  if (hold) { tx = st.x; lat = 1.4; }
   const hw = w.track.bounds(st.s).halfWidth;
   const b = blocker(w, st, tx);
   if (b) {
