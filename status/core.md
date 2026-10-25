@@ -182,3 +182,24 @@ Verification (round 1 end): tsc 0 errors (whole project) · test-core-guard OK �
 (new d-pad case) · full autopilot coast race to results, 0 errors (shots/core/a1/race-full.mjs) · handover coast → city →
 quit → city: one world in the scene, old track freed, 0 errors (flow-probe.mjs) · ?stub=all / ?stub=fx start + restart OK
 (stub-probe.mjs) · `__br.sim.riders()` keeps live rows after an in-page restart (sim-rows.mjs).
+
+## r4 (2026-10-26) — Police 2.0, Weapons 2.0, tricks + STYLE, rivals, track events, maps, easter eggs
+Lead = this session (design SPEC §14–§22, core contracts, acceptance tests `tools/r4/*.mjs` self-tested on the old
+code first, review + fixes, commits). Every unit change was built by a MiniMax-M3.1 worker (lead runner outside the
+repo; one brief per job in `briefs/r4/`, checkpoints in `status/r4/`), one job per set of owned files, up to ~10 in
+parallel on the shared tree.
+- core: TrackId watertown/gobi + TRACK_ORDER of five; `TRACK_WEATHER` (own weather first: watertown drizzles);
+  RaceConfig weather / reverse / route / nemesis; per-session modules style + secrets; SaveData rivalry / secrets /
+  unlocks / duckRider / stats; the r4 events (events-map.ts).
+- wave 1: combat throw, sim tricks, actors poses, style, llm bike + Konami, watertown, gobi, weather variants.
+- wave 2: combat traits, police 2.0, rivals (grudges / nemesis / alliances / AI throws + tricks), track events,
+  easter eggs.
+- wave 3: reverse tracks, HUD, fx (+ rain / snow), audio (r4 sfx, two race songs, weather beds, 82 voice lines),
+  screens (race options, 3 × 5 career, race report, 彩蛋 n/9), achievements (+26), seeded routes.
+- polish: LLM bike exaggerated, water town / gobi look, sea + clouds per weather, STYLE for roadblock / geese / stalls.
+- Lead fixes in review (tests were wrong as often as the code): pan-parry/chill-throw bypass removed, slipper homes on the
+  nearest rider, bonus SP capped at the bar, alliance only for a runaway leader, nemesis card once, fx trick trail on
+  events (no property watcher), line endings (python writes on Windows turn LF into CRLF — normalise before commit).
+Residual: `features/bridge.ts` red arch is removed at runtime by the water town (make the arch style per track);
+SHOWTIME now fires about twice a race (more fighting + the STYLE / trick bonus, budget 40 SP per race) — the soak
+accepts it; the records sheet lists 71 achievements in dense one-line cells.
