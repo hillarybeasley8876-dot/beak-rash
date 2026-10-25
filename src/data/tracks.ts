@@ -1,5 +1,5 @@
 // Track catalogue (names/blurbs for menus). Layout and scenery live in world/ (track unit).
-import type { TrackId } from '../core/types';
+import type { TrackId, Weather } from '../core/types';
 import { INFO as GOBI } from './track-content/gobi';
 import { INFO as WATERTOWN } from './track-content/watertown';
 
@@ -30,4 +30,14 @@ export const TRACKS: Record<TrackId, TrackInfo> = {
   gobi: GOBI,
 };
 
-export const TRACK_ORDER: TrackId[] = ['coast', 'city', 'mountain'];
+export const TRACK_ORDER: TrackId[] = ['coast', 'city', 'mountain', 'watertown', 'gobi'];
+
+/** Weather per track (SPEC §20): the track's own weather first (a race that asks for none gets it), then the
+ *  variants a race may ask for. world/weather/table.ts builds them; menus offer exactly these. */
+export const TRACK_WEATHER: Record<TrackId, readonly Weather[]> = {
+  coast: ['clear', 'rain', 'dusk', 'fog'],
+  city: ['clear', 'rain', 'fog'],
+  mountain: ['clear', 'snow', 'fog', 'rain'],
+  watertown: ['rain', 'fog', 'clear'],
+  gobi: ['clear', 'dusk', 'fog'],
+};

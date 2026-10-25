@@ -3,7 +3,7 @@
 // instead of breaking the loading screen or the session.
 import { BIKES } from '../data/bikes';
 import { RACER_POOL, ROSTER } from '../data/roster';
-import { TRACKS } from '../data/tracks';
+import { TRACKS, TRACK_WEATHER } from '../data/tracks';
 import { Rng } from './rng';
 import type { RaceConfig } from './contracts';
 import type { SaveStore } from './save';
@@ -63,8 +63,10 @@ export function buildRaceConfig(params: URLSearchParams, save: SaveStore, o: Par
   const rivals = random ? rng.shuffle(RACER_POOL).slice(0, 7) : known;
   const rivalBikes = (o.rivalBikes ?? []).slice(0, rivals.length)
     .map((b, i) => valid(b, isBike, ROSTER[rivals[i]].defaultBike, 'rival bike'));
+  const trackId = valid(o.trackId ?? params.get('race') ?? params.get('track') ?? 'coast', isTrack, 'coast', 'track');
+  const ownWeather = TRACK_WEATHER[trackId][0] ?? 'clear';
   return {
-    trackId: valid(o.trackId ?? params.get('race') ?? params.get('track') ?? 'coast', isTrack, 'coast', 'track'),
+    trackId,
     mode: o.mode ?? 'quick',
     seed,
     level: Math.min(MAX_LEVEL, Math.max(1, Math.round(finiteOr(o.level ?? params.get('level'), 1)))),
@@ -75,7 +77,7 @@ export function buildRaceConfig(params: URLSearchParams, save: SaveStore, o: Par
     traffic: o.traffic ?? params.get('traffic') !== '0',
     police: o.police ?? params.get('police') !== '0',
     autopilot: o.autopilot ?? params.get('autopilot') === '1',
-    weather: valid(o.weather ?? params.get('weather') ?? 'clear', isWeather, 'clear', 'weather'),
+    weather: valid(o.weather ?? params.get('weather') ?? ownWeather, isWeather, ownWeather, 'weather'),
     reverse: o.reverse ?? params.get('reverse') === '1',
     route: Math.max(0, Math.floor(finiteOr(o.route ?? params.get('route'), 0))),
     nemesis: o.nemesis !== undefined ? o.nemesis : nemesisOf(params, save, rivals),
