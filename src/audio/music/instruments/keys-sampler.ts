@@ -5,7 +5,7 @@
 // realtime resampling (a resampling source costs the audio thread ≈ 3× a unity-rate one). Chords
 // longer than a sample, and anything before the samples exist, play on the live voices.
 import { Rhodes } from './keys';
-import { premix, type MixNote } from './premix';
+import { offline, playMix, premix, type MixNote } from './premix';
 import type { Band } from '../band';
 
 export const KEY_LOW = 47;
@@ -61,9 +61,15 @@ export class SampledKeys {
       });
       if (!notes.length) return;
       const ctx = this.b.ctx;
-      const src = new AudioBufferSourceNode(ctx, { buffer: premix(notes, { off: Math.max(0.01, dur), release: KEY_RELEASE }, ctx.sampleRate) });
+      const mix = { off: Math.max(0.01, dur), release: KEY_RELEASE };
+      const at = t + Math.abs(jitter(this.b)) * 0.004;
+      if (offline(ctx)) {
+        playMix(ctx, notes, mix, at, this.b.input('keys'));
+        return;
+      }
+      const src = new AudioBufferSourceNode(ctx, { buffer: premix(notes, mix, ctx.sampleRate) });
       src.connect(this.b.input('keys'));
-      src.start(t + Math.abs(jitter(this.b)) * 0.004);
+      src.start(at);
       return;
     }
     midis.forEach((m, i) => {

@@ -111,7 +111,7 @@ export const RESULTS: Song = {
   swing: 0.16,
   key: 'F major',
   lead: 'synth',
-  // The bright synth-brass melody reads louder than its level: ≈ −4.5 LU under the full mix.
+  // The bright synth-brass melody reads louder than its level.
   mix: { lead: 0.78 },
   sections: {
     intro: {
@@ -119,7 +119,7 @@ export const RESULTS: Song = {
       keys: 'X-------x-------', pad: 'X---------------', hat: 'x.x.x.x.x.x.x.x.',
       fill: { snare: '....X...X.x.XxXX', tom: '........1.2.3...', bass: '1> . . . . . . . 5 . 8^ . 7 . 8^ .' },
     },
-    A: { ...A, gainDb: -3 },
+    A: { ...A, gainDb: -4.5 },
     A2: { ...A, lead: MELODY, perc: 's.s.T.s.s.s.T.s.' },
     B,
     A3: {

@@ -1,7 +1,8 @@
 // Race-start sync part of tools/audio-check.mjs: the race song waits in its vamp through the
 // intro, the count-in fills the countdown and bar 1 of section A lands on GO — also after a
 // same-track restart (pause → 重新开始) and after a pause in the middle of the countdown.
-import { withPage } from './lib.mjs';
+import { pathToFileURL } from 'node:url';
+import { withPage, parseArgs } from './lib.mjs';
 
 /** Wait in-page for race:countdown n (resolves with the audio time it fired at). */
 const countdownAt = (page, n, timeout = 20000) => page.evaluate(([want, ms]) => new Promise((resolve, reject) => {
@@ -72,4 +73,11 @@ export async function startCheck(args) {
     expect(errs.length === 0, `no audio errors (${errs.length})`);
   });
   return fails;
+}
+
+// Standalone: node tools/audio-check-start.mjs [--stub camera,fx]  (exit 1 on any failure)
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  const fails = await startCheck(parseArgs(process.argv.slice(2)));
+  console.log(fails.length ? `\nFAILED (${fails.length}):\n- ${fails.join('\n- ')}` : '\nall passed');
+  process.exit(fails.length ? 1 : 0);
 }

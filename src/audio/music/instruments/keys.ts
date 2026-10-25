@@ -61,10 +61,8 @@ export class Rhodes {
     const [bodyWave, barkWave] = epWaves(b.ctx);
     const voices: EpVoice[] = [];
     for (let i = 0; i < 4; i++) {
-      const body = osc(b, 'sine', 220, jitter(b) * 7);
-      const bark = osc(b, 'sine', 220, jitter(b) * 7);
-      body.setPeriodicWave(bodyWave);
-      bark.setPeriodicWave(barkWave);
+      const body = osc(b, bodyWave, 220, jitter(b) * 7);
+      const bark = osc(b, barkWave, 220, jitter(b) * 7);
       const bodyAmp = new GainNode(b.ctx, { gain: 0 });
       const barkAmp = new GainNode(b.ctx, { gain: 0 });
       body.connect(bodyAmp);
@@ -137,8 +135,7 @@ export class Clav {
     const level = new GainNode(ctx, { gain: CLAV_LEVEL });
     level.connect(this.wah);
     for (let i = 0; i < 2; i++) {
-      const o = osc(b, 'sine', 330, jitter(b) * 6);
-      o.setPeriodicWave(wave);
+      const o = osc(b, wave, 330, jitter(b) * 6);
       o.connect(level);
       this.oscs.push(o);
     }
@@ -160,13 +157,14 @@ export class Clav {
 export const PAD_DETUNE = (i: number): number => (i % 2 ? 9 : -11);
 export const PAD_RELEASE = 0.7;
 
-/** The pad's slowly opening low-pass: 700 Hz → 1500 Hz over min(1.2 s, the chord). */
+/** The pad's slowly opening low-pass: 650 Hz → 1 kHz over min(1.2 s, the chord): a warm bed under the
+ *  hook's 0.7–3 kHz, not on it. */
 export function padFilter(fr: AudioParam, t: number, dur: number): void {
   const open = t + Math.max(0.06, Math.min(1.2, dur));
   anchor(fr, t);
-  fr.linearRampToValueAtTime(700, t + 0.05);
-  fr.linearRampToValueAtTime(1500, open);
-  settle(fr, open, 1500);
+  fr.linearRampToValueAtTime(650, t + 0.05);
+  fr.linearRampToValueAtTime(1000, open);
+  settle(fr, open, 1000);
 }
 
 /** The pad's swell; returns when the chord has died away. */

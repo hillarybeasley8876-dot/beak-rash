@@ -5,7 +5,8 @@
 // A control tab in the same browser (one 32 kHz oscillator) is sampled alongside: while it reads
 // < 1 % the meter is not inflated by machine load and an overrun FAILS; only a control ≥ 1 % turns
 // overruns into warnings. Any '[audio] unknown sfx' warning during the run fails the gate too.
-import { withPage } from './lib.mjs';
+import { pathToFileURL } from 'node:url';
+import { withPage, parseArgs } from './lib.mjs';
 
 const P50_MAX = 5;
 const P90_MAX = 8;
@@ -116,4 +117,11 @@ export async function cpuCheck(args = {}) {
     if (over && gate && !inflated) fails.push(`cpu ${k}: p50 ${r.p50} % / p90 ${r.p90} % (max ${P50_MAX} / ${P90_MAX}; control ${r.ctl50} %)`);
   }
   return { fails, report };
+}
+
+// Standalone: node tools/audio-check-cpu.mjs [--stub camera,fx]  (exit 1 on any failure)
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  const { fails } = await cpuCheck(parseArgs(process.argv.slice(2)));
+  console.log(fails.length ? `\nFAILED (${fails.length}):\n- ${fails.join('\n- ')}` : '\nall passed');
+  process.exit(fails.length ? 1 : 0);
 }

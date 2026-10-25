@@ -1,7 +1,8 @@
 // Held KO lines (part of audio-check --game): the characters' lines wait for the end of the KO
 // cinematic, then for the bark channel. A long rival bark cut by the announcer must not block the
 // pelican's quip; a repeat KO's short cinematic still gets the victim's groan; so does WRECKED.
-import { withPage } from './lib.mjs';
+import { pathToFileURL } from 'node:url';
+import { withPage, parseArgs } from './lib.mjs';
 
 /** Bark checks in a live race; returns failure messages. */
 export async function barksCheck(args) {
@@ -92,4 +93,11 @@ export async function barksCheck(args) {
     expect(errs.length === 0, `no audio errors (${errs.length})`);
   });
   return fails;
+}
+
+// Standalone: node tools/audio-check-barks.mjs [--stub camera,fx]  (exit 1 on any failure)
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  const fails = await barksCheck(parseArgs(process.argv.slice(2)));
+  console.log(fails.length ? `\nFAILED (${fails.length}):\n- ${fails.join('\n- ')}` : '\nall passed');
+  process.exit(fails.length ? 1 : 0);
 }

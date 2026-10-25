@@ -48,8 +48,10 @@ export class VoicePlayer {
   private byText = new Map<string, string>();
   /** When each channel's line ends (or ended, when it was cut). */
   private busy: Record<VoiceChannel, number> = { announcer: 0, bark: 0 };
-  /** Earliest start of the next bark: the gap after the last bark, and the end of a loud announcer line. */
+  /** Earliest start of the next bark: the gap after the last bark (only for lines that do not outrank
+   *  it), and the end of a loud announcer line. */
   private barkUntil = 0;
+  private barkPriority = 0;
   private loudUntil = 0;
   private current: Record<VoiceChannel, Playing | null> = { announcer: null, bark: null };
   private pending: { id: string; opts: VoiceOpts; at: number } | null = null;
@@ -111,7 +113,7 @@ export class VoicePlayer {
     const now = this.engine.now;
     const channel = opts.channel ?? 'announcer';
     if (channel === 'bark' && !this.paused && now < this.barkUntil && now >= this.loudUntil && this.outranks(opts)) this.cut('bark');
-    if (channel === 'bark' && (this.paused || now < this.barkGate)) return this.waitForBark(id, opts);
+    if (channel === 'bark' && (this.paused || now < this.barkGate(opts.priority ?? 1))) return this.waitForBark(id, opts);
     const clip = this.clips.get(id);
     if (clip === 'missing') return 'none';
     if (!clip) {
@@ -136,8 +138,10 @@ export class VoicePlayer {
     return 'started';
   }
 
-  private get barkGate(): number {
-    return Math.max(this.barkUntil, this.loudUntil);
+  /** When a bark of `priority` may start: a more important line (the pelican's own) skips the gap
+   *  after a lesser one (a rival's taunt that just ended must not make the player's KO quip expire). */
+  private barkGate(priority: number): number {
+    return priority > this.barkPriority ? this.loudUntil : Math.max(this.barkUntil, this.loudUntil);
   }
 
   /** A more important bark (the player's own line) cuts the rival line that is playing. */
@@ -146,10 +150,12 @@ export class VoicePlayer {
     return cur !== null && (opts.priority ?? 1) > cur.priority;
   }
 
-  /** A bark that may wait (a KO line held for the cinematic's end) takes the one waiting slot. */
+  /** A bark that may wait (a KO line held for the cinematic's end) takes the one waiting slot; a more
+   *  important line (the pelican's own) takes it over from a rival's. */
   private waitForBark(id: string, opts: VoiceOpts): VoiceResult {
     const wait = opts.wait ?? 0;
-    if (this.paused || wait <= 0 || this.pendingBark) return 'dropped';
+    const held = this.pendingBark;
+    if (this.paused || wait <= 0 || (held && (opts.priority ?? 1) <= (held.opts.priority ?? 1))) return 'dropped';
     this.pendingBark = { id, opts, at: this.engine.now };
     void this.load(id);
     return 'queued';
@@ -180,6 +186,7 @@ export class VoicePlayer {
       pan = new StereoPannerNode(ctx, { pan: Math.max(-1, Math.min(1, where?.pan ?? opts.pan ?? 0)) });
       head = head.connect(pan);
       this.barkUntil = now + clip.duration + BARK_GAP;
+      this.barkPriority = opts.priority ?? 1;
     }
     head.connect(this.engine.voiceIn);
     src.start(now);
@@ -222,7 +229,7 @@ export class VoicePlayer {
     }
     const waiting = this.pendingBark;
     if (waiting && now - waiting.at > (waiting.opts.wait ?? 0)) this.pendingBark = null;
-    else if (waiting && !this.paused && now >= this.barkGate) {
+    else if (waiting && !this.paused && now >= this.barkGate(waiting.opts.priority ?? 1)) {
       this.pendingBark = null;
       const clip = this.clips.get(waiting.id);
       if (clip && clip !== 'missing') this.start(waiting.id, clip, waiting.opts, 'bark');

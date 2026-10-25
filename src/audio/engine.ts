@@ -8,7 +8,7 @@
 // costs audio-thread time). "duck" follows the slow-mo / pause muffle and announcer lines; "hit
 // duck" is scheduled with 5 ms attacks for stingers and KO impacts. Works on a realtime
 // AudioContext or an OfflineAudioContext (audio-check renders).
-import { softClipCurve, impulseResponse } from './dsp/curves';
+import { softClipCurve } from './dsp/curves';
 import { filter, holdAt, steer } from './dsp/env';
 import { loopReverb } from './dsp/plate';
 import { FilterSwitch } from './dsp/switch';
@@ -25,8 +25,14 @@ const MUSIC_LP_MIN = 360;   // Hz at full muffle (slow-mo / pause)
 const SFX_LP_MIN = 2200;
 const DUCK_ATTACK = 0.005;
 const DUCK_RELEASE = 0.12;  // s time constant back to unity
-const VERB_TAIL = 4;        // s after the last music before the reverb loop is unplugged
-const VERB_RETURN = 0.1;    // reverb return: ≈ 1 dB over the tail level the 0.39 convolution plate had
+const VERB_TAIL = 2.5;      // s after the last live music before the reverb loop (RT60 ≈ 0.9 s) is unplugged
+/** Tunnel reverb: a brighter twin of the music's loop (level and decay within 1.5 dB of the former 1.4 s
+ *  convolution over 1.5 s, at a quarter of its audio-thread cost); unplugged SPACE_TAIL s after the space. */
+const TUNNEL = { fb: 0.74, damp: 6000 };
+const TUNNEL_RETURN = 0.32;
+const SPACE_TAIL = 2.5;
+/** Music reverb return: ≈ 1 dB over the tail level the 0.39 convolution plate had (bar renders use it too). */
+export const VERB_RETURN = 0.1;
 
 export class Engine {
   readonly musicIn: GainNode;
@@ -52,7 +58,10 @@ export class Engine {
   private hitDuck: GainNode;
   private sfxDuck: GainNode;
   private sfxSpace: GainNode;
-  private sfxConv: ConvolverNode | null = null;
+  /** The tunnel reverb's return (built on the first tunnel), plugged in only while it can be heard. */
+  private spaceReturn: GainNode | null = null;
+  private spaceLive = false;
+  private spaceUntil = Infinity;
   /** The music reverb's return: a feedback loop always renders while connected, so it is unplugged when idle. */
   private verbReturn: GainNode;
   private verbLive = true;
@@ -123,9 +132,14 @@ export class Engine {
     this.verbLive = true;
   }
 
-  /** Unplug the reverb loop once the music has been silent for its tail (realtime contexts only). */
+  /** Unplug the reverb loops once they have been silent for their tail (realtime contexts only). */
   tick(): void {
-    if (!this.verbLive || !(this.ctx instanceof AudioContext) || this.now < this.verbUntil + VERB_TAIL) return;
+    if (!(this.ctx instanceof AudioContext)) return;
+    if (this.spaceLive && this.now >= this.spaceUntil) {
+      this.spaceReturn?.disconnect();
+      this.spaceLive = false;
+    }
+    if (!this.verbLive || this.now < this.verbUntil + VERB_TAIL) return;
     this.verbReturn.disconnect();
     this.verbLive = false;
   }
@@ -190,12 +204,20 @@ export class Engine {
     this.duckGain = level;
   }
 
-  /** Sfx reverb amount (tunnels, under bridges): 0 = open road. */
+  /** Sfx reverb amount (tunnels, under bridges): 0 = open road (the loop unplugs after its tail). */
   setSfxSpace(amount: number): void {
     const a = Math.min(1, Math.max(0, amount));
-    if (a > 0 && !this.sfxConv) {
-      this.sfxConv = new ConvolverNode(this.ctx, { buffer: impulseResponse(this.ctx, 1.4, 1.1, { preDelay: 0.008, bright: 0.7, seed: 23 }) });
-      this.sfxSpace.connect(this.sfxConv).connect(new GainNode(this.ctx, { gain: 0.9 })).connect(this.sfxIn);
+    if (a > 0) {
+      if (!this.spaceReturn) {
+        this.spaceReturn = loopReverb(this.ctx, this.sfxSpace, this.sfxIn, TUNNEL_RETURN, TUNNEL);
+        this.spaceLive = true;
+      } else if (!this.spaceLive) {
+        this.spaceReturn.connect(this.sfxIn);
+        this.spaceLive = true;
+      }
+      this.spaceUntil = Infinity;
+    } else if (this.spaceLive) {
+      this.spaceUntil = this.now + SPACE_TAIL;
     }
     steer(this.sfxSpace.gain, this.now, a, 0.15);
   }

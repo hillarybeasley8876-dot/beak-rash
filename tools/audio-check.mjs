@@ -4,7 +4,7 @@
 //            every stinger and every sfx through the real mixing graph in an OfflineAudioContext
 //            (sandbox/audio.html): peak / RMS / clipping / clicks / dropouts / render cost; per song the
 //            bass stem, the hook over the race mix, and one full loop's tone (octaves vs 125 Hz, width,
-//            loudness range, breakdown / build).
+//            loudness range, breakdown / build); per race song the final-stretch layer's tone.
 //  game    — runs a real race (audio-check-game.mjs): nothing before unlock, music per screen, event →
 //            sound mapping, KO cinematic, pause muffle, mix peaks in game, no errors when muted;
 //            race-start sync (audio-check-start.mjs), adaptive layers / finish cues (audio-check-adaptive.mjs),
@@ -25,10 +25,12 @@ import { barksCheck } from './audio-check-barks.mjs';
 const args = parseArgs(process.argv.slice(2));
 const SECONDS = Number(args.seconds ?? 20);
 const PEAK_MAX = -1;        // dBFS
-const CPU_MAX = 4;
-// The offline render time is wall-clock: on a loaded machine (other agents, browsers) it inflates.
-// Above one runnable thread per core, CPU overruns are reported as warnings instead of failures.
-const LOADED = os.loadavg()[0] > os.cpus().length;        // % of one core for music alone (net offline render time / audio time); sfx share the 5 % budget
+// Net offline render time / audio time (% of one core) for the music: the band now plays from bars
+// rendered off the audio thread (music/bars.ts), so this is the render thread's cost; the audio-thread
+// budget is the realtime gate (audio-check-cpu.mjs). The render time is wall-clock: on a loaded machine
+// (other agents, browsers) it inflates, so above one runnable thread per core overruns are warnings.
+const CPU_MAX = 6;
+const LOADED = os.loadavg()[0] > os.cpus().length;
 
 function verdict(s, { music }) {
   const bad = [];
@@ -109,6 +111,15 @@ if (RUN_OFFLINE) await withPage(async (page, h) => {
     if (t.breakdown && t.breakdown.build.some((v, k, a) => k > 0 && v <= (a[k - 1] ?? -Infinity))) bad.push(`build not rising ${t.breakdown.build.join(' ')}`);
     if (bad.length) failures.push(`${id} tone: ${bad.join(', ')}`);
     console.log(`${(id + ' tone').padEnd(26)} 63 ${o['63']} 250 ${o['250']} 1k ${o['1000']} 4k ${o['4000']} 8k ${o['8000']} | S/M ${t.sideMid} (>200 Hz ${t.sideMidHigh}) corr ${t.corr} | LRA ${t.lra} | D ${t.breakdown?.dropDb ?? '-'}  ${bad.length ? 'FAIL ' + bad.join(', ') : 'ok'}`);
+    if (!id.startsWith('race-')) continue;
+    // The final-stretch layer (claps, cowbell, doubled hook, double-time hats) was the honkiest mix of all.
+    const st = await page.evaluate((songId) => window.__audioCheck.tone(songId, true), id);
+    const so = st.octaves;
+    const sbad = [];
+    if (so['1000'] > -4) sbad.push(`1 kHz ${so['1000']} dB (max -4)`);
+    if (so['8000'] > -8) sbad.push(`8 kHz ${so['8000']} dB (max -8)`);
+    if (sbad.length) failures.push(`${id} stretch tone: ${sbad.join(', ')}`);
+    console.log(`${(id + ' stretch tone').padEnd(26)} 63 ${so['63']} 250 ${so['250']} 1k ${so['1000']} 4k ${so['4000']} 8k ${so['8000']} | S/M >200 Hz ${st.sideMidHigh}  ${sbad.length ? 'FAIL ' + sbad.join(', ') : 'ok'}`);
   }
   if (!only) {
     for (const id of stingers) {

@@ -1,7 +1,8 @@
 // In-game part of tools/audio-check.mjs: a real race (nothing before unlock, countdown, event →
 // sound mapping within a frame, KO cinematic, pause, mute, screen music, no errors) and a race
 // load recording (the music keeps playing while the main thread blocks).
-import { withPage } from './lib.mjs';
+import { pathToFileURL } from 'node:url';
+import { withPage, parseArgs } from './lib.mjs';
 
 /** In-game checks against the live game page; returns failure messages. */
 export async function gameCheck(args) {
@@ -60,6 +61,11 @@ export async function gameCheck(args) {
       [[['rider:boost', { riderId: 0, kind: 'drift', power: 0.3, time: 1 }]], [['sfx', 'bike.miniturbo']]],
       [[['rider:crash', { riderId: 1, cause: 'wall', speed: 15, attacker: null }]], [['sfx', 'bike.crash']]],
       [[['traffic:honk', { obstacleId: -1 }]], [['sfx', 'traffic.horn.car']]],
+      // The corgi's sounds come from race events (placed where it is), not sfx() calls.
+      [[['police:whistle', { riderId: 0 }]], [['sfx', 'police.whistle']]],
+      [[['police:knock', { riderId: 0, weapon: 'leek' }]], [['sfx', 'hit.leek']]],
+      [[['police:knock', { riderId: 0, weapon: 'none' }]], [['sfx', 'hit.none'], ['sfx', 'bike.bump']]],
+      [[['police:horn', { riderId: 0 }]], [['sfx', 'traffic.horn.police']]],
       [[['taunt', { riderId: 0, text: '叮叮叮！', character: 'pelican' }]], [['sfx', 'bike.bell']]],
     ];
     for (const [events, want] of cases) {
@@ -72,18 +78,37 @@ export async function gameCheck(args) {
       await h.sleep(250);
     }
 
+    // The race's own fights may just have made the pelican speak (one line per 6 s) or left a rival line
+    // waiting: start from a clean slate (this checks the KO wiring; the gaps have their own checks in
+    // audio-check-barks.mjs).
+    await page.waitForFunction(() => ['pelican_ko_0', 'pelican_ko_1'].every((id) => window.__br.app.audio.rt.voices.clips.has(id)), null, { timeout: 20000 });
+    await h.eval(() => {
+      const v = window.__br.app.audio.rt.voices;
+      window.__br.app.audio.cool.delete('pelicanLine');
+      v.barkUntil = -Infinity;
+      v.pendingBark = null;
+    });
     const koAt = await nowMs();
     await h.eval(() => window.__br.ko(2, 0));
     await h.sleep(500);
     const midKo = await h.eval(() => window.__br.audio.state());
     await h.sleep(1500);
+    // The quip follows the cinematic's end (and the announcer line): wait up to 1.5 s more for it.
+    await page.waitForFunction((at) => window.__br.audio.trace().some((e) => e.ms >= at && e.kind === 'bark' && e.id.startsWith('pelican_ko_')), Math.floor(koAt), { timeout: 1500 }).catch(() => null);
     const ko = await since(koAt);
     expect(has(ko, 'sfx', 'ko.boom') && has(ko, 'sting', 'ko'), `KO → boom + KO stinger (${ko.map((e) => e.id).join(' ')})`);
     expect(ko.some((e) => e.kind === 'voice' && /^ann_(ko|double|triple)$/.test(e.id)), 'KO → announcer 击倒/双杀');
     expect(midKo.muffle > 0.4, `KO slow-mo muffles the music (muffle ${(+midKo.muffle).toFixed(2)})`);
     const after = await h.eval(() => window.__br.audio.state());
     expect(after.muffle < 0.15, `muffle released after the cinematic (${(+after.muffle).toFixed(2)})`);
-    expect(ko.some((e) => e.kind === 'bark' && /^pelican_ko_/.test(e.id)), `player KO → the pelican's own quip after the cinematic (${ko.filter((e) => e.kind === 'bark').map((e) => e.id).join(' ') || 'no bark'})`);
+    const quip = ko.some((e) => e.kind === 'bark' && /^pelican_ko_/.test(e.id));
+    expect(quip, `player KO → the pelican's own quip after the cinematic (${ko.filter((e) => e.kind === 'bark').map((e) => e.id).join(' ') || 'no bark'})`);
+    if (!quip) {
+      console.log('     voice state:', JSON.stringify(await h.eval(() => {
+        const v = window.__br.app.audio.rt.voices;
+        return { now: v.engine.now, barkUntil: v.barkUntil, loudUntil: v.loudUntil, pending: v.pendingBark?.id ?? null, paused: v.paused };
+      })), 'trace:', JSON.stringify(ko.map((e) => [e.kind, e.id, Math.round(e.ms - koAt)])));
+    }
     await h.sleep(1500); // the KO quip's bark gap
     // Clips stream in after unlock (two at a time): a bark whose clip is still loading is dropped.
     await page.waitForFunction(() => ['pelican_taunt_0', 'pelican_taunt_1'].every((id) => window.__br.app.audio.rt.voices.clips.has(id)), null, { timeout: 20000 });
@@ -132,6 +157,13 @@ export async function gameCheck(args) {
     await emit([['combat:hit', { attacker: 0, victim: 1, damage: 5, side: 1, weapon: 'leek', heavy: false, crit: false, blocked: false, skillId: null }]]);
     const muted = await h.eval(() => window.__br.audio.level(1));
     expect(muted.peakDb < -70, `master 0 → silent, also across an unrelated save (${muted.peakDb} dBFS)`);
+    if (muted.peakDb >= -70) {
+      console.log('     volumes:', JSON.stringify(await h.eval(() => {
+        const a = window.__br.app.audio;
+        const e = a.rt.engine;
+        return { saved: window.__br.app.save.data.settings, runtime: a.volumes, gains: { master: e.vol.master.gain.value, music: e.vol.music.gain.value, sfx: e.vol.sfx.gain.value, voice: e.vol.voice.gain.value, impact: e.impactVol.gain.value } };
+      })));
+    }
     await page.evaluate((m) => window.__br.app.save.update((d) => { d.settings.master = m; }), master);
 
     // After a race the menus get the lounge song; from the title, the main theme carries on into the menu.
@@ -177,4 +209,11 @@ export async function gameCheck(args) {
     expect(gap <= 200, `music keeps playing through a race load (longest gap ${gap} ms, limit 200)`);
   });
   return fails;
+}
+
+// Standalone: node tools/audio-check-game.mjs [--stub camera,fx]  (exit 1 on any failure)
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  const fails = await gameCheck(parseArgs(process.argv.slice(2)));
+  console.log(fails.length ? `\nFAILED (${fails.length}):\n- ${fails.join('\n- ')}` : '\nall passed');
+  process.exit(fails.length ? 1 : 0);
 }

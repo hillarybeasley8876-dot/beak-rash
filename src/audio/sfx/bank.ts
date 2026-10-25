@@ -32,14 +32,27 @@ export interface PlayOpts {
 export const PREWARM_UI = ['ui.move', 'ui.confirm', 'ui.back', 'ui.cutin', 'ui.slash', 'ui.coin', 'ui.count'];
 export const PREWARM_RACE = [
   'bike.passby', 'traffic.whoosh', 'bike.bump', 'swing.light', 'swing.heavy', 'hit.none', 'hit.saltfish', 'hit.baguette',
-  'hit.pan', 'hit.leek', 'hit.umbrella', 'hit.selfie', 'hit.slipper', 'hit.keyboard', 'hit.crit', 'hit.block', 'bike.hop',
+  'hit.pan', 'hit.leek', 'hit.umbrella', 'hit.selfie', 'hit.slipper', 'hit.keyboard', 'hit.baton', 'hit.crit', 'hit.block', 'bike.hop',
   'bike.land', 'bike.nearmiss', 'bike.crash', 'bike.drift.start', 'bike.drift.level', 'bike.miniturbo', 'bike.boost',
   'pickup.coin', 'pickup.fish', 'obstacle.hit', 'traffic.horn.car', 'traffic.horn.van', 'skill.cast', 'skill.hit',
 ];
 
+/**
+ * Everything a race can play, rendered ahead (a first play would synthesize a whole graph live on the
+ * audio thread): the common set first, then the session's characters' skills and calls, then every
+ * other world / combat / bike sound.
+ */
+export function raceSounds(characters: readonly string[]): string[] {
+  const ids = Object.keys(SFX);
+  const own = characters.flatMap((c) => [...ids.filter((id) => id.startsWith(`skill.${c}.`)), `animal.${c}`]);
+  const rest = ids.filter((id) => !/^(ui|skill|animal)\./.test(id));
+  return [...new Set([...PREWARM_RACE, ...own.filter((id) => id in SFX), 'skill.cast', 'skill.hit', 'ui.incoming', 'ui.deny', 'ui.unlock', ...rest])];
+}
+
 /** Concurrent one-shots (a busy pack is capped here: the quietest sound gives way; every voice is
- *  two nodes the realtime thread renders, and a dozen overlapping hits already mask each other). */
-const MAX_ACTIVE = 16;
+ *  two nodes the realtime thread renders, ≈ 0.06 % of it, and a dozen overlapping hits already mask
+ *  each other). */
+const MAX_ACTIVE = 12;
 const PER_ID_DEFAULT = 3;
 /** Pitches asked for often enough to get their own pre-rendered takes (heavy hits). */
 const BAKED_PITCHES = new Set([0.9]);

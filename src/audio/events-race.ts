@@ -2,6 +2,7 @@
 // finish), riding (hops, landings, drift, boosts, crashes, walls), police, traffic and the KO /
 // SHOWTIME cinematics. Gameplay code never needs to call sfx() itself. Screen music is the UI's
 // call (AudioSystem.music).
+import { hitSfx } from './events-combat';
 import type { EventBus } from '../core/events';
 import type { GameEvents } from '../core/events-map';
 import type { Host } from './host';
@@ -20,6 +21,8 @@ const COUNT_LINES: Record<number, string> = { 3: 'ann_3', 2: 'ann_2', 1: 'ann_1'
 const RIVAL_BOOST = { range: 12, every: 3, volume: 0.5 };
 /** The KO impact owns the sub while a cinematic runs: other crashes lose their low end. */
 const CINE_HIGHPASS = 180;
+/** Rate limits (s) of the corgi's whistle, knocks and let-go toot. */
+const POLICE_GAP = { whistle: 0.8, knock: 0.25, horn: 1.5 };
 
 export function wireRace(bus: EventBus<GameEvents>, h: Host): void {
   const isPlayer = (id: number): boolean => h.isPlayer(id);
@@ -96,6 +99,19 @@ export function wireRace(bus: EventBus<GameEvents>, h: Host): void {
     h.play('police.busted');
     h.stinger('busted');
     h.announce('ann_busted', 3);
+  });
+  // The corgi's own sounds, placed where it rides (race emits them; nothing calls sfx() for them).
+  bus.on('police:whistle', ({ pos }) => {
+    if (h.cooldown('policeWhistle', POLICE_GAP.whistle)) h.play('police.whistle', pos);
+  });
+  bus.on('police:knock', ({ weapon, pos }) => {
+    if (!h.cooldown('policeKnock', POLICE_GAP.knock)) return;
+    h.play(hitSfx(weapon), pos);
+    // Unarmed (a shove or the Wing Dash ram): the thump plus the corgi's bike clattering back.
+    if (weapon === 'none') h.play('bike.bump', pos, { volume: 0.7 });
+  });
+  bus.on('police:horn', ({ pos }) => {
+    if (h.cooldown('policeHorn', POLICE_GAP.horn)) h.play('traffic.horn.police', pos);
   });
   bus.on('traffic:honk', ({ obstacleId, pos }) => {
     const kind = h.session()?.obstacles.find((o) => o.id === obstacleId)?.kind ?? 'car';

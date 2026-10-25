@@ -12,6 +12,8 @@ export class FilterSwitch {
   private on = false;
   private plugged = false;
   private unplugAt = Infinity;
+  /** `from` feeds the switch (detach() stops pulling everything upstream). */
+  private attached = true;
 
   constructor(private from: AudioNode, readonly filter: BiquadFilterNode, to: AudioNode) {
     const ctx = filter.context;
@@ -25,27 +27,45 @@ export class FilterSwitch {
     return this.on;
   }
 
-  /** Filter in (true) or out (false) from `now`, crossfading the dry and filtered paths. */
-  set(on: boolean, now: number): void {
+  /** Filter in (true) or out (false) from `now`, crossfading the dry and filtered paths
+   *  (`immediate`: switched at `now`, for a render that starts in the middle of a filtered passage). */
+  set(on: boolean, now: number, immediate = false): void {
     if (on === this.on) return;
     this.on = on;
     if (on && !this.plugged) {
-      this.from.connect(this.filter);
+      if (this.attached) this.from.connect(this.filter);
       this.plugged = true;
     }
     this.unplugAt = on ? Infinity : now + FADE + 0.03;
     for (const [g, v] of [[this.dry.gain, on ? 0 : 1], [this.wet.gain, on ? 1 : 0]] as const) {
       anchor(g, now);
-      g.linearRampToValueAtTime(v, now + FADE);
-      settle(g, now + FADE, v);
+      if (immediate) g.setValueAtTime(v, now);
+      else g.linearRampToValueAtTime(v, now + FADE);
+      settle(g, immediate ? now : now + FADE, v);
     }
   }
 
   /** Unplug the filter once its fade-out is over (call regularly). */
   tick(now: number): void {
     if (!this.on && this.plugged && now >= this.unplugAt) {
-      this.from.disconnect(this.filter);
+      if (this.attached) this.from.disconnect(this.filter);
       this.plugged = false;
     }
+  }
+
+  /** Stop pulling `from` (nothing upstream renders) or pull it again. */
+  attach(on: boolean): void {
+    if (on === this.attached) return;
+    this.attached = on;
+    for (const node of this.plugged ? [this.dry, this.filter] : [this.dry]) {
+      if (on) this.from.connect(node);
+      else this.from.disconnect(node);
+    }
+  }
+
+  /** Unplug from the destination for good (its owner is gone). */
+  disconnect(): void {
+    this.dry.disconnect();
+    this.wet.disconnect();
   }
 }

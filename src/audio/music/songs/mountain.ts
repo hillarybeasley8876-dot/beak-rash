@@ -134,7 +134,7 @@ export const MOUNTAIN: Song = {
       bars: 2, chords: 'Am9 | Am9', bass: '1> . 8^ . 1 . 8^ . 1> . 8^ . 5 . 8^ .', hat: 'x.x.x.x.x.x.x.x.', cym: REST + 'W...............',
       fill: { kick: 'X...X...X...X.X.', snare: '........X.X.XXXX' },
     },
-    A: { ...A, gainDb: -3 },
+    A: { ...A, gainDb: -4.5 },
     A2: { ...A, lead: HOOK, clav: CLAV_A2, fill: [FILLS[1], FILLS[3]], layers: { 1: { brass: BRASS_TOP, lead2: transpose(HOOK, -12) } } },
     B,
     A3,
@@ -168,7 +168,7 @@ export const MOUNTAIN: Song = {
   lift: { tempo: 1.04, semis: 2 },
   layers: {
     1: { perc: 'b...T...b...T...', clav: 'xgxgxgxgxgxgxgxg', clap: '....X.......X...' },
-    2: { perc: 's.sTs.sTs.sTs.sT', clap: '....X.......X...', hat: 'XxxxXxxxXxxxXxxx', kick: K4, bass: '1> . 1 . 8^ . 1 . 1> . 1 . 8^ . 5 .' },
+    2: { perc: 's.sTs.sTs.sTs.sT', clap: '....X.......X...', hat: 'XoxoXoxoXoxoXoxo', kick: K4, bass: '1> . 1 . 8^ . 1 . 1> . 1 . 8^ . 5 .' },
   },
   notes:
     'Driving sunset rock-funk, 130 bpm, nearly straight (swing 0.04), A Dorian; loop A–A2–B–A3–S–D–B2–A4–T = 68 bars (2:06). ' +

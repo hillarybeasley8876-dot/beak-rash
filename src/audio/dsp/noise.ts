@@ -5,13 +5,13 @@ import { Rng } from '../../core/rng';
 
 export type NoiseKind = 'white' | 'pink' | 'brown' | 'crackle';
 
-const cache = new WeakMap<BaseAudioContext, Map<NoiseKind, AudioBuffer>>();
+const cache = new WeakMap<BaseAudioContext, Map<string, AudioBuffer>>();
 
-function build(ctx: BaseAudioContext, kind: NoiseKind): AudioBuffer {
+function build(ctx: BaseAudioContext, kind: NoiseKind, channels: number): AudioBuffer {
   const seconds = kind === 'crackle' ? 6 : 2.5;
   const len = Math.floor(ctx.sampleRate * seconds);
-  const buf = ctx.createBuffer(2, len, ctx.sampleRate);
-  for (let ch = 0; ch < 2; ch++) {
+  const buf = ctx.createBuffer(channels, len, ctx.sampleRate);
+  for (let ch = 0; ch < channels; ch++) {
     const rng = new Rng(0x5eed + ch * 977 + kind.length * 31);
     const d = buf.getChannelData(ch);
     if (kind === 'white') {
@@ -58,24 +58,28 @@ function build(ctx: BaseAudioContext, kind: NoiseKind): AudioBuffer {
   return buf;
 }
 
-export function noiseBuffer(ctx: BaseAudioContext, kind: NoiseKind): AudioBuffer {
+/** Stereo (decorrelated channels) or `mono` (a low-passed rumble needs no width: half the work downstream). */
+export function noiseBuffer(ctx: BaseAudioContext, kind: NoiseKind, mono = false): AudioBuffer {
   let byKind = cache.get(ctx);
   if (!byKind) {
     byKind = new Map();
     cache.set(ctx, byKind);
   }
-  let buf = byKind.get(kind);
+  const key = mono ? `${kind}/1` : kind;
+  let buf = byKind.get(key);
   if (!buf) {
-    buf = build(ctx, kind);
-    byKind.set(kind, buf);
+    buf = build(ctx, kind, mono ? 1 : 2);
+    byKind.set(key, buf);
   }
   return buf;
 }
 
 /** A noise source started at `t` (buffer offset from `rng`). Loops when `dur` is null. */
-export function noise(ctx: BaseAudioContext, kind: NoiseKind, t: number, dur: number | null, rng: Rng, rate = 1): AudioBufferSourceNode {
+export function noise(
+  ctx: BaseAudioContext, kind: NoiseKind, t: number, dur: number | null, rng: Rng, rate = 1, mono = false,
+): AudioBufferSourceNode {
   const src = ctx.createBufferSource();
-  src.buffer = noiseBuffer(ctx, kind);
+  src.buffer = noiseBuffer(ctx, kind, mono);
   src.playbackRate.value = rate;
   const offset = rng.next() * (src.buffer.duration - 0.6);
   if (dur === null) {

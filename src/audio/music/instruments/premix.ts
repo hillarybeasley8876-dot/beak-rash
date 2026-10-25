@@ -3,8 +3,15 @@
 // would), panned (equal power, unity per channel at the centre like an up-mixed mono voice),
 // started at its offset (optionally bending in: slides), and released at `off` over `release` s
 // (the live voices' exponential-looking fall). All-centred notes mix to a mono buffer (half the
-// work downstream).
+// work downstream). That saves the realtime audio thread; inside an offline render (a bar rendered
+// ahead, an analysis render) playMix() plays the same notes as separate sources instead, so the
+// render thread does the mixing and the main thread only builds a few nodes.
 import { FLOOR } from '../../dsp/env';
+
+/** An offline render (its own thread mixes; no need to pre-mix on the main thread). */
+export function offline(ctx: BaseAudioContext): boolean {
+  return typeof OfflineAudioContext !== 'undefined' && ctx instanceof OfflineAudioContext;
+}
 
 export interface MixNote {
   buf: AudioBuffer;
@@ -58,4 +65,32 @@ export function premix(notes: MixNote[], o: MixOpts, sampleRate: number): AudioB
     }
   }
   return out;
+}
+
+/**
+ * premix()'s notes as separate buffer sources from `t` into `dest` (pitch, bend, equal-power pan,
+ * the release from `off`): the same sound, mixed by the render thread. Returns when they have ended.
+ */
+export function playMix(ctx: BaseAudioContext, notes: MixNote[], o: MixOpts, t: number, dest: AudioNode): number {
+  const end = t + o.off + o.release + 0.01;
+  for (const n of notes) {
+    if (!(n.gain > 0)) continue;
+    const at = t + (n.at ?? 0);
+    const src = new AudioBufferSourceNode(ctx, { buffer: n.buf, playbackRate: n.rate });
+    if (n.bend) {
+      src.playbackRate.setValueAtTime(n.rate * n.bend.from, at);
+      src.playbackRate.exponentialRampToValueAtTime(n.rate, at + n.bend.time);
+    }
+    const pan = Math.max(-1, Math.min(1, n.pan));
+    // premix's pan law: unity per channel at the centre (an up-mixed mono voice), equal power off it.
+    const level = n.gain * (pan === 0 ? 1 : Math.SQRT2);
+    const g = new GainNode(ctx, { gain: level });
+    g.gain.setValueAtTime(level, t + o.off);
+    g.gain.exponentialRampToValueAtTime(level * FLOOR, t + o.off + Math.max(1e-3, o.release));
+    src.connect(g);
+    (pan === 0 ? g : g.connect(new StereoPannerNode(ctx, { pan }))).connect(dest);
+    src.start(at);
+    src.stop(end);
+  }
+  return end;
 }

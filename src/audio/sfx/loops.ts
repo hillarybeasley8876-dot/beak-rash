@@ -13,12 +13,12 @@ import type { Engine } from '../engine';
 import type { Surface } from '../../core/types';
 
 /** Level match of the chain loop to the old live chain (band-pass 3600 Hz), measured offline, then
- *  −2 dB with the wind (both sat on the music's hook band at race speed). */
-const CHAIN_TRIM = 0.85;
-/** Wind band centre (Hz) = WIND_LOW + WIND_SPAN · (speed / 20 m/s): it rises with speed, but stays
- *  under the 1.2–3 kHz band the lead's harmonics need. */
-const WIND_LOW = 250;
-const WIND_SPAN = 1100;
+ *  −5 dB (at race speed it was as loud as the whole music in the 2–4 kHz octaves). */
+const CHAIN_TRIM = 0.6;
+/** Wind band centre (Hz) = WIND_LOW + WIND_SPAN · (speed / 20 m/s), a broad band (Q 0.4): it rises
+ *  with speed but stays a low roar (≈ 370 Hz at race speed), off the hook's 0.7–3 kHz. */
+const WIND_LOW = 120;
+const WIND_SPAN = 250;
 const WIND_LEVEL = 0.13;
 /** Continuous changes (speed, pedal) are followed at 25 Hz: every move is an automation event the
  *  audio thread has to take in, and the 60 ms glides smooth the steps anyway. */
@@ -84,18 +84,19 @@ export class BikeLoops {
     const t = ctx.currentTime;
     const rng = new Rng(0xb1ce);
     this.white = noise(ctx, 'white', t, null, rng);
-    const brown = noise(ctx, 'brown', t, null, rng);
+    const brown = noise(ctx, 'brown', t, null, rng, 1, true);
     this.crackle = noise(ctx, 'crackle', t, null, rng);
     const L = (): Layer => new Layer(engine, this.out);
     this.layers = { wind: L(), chain: L(), free: L(), roll: L(), curb: L(), grass: L(), sand: L(), dirt: L(), water: L(), skid: L(), jet: L() };
     const ly = this.layers;
     // Always-on layers: wind (band-passed white), tyre roll (low-passed brown) and the chain whirr
     // (a pre-rendered tooth-rate gated noise loop, rate-shifted with the cadence).
-    this.windBand = filter(ctx, { type: 'bandpass', frequency: WIND_LOW, Q: 0.6 });
+    this.windBand = filter(ctx, { type: 'bandpass', frequency: WIND_LOW, Q: 0.4 });
     this.white.connect(this.windBand).connect(ly.wind.gain);
     this.chain = loopSource(ctx, 'chain', t, rng);
     this.chain.connect(ly.chain.gain);
-    this.rollLow = filter(ctx, { type: 'lowpass', frequency: 320, Q: 0.7 });
+    // Tyre roll: a band (no sub rumble below it) that rises with speed.
+    this.rollLow = filter(ctx, { type: 'bandpass', frequency: 320, Q: 0.7 });
     brown.connect(this.rollLow).connect(ly.roll.gain);
     // Freewheel: band-limited impulse train = pawl ticks, a buzz at speed.
     this.ratchet = new OscillatorNode(ctx, { frequency: 20 });

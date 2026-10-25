@@ -1,5 +1,5 @@
-// The drum lanes of one step, played on the band's kit (SongPlayer.drumBar records a whole bar of
-// them into one pre-mixed buffer), and the build bar into the final stretch.
+// The drum lanes of one step, played on the band's kit, a whole bar of them recorded into one
+// pre-mixed buffer (drumBar), and the build bar into the final stretch.
 import type { CompiledSection } from './compile';
 import type { DrumKit } from './instruments/drums';
 import type { LaneName } from './types';
@@ -8,6 +8,9 @@ import type { LaneName } from './types';
 export interface GrooveSource {
   readonly kit: DrumKit;
   readonly stepDur: number;
+  readonly swing: number;
+  /** Audio time → the kit's band clock (a bar render starts at 0). */
+  time(t: number): number;
   /** The one-bar build into the final stretch is playing (it replaces snare and toms). */
   readonly building: boolean;
   tok(sec: CompiledSection, lane: LaneName, step: number): string | null;
@@ -45,4 +48,22 @@ export function buildStep(g: GrooveSource, step: number, t: number): void {
   if (step === 0) d.riser(t, g.stepDur * 16, 1);
   d.snare(t, 0.25 + 0.75 * (step / 15), step < 8 && step % 2 === 1);
   if (step >= 12) d.tom(t, 0.7 + 0.08 * (step - 12), step < 14 ? 1 : 3);
+}
+
+/**
+ * The drums from step `from` to the end of its bar (from audio time `start`), pre-mixed into one
+ * buffer (drum-mix.ts); `crash` adds a crash on the first step. Returns the audio time the mix covers to.
+ */
+export function drumBar(g: GrooveSource, sec: CompiledSection, from: number, start: number, crash: boolean): number {
+  const d = g.kit;
+  const end = Math.min(sec.steps, (Math.floor(from / 16) + 1) * 16);
+  d.record(g.time(start));
+  if (crash && g.tok(sec, 'cym', from) !== 'C') d.crash(g.time(start), 0.9);
+  for (let s = from; s < end; s++) {
+    const t = g.time(start + (s - from) * g.stepDur + (s % 2 === 1 ? g.swing * g.stepDur : 0));
+    if (g.building) buildStep(g, s % 16, t);
+    drumStep(g, sec, s, t);
+  }
+  d.flush();
+  return start + (end - from) * g.stepDur;
 }

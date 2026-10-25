@@ -119,8 +119,9 @@ export const CITY: Song = {
   swing: 0.14,
   key: 'C minor',
   lead: 'flute',
-  // The flute carries further than the wah: ≈ −4.5 LU under the full mix.
-  mix: { lead: 0.81 },
+  // The flute's energy sits on its fundamental (0.8–1.2 kHz): it needs more level than the wah to clear
+  // the bed there, and the busy Rhodes comp steps back a little.
+  mix: { lead: 0.88, keys: 0.9 },
   crackle: 0.08,
   sections: {
     vamp: { bars: 2, chords: 'Cm9 | Cm9', kick: K1, hat: H2, bass: rep('1> . 8^ . . 1 b7 8^ . 1> . 5 . b7 8^ x', 2), keys: COMP_A, pad: 'X---------------' },
@@ -129,7 +130,7 @@ export const CITY: Song = {
       cym: REST + 'W...............',
       fill: { kick: 'X.....x.X..x....', snare: '....X.......XxXX', bass: '1> . 8^ . . 1 b7 8^ . . . . 5 . b7 8^' },
     },
-    A: { ...A, gainDb: -3 },
+    A: { ...A, gainDb: -4.5 },
     A2: { ...A, lead: HOOK, clav: CLAV_A2, fill: [FILLS[1], FILLS[3]], layers: { 1: { brass: BRASS_TOP, lead2: transpose(HOOK, -12) } } },
     B,
     A3,
@@ -158,7 +159,7 @@ export const CITY: Song = {
   lift: { tempo: 1.04, semis: 2 },
   layers: {
     1: { perc: 's.sBs.s.s.sBs.s.', clav: 'xgxgxgxgxgxgxgxg', clap: '....X.......X...' },
-    2: { perc: 'ssTsssTsssTsssTs', clap: '....X.......X...', hat: 'XxxxXxxxXxxxXxxx', kick: K4, bass: '1> . 1 . 8^ . 1 . 1> . 1 . 8^ . 5 .' },
+    2: { perc: 'ssTsssTsssTsssTs', clap: '....X.......X...', hat: 'XoxoXoxoXoxoXoxo', kick: K4, bass: '1> . 1 . 8^ . 1 . 1> . 1 . 8^ . 5 .' },
   },
   notes:
     'Night acid jazz, 124 bpm, swing 0.14, C minor; loop A–A2–B–A3–S–D–B2–A4 = 64 bars (2:04). A: Cm9 | Fm9 | Cm9 | ' +

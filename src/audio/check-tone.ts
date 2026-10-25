@@ -37,17 +37,24 @@ function power(l: Float32Array, r: Float32Array, a: number, b: number): number {
   return s / Math.max(1, i1 - i0);
 }
 
-/** Render one pass of the loop (form index loopFrom → end) and analyse it. */
-export async function tone(id: string): Promise<ToneReport> {
+/**
+ * Render one pass of the loop (form index loopFrom → end) and analyse it. `stretch`: the final-stretch
+ * form instead (intensity 2 from the loop start: one bar, the build bar, then the stretch sections,
+ * analysed from the stretch's first bar; no section / breakdown shape).
+ */
+export async function tone(id: string, stretch = false): Promise<ToneReport> {
   const song = SONGS[id];
   if (!song) throw new Error(`[audio] unknown song ${id}`);
   const bar = (60 / song.bpm) * 4;
-  const form = song.form.slice(song.loopFrom);
+  const form = stretch ? [] : song.form.slice(song.loopFrom);
   const bars = form.map((name) => song.sections[name]?.bars ?? 0);
-  const seconds = bars.reduce((a, b) => a + b, 0) * bar;
+  const lifted = (song.stretch ?? []).reduce((a, name) => a + (song.sections[name]?.bars ?? 0), 0) * (bar / (song.lift?.tempo ?? 1));
+  const skip = stretch ? 2 * bar : 0;
+  const seconds = stretch ? skip + lifted : bars.reduce((a, b) => a + b, 0) * bar;
   const ctx = new OfflineAudioContext(2, Math.floor(AUDIO_RATE * (seconds + 0.5)), AUDIO_RATE);
   const c = new Conductor(new Engine(ctx, DEFAULT_VOLUMES));
   c.play(id, 0.02, { at: 0, section: song.loopFrom });
+  if (stretch) c.setIntensity(2);
   c.schedule(0.8);
   for (let t = 0.5; t < seconds; t += 0.5) {
     void ctx.suspend(t).then(() => {
@@ -55,7 +62,9 @@ export async function tone(id: string): Promise<ToneReport> {
       return ctx.resume();
     });
   }
-  const buf = await ctx.startRendering();
+  const all = await ctx.startRendering();
+  const buf = new AudioBuffer({ length: all.length - Math.floor(skip * AUDIO_RATE), numberOfChannels: 2, sampleRate: AUDIO_RATE });
+  for (let ch = 0; ch < 2; ch++) buf.copyToChannel(all.getChannelData(ch).subarray(Math.floor(skip * AUDIO_RATE)), ch);
   const l = buf.getChannelData(0);
   const r = buf.getChannelData(1);
   const mid = new Float32Array(l.length);

@@ -40,8 +40,11 @@ export function allpassDiffuser(ctx: BaseAudioContext, length: number, delays: n
 
 const diffusers = new Map<number, AudioBuffer>();
 
-/** Build the loop between a (mono) send `input` and a stereo `output`; returns the return gain. */
-export function loopReverb(ctx: BaseAudioContext, input: AudioNode, output: AudioNode, level: number): GainNode {
+/** Build the loop between a send `input` (summed to mono) and a stereo `output`; returns the return gain.
+ *  `fb` sets the decay (0.73 ≈ 0.9 s, 0.86 ≈ 1.4 s), `damp` the loop's low-pass (Hz). */
+export function loopReverb(
+  ctx: BaseAudioContext, input: AudioNode, output: AudioNode, level: number, { fb = 0.73, damp = 4800 } = {},
+): GainNode {
   const rate = ctx.sampleRate;
   let ir = diffusers.get(rate);
   if (!ir) diffusers.set(rate, (ir = allpassDiffuser(ctx, Math.round(rate * 0.016), [19, 27, 37, 53].map((n) => Math.round((n * rate) / 32000)), 0.45)));
@@ -49,14 +52,14 @@ export function loopReverb(ctx: BaseAudioContext, input: AudioNode, output: Audi
   const pre = new DelayNode(ctx, { delayTime: 0.012, maxDelayTime: 0.05, ...mono });
   const sum = new GainNode(ctx, { gain: 1, ...mono });
   const diffuse = new ConvolverNode(ctx, { buffer: ir, disableNormalization: true, ...mono });
-  const damp = new BiquadFilterNode(ctx, { type: 'lowpass', frequency: 4800, Q: 0 });
-  const fb = new GainNode(ctx, { gain: 0.73 });
+  const lp = new BiquadFilterNode(ctx, { type: 'lowpass', frequency: damp, Q: 0 });
+  const back = new GainNode(ctx, { gain: fb });
   const loop = new DelayNode(ctx, { delayTime: 0.021, maxDelayTime: 0.05 });
   input.connect(pre).connect(sum);
   loop.connect(sum);
-  sum.connect(diffuse).connect(damp).connect(fb).connect(loop);
+  sum.connect(diffuse).connect(lp).connect(back).connect(loop);
   const merge = new ChannelMergerNode(ctx, { numberOfInputs: 2 });
-  damp.connect(merge, 0, 0);
+  lp.connect(merge, 0, 0);
   // The late tap carries one pass less energy: +0.9 dB keeps the image centred.
   loop.connect(new GainNode(ctx, { gain: 1.11 })).connect(merge, 0, 1);
   const ret = new GainNode(ctx, { gain: level });

@@ -15,7 +15,7 @@ import { Conductor } from './music/conductor';
 import { SONGS } from './music/songs';
 import { Pump } from './music/pump';
 import { isStinger, type StingerId } from './music/stingers';
-import { PREWARM_RACE, PREWARM_UI, SfxPlayer, type PlayOpts } from './sfx/bank';
+import { PREWARM_UI, SfxPlayer, raceSounds, type PlayOpts } from './sfx/bank';
 import { CENTER, place, type Placement } from './sfx/spatial';
 import { Barks } from './voice/barks';
 import { VoicePlayer } from './voice/player';
@@ -242,7 +242,7 @@ export class AudioRuntime implements AudioSystem, Host {
     if (!session) return;
     this.finishPlace = null;
     this.pump.set('settling');
-    this.rt?.sfx.prewarm(PREWARM_RACE);
+    this.rt?.sfx.prewarm(raceSounds(session.riders.map((r) => r.character)));
     // Restarting the same track: the song is already current, so re-enter its vamp for the new intro.
     const id = this.raceSong();
     if (this.unlocked && this.rt && id !== null && this.rt.conductor.playing === id && this.vampFor(id)) {

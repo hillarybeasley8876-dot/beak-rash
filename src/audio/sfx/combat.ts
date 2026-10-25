@@ -1,5 +1,6 @@
 // Combat sounds: swings, a distinct hit per weapon (fish slap, baguette thwack, pan BONG, slipper
-// SLAP, keyboard clack…), crit / block layers, KO boom, weapon drop / pick / break, pickups.
+// SLAP, keyboard clack, the corgi's baton whack…), crit / block layers, KO boom, weapon drop / pick /
+// break, pickups.
 import { fm, hiss, ring, span, tone, type SfxFn } from './kit';
 
 const PAN_PARTIALS: Array<[number, number, number]> = [[1, 1, 1.3], [2.32, 0.6, 0.9], [4.25, 0.35, 0.6], [6.63, 0.2, 0.4]];
@@ -47,6 +48,12 @@ export const COMBAT_SFX: Record<string, SfxFn> = {
     hiss(s, { a: 0.0005, d: 0.045, peak: 0.95, filt: { type: 'bandpass', f: 1100, q: 1.2 } }),
     hiss(s, { a: 0.0005, d: 0.02, peak: 0.5, filt: { type: 'highpass', f: 2500 } }),
     tone(s, { f: 170, to: 90, d: 0.06, peak: 0.3 }),
+  ),
+  // The police baton: a hard rubber whack (a short dull knock with a slap on top).
+  'hit.baton': (s) => span(
+    tone(s, { type: 'triangle', f: 320, to: 180, d: 0.06, peak: 0.45 }),
+    hiss(s, { a: 0.0006, d: 0.035, peak: 0.7, filt: { type: 'bandpass', f: 1400, q: 1 } }),
+    tone(s, { f: 120, to: 70, d: 0.08, peak: 0.35 }),
   ),
   'hit.keyboard': (s) => span(...[0, 0.035, 0.07, 0.1].map((at) => span(
     tone(s, { type: 'square', f: 3800, at, a: 0.0008, d: 0.012, peak: 0.12, filt: { type: 'bandpass', f: 4000, q: 1.5 } }),

@@ -3,23 +3,37 @@
 // follows the adaptive intensity (layers; the final stretch = a one-bar build, then the stretch
 // form with a tempo / key lift), can hold a vamp and re-phase onto a downbeat (race start), and
 // fades out on stop. Steps that fall behind the audio clock (main-thread stall) are skipped.
+// In a realtime context whole bars are rendered ahead (music/bars.ts) whenever nothing can re-phase
+// them (no vamp, no countdown, no race load): the band then plays from buffers and its live graph
+// is unplugged. The vamp, the count-in, race loads and each song's first bar play live.
 import { Rng } from '../../core/rng';
 import { noise } from '../dsp/noise';
-import { Band } from './band';
-import { buildStep, drumStep, type GrooveSource } from './groove';
-import { BASS_TOKEN, compileSong, tiedLength, tokenAt, type CompiledSection, type CompiledSong } from './compile';
-import { degreeOffset, noteToMidi, parseKey, voiceChord, type Chord, type Tonality } from './theory';
+import { Band, sectionEnd } from './band';
+import { BarRenderer, type BarJob } from './bars';
+import { drumBar } from './groove';
+import { CHORD_LANES, bassStep, chordStep, leadStep, noteSpan, type LaneSource } from './lanes';
+import { compileSong, songMix, tiedLength, tokenAt, type CompiledSection, type CompiledSong } from './compile';
+import { parseKey, type Chord, type Tonality } from './theory';
+import type { DrumSample } from './instruments/drum-samples';
 import type { Engine } from '../engine';
 import type { Channel, LaneName, Song } from './types';
 
 const VEL: Record<string, number> = { X: 1, x: 0.8, o: 0.55, g: 0.3, S: 1, s: 0.7, T: 1, t: 0.7, B: 1, b: 0.75, r: 0.7, f: 0.9 };
-const CHORD_LANES = ['keys', 'clav', 'brass', 'pad'] as const;
-type ChordLane = (typeof CHORD_LANES)[number];
-const CENTER: Record<ChordLane, number> = { keys: 63, clav: 68, brass: 71, pad: 60 };
 const LATE = 0.03;   // s: a step this far behind the clock is skipped, not played late
-const LEAD_VEL = 0.9;
-const LEAD2_VEL = 0.62; // the harmony / octave line under the hook
 const BUILD = 'build';
+/** Bar renders: opened ≥ BAR_LEAD s before their bar, sequenced SLICE_MS of main-thread time per
+ *  scheduling call (all at once from RUSH s before the bar); they last the longest note + NOTE_RING,
+ *  at least the bar + DRUM_RING (a crash), then FX_TAIL (delay / reverb). */
+const BAR_LEAD = 0.6, SLICE_MS = 1.5, RUSH = 0.3, NOTE_RING = 0.8, DRUM_RING = 2, FX_TAIL = 2.2;
+/** Live steps run past the lookahead only to reach a bar line this close (s), whose bar is then rendered. */
+const REACH = BAR_LEAD + 0.25;
+/** The live graph stays plugged LIVE_TAIL s after the last live step's bar; the final stretch lifts the band
+  *  +2 dB but trims the lead by STRETCH_LEAD (−2.5 dB: about where it was; the doubled hook carries it). */
+const LIVE_TAIL = 2, STRETCH_LEAD = 0.75;
+
+interface Job { bar: BarJob; band: Band; at: number; end: number }
+/** A background tab's timer fires about once a second: bars are sequenced whole there (no frames to spare). */
+const hidden = (): boolean => typeof document !== 'undefined' && document.hidden;
 
 export interface PlayerOpts {
   section?: number;
@@ -29,13 +43,6 @@ export interface PlayerOpts {
   vamp?: boolean;
   /** Channel gain multipliers on top of the song's mix (analysis: solo / mute stems). */
   mix?: Partial<Record<Channel, number>>;
-}
-
-function mixOf(song: Song, extra: Partial<Record<Channel, number>> | undefined): Partial<Record<Channel, number>> {
-  if (!extra) return song.mix ?? {};
-  const out: Partial<Record<Channel, number>> = { ...song.mix };
-  for (const ch of Object.keys(extra) as Channel[]) out[ch] = (out[ch] ?? 1) * (extra[ch] ?? 1);
-  return out;
 }
 
 export class SongPlayer {
@@ -58,12 +65,23 @@ export class SongPlayer {
   /** Audio time up to which the drums are pre-mixed (drumBar). */
   private drumsUntil = -Infinity;
   private semis = 0;
+  private bpm: number;
   private passes = new Map<string, number>();
-  private voicings: Partial<Record<ChordLane, number[]>> = {};
   private rng: Rng;
   private stopAt = Infinity;
   private crackle: AudioBufferSourceNode | null = null;
   private readonly home: Tonality;
+  private readonly mix: Partial<Record<Channel, number>>;
+  /** Bar renders (realtime contexts only; offline renders and a failed render play live). */
+  private bars: BarRenderer | null;
+  /** Step context; its band / base = where the steps being sequenced play (the live band, or a bar render's). */
+  private lanes: LaneSource;
+  /** Audio time until which live-scheduled notes may sound (the live graph stays plugged until then). */
+  private liveEnd = -Infinity;
+  private shapeStale = false;    // the live band's section dynamics are behind (bars were rendered since)
+  private shapeLevel = 1;        // level at the end of the last section started (a bar render starts there)
+  private turns = new Map<DrumSample, number>(); // drum take rotation, shared by every band of the song
+  private job: Job | null = null; // the bar render being sequenced (its band, start and end in audio time)
   /** Recent section starts (audio time): tests check that section A lands on the race GO. */
   readonly starts: Array<{ section: string; at: number }> = [];
 
@@ -72,9 +90,22 @@ export class SongPlayer {
     this.compiled = compileSong(song);
     this.home = parseKey(song.key);
     this.rng = new Rng(song.bpm * 7919 + song.id.length);
-    this.band = new Band(engine, song.bpm, mixOf(song, opts.mix), engine.musicIn, this.rng.fork(0xba4d));
+    this.mix = songMix(song, opts.mix);
+    this.band = new Band(engine, song.bpm, this.mix, engine.musicIn, this.rng.fork(0xba4d));
     this.band.fade(1, opts.fadeIn ?? 0.02, start);
+    this.band.drums.shareTurns(this.turns);
+    const ctx = engine.ctx;
+    this.bars = typeof AudioContext !== 'undefined' && ctx instanceof AudioContext ? new BarRenderer(ctx, this.band.out) : null;
+    this.lanes = {
+      band: this.band, base: 0, stepDur: 0, semis: 0, lead: song.lead, voicings: {}, leads: new Map(),
+      time: (t) => Math.max(0, t - this.lanes.base),
+      tok: (sec, lane, step) => this.tok(sec, lane, step),
+      len: (sec, lane, step) => this.len(sec, lane, step),
+      vel: (c) => this.vel(c),
+      random: () => this.rng.next(),
+    };
     this.stepDur = 60 / song.bpm / 4;
+    this.bpm = song.bpm;
     this.nextTime = start;
     this.form = song.form;
     this.loopFrom = song.loopFrom;
@@ -82,15 +113,18 @@ export class SongPlayer {
     this.intensity = opts.intensity ?? 0;
     if (opts.vamp) this.holdName = song.vamp ?? this.form[0] ?? null;
     if (song.crackle) {
-      const src = noise(engine.ctx, 'crackle', start, null, this.rng);
-      src.connect(new GainNode(engine.ctx, { gain: song.crackle })).connect(this.band.input('fx'));
+      // Vinyl crackle runs past the fader's section dynamics, so it carries on while bars are rendered.
+      const src = noise(ctx, 'crackle', start, null, this.rng);
+      src.connect(new GainNode(ctx, { gain: song.crackle * this.band.level('fx') })).connect(this.band.out);
       this.crackle = src;
     }
   }
 
-  get stopped(): boolean {
-    return this.engine.ctx.currentTime > this.stopAt;
-  }
+  /** Stopped and its band unplugged: the conductor can forget it. */
+  get gone(): boolean { return this.band.gone; }
+
+  /** Audio time until which this song plays live notes (the music reverb stays on for them). */
+  get liveUntil(): number { return this.liveEnd; }
 
   /** The key the song is in right now (the final-stretch lift transposes it). */
   get key(): Tonality {
@@ -136,10 +170,12 @@ export class SongPlayer {
 
   /**
    * Re-phase: the next step played is step 0 of `section` at audio time `at` (the race GO).
-   * Steps until then are skipped; a vamp hold ends.
+   * Steps until then are skipped; a vamp hold ends; rendered bars end at `at`.
    */
   cue(section: string, at: number): void {
     this.cutDrums(this.nextTime);
+    this.job = null;
+    this.bars?.cut(at);
     const i = this.form.indexOf(section);
     this.holdName = null;
     this.pendingForm = null;
@@ -157,6 +193,8 @@ export class SongPlayer {
     this.stepInSection = 0;
     this.nextTime = Math.min(this.nextTime, at);
     this.cutDrums(this.nextTime);
+    this.job = null;
+    this.bars?.cut(this.nextTime);
   }
 
   /** Pre-mixed drums stop at `at` (what the old timeline still had queued); the next step re-mixes. */
@@ -179,22 +217,85 @@ export class SongPlayer {
   /** Fade out over `fade` s from `at` (default now) and stop scheduling. */
   stop(fade: number, at = this.engine.ctx.currentTime): void {
     if (this.stopAt !== Infinity) return;
+    if (this.job) this.sequence(this.job, true);
     this.band.fade(0, fade, at);
     this.stopAt = at + fade + 0.05;
     this.crackle?.stop(this.stopAt + 0.05);
+    this.bars?.stop(this.stopAt);
     this.band.dispose(this.stopAt + 2.5);
   }
 
-  /** Schedule every step that starts before `until` (seconds, audio clock). */
-  schedule(until: number): void {
+  /**
+   * Schedule every step that starts before `until` (seconds, audio clock). `ahead`: nothing will
+   * re-phase the song soon (no countdown, no race load), so whole bars are rendered a bar early.
+   */
+  schedule(until: number, ahead = false): void {
     const now = this.engine.ctx.currentTime;
     this.band.tick(now);
+    if (this.job) this.sequence(this.job, !ahead || hidden() || this.job.at < now + RUSH);
     // After a stall, resync to the clock instead of firing a burst of past notes.
     for (let guard = 0; this.nextTime < now - LATE && guard < 100000; guard++) this.advance();
-    while (this.nextTime < until && this.nextTime < this.stopAt) {
-      this.scheduleStep();
-      this.advance();
+    const bars = ahead && this.bars && !this.bars.failed && this.holdName === null ? this.bars : null;
+    const limit = bars ? until + 16 * this.stepDur : until;
+    while (!this.job && this.nextTime < limit && this.nextTime < this.stopAt) {
+      const toBar = ((16 - (this.stepInSection % 16)) % 16) * this.stepDur;
+      if (bars && toBar === 0 && this.nextTime >= now + BAR_LEAD) this.openBar(bars);
+      else if (this.nextTime < until || this.nextTime + toBar - now <= REACH) this.liveStep();
+      else break;
     }
+    if (now > this.liveEnd) this.band.setLive(false);
+  }
+
+  /** One step on the live band (plugged in again first, its section dynamics caught up). */
+  private liveStep(): void {
+    this.band.setLive(true);
+    const sec = this.section();
+    if (this.shapeStale && this.stepInSection % 16 === 0) {
+      this.shapeStale = false;
+      const bar = this.stepInSection / 16;
+      if (bar > 0) this.band.section(this.nextTime, this.stepDur * 16, sec.gainDb, sec.shape, bar);
+    }
+    this.liveEnd = Math.max(this.liveEnd, this.nextTime + this.stepDur * 16 + LIVE_TAIL);
+    this.scheduleStep();
+    this.advance();
+  }
+
+  /** Start a bar render for the bar at nextTime (its band follows the song's mix, tempo and section level). */
+  private openBar(bars: BarRenderer): void {
+    const sec = this.section();
+    const bar = 16 * this.stepDur;
+    const seconds = Math.max(bar + DRUM_RING, noteSpan(this.lanes, sec, this.stepInSection) * this.stepDur + NOTE_RING) + FX_TAIL;
+    const at = bars.frame(this.nextTime);
+    const job = bars.open(at, seconds);
+    if (!job) return this.liveStep();
+    const band = new Band(job.host, this.bpm, this.mix, job.host.musicIn, this.rng.fork(Math.floor(at * 1000)));
+    band.open(this.shapeLevel);
+    band.drums.shareTurns(this.turns);
+    if (this.semis !== 0 || this.form !== this.song.form) band.trim('lead', STRETCH_LEAD, 0);
+    const from = this.stepInSection / 16;
+    if (from > 0) band.section(0, bar, sec.gainDb, sec.shape, from);
+    this.shapeStale = true;
+    this.job = { bar: job, band, at, end: this.nextTime + bar };
+    this.sequence(this.job, hidden());
+  }
+
+  /** Sequence steps into the bar render for SLICE_MS (`all`: to the bar's end); render it once complete. */
+  private sequence(job: Job, all: boolean): void {
+    const t0 = performance.now();
+    this.lanes.band = job.band;
+    this.lanes.base = job.at;
+    try {
+      do {
+        this.scheduleStep();
+        this.advance();
+      } while (this.nextTime < job.end - 1e-6 && this.nextTime < this.stopAt && (all || performance.now() - t0 < SLICE_MS));
+    } finally {
+      this.lanes.band = this.band;
+      this.lanes.base = 0;
+    }
+    if (this.nextTime < job.end - 1e-6 && this.nextTime < this.stopAt) return;
+    this.job = null;
+    job.bar.finish();
   }
 
   private sectionName(): string {
@@ -244,10 +345,12 @@ export class SongPlayer {
     this.formIndex = stretch ? 0 : this.song.loopFrom;
     this.stepInSection = 0;
     this.crashNext = true;
-    this.stepDur = 60 / (this.song.bpm * lift.tempo) / 4;
+    this.bpm = this.song.bpm * lift.tempo;
+    this.stepDur = 60 / this.bpm / 4;
     this.semis = lift.semis;
-    this.band.setTempo(this.song.bpm * lift.tempo, this.nextTime);
+    this.band.setTempo(this.bpm, this.nextTime);
     this.band.fade(this.levelGain(stretch), 0.25, this.nextTime);
+    this.band.trim('lead', stretch ? STRETCH_LEAD : 1, this.nextTime);
   }
 
   private fillIndex(): number | null {
@@ -261,39 +364,24 @@ export class SongPlayer {
     const human = (amount: number): number => Math.max(0, t0 + (this.rng.next() - 0.5) * amount);
     const chord = sec.chords[step] ?? sec.chords[0];
     if (!chord) return;
+    const g = this.lanes;
+    g.stepDur = this.stepDur;
+    g.semis = this.semis;
     if (step === 0) {
       this.starts.push({ section: sec.name, at: this.nextTime });
       if (this.starts.length > 12) this.starts.shift();
-      this.band.section(this.nextTime, this.stepDur * 16, sec.gainDb, sec.shape);
+      g.band.section(g.time(this.nextTime), this.stepDur * 16, sec.gainDb, sec.shape);
+      this.shapeLevel = sectionEnd(sec.gainDb, sec.shape);
     }
-    if (this.nextTime >= this.drumsUntil - 1e-6) this.drumBar(sec, step);
-    this.bass(sec, step, human(0.003), chord);
-    for (const lane of CHORD_LANES) this.chordLane(lane, sec, step, human(0.006), chord);
-    this.leadLane('lead', sec, step, human(0.004), LEAD_VEL);
-    this.leadLane('lead2', sec, step, human(0.004), LEAD2_VEL);
-  }
-
-  /** The drums from step `from` to the end of its bar, pre-mixed into one buffer (drum-mix.ts). */
-  private drumBar(sec: CompiledSection, from: number): void {
-    const d = this.band.drums;
-    const start = this.nextTime;
-    const end = Math.min(sec.steps, (Math.floor(from / 16) + 1) * 16);
-    const g: GrooveSource = {
-      kit: d, stepDur: this.stepDur, building: this.building,
-      tok: (x, lane, step) => this.tok(x, lane, step), vel: (c) => this.vel(c), random: () => this.rng.next(),
-    };
-    d.record(start);
-    if (this.crashNext) {
+    if (this.nextTime >= this.drumsUntil - 1e-6) {
+      const kit = { kit: g.band.drums, swing: this.song.swing, building: this.building, time: g.time };
+      this.drumsUntil = drumBar({ ...g, ...kit }, sec, step, this.nextTime, this.crashNext);
       this.crashNext = false;
-      if (this.tok(sec, 'cym', from) !== 'C') d.crash(start, 0.9);
     }
-    for (let s = from; s < end; s++) {
-      const t = start + (s - from) * this.stepDur + (s % 2 === 1 ? this.song.swing * this.stepDur : 0);
-      if (this.building) buildStep(g, s % 16, t);
-      drumStep(g, sec, s, t);
-    }
-    d.flush();
-    this.drumsUntil = start + (end - from) * this.stepDur;
+    bassStep(g, sec, step, human(0.003), chord);
+    for (const lane of CHORD_LANES) chordStep(g, lane, sec, step, human(0.006), chord);
+    leadStep(g, 'lead', sec, step, human(0.004));
+    leadStep(g, 'lead2', sec, step, human(0.004));
   }
 
   private tok(sec: CompiledSection, lane: LaneName, step: number): string | null {
@@ -307,66 +395,5 @@ export class SongPlayer {
 
   private vel(c: string): number {
     return (VEL[c] ?? 0.8) * (0.94 + this.rng.next() * 0.12);
-  }
-
-  private bass(sec: CompiledSection, step: number, t: number, chord: Chord): void {
-    const tok = this.tok(sec, 'bass', step);
-    if (!tok) return;
-    const root = 28 + ((chord.bass - 4 + 12) % 12) + this.semis;
-    if (tok === 'x') {
-      this.band.bass.dead(t, root + 12, 0.85);
-      return;
-    }
-    const m = BASS_TOKEN.exec(tok);
-    const off = m?.[1] ? degreeOffset(m[1], chord) : null;
-    if (!m || off === null) return;
-    let midi = root + off;
-    for (const ch of m[2] ?? '') midi += ch === ',' ? -12 : 12;
-    const art = m[3] ?? '';
-    this.band.bass.note(t, {
-      midi, dur: Math.max(0.05, this.len(sec, 'bass', step) * this.stepDur * 0.9), vel: 0.86 + this.rng.next() * 0.12,
-      pop: art.includes('^'), accent: art.includes('>'), slide: art.includes('~'),
-    });
-  }
-
-  private chordLane(lane: ChordLane, sec: CompiledSection, step: number, t: number, chord: Chord): void {
-    const tok = this.tok(sec, lane, step);
-    if (!tok) return;
-    if (lane === 'clav' && tok === 'g') {
-      this.band.clav.mute(t, 0.8);
-      return;
-    }
-    const voiced = voiceChord(chord, CENTER[lane], this.voicings[lane] ?? null, lane === 'pad');
-    this.voicings[lane] = voiced;
-    const notes = this.semis ? voiced.map((n) => n + this.semis) : voiced;
-    const len = tok === 's' ? 1 : this.len(sec, lane, step);
-    const dur = len * this.stepDur * (tok === 's' ? 0.55 : 0.94);
-    const vel = this.vel(tok);
-    if (lane === 'keys') this.band.keys.chord(t, notes, dur, vel);
-    else if (lane === 'pad') this.band.pad.chord(t, notes, dur, vel);
-    else if (lane === 'clav') this.band.clav.hit(t, notes.slice(0, 2), dur, vel);
-    else this.band.brass.stab(t, notes, dur, vel, tok === 'f' ? 'fall' : tok === 'r' ? 'rip' : 'hit');
-  }
-
-  private leadLane(lane: 'lead' | 'lead2', sec: CompiledSection, step: number, t: number, vel: number): void {
-    const tok = this.tok(sec, lane, step);
-    if (!tok) return;
-    // A lead2 note shadowing the lead an octave down sounds inside the lead voice (one oscillator more).
-    const doubled = this.doubled(sec, step);
-    if (lane === 'lead2' && doubled) return;
-    const scoop = tok.endsWith('~');
-    const midi = noteToMidi(scoop ? tok.slice(0, -1) : tok) + this.semis;
-    const dur = this.len(sec, lane, step) * this.stepDur * 0.9;
-    const voice = this.band.lead(sec.voice ?? this.song.lead, lane === 'lead' ? 0 : 1);
-    voice.note(t, midi, dur, vel * (0.9 + this.rng.next() * 0.15), scoop, lane === 'lead' && doubled ? LEAD2_VEL / LEAD_VEL : 0);
-  }
-
-  /** The lead2 note at this step is the lead's own note an octave down, of the same length. */
-  private doubled(sec: CompiledSection, step: number): boolean {
-    const a = this.tok(sec, 'lead', step);
-    const b = this.tok(sec, 'lead2', step);
-    if (!a || !b) return false;
-    const pitch = (x: string): number => noteToMidi(x.endsWith('~') ? x.slice(0, -1) : x);
-    return pitch(b) === pitch(a) - 12 && this.len(sec, 'lead2', step) === this.len(sec, 'lead', step);
   }
 }

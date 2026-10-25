@@ -45,8 +45,7 @@ export class Lead {
       this.filt = filter(ctx, voice === 'wah' ? { type: 'bandpass', frequency: 1000, Q: 2.2 } : { type: 'lowpass', frequency: 2300, Q: 2.5 });
       this.filt.connect(this.amp);
       // Saw + square as one oscillator with the pair's long-term spectrum (see layerWave).
-      const o = osc(b, 'sawtooth', 220);
-      o.setPeriodicWave(layerWave(ctx, 1, 1));
+      const o = osc(b, layerWave(ctx, 1, 1), 220);
       o.connect(this.filt);
       this.oscs.push({ o, mul: 1 });
     }
@@ -57,11 +56,16 @@ export class Lead {
     }
   }
 
+  /** The note before this voice existed (a bar render continuing a phrase): legato glides from it. */
+  follow(midi: number, end: number): void {
+    this.lastMidi = midi;
+    this.lastEnd = end;
+  }
+
   /** The octave-down oscillator, built on the first doubled note (same wave, vibrato and filter). */
   private subOsc(): Sub {
     if (this.sub) return this.sub;
-    const o = osc(this.b, this.voice === 'flute' ? 'sine' : 'sawtooth', 110);
-    if (this.voice !== 'flute') o.setPeriodicWave(layerWave(this.b.ctx, 1, 1));
+    const o = osc(this.b, this.voice === 'flute' ? 'sine' : layerWave(this.b.ctx, 1, 1), 110);
     o.detune.automationRate = 'k-rate';
     this.vib.connect(o.detune);
     const level = new GainNode(this.b.ctx, { gain: 0 });

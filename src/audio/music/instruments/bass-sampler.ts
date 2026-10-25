@@ -10,7 +10,7 @@ import {
 } from './bass';
 import { bankOf, prepareBank, zoneOf, type BankSpec } from './bank';
 import { playSample } from './drum-samples';
-import { premix, type MixNote } from './premix';
+import { offline, playMix, premix, type MixNote } from './premix';
 import { filter } from '../../dsp/env';
 import type { Band } from '../band';
 
@@ -61,7 +61,7 @@ export function prepareBassSamples(sampleRate: number): Promise<void> {
 export class SampledBass {
   private live: SlapBass | null = null;
   /** The sounding note (closed at the next onset). */
-  private last: { src: AudioBufferSourceNode; gain: GainNode; end: number } | null = null;
+  private last: { src: AudioBufferSourceNode | null; gain: GainNode; end: number } | null = null;
 
   constructor(private b: Band) {}
 
@@ -98,10 +98,15 @@ export class SampledBass {
   private play(t: number, note: MixNote, off: number, release: number): void {
     this.close(t);
     const ctx = this.b.ctx;
+    const gain = new GainNode(ctx, { gain: 1 });
+    gain.connect(this.b.input('bass'));
+    if (offline(ctx)) {
+      this.last = { src: null, gain, end: playMix(ctx, [note], { off, release }, t, gain) };
+      return;
+    }
     const buffer = premix([note], { off, release }, ctx.sampleRate);
     const src = new AudioBufferSourceNode(ctx, { buffer });
-    const gain = new GainNode(ctx, { gain: 1 });
-    src.connect(gain).connect(this.b.input('bass'));
+    src.connect(gain);
     src.start(t);
     this.last = { src, gain, end: t + buffer.duration };
   }
@@ -113,6 +118,6 @@ export class SampledBass {
     if (!last || last.end <= t) return;
     last.gain.gain.setValueAtTime(1, t);
     last.gain.gain.linearRampToValueAtTime(0, t + 0.006);
-    last.src.stop(t + 0.008);
+    last.src?.stop(t + 0.008);
   }
 }

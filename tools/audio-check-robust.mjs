@@ -1,5 +1,6 @@
 // Robustness part of tools/audio-check.mjs: the game must run (silently) without WebAudio.
-import { withPage, BASE } from './lib.mjs';
+import { pathToFileURL } from 'node:url';
+import { withPage, BASE, parseArgs } from './lib.mjs';
 
 /** Boot with the AudioContext constructor throwing / missing: title → menu → race, 0 page errors. */
 async function noAudio(mode, expect) {
@@ -63,6 +64,12 @@ async function voicePause(stub, expect) {
 async function webkitEarly(stub, expect) {
   await withPage(async (page, h) => {
     await h.goto(`/?race=coast&seed=3&police=0&manual=1${stub}`);
+    // Playwright's WebKit on Windows is built without WebAudio: nothing to suspend there (the game
+    // runs silent, as the no-WebAudio cases above check).
+    if (await page.evaluate(() => typeof AudioContext === 'undefined')) {
+      console.log('skip WebKit: this WebKit build has no WebAudio (AudioContext undefined)');
+      return;
+    }
     await h.sleep(1500);
     const pre = await h.eval(() => window.__br.audio.state());
     await page.mouse.click(640, 360);
@@ -87,4 +94,11 @@ export async function robustCheck(args = {}) {
   await voicePause(stub, expect);
   await webkitEarly(stub, expect);
   return fails;
+}
+
+// Standalone: node tools/audio-check-robust.mjs [--stub camera,fx]  (exit 1 on any failure)
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  const fails = await robustCheck(parseArgs(process.argv.slice(2)));
+  console.log(fails.length ? `\nFAILED (${fails.length}):\n- ${fails.join('\n- ')}` : '\nall passed');
+  process.exit(fails.length ? 1 : 0);
 }

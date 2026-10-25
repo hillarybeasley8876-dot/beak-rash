@@ -130,7 +130,7 @@ export const MENU: Song = {
       bars: 2, chords: 'Fm9 | Fm9', keys: 'X-------x-------', hat: 'x...x...x...x...', pad: 'X---------------',
       fill: { keys: 'X---..x-...x-...', snare: '....r.......r.gg', bass: '. . . . . . . . 5 - 8 . 7 - 5 .', cym: '........W.......' },
     },
-    A: { ...A, gainDb: -3 },
+    A: { ...A, gainDb: -4.5 },
     A2: { ...A, bass: BASS_A2, lead: MELODY },
     B,
     A3: { ...A, kick: K2, snare: S2, bass: BASS_A3, keys: COMP_A3, lead: MELODY, lead2: transpose(MELODY, -12), perc: '..s.t.s...s.t.s.' },

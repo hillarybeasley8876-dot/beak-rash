@@ -2,7 +2,8 @@
 // after it held for 2 s (a 3 ↔ 4 pack battle does not toggle them) and switch on a 2-bar line;
 // once the player has finished, the final-stretch form and intensity hold until the results; the
 // FINISH cue, its announcer line and the results song's opening depend on the place.
-import { withPage } from './lib.mjs';
+import { pathToFileURL } from 'node:url';
+import { withPage, parseArgs } from './lib.mjs';
 
 /** Pin the player's place / progress / mode (race logic writes are ignored while pinned). */
 const pinPlayer = () => {
@@ -93,4 +94,11 @@ export async function adaptiveCheck(args = {}) {
     await page.evaluate(() => cancelAnimationFrame(window.__watchRaf));
   });
   return fails;
+}
+
+// Standalone: node tools/audio-check-adaptive.mjs [--stub camera,fx]  (exit 1 on any failure)
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  const fails = await adaptiveCheck(parseArgs(process.argv.slice(2)));
+  console.log(fails.length ? `\nFAILED (${fails.length}):\n- ${fails.join('\n- ')}` : '\nall passed');
+  process.exit(fails.length ? 1 : 0);
 }

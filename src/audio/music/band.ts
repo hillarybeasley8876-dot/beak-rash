@@ -1,13 +1,16 @@
 // A Band is one song's mixer: per-instrument channel strips (gain → pan → sends), a tempo-synced
-// delay, keys tremolo, bass grit, kick side-chain ducking and a bass-drop high-pass for KO slow-mo.
-// Each SongPlayer owns a Band, so crossfades and stingers never fight over the same nodes.
-// Strips, instruments and the shared noise source are created on first use: a band only runs
-// the nodes its song actually needs (CPU).
+// delay, keys tremolo, bass grit, kick side-chain ducking, section dynamics and a bass-drop
+// high-pass for KO slow-mo. Each SongPlayer owns a Band, so crossfades and stingers never fight
+// over the same nodes. Strips, instruments and the shared noise source are created on first use:
+// a band only runs the nodes its song actually needs (CPU). The same code also plays inside a bar
+// render (music/bars.ts, an OfflineAudioContext); the result enters the song's realtime band at
+// `out`:  strips → sum → [breakdown low-pass] → section shape → out (fade) → [KO high-pass] → dest.
 import { Rng } from '../../core/rng';
 import { driveCurve } from '../dsp/curves';
 import { anchor, filter, holdAt, settle, steer } from '../dsp/env';
 import { noise } from '../dsp/noise';
 import { FilterSwitch } from '../dsp/switch';
+import { dottedDelay, haasPair } from './band-fx';
 import { Brass } from './instruments/brass';
 import { DrumKit } from './instruments/drums';
 import { SampledBass } from './instruments/bass-sampler';
@@ -16,44 +19,66 @@ import { SampledPad } from './instruments/pad-sampler';
 import { SampledKeys } from './instruments/keys-sampler';
 import { Lead } from './instruments/lead';
 import { Gate, osc } from './instruments/voice';
-import type { Engine } from '../engine';
 import type { Channel, LeadVoice } from './types';
 
-// Melody on top: lead hooks ≈ −5 LU under the full mix, bass ≈ −8, drums ≈ −4 (audio-check stems).
+/** Where a band plays: its context, the music bus and the reverb send (the Engine, or a bar render's own graph). */
+export interface MusicHost {
+  readonly ctx: BaseAudioContext;
+  readonly musicIn: AudioNode;
+  readonly musicVerb: AudioNode;
+}
+
+// Balanced by spectrum (audio-check tone gates): kick + bass own 40–120 Hz, keys + pad the warm bed, the hook clears it.
 const DEFAULT_MIX: Record<Channel, number> = {
-  drums: 0.8, bass: 0.6, keys: 0.8, clav: 2.4, brass: 1.05, lead: 0.45, pad: 0.45, fx: 0.6,
+  drums: 0.8, bass: 0.6, keys: 1.18, clav: 2.4, brass: 1.05, lead: 0.375, pad: 1.15, fx: 0.6,
 };
 // Send levels come in a few shared values: channels with the same level feed one send gain.
 const VERB: Record<Channel, number> = { drums: 0.15, bass: 0, keys: 0.29, clav: 0.15, brass: 0.29, lead: 0.38, pad: 0.4, fx: 0.29 };
 const DELAY: Record<Channel, number> = { drums: 0, bass: 0, keys: 0.09, clav: 0.09, brass: 0.09, lead: 0.22, pad: 0, fx: 0.09 };
+/** Haas width sends (band-fx.ts): the lead and the horns spread without leaving the centre. */
+const WIDTH: Partial<Record<Channel, number>> = { lead: 0.22, brass: 0.22 };
 const DUCKED = new Set<Channel>(['bass', 'keys', 'pad', 'clav']);
 /** Comping parts and horns step back (−7.5 dB) while the lead plays, so the hook sits on top. */
 const UNDER_LEAD = new Set<Channel>(['keys', 'pad', 'clav', 'brass']);
 const UNDER_LEAD_GAIN = 0.42;
+/** A static dip in the comping bed where the hooks live (0.7–2 kHz). */
+const BED_DIP = { f: 1100, q: 0.9, db: -4 };
 /** Stereo image: the pad bakes its spread into its pre-mixed chords, the keys auto-pan, the horns
  *  sit right and the clav left, the drums are stereo samples, the reverb is decorrelated. */
 const PAN: Partial<Record<Channel, number>> = { clav: -0.55, brass: 0.4 };
-/** Breakdown: bars 1–4 this far down (dB) behind a low-pass at BREAK_LP; the build climbs to BUILD_TOP dB. */
-const BREAK_DB = -6;
-const BUILD_TOP_DB = 2;
-const BREAK_LP = 900;
+/** Breakdown: bars 1–4 BREAK_DB down (deep: the pad bed carries it) behind a BREAK_LP low-pass; the build climbs to BUILD_TOP_DB. */
+const BREAK_DB = -8, BUILD_TOP_DB = 2, BREAK_LP = 900;
+
+/** Section level (gain) at the end of a section: a breakdown ends on its build's top. */
+export function sectionEnd(gainDb: number, shape: 'breakdown' | undefined): number {
+  return Math.pow(10, (gainDb + (shape === 'breakdown' ? BUILD_TOP_DB : 0)) / 20);
+}
 
 export class Band {
   readonly ctx: BaseAudioContext;
+  /** The fader (crossfades, levels, stop): pre-rendered bars play into it. */
   readonly out: GainNode;
+  private sum: GainNode;         // every strip and the effect returns, before the section dynamics
   private strips = new Map<Channel, GainNode>();
+  /** Each strip's fader (the input, or the gain after a drive) and the trims applied to it. */
+  private faders = new Map<Channel, GainNode>();
+  private trims = new Map<Channel, number>();
   private sc: GainNode;          // side-chain gain shared by bass / keys / pad / clav
   private under: GainNode;       // lead side-chain for keys / pad / clav (then the kick side-chain)
   private underFree: GainNode;   // lead side-chain for the horns (no kick duck)
   private hp: BiquadFilterNode;  // bass drop
   private bassDrop: FilterSwitch; // the high-pass is only in the path during a KO drop
   private dropClear = Infinity;
+  private goneAt = Infinity;     // when dispose() unplugs the band (audio time)
+  gone = false;                  // unplugged for good
   private shape: GainNode;       // section dynamics (levels, breakdowns)
   private sweep: FilterSwitch;   // the breakdown low-pass, only in the path during a breakdown
   private sweepEnd = Infinity;
   private sends: GainNode;       // reverb send bus, post-fader (follows fade())
+  private live = true;           // the instrument graph is plugged in (setLive)
   private delayIn: GainNode | null = null;
   private delayLine: DelayNode | null = null;
+  private widthIn: GainNode | null = null;
   private tremolo: OscillatorNode | null = null;
   private tempo: number;
   private owned: AudioScheduledSourceNode[] = [];
@@ -70,25 +95,63 @@ export class Band {
   private sendGains = new Map<string, GainNode>();
 
   constructor(
-    readonly engine: Engine, bpm: number, private mix: Partial<Record<Channel, number>> = {},
-    dest: AudioNode = engine.musicIn, readonly rng: Rng = new Rng(0xba4d),
+    private host: MusicHost, bpm: number, private mix: Partial<Record<Channel, number>> = {},
+    dest: AudioNode = host.musicIn, readonly rng: Rng = new Rng(0xba4d),
   ) {
-    const ctx = engine.ctx;
+    const ctx = host.ctx;
     this.ctx = ctx;
     this.tempo = bpm;
-    this.out = new GainNode(ctx, { gain: 0 });
+    this.sum = new GainNode(ctx, { gain: 1 });
     this.shape = new GainNode(ctx, { gain: 1 });
-    this.sweep = new FilterSwitch(this.out, filter(ctx, { type: 'lowpass', frequency: BREAK_LP, Q: 1.2 }), this.shape);
+    this.sweep = new FilterSwitch(this.sum, filter(ctx, { type: 'lowpass', frequency: BREAK_LP, Q: 1.2 }), this.shape);
+    this.out = new GainNode(ctx, { gain: 0 });
+    this.shape.connect(this.out);
     this.hp = filter(ctx, { type: 'highpass', frequency: 18, Q: 0.7 });
-    this.bassDrop = new FilterSwitch(this.shape, this.hp, dest);
+    this.bassDrop = new FilterSwitch(this.out, this.hp, dest);
     this.sc = new GainNode(ctx, { gain: 1 });
-    this.sc.connect(this.out);
+    this.sc.connect(this.sum);
     this.under = new GainNode(ctx, { gain: 1 });
-    this.under.connect(this.sc);
+    // The comping bed (keys, pad, clav) leaves the hook's band a little room: warmth below, not on it.
+    this.under.connect(filter(ctx, { type: 'peaking', frequency: BED_DIP.f, Q: BED_DIP.q, gain: BED_DIP.db })).connect(this.sc);
     this.underFree = new GainNode(ctx, { gain: 1 });
-    this.underFree.connect(this.out);
+    this.underFree.connect(this.sum);
     this.sends = new GainNode(ctx, { gain: 0 });
-    this.sends.connect(engine.musicVerb);
+    this.sends.connect(host.musicVerb);
+  }
+
+  /** A bar render's band: fader and sends open from the first sample (no fade-in), section level `level`. */
+  open(level: number): void {
+    this.out.gain.value = 1;
+    this.sends.gain.value = 1;
+    this.shape.gain.value = level;
+  }
+
+  /**
+   * Plug the instrument graph in or out. While a song plays pre-rendered bars, its live strips,
+   * voices, LFOs and delay loop are unplugged: the audio thread no longer renders any of them.
+   */
+  setLive(on: boolean): void {
+    if (on === this.live) return;
+    this.live = on;
+    this.sweep.attach(on);
+    if (on) this.sends.connect(this.host.musicVerb);
+    else this.sends.disconnect();
+  }
+
+  /** A channel's fader level (the default mix × the song's trim). */
+  level(ch: Channel): number {
+    return DEFAULT_MIX[ch] * (this.mix[ch] ?? 1);
+  }
+
+  /** Trim a channel's fader by `gain` from `at` (60 ms move), e.g. the lead in the final stretch. */
+  trim(ch: Channel, gain: number, at: number): void {
+    if ((this.trims.get(ch) ?? 1) === gain) return;
+    this.trims.set(ch, gain);
+    const f = this.faders.get(ch)?.gain;
+    if (!f) return;
+    anchor(f, at);
+    f.linearRampToValueAtTime(this.level(ch) * gain, at + 0.06);
+    settle(f, at + 0.06, this.level(ch) * gain);
   }
 
   /** Channel input for instrument voices (strip created on first use). */
@@ -109,15 +172,17 @@ export class Band {
     const hit = this.strips.get(ch);
     if (hit) return hit;
     const ctx = this.ctx;
-    const level = DEFAULT_MIX[ch] * (this.mix[ch] ?? 1);
+    const level = this.level(ch);
     // Without a drive insert the input node is the fader itself (one node less per channel).
     const driven = ch === 'bass' || ch === 'lead';
-    const input = new GainNode(ctx, { gain: driven ? 1 : level });
+    const trimmed = level * (this.trims.get(ch) ?? 1);
+    const input = new GainNode(ctx, { gain: driven ? 1 : trimmed });
     let head: AudioNode = input;
     if (driven) {
       head = head.connect(new WaveShaperNode(ctx, { curve: driveCurve(ch === 'bass' ? 1.3 : 2.2), oversample: 'none' }));
-      head = head.connect(new GainNode(ctx, { gain: level }));
+      head = head.connect(new GainNode(ctx, { gain: trimmed }));
     }
+    this.faders.set(ch, head as GainNode);
     if (ch === 'keys') {
       // 8th-note auto-pan, the classic suitcase-piano tremolo.
       const pan = new StereoPannerNode(ctx, { pan: 0 });
@@ -129,40 +194,36 @@ export class Band {
       this.tremolo = lfo;
       head = head.connect(pan);
     }
-    const dest = UNDER_LEAD.has(ch) ? (DUCKED.has(ch) ? this.under : this.underFree) : DUCKED.has(ch) ? this.sc : this.out;
+    const dest = UNDER_LEAD.has(ch) ? (DUCKED.has(ch) ? this.under : this.underFree) : DUCKED.has(ch) ? this.sc : this.sum;
     const pan = (x: number): StereoPannerNode => new StereoPannerNode(ctx, { pan: x });
     const side = PAN[ch];
     (side === undefined ? head : head.connect(pan(side))).connect(dest);
     if (VERB[ch] > 0) head.connect(this.send('verb', VERB[ch]));
     if (DELAY[ch] > 0) head.connect(this.send('delay', DELAY[ch]));
+    const width = WIDTH[ch];
+    if (width) head.connect(this.send('width', width));
     this.strips.set(ch, input);
     return input;
   }
 
   /** The shared send gain for `level` into the reverb or the delay. */
-  private send(kind: 'verb' | 'delay', level: number): GainNode {
+  private send(kind: 'verb' | 'delay' | 'width', level: number): GainNode {
     const key = `${kind}${level}`;
     let g = this.sendGains.get(key);
     if (!g) {
       g = new GainNode(this.ctx, { gain: level });
-      g.connect(kind === 'verb' ? this.sends : this.delay());
+      g.connect(kind === 'verb' ? this.sends : kind === 'delay' ? this.delay() : (this.widthIn ??= haasPair(this.ctx, this.sum)));
       this.sendGains.set(key, g);
     }
     return g;
   }
 
-  /** Dotted-8th feedback delay (band-passed repeats), created with the first strip that sends. */
+  /** The dotted-8th delay (band-fx.ts), created with the first strip that sends. */
   private delay(): AudioNode {
     if (this.delayIn) return this.delayIn;
-    const ctx = this.ctx;
-    const d = new DelayNode(ctx, { delayTime: (60 / this.tempo) * 0.75, maxDelayTime: 2 });
-    this.delayLine = d;
-    const fb = new GainNode(ctx, { gain: 0.32 });
-    const tone = filter(ctx, { type: 'bandpass', frequency: 1600, Q: 0.5 });
-    this.delayIn = new GainNode(ctx, { gain: 1 });
-    this.delayIn.connect(d).connect(tone).connect(fb).connect(d);
-    tone.connect(this.out);
-    return this.delayIn;
+    const { input, line } = dottedDelay(this.ctx, this.tempo, this.sum);
+    this.delayLine = line;
+    return (this.delayIn = input);
   }
 
   /** Instruments are created on first use, so a band only runs the voices its song needs. */
@@ -190,11 +251,13 @@ export class Band {
     return (this.strings ??= new SampledPad(this));
   }
 
-  lead(voice: LeadVoice, slot = 0): Lead {
+  /** A lead voice; `prev` = the last note it played before this band existed (a bar render's legato). */
+  lead(voice: LeadVoice, slot = 0, prev?: { midi: number; end: number }): Lead {
     const key = `${voice}${slot}`;
     let l = this.leads.get(key);
     if (!l) {
       l = new Lead(this, voice);
+      if (prev) l.follow(prev.midi, prev.end);
       this.leads.set(key, l);
     }
     return l;
@@ -217,35 +280,49 @@ export class Band {
     return g;
   }
 
-  /** Section dynamics from `t` (bars of `bar` s): the section's level, and the breakdown filter sweep. */
-  section(t: number, bar: number, gainDb: number, shape: 'breakdown' | undefined): void {
+  /**
+   * Section dynamics from `t` (bars of `bar` s): the section's level, and the breakdown filter
+   * sweep. `from` > 0 = start at that bar of the section (a bar render), at its level at once.
+   */
+  section(t: number, bar: number, gainDb: number, shape: 'breakdown' | undefined, from = 0): void {
     const g = this.shape.gain;
     const level = Math.pow(10, gainDb / 20);
+    const enter = from === 0;
     anchor(g, t);
     if (shape !== 'breakdown') {
-      g.linearRampToValueAtTime(level, t + 0.12);
-      settle(g, t + 0.12, level);
+      if (enter) g.linearRampToValueAtTime(level, t + 0.12);
+      else g.setValueAtTime(level, t);
+      settle(g, enter ? t + 0.12 : t, level);
       if (this.sweep.engaged) this.sweep.set(false, t);
       this.sweepEnd = Infinity;
       return;
     }
     // Bars 1–4 down and filtered; bars 5–8 climb back bar by bar (even steps in dB) as the filter opens.
-    const at = (k: number): number => t + k * bar;
-    g.linearRampToValueAtTime(level * Math.pow(10, BREAK_DB / 20), t + 0.12);
-    g.setValueAtTime(level * Math.pow(10, BREAK_DB / 20), at(4));
-    for (let k = 1; k <= 4; k++) g.linearRampToValueAtTime(level * Math.pow(10, (BREAK_DB + ((BUILD_TOP_DB - BREAK_DB) * k) / 4) / 20), at(4 + k));
-    settle(g, at(8), level * Math.pow(10, BUILD_TOP_DB / 20));
+    const at = (k: number): number => t + (k - from) * bar;
+    const v = (k: number): number => level * Math.pow(10, (k <= 4 ? BREAK_DB : BREAK_DB + ((BUILD_TOP_DB - BREAK_DB) * (k - 4)) / 4) / 20);
+    if (enter) g.linearRampToValueAtTime(v(0), t + 0.12);
+    else g.setValueAtTime(v(from), t);
+    if (from < 4) g.setValueAtTime(v(4), at(4));
+    for (let k = Math.max(5, from + 1); k <= 8; k++) g.linearRampToValueAtTime(v(k), at(k));
+    settle(g, at(8), v(8));
     const f = this.sweep.filter.frequency;
+    const top = Math.min(14000, this.ctx.sampleRate * 0.45);
     holdAt(f, t);
-    f.setValueAtTime(BREAK_LP, t);
-    f.setValueAtTime(BREAK_LP, at(4));
-    f.exponentialRampToValueAtTime(Math.min(14000, this.ctx.sampleRate * 0.45), at(8));
-    this.sweep.set(true, t);
+    f.setValueAtTime(from <= 4 ? BREAK_LP : BREAK_LP * Math.pow(top / BREAK_LP, (from - 4) / 4), t);
+    if (from < 4) f.setValueAtTime(BREAK_LP, at(4));
+    f.exponentialRampToValueAtTime(top, at(8));
+    this.sweep.set(true, t, !enter);
     this.sweepEnd = at(8);
   }
 
   /** Unplug voices that have finished sounding (called from the scheduler). */
   tick(now: number): void {
+    if (now >= this.goneAt && !this.gone) {
+      this.gone = true;
+      this.out.disconnect();
+      this.sends.disconnect();
+      this.bassDrop.disconnect();
+    }
     for (const g of this.gates) g.sleep(now);
     if (now >= this.sweepEnd) {
       this.sweep.set(false, now);
@@ -313,15 +390,10 @@ export class Band {
     this.tremolo?.frequency.setValueAtTime(bpm / 30, at);
   }
 
+  /** Stop every source at `at`; the next tick() from then on unplugs the band. */
   dispose(at: number): void {
-    const last = this.owned[0];
     for (const src of this.owned) src.stop(at);
     this.owned = [];
-    const unplug = (): void => {
-      this.out.disconnect();
-      this.sends.disconnect();
-    };
-    if (last) last.onended = unplug;
-    else unplug();
+    this.goneAt = at;
   }
 }

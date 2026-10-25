@@ -7,7 +7,7 @@
 import { midiToHz } from '../theory';
 import { PAD_DETUNE, PAD_RELEASE, Pad, padAmp, padFilter } from './keys';
 import { bankOf, layerOf, prepareBank, zoneOf, type BankSpec } from './bank';
-import { premix, type MixNote } from './premix';
+import { offline, playMix, premix, type MixNote } from './premix';
 import { filter } from '../../dsp/env';
 import type { Band } from '../band';
 
@@ -46,7 +46,13 @@ export class SampledPad {
       return;
     }
     const ctx = this.b.ctx;
-    const src = new AudioBufferSourceNode(ctx, { buffer: premix(notes, { off: dur, release: PAD_RELEASE }, ctx.sampleRate) });
+    const mix = { off: dur, release: PAD_RELEASE };
+    if (offline(ctx)) {
+      playMix(ctx, notes, mix, t, this.b.input('pad'));
+      return;
+    }
+    // Mixed at the bank's half rate (half the main-thread work; the source resamples a low-passed pad).
+    const src = new AudioBufferSourceNode(ctx, { buffer: premix(notes, mix, SPEC.renderRate ?? ctx.sampleRate) });
     src.connect(this.b.input('pad'));
     src.start(t);
   }

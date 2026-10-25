@@ -33,9 +33,9 @@ export function bassFilter(fr: AudioParam, q: AudioParam, t: number, n: BassNote
   const start = Math.min(9500, f * bright);
   holdAt(fr, t);
   fr.setValueAtTime(start, t);
-  fr.exponentialRampToValueAtTime(Math.min(start, f * 4.4 + 420), t + (n.pop ? 0.2 : 0.13));
+  fr.exponentialRampToValueAtTime(Math.min(start, f * 3 + 170), t + (n.pop ? 0.2 : 0.13));
   holdAt(q, t);
-  q.setValueAtTime(n.pop ? 9 : 6, t);
+  q.setValueAtTime(n.pop ? 7 : 3.5, t);
 }
 
 /** The note's envelope; returns when it has died away. */
@@ -70,8 +70,7 @@ export class SlapBass {
   constructor(private b: Band) {
     const ctx = b.ctx;
     // The sub rides through the low-pass too (its cutoff stays above the fundamental).
-    const tone = osc(b, 'sine');
-    tone.setPeriodicWave(bassWave(ctx));
+    const tone = osc(b, bassWave(ctx));
     this.oscs = [tone];
     this.lp = filter(ctx, { type: 'lowpass', frequency: 400, Q: 5 });
     this.amp = new GainNode(ctx, { gain: 0 });

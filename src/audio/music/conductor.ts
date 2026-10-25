@@ -14,6 +14,8 @@ import type { Channel } from './types';
 const STING_DUCK_DB = -7.5;
 /** A count arriving this far (s) from the predicted GO re-phases the song (stall, missed pause). */
 const DRIFT = 0.06;
+/** Bars are rendered ahead only under this lookahead (s): a race load (3 s) queues live notes instead. */
+const AHEAD_MAX = 2;
 
 export class Conductor {
   private current: SongPlayer | null = null;
@@ -159,11 +161,16 @@ export class Conductor {
 
   /** Schedule music up to `until` (audio clock) and drop finished crossfades. */
   schedule(until: number): void {
-    this.stingBand?.tick(this.engine.now);
-    if (this.current || this.fading.length) this.engine.keepReverb(until);
-    this.current?.schedule(until);
-    for (const p of this.fading) p.schedule(until);
-    if (this.fading.length) this.fading = this.fading.filter((p) => !p.stopped);
+    const now = this.engine.now;
+    this.stingBand?.tick(now);
+    // Whole bars render ahead unless a countdown may re-phase the song or a race load needs live notes queued.
+    const ahead = this.goAt === null && until - now <= AHEAD_MAX;
+    this.current?.schedule(until, ahead);
+    for (const p of this.fading) p.schedule(until, ahead);
+    if (this.fading.length) this.fading = this.fading.filter((p) => !p.gone);
+    // The music reverb runs while a song plays live notes (rendered bars carry their own).
+    const live = Math.max(this.current?.liveUntil ?? -Infinity, ...this.fading.map((p) => p.liveUntil));
+    if (live > now) this.engine.keepReverb(Math.min(until, live));
     this.engine.tick();
   }
 }

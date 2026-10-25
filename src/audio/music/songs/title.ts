@@ -126,7 +126,7 @@ export const TITLE: Song = {
   swing: 0.1,
   key: 'D Dorian',
   lead: 'wah',
-  // Hook ≈ −4.5 LU under the full mix; a little less sub (low end ≤ 40 %).
+  // The hook a touch under the default; a little less sub.
   mix: { lead: 0.88, bass: 0.85 },
   crackle: 0.12,
   sections: {
@@ -135,7 +135,7 @@ export const TITLE: Song = {
       hat: 'x.x.x.x.x.x.x.x.', cym: REST + 'W...............',
       fill: { kick: 'X.........X.....', snare: '....X.....x.xxXX', tom: '........1.2.3.3.', bass: '1> - - . . . . . 5 . 8^ . 7 . 8^ .' },
     },
-    A: { ...A, gainDb: -3 },
+    A: { ...A, gainDb: -4.5 },
     A2: { ...A, lead: HOOK, clav: CLAV },
     B,
     A3,

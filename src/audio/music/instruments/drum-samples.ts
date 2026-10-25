@@ -57,7 +57,7 @@ function cymbal(
 type NoiseHit = (sr: number, len: number, rng: Rng) => Float32Array;
 const CLICK = noiseHit([['bandpass', 3200, 0.8]], 0.0008, 0.008);
 const TOM_CLICK = noiseHit([['bandpass', 3200, 0.8]], 0.001, 0.02);
-const WIRES = (decay: number): NoiseHit => noiseHit([['highpass', 1300, 0.7], ['peaking', 4200, 1.2, 5]], 0.0015, decay);
+const WIRES = (decay: number): NoiseHit => noiseHit([['highpass', 1300, 0.7], ['peaking', 4200, 1.2, 3]], 0.0015, decay);
 
 /** A pitched body (glide + envelope) plus a noise layer at `noise` × the body, all × `scale`. */
 function drumBody(
@@ -68,7 +68,7 @@ function drumBody(
   return scale === 1 ? x : x.map((v) => v * scale);
 }
 
-const HAT_NOISE: Array<[Parameters<typeof biquad>[2], number, number, number?]> = [['highpass', 7200, 0.6], ['peaking', 10500, 0.9, 3]];
+const HAT_NOISE: Array<[Parameters<typeof biquad>[2], number, number, number?]> = [['highpass', 7200, 0.6], ['peaking', 10500, 0.9, 0]];
 const CRASH_NOISE: Array<[Parameters<typeof biquad>[2], number, number, number?]> = [['highpass', 4200, 0.5], ['peaking', 7600, 0.7, 4]];
 
 const RECIPES: Record<DrumSample, Recipe> = {
@@ -85,19 +85,19 @@ const RECIPES: Record<DrumSample, Recipe> = {
   tom3: { seconds: 0.44, build: (sr, len, rng) => drumBody(sr, len, rng, 'sine', [[0, 118], [0.18, 86]], 0.002, 0.42, TOM_CLICK, 0.1 / 0.62) },
   rim: { seconds: 0.04, build: (sr, len) => percEnv(glide(len, sr, 'triangle', [[0, 1750]]), sr, 0.0005, 0.03) },
   // Shell (triangle 240 → 180 Hz) + wires; the levels are relative to the wires (the hit's gain).
-  snare: { seconds: 0.2, takes: 3, build: (sr, len, rng) => drumBody(sr, len, rng, 'triangle', [[0, 240], [0.04, 180]], 0.001, 0.09, WIRES(0.17), 0.75 / 0.42, 0.42 / 0.75) },
+  snare: { seconds: 0.2, takes: 3, build: (sr, len, rng) => drumBody(sr, len, rng, 'triangle', [[0, 240], [0.04, 180]], 0.001, 0.11, WIRES(0.17), 0.9 / 0.8, 0.8) },
   snareGhost: { seconds: 0.07, takes: 3, build: (sr, len, rng) => drumBody(sr, len, rng, 'triangle', [[0, 240], [0.04, 180]], 0.001, 0.04, WIRES(0.06), 0.24 / 0.12, 0.12 / 0.24) },
   shaker: { seconds: 0.09, stereo: true, takes: 3, build: noiseHit([['bandpass', 5600, 1.4]], 0.012, 0.07) },
   clap: {
     seconds: 0.23, takes: 2,
-    build: (sr, len, rng) => shapeEnv(biquad(whiteNoise(len, rng), sr, 'bandpass', 1150, 1.1), sr, [
+    build: (sr, len, rng) => shapeEnv(biquad(whiteNoise(len, rng), sr, 'bandpass', 1500, 0.7), sr, [
       [0.001, 1, 'lin'], [0.009, 0.15, 'exp'], [0.012, 1, 'lin'], [0.02, 0.15, 'exp'], [0.023, 1, 'lin'], [0.031, 0.15, 'exp'],
       [0.034, 0.8, 'lin'], [0.22, 0.0001, 'exp'], [0.225, 0, 'lin'],
     ]),
   },
   tamb: {
     seconds: 0.18, stereo: true, takes: 3,
-    build: (sr, len, rng) => shapeEnv(biquad(biquad(whiteNoise(len, rng), sr, 'highpass', 5200, 0.7), sr, 'peaking', 8800, 3, 9), sr, [
+    build: (sr, len, rng) => shapeEnv(biquad(biquad(whiteNoise(len, rng), sr, 'highpass', 5200, 0.7), sr, 'peaking', 8800, 3, 5), sr, [
       [0.001, 1, 'lin'], [0.012, 0.3, 'exp'], [0.017, 0.78, 'lin'], [0.028, 0.3, 'exp'], [0.033, 0.56, 'lin'], [0.044, 0.3, 'exp'],
       [0.17, 0.0001, 'exp'], [0.175, 0, 'lin'],
     ]),
@@ -126,20 +126,21 @@ const RECIPES: Record<DrumSample, Recipe> = {
   clavMute: { seconds: 0.035, takes: 2, build: noiseHit([['bandpass', 1700, 1.8]], 0.001, 0.025) },
   // Two-square disco cowbell (lives in 0.5–3 kHz, cuts through a busy mix).
   cowbell: {
-    seconds: 0.3,
+    seconds: 0.22,
     build: (sr, len, rng) => {
       const x = new Float32Array(len);
       addSquare(x, sr, 562, 1, rng.next());
       addSquare(x, sr, 845, 1, rng.next());
-      return percEnv(biquad(x, sr, 'bandpass', 1700, 1.1), sr, 0.001, 0.28);
+      return percEnv(biquad(x, sr, 'bandpass', 1700, 1.1), sr, 0.001, 0.2);
     },
   },
   crash: { seconds: 2.0, stereo: true, build: (sr, len, rng) => cymbal(sr, len, rng, { noise: CRASH_NOISE, scale: 1.6, band: 7000, q: 0.8, metal: 0.45, attack: 0.002, decay: 1.9, win: 0.3 }) },
 };
 
-/** Sample data per sample rate (synthesized once per page), AudioBuffers per context. */
+/** Sample data and AudioBuffers per sample rate (synthesized once per page; a buffer plays in any
+ *  context, so bar renders do not copy every sample again). */
 const data = new Map<string, Float32Array[]>();
-const buffers = new WeakMap<BaseAudioContext, Map<string, AudioBuffer>>();
+const buffers = new Map<string, AudioBuffer>();
 
 /** FNV-1a: a stable seed per sample name. */
 function seedOf(name: string): number {
@@ -164,21 +165,17 @@ function channels(sr: number, kind: DrumSample, take: number): Float32Array[] {
   return chans;
 }
 
-/** Take `take` of the sample `kind` in this context (built on first use, shared by every band). */
+/** Take `take` of the sample `kind` at this context's rate (built on first use, shared by every band). */
 export function drumSample(ctx: BaseAudioContext, kind: DrumSample, take = 0): AudioBuffer {
-  let byKey = buffers.get(ctx);
-  if (!byKey) {
-    byKey = new Map();
-    buffers.set(ctx, byKey);
-  }
   const n = take % takesOf(kind);
-  const key = `${kind}#${n}`;
-  let buf = byKey.get(key);
+  const key = `${ctx.sampleRate}:${kind}#${n}`;
+  let buf = buffers.get(key);
   if (!buf) {
     const chans = channels(ctx.sampleRate, kind, n);
-    buf = ctx.createBuffer(chans.length, chans[0]?.length ?? 1, ctx.sampleRate);
-    chans.forEach((c, ch) => buf?.getChannelData(ch).set(c));
-    byKey.set(key, buf);
+    const b = new AudioBuffer({ length: chans[0]?.length ?? 1, numberOfChannels: chans.length, sampleRate: ctx.sampleRate });
+    chans.forEach((c, ch) => b.getChannelData(ch).set(c));
+    buffers.set(key, b);
+    buf = b;
   }
   return buf;
 }

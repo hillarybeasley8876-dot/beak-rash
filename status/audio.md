@@ -365,3 +365,41 @@ open, [ ] = not audio's files. Scratch probes / logs: shots/audio/fix3/ (probe-*
   rival bark had taken the channel before the pelican's bell taunt); in game 0 __br.errors, race mix peak −3.3…−4.1 dBFS /
   rms −19.7…−20.1 (shots/audio/fix3/race.jpg, lab.jpg). CPU part of that run: menu 2.31 / 3.09, race 5.53 / 7.40,
   pack 5.58 / 6.56, stretch 5.00 / 6.30 → race / pack p50 FAIL (T0 stays [~]).
+
+## r3 polish (2026-10-25)
+Polish round r3 against reviews/audio-r3-music.json + audio-r3-tech.json, measured on the Windows box (Ryzen 9 5950X,
+Chromium/D3D11). Probes, renders and logs: shots/r3-audio/ (render-loops.mjs + analyze.py = octave bands vs 125 Hz,
+tilt, LUFS, LRA, S/M, clicks; probe-*.mjs realtime / capture probes; full-2.log).
+- [x] CPU (music #1, tech #0/#2): the music now plays from bars rendered ahead (music/bars.ts): each bar is
+  sequenced into a fresh Band on its own OfflineAudioContext (same instruments, side-chain, sends, delay, reverb;
+  notes are mixed by the render thread via premix.playMix, no JS pre-mix) and plays as one buffer into the song's
+  realtime band (`out` → KO high-pass); the live graph is unplugged ~2 s later. Live only: race vamp + count-in,
+  race loads (3 s lookahead), each song's first bar, offline analysis renders. Bars are sequenced in 1.5 ms
+  main-thread slices. Capture check (worklet tap): bar-rendered = live path within 0.1 dB per octave, RMS +0.01 dB,
+  0 ± 1 sample per bar, 0 clicks. Also: tunnel convolver (stayed plugged forever after the first tunnel, ≈ 2.5–3 %)
+  → gated loop reverb matched within 1.5 dB; siren = pre-rendered loop; reverb / live tails 2.5 / 2 s; sfx cap
+  16 → 12; every race sound prewarmed at race start (96 sounds, 105 s ≈ 13 MB, done 3 s into the intro: first
+  plays had synthesized whole graphs live — 8–33 % spikes). Gate (p50 / p90 %, control tab 0.23–0.45 %): before
+  menu 3.14 / 4.25, race 6.72 / 9.81, pack 10.03 / 13.02, stretch 8.64 / 11.56, sfx-only 3.60 / 7.34 → after
+  (final code, 4 runs) menu 1.26–2.37 / 1.60–3.63, race 2.57–3.05 / 3.39–4.82, pack 2.92–3.70 / 4.85–6.60, stretch
+  2.39–3.05 / 3.27–4.99, sfx-only 2.03–2.28 / 2.71–3.94. Main thread: 5.5–6.1 ms per s of music, max 9 ms per call
+  (live path 7.9 ms/s, max 12.6). Final `node tools/audio-check.mjs` (shots/r3-audio/full-3.log) exit 0.
+- [x] Tone (music #0), octaves vs 125 Hz, base → now: coast 250 −8.5 → −6.5, 1k −6.1 → −6.7, 2k −7.9 → −9.1, 8k
+  −10.1 → −12.5 (bumpiness 2.1 → 1.4 dB); city 250 −7.5 → −6.0, 4k −12.1 → −14.3; mountain 250 −8.3 → −6.1, 8k −12.9
+  → −14.8; title 1k −7.4 → −8.4; results 250 −6.8 → −4.6. Stretch layer 1k: coast −1.4 → −5.1, city −3.5 → −6.1,
+  mountain −2.2 → −4.9. In-game composite (music + bike loops, 20 m/s): 1k −7.2 → −7.8, 2k −7.8 → −9.8, 4k −8.1 →
+  −11.0, 8k −9.1 → −11.6. How: warmer slap bass (filter settles f·3 + 170 Hz, Q 3.5), keys +3.4 dB, pad +8 dB with a
+  1 kHz top, a −4 dB / 1.1 kHz dip on the comping bed, lead −1.6 dB (a further −2.5 dB in the stretch), fatter snare
+  body / tamer wires, clap 1150 → 1500 Hz Q 0.7 −2.4 dB, cowbell −7.5 dB, hats / ride / crash / shaker / tambourine
+  −1.3…−2.1 dB, stretch hats accented; bike wind ≈ 370 Hz at race speed (was ≈ 1.3 kHz), chain −5 dB, roll band-passed.
+  New gate: race songs' stretch tone (1 kHz ≤ −4, 8 kHz ≤ −8).
+- [x] Width / dynamics (music #2/#3): brass in two pairs (±0.3), Haas width send on lead + horns, louder pad bed:
+  S/M above 200 Hz −8.6…−11.5 → −7.1…−9.7 dB, correlation 0.91–0.96 → 0.86–0.93; breakdown −8 dB, A sections −4.5 dB:
+  LRA 4.1–5.1 → 4.4–5.7 LU, D bars 1–4 −6.9…−9.4 dB under B2, builds rising.
+- [x] Voices (tech #1, music #4/#6): cut() fix was in; the 1.3 s bark gap no longer blocks a line that outranks the
+  last bark, and the pelican's held line takes the waiting slot over from a rival's (an AI-vs-AI KO had taken it).
+  Countdown words measured −16.1…−16.5 dB active RMS vs the set's −16.2 median (already matched).
+- [x] Police (music #7, tech #3): police:whistle / police:knock / police:horn are placed and rate-limited (knock
+  'none' = hit.none + bike.bump); new hit.baton; unknown weapons fall back to hit.none.
+- Tools: every audio-check-*.mjs runs standalone; the WebKit case is skipped when that WebKit has no WebAudio
+  (Playwright WebKit on Windows); KO-quip case starts from a clean slate (the race's own fights could hold the line).

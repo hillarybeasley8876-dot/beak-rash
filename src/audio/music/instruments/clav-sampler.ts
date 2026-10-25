@@ -7,7 +7,7 @@ import { midiToHz } from '../theory';
 import { CLAV_DUTY, CLAV_LEVEL, CLAV_MAX, CLAV_RELEASE, Clav, clavAmp, clavWah } from './keys';
 import { bankOf, layerOf, prepareBank, zoneOf, type BankSpec } from './bank';
 import { playSample } from './drum-samples';
-import { premix, type MixNote } from './premix';
+import { offline, playMix, premix, type MixNote } from './premix';
 import { pulseWave } from '../../dsp/curves';
 import { filter } from '../../dsp/env';
 import type { Band } from '../band';
@@ -46,7 +46,12 @@ export class SampledClav {
       return;
     }
     const ctx = this.b.ctx;
-    const src = new AudioBufferSourceNode(ctx, { buffer: premix(notes, { off: Math.min(dur, CLAV_MAX), release: CLAV_RELEASE }, ctx.sampleRate) });
+    const mix = { off: Math.min(dur, CLAV_MAX), release: CLAV_RELEASE };
+    if (offline(ctx)) {
+      playMix(ctx, notes, mix, t, this.b.input('clav'));
+      return;
+    }
+    const src = new AudioBufferSourceNode(ctx, { buffer: premix(notes, mix, ctx.sampleRate) });
     src.connect(this.b.input('clav'));
     src.start(t);
   }

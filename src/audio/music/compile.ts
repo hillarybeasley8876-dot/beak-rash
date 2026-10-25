@@ -1,7 +1,7 @@
 // Compiles Song data into per-step lookups: chord per step, lane tokens (base, fill, layers),
 // tie-aware durations. Pure functions over the data model; cached per song.
 import { degreeOffset, noteToMidi, parseChord, type Chord } from './theory';
-import type { LaneName, Lanes, LeadVoice, Section, Song } from './types';
+import type { Channel, LaneName, Lanes, LeadVoice, Section, Song } from './types';
 
 export type LaneSteps = Partial<Record<LaneName, string[]>>;
 
@@ -139,4 +139,12 @@ export function tiedLength(sec: CompiledSection, lane: LaneName, step: number, i
   let j = step + 1;
   while (j < sec.steps && tokenAt(sec, lane, j, intensity, fill) === '-') j++;
   return j - step;
+}
+
+/** A song's channel trims, times `extra` multipliers (analysis renders solo / mute stems). */
+export function songMix(song: Song, extra: Partial<Record<Channel, number>> | undefined): Partial<Record<Channel, number>> {
+  if (!extra) return song.mix ?? {};
+  const out: Partial<Record<Channel, number>> = { ...song.mix };
+  for (const ch of Object.keys(extra) as Channel[]) out[ch] = (out[ch] ?? 1) * (extra[ch] ?? 1);
+  return out;
 }

@@ -121,7 +121,7 @@ export const COAST: Song = {
   swing: 0.08,
   key: 'A major',
   lead: 'wah',
-  // Four-on-the-floor + slap octaves: a little less bass keeps the low end ≤ 40 %.
+  // Four-on-the-floor + slap octaves: a little less bass keeps the low end from booming.
   mix: { bass: 0.9 },
   sections: {
     vamp: { bars: 2, chords: 'Amaj9 | Amaj9', kick: K1, hat: 'x.x.x.x.x.x.x.x.', bass: rep('1> . . 8^ . 1 5 . 6 . 8^ . 5 x 3 .', 2), keys: bars('X-------........', REST) },
@@ -130,7 +130,7 @@ export const COAST: Song = {
       cym: REST + 'W...............',
       fill: { snare: '....X...X.X.XXXX', bass: '1> . . . . . . . 5 . 8^ . 7 . 8^ .', brass: '............r---' },
     },
-    A: { ...A, gainDb: -3 },
+    A: { ...A, gainDb: -4.5 },
     A2: { ...A, lead: HOOK, fill: [FILLS[1], FILLS[3]], layers: { 1: { brass: BRASS_TOP, lead2: transpose(HOOK, -12) } } },
     B,
     A3,
@@ -159,7 +159,7 @@ export const COAST: Song = {
   lift: { tempo: 1.04, semis: 2 },
   layers: {
     1: { perc: 'b.s.B.s.b.s.B.s.', clav: 'xgxgxgxgxgxgxgxg', clap: '....X.......X...' },
-    2: { perc: 's.sbs.sbs.sbs.sb', clap: '....X.......X...', hat: 'XxxxXxxxXxxxXxxx', bass: '1> . 1 . 8^ . 1 . 1> . 1 . 8^ . 5 .' },
+    2: { perc: 's.sbs.sbs.sbs.sb', clap: '....X.......X...', hat: 'XoxoXoxoXoxoXoxo', bass: '1> . 1 . 8^ . 1 . 1> . 1 . 8^ . 5 .' },
   },
   notes:
     'Sunny disco-funk, 128 bpm, swing 0.08, A major; loop A–A2–B–A3–S–D–B2–A4 = 64 bars (2:00). A: Amaj9 | Bm9–E13 | Amaj9 | ' +

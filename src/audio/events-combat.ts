@@ -14,6 +14,12 @@ function skillSfx(skillId: string, suffix: '' | '.hit' | '.end'): string | null 
   return null;
 }
 
+/** The hit of a weapon (a weapon without its own sound yet gets the unarmed one). */
+export function hitSfx(weapon: string): string {
+  const id = `hit.${weapon}`;
+  return id in SFX ? id : 'hit.none';
+}
+
 function pickupSfx(kind: string): string {
   const k = kind.toLowerCase();
   if (k.includes('fish') && !k.includes('can')) return 'pickup.fish';
@@ -41,7 +47,7 @@ export function wireCombat(bus: EventBus<GameEvents>, h: Host): void {
     const opts = { volume: e.heavy ? 1.15 : 1, pitch: e.heavy ? 0.9 : 1 };
     if (e.blocked) h.play('hit.block', e.pos, opts);
     else if (e.skillId) h.play(skillSfx(e.skillId, '.hit') ?? 'skill.hit', e.pos, opts);
-    else h.play(`hit.${e.weapon}`, e.pos, opts);
+    else h.play(hitSfx(e.weapon), e.pos, opts);
     if (e.crit && !e.blocked) h.play('hit.crit', e.pos);
   });
   bus.on('combat:ko', ({ attacker, victim, pos }) => {

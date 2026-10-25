@@ -5,8 +5,12 @@
 import { filter, perc } from '../../dsp/env';
 import type { Band } from '../band';
 
-export function osc(b: Band, type: OscillatorType, frequency = 110, detune = 0): OscillatorNode {
-  const o = new OscillatorNode(b.ctx, { type, frequency, detune });
+/** A running oscillator of the band (`wave`: a built-in type, or a custom wave — created with it, so
+ *  no built-in wave table is computed for nothing: ≈ 0.5 ms per type in every new context). */
+export function osc(b: Band, wave: OscillatorType | PeriodicWave, frequency = 110, detune = 0): OscillatorNode {
+  const o = wave instanceof PeriodicWave
+    ? new OscillatorNode(b.ctx, { type: 'custom', periodicWave: wave, frequency, detune })
+    : new OscillatorNode(b.ctx, { type: wave, frequency, detune });
   // Pitch moves (scoops, slides, rips, falls) step once per 4 ms render quantum: inaudible, and the
   // oscillator stays on the constant-increment path (≈ −10 % of the music's render time).
   o.frequency.automationRate = 'k-rate';

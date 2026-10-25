@@ -9,6 +9,7 @@
 import { noise } from '../../dsp/noise';
 import { filter } from '../../dsp/env';
 import { mixBar, type BarHit } from './drum-mix';
+import { offline } from './premix';
 import { playSample, type DrumSample } from './drum-samples';
 import type { Band } from '../band';
 
@@ -27,6 +28,11 @@ export class DrumKit {
   private bars: Array<{ src: AudioBufferSourceNode; gain: GainNode; end: number }> = [];
 
   constructor(private b: Band) {}
+
+  /** Continue another kit's take rotation (a bar render's kit carries on from the bar before). */
+  shareTurns(turns: Map<DrumSample, number>): void {
+    this.turns = turns;
+  }
 
   private get out(): AudioNode {
     return this.b.input('drums');
@@ -54,8 +60,10 @@ export class DrumKit {
     return hit;
   }
 
-  /** Collect the following hits into one buffer that starts at `start` (see flush). */
+  /** Collect the following hits into one buffer that starts at `start` (see flush). An offline
+   *  render plays every hit as it comes: its own thread mixes them. */
   record(start: number): void {
+    if (offline(this.b.ctx)) return;
     this.rec = [];
     this.recStart = start;
   }
@@ -101,12 +109,12 @@ export class DrumKit {
   }
 
   clap(t: number, vel: number): void {
-    this.sample('clap', t, 0.82 * vel);
+    this.sample('clap', t, 0.62 * vel);
   }
 
   hat(t: number, vel: number, open: boolean): void {
     this.choke(t);
-    const level = (open ? 0.43 : 0.37) * vel;
+    const level = (open ? 0.34 : 0.29) * vel;
     const played = this.sample(open ? 'hatOpen' : 'hat', t, level, 0.36);
     if (!open) return;
     const live = played instanceof GainNode;
@@ -125,11 +133,11 @@ export class DrumKit {
   }
 
   shaker(t: number, vel: number): void {
-    this.sample('shaker', t, 0.8 * vel, -0.38);
+    this.sample('shaker', t, 0.65 * vel, -0.38);
   }
 
   tambourine(t: number, vel: number): void {
-    this.sample('tamb', t, 0.54 * vel, 0.42);
+    this.sample('tamb', t, 0.45 * vel, 0.42);
   }
 
   tom(t: number, vel: number, which: 1 | 2 | 3): void {
@@ -137,11 +145,11 @@ export class DrumKit {
   }
 
   crash(t: number, vel: number): void {
-    this.sample('crash', t, 0.25 * vel, -0.2);
+    this.sample('crash', t, 0.21 * vel, -0.2);
   }
 
   ride(t: number, vel: number): void {
-    this.sample('ride', t, 0.21 * vel, 0.32);
+    this.sample('ride', t, 0.18 * vel, 0.32);
   }
 
   /** Reverse-cymbal swell that lands exactly on `t + dur` (section transitions, stingers). */
@@ -188,6 +196,6 @@ export class DrumKit {
 
   /** Two-square disco cowbell (lives in 0.5–3 kHz, cuts through a busy mix). */
   cowbell(t: number, vel: number): void {
-    this.sample('cowbell', t, 1.3 * vel, 0.22);
+    this.sample('cowbell', t, 0.55 * vel, 0.22);
   }
 }

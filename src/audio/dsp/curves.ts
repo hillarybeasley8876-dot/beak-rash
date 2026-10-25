@@ -1,6 +1,5 @@
-// Static curves and buffers: soft-clip / drive shaper curves, reverb impulse responses and
-// periodic waves (impulse train, narrow pulse). All cached per audio context.
-import { Rng } from '../../core/rng';
+// Static curves: soft-clip / drive shaper curves and periodic waves (impulse train, narrow pulse,
+// layered / mixed oscillator spectra). Waves are cached per audio context.
 
 /**
  * Master safety clipper. Domain [-1, 1] represents input [-2, 2] (feed it through a 0.5 gain):
@@ -29,45 +28,6 @@ export function driveCurve(amount: number, n = 2048): Float32Array<ArrayBuffer> 
   return curve;
 }
 
-/**
- * Stereo reverb impulse: early reflections + exponentially decaying noise whose brightness
- * falls over time (one-pole low-pass with a closing cutoff), so tails sound warm, not hissy.
- */
-export function impulseResponse(
-  ctx: BaseAudioContext, seconds: number, rt60: number,
-  opts: { preDelay?: number; bright?: number; seed?: number; channels?: 1 | 2 } = {},
-): AudioBuffer {
-  const sr = ctx.sampleRate;
-  const len = Math.floor(sr * seconds);
-  const channels = opts.channels ?? 2;
-  const buf = ctx.createBuffer(channels, len, sr);
-  const pre = Math.floor((opts.preDelay ?? 0.012) * sr);
-  const bright = opts.bright ?? 0.6;
-  for (let ch = 0; ch < channels; ch++) {
-    const rng = new Rng((opts.seed ?? 77) + ch * 131);
-    const d = buf.getChannelData(ch);
-    let lp = 0;
-    for (let i = pre; i < len; i++) {
-      const t = (i - pre) / sr;
-      const amp = Math.pow(10, (-3 * t) / rt60);
-      const cutoff = bright * Math.exp(-t * 2.2) + 0.04; // one-pole coefficient, closes over time
-      lp += cutoff * ((rng.next() * 2 - 1) - lp);
-      d[i] = lp * amp;
-    }
-    for (let k = 0; k < 7; k++) {
-      const at = pre + Math.floor(rng.range(0.004, 0.07) * sr);
-      if (at < len) d[at] = (d[at] ?? 0) + rng.range(0.25, 0.6) * (rng.chance(0.5) ? 1 : -1);
-    }
-    let peak = 0;
-    for (let i = 0; i < len; i++) peak = Math.max(peak, Math.abs(d[i] ?? 0));
-    const fade = Math.floor(sr * 0.05);
-    for (let i = 0; i < len; i++) {
-      const tail = i > len - fade ? (len - i) / fade : 1;
-      d[i] = ((d[i] ?? 0) / (peak || 1)) * 0.6 * tail;
-    }
-  }
-  return buf;
-}
 
 const waves = new WeakMap<BaseAudioContext, Map<string, PeriodicWave>>();
 

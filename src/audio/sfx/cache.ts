@@ -8,8 +8,8 @@
 import { Rng } from '../../core/rng';
 import type { SfxFn } from './kit';
 
-/** Total cached audio (s, all takes): bounds memory (≈ 128 kB per mono second at 32 kHz). */
-const BUDGET_S = 110;
+/** Total cached audio (s, all takes): bounds memory (≈ 128 kB per mono second at 32 kHz; 160 s ≈ 20 MB). */
+const BUDGET_S = 160;
 /** Sounds shorter than this get the TAKE_PITCHES takes (noise offsets differ), longer ones one. */
 const SHORT_S = 0.9;
 const TAKE_PITCHES = [1, 0.97, 1.03];
