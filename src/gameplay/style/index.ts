@@ -6,6 +6,7 @@ import type { RiderId } from '../../core/types';
 import type { SessionModuleLike } from '../session-module';
 import { driftAction, fixedAction, hitAction, trickAction, type StyleAction } from './actions';
 import { StyleChain } from './chain';
+import { createTrackStyle } from './track-events';
 import { CHAIN_WINDOW, COINS_PER_POINT, SP_CAP, SP_PER_POINT } from './tuning';
 
 export function createStyle(app: AppContext): SessionModuleLike {
@@ -52,6 +53,10 @@ export function createStyle(app: AppContext): SessionModuleLike {
     if (session.time - lastAt > CHAIN_WINDOW) bank(false);
   };
 
+  // The set pieces on the road (the roadblock gap, the goose flock, the fruit stalls) score through their
+  // own events, but the player has to reach them: the crossings are checked every frame.
+  const track = createTrackStyle({ bus: app.bus, session: () => session, score });
+
   const listen = (): Array<() => void> => {
     const bus = app.bus;
     return [
@@ -85,13 +90,14 @@ export function createStyle(app: AppContext): SessionModuleLike {
         const me = e.results.find((r) => r.isPlayer);
         if (me && best > 0) me.styleBest = best;
       }),
-    ];
+    ].concat(track.listen());
   };
 
   const detach = (): void => {
     for (const off of offs) off();
     offs = [];
     chain.reset();
+    track.reset();
     session = null;
   };
 
@@ -104,6 +110,6 @@ export function createStyle(app: AppContext): SessionModuleLike {
     offs = listen();
   };
 
-  // core calls update() once per frame after the session stepped: one compare, no allocation.
-  return { attach, update: checkTimeout, dispose: detach };
+  // core calls update() once per frame after the session stepped: the chain timeout and the road spots.
+  return { attach, update: () => { checkTimeout(); track.update(); }, dispose: detach };
 }
