@@ -4,11 +4,12 @@
 // -> shots/fx/acc1/<track>-<variant><tag>/NN-<ms>.png, sheet.jpg (contact sheet), log.txt
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { withPage } from '../tools/lib.mjs';
 
 const [track = 'coast', variant = 'ko', extra = '', tag = ''] = process.argv.slice(2);
-const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, 'shots/fx/acc1', `${track}-${variant}${tag}`);
 fs.mkdirSync(OUT, { recursive: true });
 const TIMES = (process.env.TIMES ?? '').split(',').filter(Boolean).map(Number);
@@ -87,7 +88,7 @@ await withPage(async (page, h) => {
   log.push('events ' + JSON.stringify(await page.evaluate(() => window.__acc.ev)));
   log.push('errors ' + JSON.stringify(await h.errors()).slice(0, 1500));
   log.push('logs ' + h.logs.slice(0, 10).join('\n').slice(0, 1500));
-  execFileSync('python3', [path.join(ROOT, 'sandbox/fx.grid.py'), path.join(OUT, 'sheet.jpg'), '4', '480', ...files]);
+  execFileSync(process.platform === 'win32' ? 'python' : 'python3', [path.join(ROOT, 'sandbox/fx.grid.py'), path.join(OUT, 'sheet.jpg'), '4', '480', ...files]);
 }, { size: '1920x1080' });
 fs.writeFileSync(path.join(OUT, 'log.txt'), log.join('\n'));
 console.log(log.join('\n'));

@@ -39,7 +39,7 @@ const res = await withPage(async (page, h) => {
 }, { size: a.size ?? '1920x1080' });
 console.log(JSON.stringify(res));
 if (files.length) {
-  execFileSync('python3', ['-c', `
+  execFileSync(process.platform === 'win32' ? 'python' : 'python3', ['-c', `
 import sys
 from PIL import Image
 fs = sys.argv[2:]; cols = 2 if len(fs) > 1 else 1; w = 640; h = 360
