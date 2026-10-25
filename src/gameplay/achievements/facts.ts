@@ -30,6 +30,9 @@ export interface RaceFacts {
   robbedBy: Map<RiderId, number>; // seagull id → sim time it robbed the player
   passes: PassWindow[];
   chase: { active: boolean; busted: boolean };
+  wanted3: boolean;        // the player's wanted stars reached ★3 (police 2.0, SPEC §14)
+  alliance: boolean;       // an alliance formed against the player (SPEC §18)
+  events: number;          // track events that started in this race (SPEC §19)
 }
 
 export function newFacts(): RaceFacts {
@@ -40,6 +43,7 @@ export function newFacts(): RaceFacts {
     wing: { active: false, hits: new Set() },
     ult: { at: -Infinity, victims: new Set(), kos: 0 },
     robbedBy: new Map(), passes: [], chase: { active: false, busted: false },
+    wanted3: false, alliance: false, events: 0,
   };
 }
 

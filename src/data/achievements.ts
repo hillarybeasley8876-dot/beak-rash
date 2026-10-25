@@ -55,6 +55,38 @@ const DEFS = {
   career: { name: '大嘴吃四方', desc: '巡回赛三个杯赛全部通关', icon: '终' },
   veteran: { name: '风雨无阻', desc: '累计完成 20 场比赛', icon: '雨' },
   kos100: { name: '百鸟朝凤', desc: '累计击倒 100 名对手', icon: '百' },
+  // ---- r4: air tricks & STYLE chains (SPEC §16–§17)
+  backflip: { name: '鹈鹕后空翻', desc: '一次后空翻，稳稳落地', icon: '空' },
+  trick_combo: { name: '花活三连', desc: '一次腾空连做三个特技并落地', icon: '连' },
+  superman: { name: '超鹕', desc: '摆出超人姿势，落地前收回车把', icon: '超' },
+  style_5k: { name: '浪到飞起', desc: '一次 STYLE 连段拿下 5,000 分', icon: '浪' },
+  style_broken: { name: '煮熟的鸭子飞了', desc: '2,000 分以上的 STYLE 连段被打断', icon: '煮' },
+  // ---- r4: police 2.0 & the pan (SPEC §14–§15)
+  corgi_down: { name: '柯基下班了', desc: '把柯基警官打得提前下班', icon: '班' },
+  parry: { name: '当！', desc: '用平底锅完美格挡一次', icon: '当' },
+  wanted3: { name: '法外狂鹕', desc: '被通缉到三颗星，还把警察甩掉了', icon: '星' },
+  bribe: { name: 'V我50', desc: '柯基警官收下了你的 50 小鱼干', icon: '贿' },
+  // ---- r4: rivals & alliances (SPEC §18)
+  nemesis: { name: '冤冤相报', desc: '击倒找你寻仇的宿敌', icon: '仇' },
+  alliance_break: { name: '塑料友谊', desc: '围剿你的联盟自己打起来了', icon: '塑' },
+  alliance_win: { name: '以一敌三', desc: '被围剿的比赛照样夺冠', icon: '围' },
+  // ---- r4: track events (SPEC §19)
+  event_survivor: { name: '见怪不怪', desc: '一场遇上两次赛道突发事件也没翻车', icon: '怪' },
+  // ---- r4: maps & modes (SPEC §20)
+  watertown: { name: '江南第一鹕', desc: '在江南水乡夺冠', icon: '江' },
+  gobi: { name: '大漠孤鹕', desc: '在戈壁公路夺冠', icon: '漠' },
+  reverse: { name: '倒反天罡', desc: '在反向赛道夺冠', icon: '倒' },
+  snow: { name: '踏雪寻鱼', desc: '在雪天夺冠', icon: '雪' },
+  route: { name: '天马行空', desc: '在随机路线上夺冠', icon: '路' },
+  llm_win: { name: '幻觉加速', desc: '骑大模型限定款夺冠', icon: '幻' },
+  // ---- r4: easter eggs (SPEC §21)
+  ducks: { name: '这是鸭子不是鹈鹕', desc: '五条赛道的路边，各藏着一只', icon: '鸭' },
+  svg: { name: '致敬原作', desc: '有幅画画歪了。扔点什么过去', icon: '画' },
+  goose_poem: { name: '鹅鹅鹅', desc: '对着鹅霸，把车铃按得像诗一样', icon: '诗' },
+  sloth_wait: { name: '你也不急？', desc: '比树懒还沉得住气', icon: '等' },
+  pelican_god: { name: '心诚则灵', desc: '抬头看云。看到了，就摇铃', icon: '神' },
+  konami: { name: '链条接在脖子上', desc: '↑↑↓↓……后面是什么来着？', icon: '码' },
+  eggs_all: { name: '彩蛋猎人', desc: '找到全部九个彩蛋', icon: '彩' },
 } satisfies Record<string, Omit<AchievementDef, 'id'>>;
 
 export type AchievementId = keyof typeof DEFS;

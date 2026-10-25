@@ -7,8 +7,12 @@ import type { AchievementId } from '../data/achievements';
 import { makeRuleCtx, newFacts, type RaceFacts } from './achievements/facts';
 import { careerRules } from './achievements/rules-career';
 import { combatRules } from './achievements/rules-combat';
+import { eggRules } from './achievements/rules-eggs';
+import { policeRules } from './achievements/rules-police';
 import { raceRules } from './achievements/rules-race';
+import { rivalRules } from './achievements/rules-rivals';
 import { rideRules } from './achievements/rules-ride';
+import { trickRules } from './achievements/rules-tricks';
 
 export interface AchievementSystem {
   /** Track a race (game.ts calls this next to ui.attach); null when the race is over or quit. */
@@ -59,7 +63,10 @@ export function createAchievements(app: AppContext): AchievementSystem {
     current = session;
     facts = newFacts();
     const ctx = makeRuleCtx(app, session, facts, (id) => unlock(session, id));
-    offs = [...raceRules(ctx), ...rideRules(ctx), ...combatRules(ctx), ...careerRules(ctx)];
+    offs = [
+      ...raceRules(ctx), ...rideRules(ctx), ...combatRules(ctx), ...careerRules(ctx),
+      ...trickRules(ctx), ...policeRules(ctx), ...rivalRules(ctx), ...eggRules(ctx),
+    ];
     // Registered last, so it runs after the rules' own race:end handlers: once results are final the
     // race can no longer earn anything (teardown events such as the police leaving are not "real").
     offs.push(app.bus.on('race:end', () => {

@@ -13,12 +13,13 @@ const ID = Object.fromEntries(FIELD.map((c, i) => [c, i]));
 const P = { x: 0, y: 0, z: 0 };
 
 /** Minimal AppContext + Session the rules need (bus, save, riders, places, time). */
-function makeWorld({ autopilot = false, bike = 'roadbike', stats = {}, config = {}, best = {}, achievements = [] } = {}) {
+function makeWorld({ autopilot = false, bike = 'roadbike', stats = {}, config = {}, best = {}, achievements = [], secrets = [], unlocks = [] } = {}) {
   const bus = new EventBus();
   const save = {
     data: {
       achievements: [...achievements], stats: { races: 0, wins: 0, kos: 0, wrecked: 0, busted: 0, distance: 0, ...stats },
       career: { unlocked: 1, best: { ...best } },
+      secrets: [...secrets], unlocks: [...unlocks],
     },
     update(fn) { fn(this.data); },
   };
@@ -28,7 +29,7 @@ function makeWorld({ autopilot = false, bike = 'roadbike', stats = {}, config = 
     return r;
   });
   const session = {
-    config: { autopilot, mode: 'quick', trackId: 'coast', level: 1, ...config }, riders, player: riders[0], phase: 'racing', time: 0,
+    config: { autopilot, mode: 'quick', trackId: 'coast', level: 1, playerBike: bike, ...config }, riders, player: riders[0], phase: 'racing', time: 0,
     rider: (id) => riders[id],
   };
   const app = { bus, save };
@@ -389,6 +390,111 @@ scenario('pigeon-and-sloth-passes', (expect) => {
   expect(!v.has('sloth'), 'a rival already ahead does not "pass" you');
 });
 
+// ---------------------------------------------------------------- r4: tricks, style, police, rivals, maps, eggs
+scenario('r4-tricks-and-style', (expect) => {
+  const w = makeWorld();
+  w.emit('rider:trick', { riderId: ID.goose, phase: 'land', kind: 'backflip', count: 3, points: 400 });
+  w.emit('rider:trick', { riderId: 0, phase: 'fail', kind: 'backflip', count: 1, points: 0 });
+  w.emit('style:bank', { riderId: 0, total: 4900, count: 6, sp: 20, coins: 19, broken: false });
+  w.emit('style:bank', { riderId: 0, total: 1900, count: 4, sp: 19, coins: 7, broken: true });
+  expect(!w.has('backflip') && !w.has('trick_combo') && !w.has('superman'), 'a rival\'s trick and a failed trick are not the player\'s');
+  expect(!w.has('style_5k') && !w.has('style_broken'), '4,900 unbroken and 1,900 broken are not enough');
+  w.emit('rider:trick', { riderId: 0, phase: 'land', kind: 'backflip', count: 1, points: 120 });
+  w.emit('rider:trick', { riderId: 0, phase: 'land', kind: 'spin', count: 3, points: 520 });
+  w.emit('rider:trick', { riderId: 0, phase: 'land', kind: 'superman', count: 1, points: 120 });
+  w.emit('style:bank', { riderId: 0, total: 5200, count: 9, sp: 25, coins: 20, broken: false });
+  w.emit('style:bank', { riderId: 0, total: 2400, count: 5, sp: 24, coins: 9, broken: true });
+  for (const id of ['backflip', 'trick_combo', 'superman', 'style_5k', 'style_broken']) expect(w.has(id), `missing ${id}`);
+});
+
+scenario('r4-police-2', (expect) => {
+  const w = makeWorld();
+  w.emit('police:down', { obstacleId: 900, attacker: ID.goose, pos: P });
+  w.emit('combat:parry', { riderId: ID.goose, attacker: 0, obstacleId: 901, weapon: 'pan', pos: P });
+  w.emit('police:wanted', { riderId: 0, level: 2, prev: 1 });
+  w.emit('police:alert', { riderId: 0, level: 0, reason: 'lost' });
+  w.emit('police:bribe', { riderId: 0, obstacleId: 900, amount: 50, accepted: false });
+  expect(!w.has('corgi_down') && !w.has('parry') && !w.has('wanted3') && !w.has('bribe'), 'the near misses unlock nothing');
+  w.emit('police:down', { obstacleId: 900, attacker: 0, pos: P });
+  w.emit('combat:parry', { riderId: 0, attacker: null, obstacleId: 901, weapon: 'pan', pos: P });
+  w.emit('police:wanted', { riderId: 0, level: 3, prev: 2 });
+  w.emit('police:alert', { riderId: 0, level: 0, reason: 'lost' });
+  w.emit('police:bribe', { riderId: 0, obstacleId: 902, amount: 50, accepted: true });
+  for (const id of ['corgi_down', 'parry', 'wanted3', 'bribe']) expect(w.has(id), `missing ${id}`);
+  const late = makeWorld();
+  late.emit('police:alert', { riderId: 0, level: 0, reason: 'lost' });      // lost before the stars came up
+  late.emit('police:wanted', { riderId: 0, level: 3, prev: 2 });
+  expect(!late.has('wanted3'), 'losing the police before ★3 is not a three-star escape');
+});
+
+scenario('r4-rivals', (expect) => {
+  const w = makeWorld();
+  w.emit('race:alliance', { phase: 'form', members: [ID.goose], target: 0, reason: 'leader' });
+  w.emit('race:alliance', { phase: 'break', members: [ID.goose], target: 0, reason: 'timeout' });
+  w.emit('race:nemesisDown', { riderId: ID.goose, attacker: ID.cat, bonus: 150 });
+  w.finish(2);
+  expect(!w.has('alliance_break') && !w.has('alliance_win') && !w.has('nemesis'), 'a timed-out alliance, a rival\'s KO and a 2nd place unlock nothing');
+  w.emit('race:nemesisDown', { riderId: ID.goose, attacker: 0, bonus: 150 });
+  w.emit('race:alliance', { phase: 'break', members: [ID.goose], target: 0, reason: 'betrayal' });
+  expect(w.has('nemesis') && w.has('alliance_break'), 'the nemesis goes down, the friendship breaks');
+  w.finish(1);
+  expect(w.has('alliance_win'), 'a win while they hunt you');
+});
+
+scenario('r4-track-events', (expect) => {
+  const w = makeWorld();
+  w.emit('race:event', { kind: 'fishSpill', phase: 'start', s: 400, pos: P });
+  w.emit('race:event', { kind: 'roadworks', phase: 'start', s: 1400, pos: P });
+  w.emit('rider:crash', { riderId: 0, cause: 'wall', speed: 12, pos: P, attacker: null });
+  w.finish(3);
+  expect(!w.has('event_survivor'), 'two events but a crash');
+  const one = makeWorld();
+  one.emit('race:event', { kind: 'fishSpill', phase: 'start', s: 400, pos: P });
+  one.emit('race:event', { kind: 'roadworks', phase: 'warn', s: 1400, pos: P });
+  one.finish(3);
+  expect(!one.has('event_survivor'), 'one started event is not two');
+  const clean = makeWorld();
+  clean.emit('race:event', { kind: 'fishSpill', phase: 'start', s: 400, pos: P });
+  clean.emit('race:event', { kind: 'roadworks', phase: 'start', s: 1400, pos: P });
+  clean.finish(3);
+  expect(clean.has('event_survivor'), 'two events and no crash');
+});
+
+scenario('r4-maps-and-modes', (expect) => {
+  const win = (config, bike) => { const w = makeWorld({ config, bike }); w.finish(1); return w; };
+  const second = (config, bike) => { const w = makeWorld({ config, bike }); w.finish(2); return w; };
+  const maps = [
+    ['watertown', { trackId: 'watertown' }],
+    ['gobi', { trackId: 'gobi' }],
+    ['reverse', { trackId: 'coast', reverse: true }],
+    ['snow', { trackId: 'mountain', weather: 'snow' }],
+    ['route', { trackId: 'city', route: 77 }],
+  ];
+  for (const [id, config] of maps) {
+    expect(!second(config).has(id), `${id}: 2nd place does not unlock it`);
+    expect(win(config).has(id), `${id}: a win unlocks it`);
+  }
+  expect(!second({}, 'llm').has('llm_win'), 'llm_win: 2nd place on the LLM bike does not unlock it');
+  expect(win({}, 'llm').has('llm_win'), 'llm_win: a win on the LLM bike unlocks it');
+  const plain = win({ trackId: 'coast' });
+  expect(!plain.has('watertown') && !plain.has('gobi') && !plain.has('reverse') && !plain.has('snow') && !plain.has('route'), 'a plain coast win is no map');
+});
+
+scenario('r4-eggs', (expect) => {
+  const w = makeWorld({ secrets: ['duck_coast', 'duck_city', 'duck_mountain', 'duck_watertown'] });
+  w.emit('secret:found', { id: 'duck_gobi', riderId: 0, pos: P, first: true });
+  expect(!w.has('ducks'), 'four ducks are not five');
+  w.save.update((d) => { d.secrets.push('duck_gobi', 'svg_city', 'goose_poem', 'sloth', 'pelican_god'); });
+  for (const id of ['duck_gobi', 'svg_city', 'goose_poem', 'sloth', 'pelican_god']) {
+    w.emit('secret:found', { id, riderId: 0, pos: P, first: true });
+  }
+  for (const id of ['ducks', 'svg', 'goose_poem', 'sloth_wait', 'pelican_god']) expect(w.has(id), `missing ${id}`);
+  expect(!w.has('konami') && !w.has('eggs_all'), 'no Konami bike, no nine eggs');
+  w.save.update((d) => { d.secrets.push('bribe', 'pelican_word', 'credits_thanks'); d.unlocks.push('llm'); });
+  w.emit('race:end', { results: [] });
+  expect(w.has('konami') && w.has('eggs_all'), 'the nine eggs and the Konami bike at the race end');
+});
+
 // ---------------------------------------------------------------- lifecycle & persistence
 scenario('no-unlocks-after-quit-or-in-autopilot', (expect) => {
   const w = makeWorld();
@@ -418,26 +524,27 @@ const endRace = (w, place) => w.emit('race:end', { results: FIELD.map((c, i) => 
   place: i === 0 ? place ?? 8 : i + 1, time: i === 0 && place === null ? null : 150 + i, kos: 0, wrecked: 0, coins: 0 })) });
 
 scenario('cup-and-career-clears', (expect) => {
+  // The ladder is three cups × five tracks now: a cup's last event is the fifth track (gobi).
   const career = (trackId, level) => ({ mode: 'career', trackId, level });
   const mid = makeWorld({ config: career('city', 1) });          // a cup's middle event
   endRace(mid, 1);
   const quick = makeWorld({ config: { mode: 'quick', trackId: 'mountain', level: 1 } });
   endRace(quick, 1);
-  const fourth = makeWorld({ config: career('mountain', 1) });   // the final, but 4th
+  const fourth = makeWorld({ config: career('gobi', 1) });       // the final, but 4th
   endRace(fourth, 4);
-  const dnf = makeWorld({ config: career('mountain', 1) });
+  const dnf = makeWorld({ config: career('gobi', 1) });
   endRace(dnf, null);
   expect([mid, quick, fourth, dnf].every((w) => !w.has('cup1')), 'no cup without a top-3 on its last event');
-  const cup1 = makeWorld({ config: career('mountain', 1) });
+  const cup1 = makeWorld({ config: career('gobi', 1) });
   endRace(cup1, 3);
   expect(cup1.has('cup1') && !cup1.has('cup2') && !cup1.has('career'), 'third on the 菜鸟杯 final clears it');
-  const last = makeWorld({ config: career('mountain', 3), best: { '1-mountain': 2, '2-mountain': 1 } });
+  const last = makeWorld({ config: career('gobi', 3), best: { '1-gobi': 2, '2-gobi': 1 } });
   endRace(last, 1);
   expect(['cup1', 'cup2', 'cup3', 'career'].every((id) => last.has(id)), `the last cup with two cleared before: all four (${last.save.data.achievements})`);
-  const old = makeWorld({ config: { mode: 'quick', trackId: 'coast', level: 1 }, best: { '1-mountain': 1, '2-mountain': 3, '3-mountain': 2 } });
+  const old = makeWorld({ config: { mode: 'quick', trackId: 'coast', level: 1 }, best: { '1-gobi': 1, '2-gobi': 3, '3-gobi': 2 } });
   endRace(old, 6);
   expect(['cup1', 'cup2', 'cup3', 'career'].every((id) => old.has(id)), 'a save that cleared the career before collects them at its next race end');
-  const twice = makeWorld({ config: career('mountain', 1), achievements: ['cup1'] });
+  const twice = makeWorld({ config: career('gobi', 1), achievements: ['cup1'] });
   endRace(twice, 1);
   expect(twice.events.length === 0 && twice.save.data.achievements.filter((id) => id === 'cup1').length === 1, 'cleared again: no second unlock');
 });
