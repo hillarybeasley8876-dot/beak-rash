@@ -73,19 +73,19 @@ export function market(d: Dress, s0: number, s1: number): void {
   const { ctx, place, rng, b } = d;
   for (let s = s0 + 4; s < s1 - 4; s += 5.2) {
     if (rng.chance(0.15)) continue;
-    const sp = place.spot(s, 1, 1.1);
+    const sp = place.spot(s, d.side(1), 1.1);
     if (!place.free(sp.pos.x, sp.pos.z, 1.9, 0.8)) continue;
     stall(b.props.at(sp.pos.x, sp.pos.z), sp.pos.x, sp.pos.y, sp.pos.z, sp.faceRoad, rng);
   }
-  villas(d, 1, s0 + 6, s1 - 6, 2);
+  villas(d, d.side(1), s0 + 6, s1 - 6, 2);
   walk(rng, s0, s1, 12, (s) => {
-    const sp = place.spot(s, -1, rng.range(3.2, 6));
+    const sp = place.spot(s, d.side(-1), rng.range(3.2, 6));
     if (sp.pos.y > -0.6 || !place.free(sp.pos.x, sp.pos.z, 2.6, 2.4)) return;
     fishingBoat(b.boats.at(sp.pos.x, sp.pos.z), sp.pos.x, sp.pos.z, sp.along + (rng.chance(0.5) ? 0 : Math.PI), rng);
   });
   // Pennant strings across the street between poles on both sides.
   for (let s = s0 + 30; s < s1 - 20; s += 45) {
-    const l = place.spot(s, -1, QUAY_POST_U), r = place.spot(s, 1, 0.5);
+    const l = place.spot(s, d.side(-1), QUAY_POST_U), r = place.spot(s, d.side(1), 0.5);
     const ly = ctx.q.toWorld(s, l.x, 0, new Vector3()).y;
     const a = new Vector3(l.pos.x, ly + 6.2, l.pos.z), bb = new Vector3(r.pos.x, r.pos.y + 6.2, r.pos.z);
     pennants(b.cloth.at(a.x, a.z), a, bb, 0.9, rng);

@@ -55,19 +55,21 @@ function riverGlowMat(c: City): MeshBasicMaterial {
 /** One continuous embankment under the far-bank towers with a lamp-lit promenade along its edge. */
 function embankment(c: City, s0: number, s1: number): void {
   const { ctx, b } = c.d;
+  // The river is on the left of the authored road; the mirrored road has it on the right (SPEC §20).
+  const mirror = ctx.mirror;
   for (let s = s0; s < s1; s += 24) {
     const fr = ctx.q.frameVis(s);
     const right = new Vector3(fr.right.x, 0, fr.right.z).normalize();
-    const edge = new Vector3(fr.pos.x, 0, fr.pos.z).addScaledVector(right, -EDGE_U);
-    if (!water(c, edge.x, edge.z) || !water(c, edge.x - right.x * 60, edge.z - right.z * 60)) continue;
+    const edge = new Vector3(fr.pos.x, 0, fr.pos.z).addScaledVector(right, -EDGE_U * mirror);
+    if (!water(c, edge.x, edge.z) || !water(c, edge.x - right.x * 60 * mirror, edge.z - right.z * 60 * mirror)) continue;
     const yaw = Math.atan2(right.x, right.z) + Math.PI;
-    const mid = edge.clone().addScaledVector(right, -DEPTH / 2);
+    const mid = edge.clone().addScaledVector(right, (-DEPTH / 2) * mirror);
     box(c.cb.far.at(mid.x, mid.z).setAux(0), trs(mid.x, BANK_Y / 2 - 0.5, mid.z, yaw, 26, BANK_Y + 1, DEPTH, m), CPAL.roof);
-    const rail = edge.clone().addScaledVector(right, -0.6);
+    const rail = edge.clone().addScaledVector(right, -0.6 * mirror);
     box(b.glow.at(rail.x, rail.z), trs(rail.x, BANK_Y + 1.0, rail.z, yaw, 24.5, 0.08, 0.08, m), PROMENADE);
     for (const k of [-6, 6]) {
       const along = new Vector3(fr.tangent.x, 0, fr.tangent.z).normalize();
-      const lamp = rail.clone().addScaledVector(along, k).addScaledVector(right, -0.8);
+      const lamp = rail.clone().addScaledVector(along, k).addScaledVector(right, -0.8 * mirror);
       box(b.glow.at(lamp.x, lamp.z), trs(lamp.x, BANK_Y + 3.4, lamp.z, yaw, 0.4, 0.3, 0.4, m), LAMP);
     }
   }
@@ -77,6 +79,7 @@ function embankment(c: City, s0: number, s1: number): void {
 export async function farBank(c: City, tick: () => Promise<void>): Promise<number> {
   const { ctx } = c.d;
   const rng = c.d.rng.fork(0xba4c);
+  const mirror = ctx.mirror;   // the river swaps sides when the road is mirrored (SPEC §20)
   const streaks = new MeshBuf();
   let n = 0;
   for (const [s0, s1] of zoneRuns(ctx, ['drop', 'riverside', 'bridge'])) {
@@ -86,18 +89,18 @@ export async function farBank(c: City, tick: () => Promise<void>): Promise<numbe
       const right = new Vector3(fr.right.x, 0, fr.right.z).normalize();
       const along = new Vector3(fr.tangent.x, 0, fr.tangent.z).normalize();
       const u = rng.range(EDGE_U + 12, 420);
-      const p = new Vector3(fr.pos.x, 0, fr.pos.z).addScaledVector(right, -u);
-      if (!water(c, p.x, p.z) || !water(c, p.x + right.x * 60, p.z + right.z * 60)) continue;
+      const p = new Vector3(fr.pos.x, 0, fr.pos.z).addScaledVector(right, -u * mirror);
+      if (!water(c, p.x, p.z) || !water(c, p.x + right.x * 60 * mirror, p.z + right.z * 60 * mirror)) continue;
       const w = rng.range(18, 34), d = rng.range(16, 28), h = rng.chance(0.25) ? rng.range(80, 130) : rng.range(26, 70);
       const yaw = Math.atan2(right.x, right.z) + Math.PI; // front (local −Z) faces the road
       const buf = c.cb.far.at(p.x, p.z);
       skylineBlock(buf, p.x, BANK_Y, p.z, yaw, w, d, h, rng, c.cb.lights.at(p.x, p.z));
       if (h > 60) {
-        const top = trs(p.x - right.x * (d / 2), BANK_Y + h + 0.6, p.z - right.z * (d / 2), yaw, w + 0.4, 1.2, d + 0.4, m);
+        const top = trs(p.x - right.x * (d / 2) * mirror, BANK_Y + h + 0.6, p.z - right.z * (d / 2) * mirror, yaw, w + 0.4, 1.2, d + 0.4, m);
         box(c.d.b.glow.at(p.x, p.z), top, CROWNS[n % CROWNS.length] as Color);
       }
       const col = (STREAKS[n % STREAKS.length] as Color).clone().multiplyScalar(h > 60 ? 1.1 : 0.7);
-      streak(streaks, p.clone().addScaledVector(right, u - EDGE_U + 2), right, along, w * 0.55, EDGE_U - 50, col);
+      streak(streaks, p.clone().addScaledVector(right, (u - EDGE_U + 2) * mirror), right.clone().multiplyScalar(mirror), along, w * 0.55, EDGE_U - 50, col);
       n++;
       await tick();
     }

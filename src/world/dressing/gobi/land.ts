@@ -35,7 +35,7 @@ export function mesas(g: GobiCtx, s: number, side: -1 | 1, count: number): void 
 
 /** The salt pan: a wide white sheet on the lake bed, following the ground. */
 export function saltLake(g: GobiCtx, s: number, len: number): void {
-  const sp = g.place.spot(s, 1, 60);
+  const sp = g.place.spot(s, g.side(1), 60);
   const yaw = roadYaw(g, s);
   const dx = Math.cos(yaw), dz = Math.sin(yaw);
   const w = 320, d = len + 200;

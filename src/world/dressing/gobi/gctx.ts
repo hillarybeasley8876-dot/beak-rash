@@ -32,6 +32,8 @@ export interface GobiCtx {
   spin: Array<{ obj: Object3D; speed: number }>;
   /** Objects nodding about their Z axis every frame (pumpjack beams). */
   nod: Array<{ obj: Object3D; phase: number; amp: number; speed: number }>;
+  /** The side of the road a helper means, mirrored when the road runs the other way (SPEC §20). */
+  side(side: -1 | 1): -1 | 1;
   /** Draw a sign face once per key (repeated signs share their atlas cell). */
   face(key: string, draw: () => AtlasRect | null): AtlasRect | null;
 }
@@ -54,6 +56,7 @@ export function makeGobiCtx(ctx: WorldCtx, field: TerrainField, rng: Rng): GobiC
     faces: new GobiBatch(ctx, 'gobi-faces', group, { cell: 420, material: faceMat, outline: 0, castShadow: false, receiveShadow: false }),
     spin: [],
     nod: [],
+    side: (sd) => (sd * ctx.mirror) as -1 | 1,
     face(key, draw) {
       if (!cells.has(key)) cells.set(key, draw());
       return cells.get(key) ?? null;

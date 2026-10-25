@@ -20,9 +20,10 @@ export interface SideTable { left: SideSamples; right: SideSamples }
 /** Edges that end in a drop (the rider falls into the water) rather than a wall. */
 export const isWaterEdge = (e: EdgeKind): boolean => e === 'quay' || e === 'water';
 
-type SidePatch = Partial<Omit<SideDef, 'ground'>> & { ground?: Partial<GroundDef> };
+export type SidePatch = Partial<Omit<SideDef, 'ground'>> & { ground?: Partial<GroundDef> };
 
-const merge = (base: SideDef, p: SidePatch | undefined): SideDef =>
+/** A side profile with a patch merged onto it (the patch's fields win). */
+export const mergeSide = (base: SideDef, p: SidePatch | undefined): SideDef =>
   p ? { ...base, ...p, ground: { ...base.ground, ...(p.ground ?? {}) } } : base;
 
 function blendGround(a: GroundDef, b: GroundDef, t: number): GroundDef {
@@ -40,8 +41,8 @@ export function buildSides(def: LayoutDef, starts: number[], sMin: number, n: nu
   const keysL: SideDef[] = [], keysR: SideDef[] = [];
   let l = def.left, r = def.right;
   def.segments.forEach((g) => {
-    l = merge(l, g.left);
-    r = merge(r, g.right);
+    l = mergeSide(l, g.left);
+    r = mergeSide(r, g.right);
     keysL.push(l);
     keysR.push(r);
   });

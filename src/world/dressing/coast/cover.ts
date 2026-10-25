@@ -38,19 +38,19 @@ export function groundCover(d: Dress, s0: number, s1: number): void {
 export function oliveTerraces(d: Dress, s0: number, s1: number): void {
   const { place, rng, b, field } = d;
   for (let s = s0 + rng.range(0, 20); s < s1 - 30; s += rng.range(55, 85)) {
-    const g = field.ground(s, 1);
+    const g = field.ground(s, d.side(1));
     if (g.mat !== 'grass' || g.detached || !rng.chance(0.75)) continue;
     const len = Math.min(rng.range(36, 60), s1 - s);
     for (const u of [rng.range(12, 15), rng.range(21, 25), rng.range(30, 35)]) {
       let prev: Vector3 | null = null;
       for (let ss = s; ss <= s + len; ss += 4) {
-        const sp = place.spot(ss, 1, u - 1.4);
+        const sp = place.spot(ss, d.side(1), u - 1.4);
         const ok = sp.pos.y > 1 && !place.onRoad(sp.pos.x, sp.pos.z, 2) && place.claim(sp.pos.x, sp.pos.z, 0.5);
         if (ok && prev && Math.abs(sp.pos.y - prev.y) < 2.5) stoneWall(b.props.at(sp.pos.x, sp.pos.z), prev, sp.pos, 0.55);
         prev = ok ? sp.pos : null;
       }
       walk(rng, s, s + len, 5.5, (ss) => {
-        const sp = place.spot(ss, 1, u + rng.range(0.6, 2));
+        const sp = place.spot(ss, d.side(1), u + rng.range(0.6, 2));
         if (sp.pos.y < 1 || place.slopeRange(sp, 2, 2) > 2.5 || !place.free(sp.pos.x, sp.pos.z, 1.5)) return;
         oliveTree(b.props.at(sp.pos.x, sp.pos.z), sp.pos.x, sp.pos.y, sp.pos.z, rng, rng.range(0.85, 1.15));
       });

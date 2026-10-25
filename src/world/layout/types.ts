@@ -108,6 +108,11 @@ export interface LayoutDef {
   heading: number;
   /** Road elevation at s = 0 (m above sea level). */
   elevation: number;
+  /** World position of s = 0 (m). The forward layouts start at the origin; a reversed layout starts
+   *  at the forward finish, so the reversed road lies on the forward one (SPEC §20). */
+  origin?: { x: number; z: number };
+  /** True when this layout is the mirrored one (the same road driven the other way, SPEC §20). */
+  reversed?: boolean;
   halfWidth: number;
   /** Visual road before the start / after the finish (straight extrapolation, m). */
   pre: number;

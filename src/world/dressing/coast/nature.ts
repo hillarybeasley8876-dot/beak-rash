@@ -95,7 +95,7 @@ export function farForest(d: Dress, s0: number, s1: number): void {
   const { place, rng, b, field } = d;
   for (const side of [-1, 1] as const) {
     for (let s = s0; s < s1; s += 9) {
-      if (field.ground(s, side).mat === 'sand' && side < 0) continue;
+      if (field.ground(s, side).mat === 'sand') continue;   // the sea side has no forest
       const u = 50 + Math.pow(rng.next(), 1.3) * 230;
       const sp = place.spot(s + rng.range(-4, 4), side, u);
       if (sp.pos.y < 3) continue;

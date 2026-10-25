@@ -77,7 +77,7 @@ export async function streetWalls(c: City, tick: () => Promise<void>): Promise<v
     if (!def) continue;
     for (const side of [-1, 1] as const) {
       // Inside of the hairpin is the roundabout island.
-      if (z.name === 'hairpin' && side > 0) continue;
+      if (z.name === 'hairpin' && side * c.d.ctx.mirror > 0) continue;   // inside of the hairpin: the island
       let s = z.s0 + rng.range(0, 3);
       while (s < z.s1) {
         const k = ctx.q.frameVis(s).curvature;

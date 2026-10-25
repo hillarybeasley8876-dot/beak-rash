@@ -90,21 +90,21 @@ export async function dressCoast(ctx: WorldCtx, field: TerrainField): Promise<vo
   // Palm boulevards on the land side through town, lamps along promenades and quays.
   for (const name of ['promenade', 'village', 'sprint', 'finish']) {
     const z = zone(ctx, name);
-    if (z) palms(d, 1, z.s0, z.s1, 0.9, 2.2, 15);
+    if (z) palms(d, d.side(1), z.s0, z.s1, 0.9, 2.2, 15);
   }
   for (const name of ['promenade', 'village', 'sprint']) {
     const z = zone(ctx, name);
-    if (z) lamps(d, 1, z.s0, z.s1, 0.9, 30);
+    if (z) lamps(d, d.side(1), z.s0, z.s1, 0.9, 30);
   }
   const quay = zone(ctx, 'market');
-  if (quay) lamps(d, -1, quay.s0, quay.s1, QUAY_POST_U, 30, true);
+  if (quay) lamps(d, d.side(-1), quay.s0, quay.s1, QUAY_POST_U, 30, true);
   distanceMarkers(d);
   billboards(d, art);
   await breathe();
   ctx.progress(0.22);
   for (const z of ctx.L.zones) {
     if (TERRACE_ZONES.has(z.name)) oliveTerraces(d, z.s0, z.s1);
-    if (HEDGE_ZONES.has(z.name)) hedges(d, 1, z.s0, z.s1);
+    if (HEDGE_ZONES.has(z.name)) hedges(d, d.side(1), z.s0, z.s1);
   }
   hillsides(d, L.sMin, L.sMin + L.n - 1);
   await breathe();
@@ -112,7 +112,7 @@ export async function dressCoast(ctx: WorldCtx, field: TerrainField): Promise<vo
   // quality=low: no distant hill villages / mid-ground / groves and no ground cover (status: quality scaling).
   const low = ctx.quality === 'low';
   if (!low) {
-    hillVillages(d, villages);
+    hillVillages(d, villages, d.side(1));
     midGround(d, L.sMin, L.sMin + L.n - 1);
     farForest(d, L.sMin, L.sMin + L.n - 1);
     await breathe();
@@ -121,7 +121,7 @@ export async function dressCoast(ctx: WorldCtx, field: TerrainField): Promise<vo
   // zone() spans all zones of a name: 'cliff' covers both cliff runs and the calanque hairpin between them.
   for (const name of ['bay', 'hillside', 'cliff', 'crest', 'descent', 'chicane']) {
     const z = zone(ctx, name);
-    if (z) rocks(d, -1, z.s0, z.s1);
+    if (z) rocks(d, d.side(-1), z.s0, z.s1);
   }
   cragTops(d, L.sMin, L.sMin + L.n - 1);
   bridgeShores(d);
@@ -129,8 +129,8 @@ export async function dressCoast(ctx: WorldCtx, field: TerrainField): Promise<vo
   await breathe();
   ctx.progress(0.52);
   islands(d);
-  atSea(d, -1, L.sMin, L.sMin + L.n - 1, 70, 320, 130);
-  atSea(d, -1, L.sMin, L.sMin + L.n - 1, 25, 60, 260);
+  atSea(d, d.side(-1), L.sMin, L.sMin + L.n - 1, 70, 320, 130);
+  atSea(d, d.side(-1), L.sMin, L.sMin + L.n - 1, 25, 60, 260);
   gulls(d, flocks, d.rng);
   await breathe();
   ctx.progress(0.58);

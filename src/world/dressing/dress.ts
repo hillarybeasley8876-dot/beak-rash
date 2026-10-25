@@ -32,6 +32,9 @@ export interface Dress {
   atlas: SignAtlas;
   /** Atlas texture; flagged for upload once every face is drawn. */
   faceTex: CanvasTexture;
+  /** The side of the road a helper means, mirrored when the road runs the other way (SPEC §20): a
+   *  dressing that hard-codes "the sea is on the left" keeps pointing at the sea. */
+  side(side: -1 | 1): -1 | 1;
   /** Draw a sign face once per key (repeated signs share their atlas cell). */
   face(key: string, draw: () => AtlasRect | null): AtlasRect | null;
 }
@@ -67,7 +70,11 @@ export function makeDress(ctx: WorldCtx, field: TerrainField, atlas: SignAtlas, 
     if (!faces.has(key)) faces.set(key, draw());
     return faces.get(key) ?? null;
   };
-  return { ctx, field, place: new Placer(ctx, field), rng, b: makeBatches(ctx, faceTex), atlas, faceTex, face };
+  return {
+    ctx, field, place: new Placer(ctx, field), rng, b: makeBatches(ctx, faceTex), atlas, faceTex,
+    side: (sd) => (sd * ctx.mirror) as -1 | 1,
+    face,
+  };
 }
 
 /** Deferred atlas painted with fallback glyphs: repaint it once the fonts have loaded (unless disposed). */

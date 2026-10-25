@@ -9,6 +9,7 @@ import { BASE, parseArgs, withPage } from '../tools/lib.mjs';
 
 const a = parseArgs(process.argv.slice(2));
 const track = a.track ?? 'coast', step = Number(a.step ?? 4), skip = new Set(String(a.skip ?? '').split(','));
+const reverse = a.reverse === true || a.reverse === '1';   // SPEC §20: the mirrored road
 const LIMITS = { roadOff: 0.04, wallGapMin: -0.08, wallGapMax: 0.35, waterOpen: 1.0, intrude: 0.08, longTask: 150 };
 
 /** Page side: API, road, edge and curb checks. */
@@ -125,7 +126,7 @@ async function rebuildStall() {
 }
 
 const res = await withPage(async (page, h) => {
-  await page.goto(`${BASE}/sandbox/track.html?track=${track}&s=60`, { waitUntil: 'load', timeout: 60000 });
+  await page.goto(`${BASE}/sandbox/track.html?track=${track}&s=60${reverse ? '&reverse=1' : ''}`, { waitUntil: 'load', timeout: 60000 });
   await page.waitForFunction(() => window.__trk?.ready === true, null, { timeout: 60000 });
   const geo = await page.evaluate(geometryChecks, [step, LIMITS]);
   const intrude = skip.has('intrude') ? null : await page.evaluate(intrusionScan);
@@ -146,6 +147,6 @@ const fails = [
   stall && stall.worst > LIMITS.longTask && `rebuild: long task ${stall.worst} ms > ${LIMITS.longTask}`,
   ...res.console.filter((l) => l.startsWith('[pageerror]') || l.startsWith('[error]')),
 ].filter(Boolean);
-console.log(JSON.stringify({ track, road: geo.road, edges: geo.edges, curbs: geo.curbs, intrude, stall, samples: geo.samples }, null, 1));
+console.log(JSON.stringify({ track, reverse, road: geo.road, edges: geo.edges, curbs: geo.curbs, intrude, stall, samples: geo.samples }, null, 1));
 console.log(fails.length ? `AUDIT FAIL (${fails.length})\n- ${fails.join('\n- ')}` : 'AUDIT OK');
 process.exit(fails.length ? 1 : 0);

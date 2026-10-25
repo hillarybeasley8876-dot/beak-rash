@@ -22,6 +22,8 @@ export interface BuiltLayout {
   ux: Float32Array; uy: Float32Array; uz: Float32Array;   // up (incl. bank)
   rx: Float32Array; ry: Float32Array; rz: Float32Array;   // right
   curv: Float32Array; slope: Float32Array; bank: Float32Array;
+  /** Heading (rad) of every sample — the layout's turn, used to mirror a layout (layout/reverse.ts). */
+  hdg: Float64Array;
   /** Tunnel roof height above the road (0 = open sky). */
   roof: Float32Array;
   sides: SideTable;
@@ -78,14 +80,15 @@ export function buildLayout(def: LayoutDef): BuiltLayout {
     def, length, halfWidth: def.halfWidth, sMin, n,
     px: F64(), py: F64(), pz: F64(), tx: F32(), ty: F32(), tz: F32(), ux: F32(), uy: F32(), uz: F32(),
     rx: F32(), ry: F32(), rz: F32(), curv: F32(), slope: F32(), bank: F32(), roof: F32(),
+    hdg: new Float64Array(n),
     sides: buildSides(def, starts, sMin, n),
     segStart: starts, features: [], marks: [], zones: [],
   };
   // Integrate forward from s = 0 (substeps of 0.25 m, midpoint rule); the pre-start road is straight.
   const i0 = Math.round(-sMin);
-  let h = def.heading, x = 0, y = def.elevation, z = 0;
+  let h = def.heading, x = def.origin?.x ?? 0, y = def.elevation, z = def.origin?.z ?? 0;
   const SUB = 4, ds = 1 / SUB;
-  const heading = new Float64Array(n);
+  const heading = L.hdg;
   for (let i = i0; i < n; i++) {
     const s = sMin + i;
     const inTrack = s >= 0 && s <= length;

@@ -26,7 +26,7 @@ export function viaduct(c: City): void {
       const sa = rows[r] ?? 0, sb = rows[r + 1] ?? 0;
       q.frameVis(sa, fr);
       const buf = b.props.at(fr.pos.x, fr.pos.z);
-      const ground = c.d.place.spot(sa, 1, 0.5).pos.y;
+      const ground = c.d.place.spot(sa, c.d.side(1), 0.5).pos.y;
       const low = fr.pos.y - ground < DECK_T + 3.2;
       for (const side of [-1, 1] as const) {
         const x = side * (field.bound(sa, side) + 0.4);
@@ -52,7 +52,7 @@ function piers(c: City, s0: number, s1: number): void {
   const fr = ctx.q.frameVis(s0), p = new Vector3();
   for (let s = s0 + 12; s < s1 - 6; s += 26) {
     ctx.q.frameVis(s, fr);
-    const ground = c.d.place.spot(s, 1, 0.5).pos.y;
+    const ground = c.d.place.spot(s, c.d.side(1), 0.5).pos.y;
     const top = fr.pos.y - DECK_T;
     if (top - ground < 3.2) continue;
     const ry = Math.atan2(fr.tangent.x, fr.tangent.z);

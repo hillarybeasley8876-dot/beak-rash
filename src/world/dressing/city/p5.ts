@@ -89,10 +89,10 @@ export function p5Pylons(c: City): number {
   };
   const spots: Array<[number, -1 | 1]> = [];
   const blvd = at('boulevard'), scr = at('scramble'), approach = zoneRuns(ctx, ['avenue'])[1];
-  if (blvd) spots.push([blvd[0] + 70, 1], [blvd[0] + 205, -1]);
-  if (scr) spots.push([(scr[0] + scr[1]) / 2 - 34, -1], [(scr[0] + scr[1]) / 2 + 30, 1]);
+  if (blvd) spots.push([blvd[0] + 70, c.d.side(1)], [blvd[0] + 205, c.d.side(-1)]);
+  if (scr) spots.push([(scr[0] + scr[1]) / 2 - 34, c.d.side(-1)], [(scr[0] + scr[1]) / 2 + 30, c.d.side(1)]);
   // The sprint's sides are full of canyon scaffolds: its pylon stands on the avenue leading into it.
-  if (approach) spots.push([approach[1] - 30, -1]);
+  if (approach) spots.push([approach[1] - 30, c.d.side(-1)]);
   let n = 0;
   spots.forEach(([s, side], k) => {
     const sides: Array<-1 | 1> = [side, side < 0 ? 1 : -1];

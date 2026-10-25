@@ -33,7 +33,11 @@ export class MountainTerrain implements TerrainMod {
 
   constructor(private readonly field: TerrainField) {
     const L = field.L;
-    for (const [s, along, x, r, h] of LAKE_PEAKS) {
+    // The mirrored road (SPEC §20) runs the other way: the peaks sit at the mirrored s, still on the
+    // lake's side of the road.
+    const mirror = L.def.reversed === true;
+    for (const [s0, along, x, r, h] of LAKE_PEAKS) {
+      const s = mirror ? L.length - s0 : s0;
       const fr = field.q.frameVis(Math.min(s, L.sMin + L.n - 1)), a = flatAxes(fr);
       const wx = fr.pos.x + a.tx * along + a.rx * x, wz = fr.pos.z + a.tz * along + a.rz * x;
       const gap = roadDistance(L, wx, wz) - r;

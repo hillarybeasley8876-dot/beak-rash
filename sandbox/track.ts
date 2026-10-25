@@ -103,7 +103,8 @@ async function sheet(track: Track, list: number[]): Promise<void> {
 
 async function main(): Promise<void> {
   const id = (params.get('track') ?? 'coast') as TrackId;
-  const track = await createTrack(app, id, new Rng(Number(params.get('seed') ?? 1)));
+  const reverse = params.get('reverse') === '1';   // SPEC §20: the same road, driven the other way
+  const track = await createTrack(app, id, new Rng(Number(params.get('seed') ?? 1)), { reverse });
   scene.add(track.group);
   fogBackup = scene.fog;
   const s = Number(params.get('s') ?? 60), x = Number(params.get('x') ?? 2);
@@ -116,7 +117,7 @@ async function main(): Promise<void> {
     rebuild: async (): Promise<void> => {
       api.track.dispose();
       renderer.render(scene, camera);
-      api.track = await createTrack(app, id, new Rng(2));
+      api.track = await createTrack(app, id, new Rng(2), { reverse });
       scene.add(api.track.group);
     },
     /** Raycast through a screen pixel: names of the first hits (debugging stray geometry). */

@@ -44,7 +44,7 @@ export function roadsideTrees(d: Dress, s0: number, s1: number): void {
     while (s < s1) {
       const zone = zoneAt(ctx.L, s) ?? 'pines';
       const z = DENSITY[zone] ?? DENSITY.pines;
-      if (!z || z.spacing <= 0 || (z.only && z.only !== side)) { s += 8; continue; }
+      if (!z || z.spacing <= 0 || (z.only && z.only * ctx.mirror !== side)) { s += 8; continue; }
       s += (z.spacing / dens) * rng.range(0.6, 1.4);
       const g = field.ground(s, side);
       if (g.detached || ctx.q.edgeKindAt(s, side) === 'tunnel') continue;

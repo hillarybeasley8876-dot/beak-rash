@@ -26,6 +26,9 @@ export interface WorldCtx {
   readonly raceRng: Rng;
   readonly quality: Quality;
   readonly group: Group;
+  /** 1 = the authored direction, −1 = the mirrored road (SPEC §20). A dressing that hard-codes a side
+   *  (the sea on the left) multiplies it by this, so the scenery follows the road it is built on. */
+  readonly mirror: 1 | -1;
   /** Register a resource the track created; disposed with the track. */
   own<T extends Disposable>(res: T): T;
   /** One owned instance per key (shared textures/materials between builders). */

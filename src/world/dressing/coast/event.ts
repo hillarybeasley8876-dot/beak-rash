@@ -105,7 +105,7 @@ export function lighthouseAt(d: Dress, s: number, x: number): void {
 }
 
 export function pierAt(d: Dress, s: number): void {
-  const sp = d.place.spot(s, -1, 0.35);
+  const sp = d.place.spot(s, d.side(-1), 0.35);
   const y = d.ctx.q.toWorld(s, sp.x, 0, new Vector3()).y;
   // faceRoad turns local −Z toward the road, so local +Z (the pier's length) points out to sea.
   const yaw = sp.faceRoad;

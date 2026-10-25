@@ -115,8 +115,8 @@ export function roadSign(d: Dress, s: number, side: -1 | 1, sign: string): void 
     case 'sharp': signAt(d, s, side, warnFace(atlas, '弯', SHARP), 1.3, 1.5); break;
     case 'lighthouse': signAt(d, s, side, roadSignFace(atlas, '鹈鹕湾灯塔 ←'), 2.4, 1.5); break;
     case 'lanes':
-      signAt(d, s, 1, roadSignFace(atlas, laneR ?? '内卷车道 →'), 2.4, 1.5);
-      signAt(d, s, -1, roadSignFace(atlas, laneL ?? '← 躺平车道'), 2.4, 1.5);
+      signAt(d, s, d.side(1), roadSignFace(atlas, laneR ?? '内卷车道 →'), 2.4, 1.5);
+      signAt(d, s, d.side(-1), roadSignFace(atlas, laneL ?? '← 躺平车道'), 2.4, 1.5);
       break;
     default: console.warn('[track] unknown road sign', sign);
   }
@@ -140,7 +140,7 @@ export function distanceMarkers(d: Dress): void {
   const L = d.ctx.L.length;
   for (let togo = 500; togo < L - 100; togo += 500) {
     const s = L - togo;
-    const side: -1 | 1 = d.ctx.q.edgeKindAt(s, 1) === 'tunnel' ? -1 : 1;
+    const side: -1 | 1 = d.ctx.q.edgeKindAt(s, d.side(1)) === 'tunnel' ? d.side(-1) : d.side(1);
     if (d.ctx.q.edgeKindAt(s, side) === 'tunnel') continue;
     signAt(d, s, side, distanceFace(d.atlas, `${(togo / 1000).toFixed(1)} KM`), 1.2, 0.95, 0.9, 1.1);
   }

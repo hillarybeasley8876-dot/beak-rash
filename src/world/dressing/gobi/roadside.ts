@@ -120,7 +120,7 @@ export function distanceMarkers(g: GobiCtx): void {
   const L = g.ctx.L.length;
   for (let togo = 500; togo < L - 120; togo += 500) {
     const s = L - togo;
-    const side: -1 | 1 = g.ctx.q.edgeKindAt(s, 1) === 'stone' ? -1 : 1;
+    const side: -1 | 1 = g.ctx.q.edgeKindAt(s, g.side(1)) === 'stone' ? g.side(-1) : g.side(1);
     const yaw = towardRiders(g, s, side, 0.25);
     const sp = g.place.spot(s, side, clearU(g, s, side, yaw, 1.3));
     if (!g.place.claim(sp.pos.x, sp.pos.z, 0.6)) continue;

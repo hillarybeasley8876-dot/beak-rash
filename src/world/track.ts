@@ -14,6 +14,7 @@ import { buildSky } from './env/sky';
 import { buildLayout } from './layout/build';
 import { TrackQuery } from './layout/query';
 import { layoutFor } from './layouts';
+import { reverseLayout } from './layout/reverse';
 import { publishDebug } from './debug';
 import { installFogCull } from './lod';
 import { lookFor, roadLookFor } from './looks';
@@ -34,7 +35,8 @@ export async function createTrack(app: AppContext, id: TrackId, rng: Rng, opts?:
   const t0 = performance.now();
   warmBillboardArt();   // cached per page: downloads overlap the road / terrain stages
   const weather = resolveWeather(id, opts?.weather);   // SPEC §20: a track only builds the weathers it allows
-  const L = buildLayout(layoutFor(id));
+  const reverse = !!opts?.reverse;                      // SPEC §20: the same road, driven the other way
+  const L = buildLayout(reverse ? reverseLayout(layoutFor(id)) : layoutFor(id));
   const q = new TrackQuery(L);
   const group = new Group();
   group.name = `track:${id}`;
@@ -46,7 +48,7 @@ export async function createTrack(app: AppContext, id: TrackId, rng: Rng, opts?:
   };
   const { ctx, updaters, owned } = createCtx({
     app, id, L, q, look: weatherLook(lookFor(id), weather), rng: new Rng(hashString(`track:${id}`)), raceRng: rng.fork(0x7a3c),
-    quality: app.quality, group, progress: report,
+    quality: app.quality, group, progress: report, mirror: reverse ? -1 : 1,
   });
   addPuddles(ctx, weather);   // rain's standing water (features: the sim makes them slick)
   let restoreEnv: (() => void) | null = null;
@@ -110,7 +112,7 @@ export async function createTrack(app: AppContext, id: TrackId, rng: Rng, opts?:
     group,
     features: L.features,
     weather,
-    reverse: false,
+    reverse,
     route: 0,
     grip: gripFor(weather),
     frameAt: (s, out) => q.frameAt(s, out),

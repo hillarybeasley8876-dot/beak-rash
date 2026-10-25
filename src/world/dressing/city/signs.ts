@@ -39,7 +39,7 @@ function roadSigns(c: City): void {
   const zone = (name: string): number | null => zoneRuns(ctx, [name])[0]?.[0] ?? null;
   const subway = ctx.L.marks.find((m) => m.kind === 'subway')?.s ?? null;
   const at = (s0: number | null, ds: number, rect: AtlasRect | null, w: number, h: number): void => {
-    if (s0 !== null) sign(c, s0 + ds, 1, rect, w, h);
+    if (s0 !== null) sign(c, s0 + ds, c.d.side(1), rect, w, h);
   };
   const sharp = ROAD_SIGNS[8] ?? '急弯 别急';
   at(zone('boulevard'), 15, roundSignFace(atlas, '限速', small(limit, '看心情')), 1.4, 1.4);
