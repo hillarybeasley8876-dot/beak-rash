@@ -31,6 +31,7 @@ export function vertical(ctx: SimCtx, sr: SimRider, c: Controls, dt: number): vo
   if (r.airborne && !sr.airOwn) startAir(sr, 'external'); // e.g. combat set airborne for the ult
   if (!r.airborne) {
     sr.airOwn = false;
+    finishOnGround(r, dt);
     if (r.y > 0.05 || r.vy > 0.5) {
       startAir(sr, 'launch');
     } else if (c.hop && r.mode === 'racing') {
@@ -100,6 +101,10 @@ function land(ctx: SimCtx, sr: SimRider): void {
   if (power > 0) giveBoost(ctx, sr, 'land', power, time);
   else if (air >= T.hardLandAir) r.speed *= 1 - T.hardLandLoss;
   resetTrick(sr);
+  if (sr.finishing) {
+    r.trick = sr.finishing; // shown until its rotation completes (finishOnGround)
+    sr.finishing = null;
+  }
   if (perfect || sr.airKind === 'hop' || (air >= T.landEventMinAir && sr.airPeak >= T.landEventMinPeak)) {
     ctx.bus.emit('rider:land', { riderId: r.id, airTime: air, perfect });
   }
@@ -133,9 +138,17 @@ function judgeTrick(ctx: SimCtx, sr: SimRider): boolean {
     crashRider(ctx, sr, 'trick', null);
     return false;
   }
+  sr.finishing = trick; // done: it keeps turning its last degrees after touchdown (view only)
   r.trick = null;
   r.trickChain += 1;
   sr.lastTrick = kind;
   sr.supermanHold = -1;
   return true;
+}
+
+/** A trick that landed at ≥ snap finishes its rotation on the ground (visual only), then clears. */
+function finishOnGround(r: SimRider['r'], dt: number): void {
+  if (!r.trick) return;
+  r.trick.t += dt;
+  if (r.trick.t >= r.trick.dur) r.trick = null;
 }

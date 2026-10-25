@@ -3,7 +3,7 @@
 // the browser between stages (the loading screen keeps animating) and reports `flow:loading`.
 import { Group } from 'three';
 import { hashString, Rng } from '../core/rng';
-import type { AppContext, Track } from '../core/contracts';
+import type { AppContext, Track, TrackOptions } from '../core/contracts';
 import type { TrackId } from '../core/types';
 import { breathe } from './breathe';
 import { createCtx } from './ctx';
@@ -28,10 +28,12 @@ import { buildFarTerrain } from './terrain/far';
 import { TerrainField } from './terrain/field';
 import { makeGround } from './terrain/ground';
 import { buildNearTerrain } from './terrain/near';
+import { addPuddles, applyWeatherMaterials, gripFor, resolveWeather, weatherLook } from './weather';
 
-export async function createTrack(app: AppContext, id: TrackId, rng: Rng): Promise<Track> {
+export async function createTrack(app: AppContext, id: TrackId, rng: Rng, opts?: TrackOptions): Promise<Track> {
   const t0 = performance.now();
   warmBillboardArt();   // cached per page: downloads overlap the road / terrain stages
+  const weather = resolveWeather(id, opts?.weather);   // SPEC §20: a track only builds the weathers it allows
   const L = buildLayout(layoutFor(id));
   const q = new TrackQuery(L);
   const group = new Group();
@@ -43,9 +45,10 @@ export async function createTrack(app: AppContext, id: TrackId, rng: Rng): Promi
     app.bus?.emit('flow:loading', { progress: span.from + (span.to - span.from) * k, label: span.label });   // sandboxes have no bus
   };
   const { ctx, updaters, owned } = createCtx({
-    app, id, L, q, look: lookFor(id), rng: new Rng(hashString(`track:${id}`)), raceRng: rng.fork(0x7a3c),
+    app, id, L, q, look: weatherLook(lookFor(id), weather), rng: new Rng(hashString(`track:${id}`)), raceRng: rng.fork(0x7a3c),
     quality: app.quality, group, progress: report,
   });
+  addPuddles(ctx, weather);   // rain's standing water (features: the sim makes them slick)
   let restoreEnv: (() => void) | null = null;
   const teardown = (): void => {
     restoreEnv?.();
@@ -88,6 +91,7 @@ export async function createTrack(app: AppContext, id: TrackId, rng: Rng): Promi
     buildFeatures(ctx, field);
     await stage(0.62, 0.9, '摆摊中 PROPS', 'sea+edges+features');
     await dressingFor(id)(ctx, field);
+    applyWeatherMaterials(ctx, weather);   // wet asphalt (rain) / snow on the up-facing surfaces (snow)
     installFogCull(ctx, group);
     await stage(0.9, 0.9, '鹈鹕就位 READY', 'dressing');
   } catch (err) {
@@ -105,6 +109,10 @@ export async function createTrack(app: AppContext, id: TrackId, rng: Rng): Promi
     look: ctx.look,
     group,
     features: L.features,
+    weather,
+    reverse: false,
+    route: 0,
+    grip: gripFor(weather),
     frameAt: (s, out) => q.frameAt(s, out),
     toWorld: (s, x, y, out) => q.toWorld(s, x, y, out),
     project: (p, hintS) => q.project(p, hintS),

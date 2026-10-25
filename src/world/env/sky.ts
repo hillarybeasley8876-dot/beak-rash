@@ -1,7 +1,7 @@
 // Sky dome (gradient + sun disc/halo) and a ring of flat cartoon clouds. Both follow the camera so
 // they never get closer; drawn first (renderOrder) without depth so everything covers them.
 import {
-  BackSide, CanvasTexture, Color, DoubleSide, Mesh, MeshBasicMaterial, ShaderMaterial, SphereGeometry, SRGBColorSpace, Vector3,
+  BackSide, CanvasTexture, Color, DoubleSide, Material, Mesh, MeshBasicMaterial, ShaderMaterial, SphereGeometry, SRGBColorSpace, Vector3,
 } from 'three';
 import { Rng } from '../../core/rng';
 import type { WorldCtx } from '../ctx';
@@ -56,6 +56,8 @@ export function buildSky(ctx: WorldCtx): void {
   dome.name = 'sky';
   dome.renderOrder = -100;
   dome.frustumCulled = false;
+  // Kept so a weather build can put the look's own sky back (a track may swap the dome for its own).
+  dome.userData.lookMaterial = mat;
   ctx.group.add(dome);
   const clouds = buildClouds(ctx, sunDir);
   ctx.onUpdate((_dtSim, dtReal, camera) => {
@@ -63,6 +65,23 @@ export function buildSky(ctx: WorldCtx): void {
     clouds.position.copy(camera.position);
     clouds.rotation.y += dtReal * 0.0015;
   });
+}
+
+/**
+ * Put the look's own sky dome and cloud tint back. A track may swap the dome for a scene of its own
+ * (the mountain's golden hour); a weather build wants the plain look-driven sky instead.
+ */
+export function restoreLookSky(ctx: WorldCtx): void {
+  const dome = ctx.group.getObjectByName('sky');
+  if (dome instanceof Mesh) {
+    const own = dome.userData.lookMaterial;
+    if (own instanceof Material) dome.material = own;
+  }
+  const clouds = ctx.group.getObjectByName('clouds');
+  if (clouds instanceof Mesh && clouds.material instanceof MeshBasicMaterial) {
+    const tint = clouds.userData.lookTint;
+    if (tint instanceof Color) clouds.material.color.copy(tint);
+  }
 }
 
 /** Four cartoon cloud silhouettes drawn into one canvas (white body, sky-tinted shade band, soft outline). */
@@ -145,6 +164,7 @@ function buildClouds(ctx: WorldCtx, sunDir: Vector3): Mesh {
   mesh.name = 'clouds';
   mesh.renderOrder = -99;
   mesh.frustumCulled = false;
+  mesh.userData.lookTint = tint.clone();   // a weather build puts the look's cloud colour back
   ctx.group.add(mesh);
   return mesh;
 }
