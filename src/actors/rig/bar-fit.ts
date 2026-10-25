@@ -13,6 +13,7 @@ const FIT: Record<BikeId, readonly [number, number, number]> = {
   tandem: [0.032, 0, 0],
   erba: [0.016, 0, 0.026],      // swept city bars: end 5.5 cm out-and-back along the grip
   shared: [0.016, 0, 0.026],
+  llm: [0, 0, 0],               // the LLM edition starts from the roadbike's drop bar
 };
 
 /** Grip point for one hand in the marker's parent (steer) space. */

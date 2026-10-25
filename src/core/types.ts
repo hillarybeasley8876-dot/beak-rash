@@ -6,7 +6,8 @@ export type CharacterId =
   | 'pelican' | 'goose' | 'capybara' | 'cat' | 'shiba'
   | 'pigeon' | 'penguin' | 'seagull' | 'sloth' | 'corgi';
 
-export type BikeId = 'roadbike' | 'erba' | 'shared' | 'fixie' | 'mtb' | 'tandem' | 'kidbike';
+export type BikeId = 'roadbike' | 'erba' | 'shared' | 'fixie' | 'mtb' | 'tandem' | 'kidbike'
+  | 'llm'; // 大模型限定款: secret, unlocked by the Konami code (SPEC §21); not in BIKE_ORDER until unlocked
 export type TrackId = 'coast' | 'city' | 'mountain';
 export type WeaponId =
   | 'none' | 'saltfish' | 'baguette' | 'pan' | 'leek' | 'umbrella' | 'selfie' | 'slipper' | 'keyboard'

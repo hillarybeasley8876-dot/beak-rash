@@ -9,4 +9,5 @@ import { roadbike } from './roadbike';
 import { shared } from './shared';
 import { tandem } from './tandem';
 
-export const BIKE_DEFS: Record<BikeId, BikeDef> = { roadbike, erba, shared, fixie, mtb, tandem, kidbike };
+// llm (大模型限定款, SPEC §21) borrows the roadbike until its own model lands (r4 bike job).
+export const BIKE_DEFS: Record<BikeId, BikeDef> = { roadbike, erba, shared, fixie, mtb, tandem, kidbike, llm: roadbike };

@@ -53,6 +53,11 @@ export const BIKES: Record<BikeId, BikeDef> = {
     topSpeed: 16.5, accel: 7.4, handling: 1.4, brake: 14, weight: 0.6, durability: -15, offroad: 0.6,
     bars: { speed: 1, accel: 5, handling: 5, weight: 1, durability: 1 },
   },
+  llm: {
+    id: 'llm', name: '大模型限定款', blurb: '链条接在脖子上，这很合理。', price: 0,
+    topSpeed: 20.8, accel: 6.2, handling: 0.9, brake: 12, weight: 1, durability: 0, offroad: 0.35,
+    bars: { speed: 4, accel: 4, handling: 3, weight: 2, durability: 2 },
+  },
 };
 
 export const BIKE_ORDER: BikeId[] = ['roadbike', 'shared', 'kidbike', 'erba', 'mtb', 'fixie', 'tandem'];
