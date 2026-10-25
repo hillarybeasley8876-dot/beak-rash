@@ -65,6 +65,4 @@
 .eg-inc-t b { font: 400 30px/1 "Bangers", sans-serif; letter-spacing: 2px; color: var(--hot); }
 .eg-inc-t i { font: 400 18px/1 "ZCOOL QingKe HuangYou", sans-serif; font-style: normal; }
 .eg-inc-eta { min-width: 64px; text-align: right; font: 400 36px/1 "Anton", sans-serif; color: var(--sp); font-variant-numeric: tabular-nums; }
-@media (prefers-reduced-motion: reduce) {
-  .eg-police::before, .eg-police::after, .eg-chip .eg-lamp { animation: none; }
-}
+.brh.is-reduced .eg-police::before, .brh.is-reduced .eg-police::after, .brh.is-reduced .eg-chip .eg-lamp { animation: none; }

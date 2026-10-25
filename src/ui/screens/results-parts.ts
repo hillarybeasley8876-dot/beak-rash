@@ -4,7 +4,7 @@
 import type { RaceResult } from '../../core/contracts';
 import { Rng } from '../../core/rng';
 import { ROSTER } from '../../data/roster';
-import { GRADE_QUOTES } from '../../data/strings';
+import { GRADE_QUOTES, GRADE_QUOTES_PLACE } from '../../data/strings';
 import { fishSvg, h, headSvg, jagged, portrait, reducedMotion, starSvg, svg } from '../p5';
 import { ordinal, type Reward } from '../progress';
 
@@ -65,13 +65,17 @@ const INK_FILTER = `<svg width="0" height="0" aria-hidden="true"><filter id="br-
 <feDisplacementMap in="speckled" in2="warp" scale="4" xChannelSelector="R" yChannelSelector="G"/>
 </filter></svg>`;
 
-/** Grade quotes that claim the win ('你最快') only fit a 1st place (content request: place-tagged lines). */
+/** A line that claims the win ('你最快') never shows off a 1st place, whatever pool it sits in. */
 const CLAIMS_WIN = /最快|第一|冠军/;
 
+/** The grade's lines plus the ones written for this finish (win / podium), seeded by the race. */
 function gradeQuote(reward: Reward, seed: number): string | null {
-  const all = GRADE_QUOTES[reward.grade.grade];
-  const fit = reward.place === 1 ? all : all.filter((q) => !CLAIMS_WIN.test(q));
-  return pickLine(fit, seed);
+  const { grade } = reward.grade;
+  const place = reward.place;
+  const extra = GRADE_QUOTES_PLACE[grade];
+  const tagged = place === 1 ? extra?.win : place !== null && place <= 3 ? extra?.podium : undefined;
+  const all = [...GRADE_QUOTES[grade], ...(tagged ?? [])];
+  return pickLine(place === 1 ? all : all.filter((q) => !CLAIMS_WIN.test(q)), seed);
 }
 
 export function gradeBlock(reward: Reward, seed: number): HTMLDivElement {

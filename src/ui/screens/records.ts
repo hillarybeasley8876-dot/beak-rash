@@ -28,14 +28,19 @@ export function recordsSheet(save: SaveStore, onClose: () => void): RecordsSheet
   const got = ACHIEVEMENTS.filter((a) => earned.has(a.id)).length;
   const cups = ([1, 2, 3] as Tier[]).filter((t) => cupCleared(save, t)).length;
   const st = save.data.stats;
-  const facts: Array<[string, string]> = [
-    ['杯赛通关', `${cups}/3`], ['比赛', String(st.races)], ['冠军', String(st.wins)], ['击倒', String(st.kos)], ['被击倒', String(st.wrecked)], ['被抓', String(st.busted)],
+  // [label, value, hover note]: stats.wrecked counts KOs suffered (combat ko.ts), not every crash — the save
+  // keeps no crash count, so the cell says exactly what it counts.
+  const facts: Array<[string, string, string?]> = [
+    ['杯赛通关', `${cups}/3`], ['比赛', String(st.races)], ['冠军', String(st.wins)], ['击倒', String(st.kos)],
+    ['被击倒', String(st.wrecked), '被对手打下车的次数（自己翻车不算）'], ['被抓', String(st.busted)],
   ];
-  const sheet = h('div', { class: 'br-rec-sheet br-panel is-white', vars: { '--clip': jagged('recsheet', { jx: 1.5, jy: 2.5, notches: 2 }) } },
+  // Past 7 rows of 6 (the catalogue grows with cup / career goals) the cells tighten so the sheet still fits.
+  const dense = ACHIEVEMENTS.length > 42 ? ' is-dense' : '';
+  const sheet = h('div', { class: `br-rec-sheet br-panel is-white${dense}`, vars: { '--clip': jagged('recsheet', { jx: 1.5, jy: 2.5, notches: 2 }) } },
     h('div', { class: 'br-rec-head' },
       h('b', { text: '成就' }), h('span', { class: 'br-rec-en', text: 'RECORDS' }),
       h('span', { class: 'br-rec-count' }, h('b', { text: String(got) }), h('i', { text: `/${ACHIEVEMENTS.length}` })),
-      h('div', { class: 'br-rec-facts' }, ...facts.map(([k, v]) => h('span', {}, h('i', { text: k }), h('b', { text: v }))))),
+      h('div', { class: 'br-rec-facts' }, ...facts.map(([k, v, note]) => h('span', note ? { title: note } : {}, h('i', { text: k }), h('b', { text: v }))))),
     h('div', { class: 'br-rec-grid' }, ...ACHIEVEMENTS.map((a) => cell(a, earned.has(a.id)))),
     h('div', { class: 'br-rec-foot' }, ...keyGlyph('TAB', 'LB'), ...keyGlyph('ESC', 'B'), h('span', { text: '收起' })));
   const el = h('div', { class: 'br-rec' }, sheet);

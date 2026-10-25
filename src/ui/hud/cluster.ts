@@ -1,5 +1,6 @@
 // P5 battle-style cluster (bottom-right): tilted portrait card with mood swaps, name plate, HP bar
-// with a trailing damage chunk, SP bar that glows "SHOWTIME READY [P / R3]", skill diamonds, weapon slot.
+// with a trailing damage chunk, SP bar that glows "SHOWTIME READY [P / R3]" (a grey "SHOWTIME 无目标"
+// while nobody is in reach), skill diamonds, weapon slot.
 import './css/cluster.css';
 import { approach, clamp01 } from '../../core/math';
 import { ROSTER } from '../../data/roster';
@@ -51,6 +52,10 @@ export class Cluster {
     const ready = el('div', 'cl-ready', this.sp.row);
     setRansom(el('span', '', ready), 'SHOWTIME READY', { seed: 5, scheme: 'mix', tilt: 7 });
     keyGlyphs(el('kbd', '', ready), 'ult');
+    // Full SP with nobody in reach (combat's ultTarget): no glow, no key — a P press would be denied.
+    const idle = el('span', 'cl-idle', ready);
+    el('b', '', idle, 'SHOWTIME');
+    el('i', '', idle, '无目标');
     this.weapon = new WeaponSlot(this.root);
     this.cast = new CastTag(this.root);
     const wrap = el('div', 'cl-pc-wrap', this.root);
@@ -117,7 +122,6 @@ export class Cluster {
       this.sp.val.text(String(spInt));
       this.sp.fill.tf(`scaleX(${(spInt / 100).toFixed(3)})`);
     }
-    this.rootW.cls('is-full', r.sp >= this.skills.ultCostSp);
     this.rootW.cls('is-low', frac < 0.3 && r.mode !== 'crashed');
     const down = r.mode === 'crashed' || r.mode === 'busted';
     this.card.setMood(down || this.hitT < 0.7 || frac < 0.25 ? 'hurt' : this.smugT < 1.6 ? 'smug' : 'main');
@@ -125,6 +129,9 @@ export class Cluster {
     this.cardWrap.tf(sx !== 0 ? `translateX(${sx.toFixed(1)}px)` : 'none');
     this.hurtW.op(this.hitT < 0.3 ? 0.55 * (1 - this.hitT / 0.3) : down ? 0.35 : 0);
     this.skills.update(r, dt);
+    const ult = this.skills.ultState;
+    this.rootW.cls('is-full', ult !== 'charging');
+    this.rootW.cls('is-idle', ult === 'idle');
     this.weapon.update(r, dt);
     this.cast.update(dt);
   }

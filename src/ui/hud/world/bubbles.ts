@@ -1,4 +1,5 @@
-// Taunt speech bubbles (P5 jagged, `taunt` events from rivals; the player's own lines go to the quip).
+// Taunt speech bubbles (P5 jagged, `taunt` events from rivals; the player's own lines go to the quip), and
+// `npc:say` lines from speakers that ride an Obstacle instead of being riders (the police corgi).
 // One layout pass per frame: a bubble sits above its speaker's drawn name tag (or head) and settles
 // clear of tags, other bubbles, the static HUD modules, the quip and the chip column, nearest speaker
 // first; at most two float at once (later lines wait briefly, nearest first). Speakers off screen or
@@ -8,7 +9,7 @@ import { Vector3 } from 'three';
 import { clamp01, damp } from '../../../core/math';
 import { ROSTER } from '../../../data/roster';
 import type { Session } from '../../../core/contracts';
-import type { RiderId } from '../../../core/types';
+import type { CharacterId, RiderId } from '../../../core/types';
 import { slam } from '../anim';
 import { el, px, w, type W } from '../dom';
 import { boxAt, overlaps, settle, type Bounds, type Rect } from './avoid';
@@ -29,12 +30,15 @@ const GAP = 14;
 const DOCK_BASE = 430; // px above the bottom edge where docked stacks start (over the corner modules)
 const FALLBACK_W = 280;
 const FALLBACK_H = 64;
+/** m above an npc's obstacle (its collision height ≈ the speaker's head) where the tail points. */
+const NPC_LIFT = 0.35;
 
 type State = 'off' | 'wait' | 'on';
 
 interface Bubble {
   root: W; inner: W; text: W; who: W; tail: W;
-  rider: RiderId; state: State; t: number; wait: number;
+  /** The speaker: a session rider, or (npc ≥ 0, rider −1) the id of the Obstacle a non-rider rides. */
+  rider: RiderId; npc: number; state: State; t: number; wait: number;
   pt: ScreenPoint; depth: number; docked: boolean; left: boolean;
   /** Unscaled box size, measured when the line is set (in the bus handler, never per frame). */
   w: number; h: number;
@@ -73,7 +77,7 @@ export class Bubbles {
       const tail = el('div', 'tb-tail', inner);
       this.pool.push({
         root: w(root), inner: w(inner), text: w(text), who: w(who), tail: w(tail),
-        rider: -1, state: 'off', t: 0, wait: 0, pt: newPoint(), depth: 0, docked: false, left: false,
+        rider: -1, npc: -1, state: 'off', t: 0, wait: 0, pt: newPoint(), depth: 0, docked: false, left: false,
         w: 0, h: 0, x: 0, y: 0, tailOn: false, dockY: NaN, rect: { l: 0, r: 0, t: 0, b: 0 },
       });
     }
@@ -81,10 +85,18 @@ export class Bubbles {
 
   show(session: Session, rider: RiderId, text: string): void {
     const r = session.rider(rider);
-    if (!r) return;
+    if (r) this.say(rider, -1, r.isPlayer ? '你' : ROSTER[r.character].name, text);
+  }
+
+  /** npc:say — `character` speaks from obstacle `obstacleId` (followed by id each frame, dropped once gone). */
+  showNpc(session: Session, obstacleId: number, character: CharacterId, text: string): void {
+    if (session.obstacles.some((o) => o.id === obstacleId && o.active)) this.say(-1, obstacleId, ROSTER[character].name, text);
+  }
+
+  private say(rider: RiderId, npc: number, who: string, text: string): void {
     // Same speaker → new line in place; else a free bubble; else bump the farthest queued line; else the oldest.
     const waiting = this.pool.filter((x) => x.state === 'wait');
-    const b = this.pool.find((x) => x.state !== 'off' && x.rider === rider)
+    const b = this.pool.find((x) => x.state !== 'off' && x.rider === rider && x.npc === npc)
       ?? this.pool.find((x) => x.state === 'off')
       ?? (waiting.length ? waiting.reduce((a, x) => (x.depth > a.depth ? x : a)) : null)
       ?? this.pool.reduce((a, x) => (x.t > a.t ? x : a));
@@ -94,9 +106,11 @@ export class Bubbles {
     }
     b.wait = 0;
     b.rider = rider;
+    b.npc = npc;
     b.t = 0;
     b.text.text(text);
-    b.who.text(r.isPlayer ? '你' : ROSTER[r.character].name);
+    b.who.text(who);
+    b.root.cls('is-npc', npc >= 0);
     // Measured here, in the bus handler (layout is clean apart from this text), not inside update().
     const node = b.inner.node as HTMLElement;
     b.w = node.offsetWidth || FALLBACK_W;
@@ -141,15 +155,27 @@ export class Bubbles {
   /** Project the speaker; false (and hidden) once the speaker is gone or invisible. Docks speakers off
    *  screen or inside the keep-clear area above the vanishing point. */
   private track(b: Bubble, session: Session, proj: Projector, zones: HudZones): boolean {
-    const r = session.rider(b.rider);
-    if (!r || r.mods.invisible) {
+    if (!this.anchor(b, session, proj)) {
       this.off(b);
       return false;
     }
-    proj.project(proj.riderHead(session, r, r.isPlayer ? 0.7 : 0.45, this.v), b.pt);
     b.docked = !b.pt.onScreen || inside(b.pt.x, b.pt.y, zones.centre);
     b.left = b.pt.x < proj.width / 2;
     b.depth = b.pt.depth > 0 ? b.pt.depth : 1e4;
+    return true;
+  }
+
+  /** Project the speaker's head into b.pt: a rider's head anchor, or the top of an npc's obstacle. */
+  private anchor(b: Bubble, session: Session, proj: Projector): boolean {
+    if (b.npc >= 0) {
+      const o = session.obstacles.find((x) => x.id === b.npc);
+      if (!o || !o.active) return false;
+      proj.project(session.track.toWorld(o.s, o.x, o.height + NPC_LIFT, this.v), b.pt);
+      return true;
+    }
+    const r = session.rider(b.rider);
+    if (!r || r.mods.invisible) return false;
+    proj.project(proj.riderHead(session, r, r.isPlayer ? 0.7 : 0.45, this.v), b.pt);
     return true;
   }
 

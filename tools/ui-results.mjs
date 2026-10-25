@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 // Results-screen check (ui-screens): the REAL achievements system (gameplay/achievements) unlocks + saves,
 // the results screen shows what it announced. Race 1: four player KOs in 2.4 s (goose first) → chips show
-// three + "+N"; race 2 (no events) → "本场无新成就" (the previous race's unlocks must not leak in).
+// three + "+N"; race 2 (no events) → "本场无新成就" (the previous race's unlocks must not leak in). Then the
+// grade table (3rd with 8 KOs is A, not S; a win is A, S with KOs or a clear lead) and place-fit grade quotes.
 // Other units run as core stubs by default (`--real` for every real unit). Exits 1 on any failed check.
-//   node tools/ui-results.mjs [--real]
+//   node tools/ui-results.mjs [--real] [--out shots/ui-screens]
 import fs from 'node:fs';
 import { parseArgs, withPage } from './lib.mjs';
 
 const args = parseArgs(process.argv.slice(2));
 const STUB = args.real ? '' : '&stub=world,sim,camera,actors,combat,race,fx,audio';
-const OUT = 'shots/ui-screens';
+const OUT = args.out ?? 'shots/ui-screens';
 const RIVALS = ['goose', 'cat', 'shiba', 'pigeon', 'seagull', 'sloth', 'capybara'];
 const problems = [];
 const expect = (ok, what) => {
@@ -83,6 +84,30 @@ await withPage(async (page, h) => {
   expect(b.ui.chips.length === Math.min(3, gained.length), `chips only for this race's unlocks (${gained.join(',') || 'none'})`);
   expect(gained.length > 0 || b.ui.none, '"本场无新成就" when nothing unlocked');
   expect(b.ui.errors.length === 0, `no console errors ${b.ui.errors.slice(-2).join(' | ')}`);
+
+  // Grades (ui/progress.ts gradeFor): KOs lift a grade but never buy one; quotes fit the finish.
+  console.log('[ui-results] grade table + place-fit quotes');
+  const g = await page.evaluate(async () => {
+    const { gradeFor } = await import('/src/ui/progress.ts');
+    const { gradeBlock } = await import('/src/ui/screens/results-parts.ts');
+    const field = (place, kos, lead) => Array.from({ length: 8 }, (_, i) => ({
+      riderId: i, character: 'goose', name: 'x', isPlayer: i + 1 === place, place: i + 1,
+      time: 160 + i * 1.5 + (i === 1 ? lead - 1.5 : 0), kos: i + 1 === place ? kos : 0, wrecked: 0, coins: 0,
+    }));
+    const grade = (place, kos, lead = 0.5) => { const f = field(place, kos, lead); return gradeFor(f[place - 1], f).grade; };
+    const claims = [];
+    for (const [letter, place] of [['A', 2], ['A', 3], ['B', 2], ['B', 5], ['C', 7], ['D', 8], ['D', null]]) {
+      for (let seed = 1; seed < 200; seed++) {
+        const q = gradeBlock({ grade: { grade: letter, title: '' }, place }, seed).querySelector('.br-grade-quote')?.textContent ?? '';
+        if (/最快|第一|冠军/.test(q)) claims.push(`${letter}@${place}: ${q}`);
+      }
+    }
+    return { p3k8: grade(3, 8), p2k8: grade(2, 8), p8k8: grade(8, 8), p1k0: grade(1, 0), p1k2: grade(1, 2), p1lead: grade(1, 0, 3), claims };
+  });
+  expect(g.p3k8 === 'A' && g.p2k8 === 'A', `3rd / 2nd with 8 KOs grade A, not S (${g.p3k8} / ${g.p2k8})`);
+  expect(g.p8k8 === 'C', `last with 8 KOs grades C (${g.p8k8})`);
+  expect(g.p1k0 === 'A' && g.p1k2 === 'S' && g.p1lead === 'S', `a win: A, S with 2 KOs or a 3 s lead (${g.p1k0} / ${g.p1k2} / ${g.p1lead})`);
+  expect(g.claims.length === 0, `no win-claiming quote off a 1st place (${g.claims.slice(0, 2).join(' | ') || 'none'})`);
 }, { size: '1920x1080' });
 
 if (problems.length) {

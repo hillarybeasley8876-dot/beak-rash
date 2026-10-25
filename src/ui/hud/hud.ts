@@ -3,6 +3,7 @@
 import './css/base.css';
 import { approach } from '../../core/math';
 import type { AppContext, Session } from '../../core/contracts';
+import { reducedMotion } from './anim';
 import type { Hud } from './contract';
 import { Cluster } from './cluster';
 import { preloadPortraits } from './badge';
@@ -39,7 +40,7 @@ export function createHud(app: AppContext, layer: HTMLElement): Hud {
   const counters = new Counters(corner('tr'));
   const speedo = new Speedo(corner('bl'));
   const brCorner = corner('br');
-  const hints = new Hints(corner('bc'), () => cluster?.skills.ultCostSp ?? 100);
+  const hints = new Hints(corner('bc'), () => cluster?.skills.ultState === 'ready');
   const quip = new Quip(brCorner);
   const world = new WorldOverlay(proj, worldHost, edgesHost);
   const cutins = new CutinLayer(root, hudLayer, sfx);
@@ -94,6 +95,7 @@ export function createHud(app: AppContext, layer: HTMLElement): Hud {
       rootW.cls('is-off', !on);
       if (!on || !session) return;
       rootW.cls('is-pad', app.input.lastDevice === 'gamepad'); // key badges follow the device in use
+      rootW.cls('is-reduced', reducedMotion()); // CSS loops calm down with 设置 › 动态效果 (switchable mid-race)
       world.measure(); // layout reads first, before this frame's writes
       resize();
       const p = session.player;

@@ -3,11 +3,12 @@
 // disconnect; keyboard hold-to-repeat in menus; 重置存档 locked mid-race and never recalled; quality
 // change offers a restart (menu side only); credits honour reduced motion and the mouse wheel; toasts
 // go quiet during a KO cinematic; a career unlock shows as a results tag (no toast). Stubs other units.
-//   node tools/ui-comfort.mjs            (exits 1 on any failure)
+//   node tools/ui-comfort.mjs [--out shots/ui-screens]   (exits 1 on any failure)
 import { parseArgs, withPage } from './lib.mjs';
 
 const args = parseArgs(process.argv.slice(2));
 const STUB = args.real ? '' : '&stub=world,sim,camera,actors,combat,race,fx,audio';
+const OUT = args.out ?? 'shots/ui-screens';
 const problems = [];
 const expect = (ok, what) => {
   console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${what}`);
@@ -118,7 +119,7 @@ async function unlockChecks(page, h) {
   expect(!(await toasts(page)).some((t) => t.includes('解锁')), 'no unlock toast over the podium');
   const shifted = await page.evaluate(() => [...document.querySelectorAll('.br-ui, .br-ui *')].filter((e) => e.scrollTop || e.scrollLeft).length);
   expect(shifted === 0, `no UI box got scrolled by the automated clicks (${shifted})`);
-  await h.shot('shots/ui-screens/comfort-unlock.png');
+  await h.shot(`${OUT}/comfort-unlock.png`);
   await page.waitForFunction(() => document.querySelector('.br-res-actions.is-armed') !== null, null, { timeout: 5000 });
   const hint = await page.evaluate(() => document.querySelector('.br-hint[data-action="back"]')?.textContent ?? '');
   expect(hint.includes('巡回赛'), `results hint bar names the back target (${hint})`);

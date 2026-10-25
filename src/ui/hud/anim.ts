@@ -29,6 +29,11 @@ export const enter = (t: number, dur: number, delay = 0): number =>
 export const exit = (t: number, life: number, dur: number): number =>
   coreReducedMotion() ? 0 : easeInCubic(clamp01((t - (life - dur)) / Math.max(1e-6, dur)));
 
+/** Snap-out 0..1 (ease-out: most of the way in the first frames) over the last `dur` s of `life`, for
+ *  lettering that must clear the frame at once; 0 under reduced motion (callers still fade). */
+export const snapOut = (t: number, life: number, dur: number): number =>
+  coreReducedMotion() ? 0 : easeOutCubic(clamp01((t - (life - dur)) / Math.max(1e-6, dur)));
+
 /** Opacity 1 → 0 over the last `dur` s of `life` (kept with reduced motion). */
 export const fadeOut = (t: number, life: number, dur: number): number =>
   1 - clamp01((t - (life - dur)) / Math.max(1e-6, dur));

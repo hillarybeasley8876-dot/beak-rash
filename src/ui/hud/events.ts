@@ -93,6 +93,7 @@ export function wireHudEvents(bus: EventBus<GameEvents>, p: HudParts): () => voi
     bus.on('achievement:unlock', (e) => p.cutins.achievement(e.id)),
     // The player's own lines (bell, gulp swallow) go to the cluster quip, not over the road.
     bus.on('taunt', (e) => (me(e.riderId) ? p.quip.line(e.text) : p.world.onTaunt(e))),
+    bus.on('npc:say', (e) => p.world.onNpcSay(e)),
     bus.on('projectile:spawn', (e) => {
       p.cutins.projectile(e);
       p.world.onProjectile(e);

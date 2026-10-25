@@ -18,7 +18,8 @@ import { trackSelectScreen } from './track-select';
 /** Last-resort screen when a factory throws: says so and offers a way back. */
 export function errorScreen(ctx: ScreenCtx, id: ScreenId): ScreenInstance {
   const f = frame({ id: 'error', bg: backdrop({ tone: 'black', star: false }) });
-  f.stage.append(h('div', { class: 'br-err', text: `这个界面摔车了（${id}）` }, h('small', { text: '按 Esc / Enter 回主菜单' })));
+  f.stage.append(h('div', { class: 'br-err', text: `这个界面摔车了（${id}）` },
+    h('small', {}, h('span', { class: 'br-kb-only', text: '按 Esc / Enter 回主菜单' }), h('span', { class: 'br-pad-only', text: '按 B / A 回主菜单' }))));
   return {
     root: f.root,
     onAction: (a) => {

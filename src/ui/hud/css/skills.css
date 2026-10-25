@@ -30,6 +30,10 @@
 .sk-d.ult .sk-key { background: var(--sp); color: var(--ink); box-shadow: 0 0 0 2px var(--ink); }
 .sk-d.ult.is-ready .sk-box { box-shadow: 0 0 0 4px var(--ink), 0 0 0 7px var(--sp), 0 0 0 10px var(--ink), 0 0 26px 10px rgba(255, 230, 0, 0.85); }
 .sk-d.ult.is-ready .sk-g { color: var(--red); }
+/* Full but nobody in reach (a cast would be denied): greyed, no glow. */
+.sk-d.ult.is-idle .sk-ultfill { background: #8b8b94; }
+.sk-d.ult.is-idle .sk-g { opacity: 0.45; }
+.sk-d.ult.is-idle .sk-key { background: #8b8b94; color: var(--ink); }
 .sk-flash { position: absolute; inset: -6px; rotate: 45deg; background: var(--paper); opacity: 0; }
 .sk-deny {
   position: absolute; left: 50%; top: -34px; translate: -50% 0; white-space: nowrap; padding: 3px 7px 1px; background: var(--red);
@@ -48,6 +52,7 @@
 .wp-pip.off { background: #c9c9cf; }
 .wp-x { font: 400 30px/1 "Anton", sans-serif; color: var(--red); }
 .wp.is-last .wp-pip:not(.off) { animation: brh-low 0.4s steps(2, end) infinite; }
+.brh.is-reduced .wp.is-last .wp-pip:not(.off) { animation: none; }
 .wp-flash { position: absolute; inset: 0; background: var(--paper); opacity: 0; pointer-events: none; }
 
 /* Repeat casts (casttag.ts): compact tag just above the diamond row, right-aligned with the ult diamond,

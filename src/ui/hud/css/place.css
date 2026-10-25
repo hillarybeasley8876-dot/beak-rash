@@ -80,4 +80,4 @@
 }
 .ctr-row.coin .ctr-k { background: var(--ink); font-family: "ZCOOL QingKe HuangYou", sans-serif; font-size: 26px; }
 @keyframes brh-spin { to { rotate: 360deg; } }
-@media (prefers-reduced-motion: reduce) { .pl.is-first .pl-star { animation: none; } }
+.brh.is-reduced .pl.is-first .pl-star { animation: none; }

@@ -84,6 +84,5 @@
   0% { translate: 1px 0; } 16% { translate: -1px 1px; } 33% { translate: 0 -1px; }
   50% { translate: 1px 1px; } 66% { translate: -1px -1px; } 83% { translate: 2px 0; }
 }
-@media (prefers-reduced-motion: reduce) {
-  .jit { animation: none; }
-}
+/* Reduced motion (core/motion.ts: 设置 › 动态效果, or the OS flag on 跟随系统): hud.ts sets .is-reduced. */
+.brh.is-reduced .jit { animation: none; }

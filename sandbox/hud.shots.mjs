@@ -35,6 +35,14 @@ const BAND = `$h('.ci-band').map((n) => (n.classList.contains('is-thin') ? 'thin
 const CO_ALPHA = `'co=' + ($h('.co-stack')[0].style.opacity || 1)`;
 const QUIP = `(() => { const n = $h('.qp')[0]; return n ? (getComputedStyle(n).visibility !== 'hidden' ? 'on@' : 'off@') + n.textContent : '-'; })()`;
 const PACK = '__hud.place(1, 7, -1.2); __hud.place(2, 8, 0.6); __hud.place(3, 9.5, 2.0); __hud.place(4, 12, -0.4)';
+/** 成就解锁 chips on screen (opacity > 0.05) and their names. */
+const ACH = `(() => { const on = $h('.chip-ach').filter((n) => +(n.style.opacity || 1) > 0.05); return 'ach=' + on.length + ' ' + on.map((n) => n.querySelector('.chip-en').textContent).join('|'); })()`;
+/** SHOWTIME state of the cluster (.cl is-full / is-idle) and the ult diamond (is-ready / is-idle). */
+const ULT = `(() => { const c = $h('.cl')[0], d = $h('.sk-d.ult')[0]; const f = (n, k) => n && n.classList.contains(k) ? k : '-'; return 'cl=' + f(c, 'is-full') + ',' + f(c, 'is-idle') + ' p=' + f(d, 'is-ready') + ',' + f(d, 'is-idle'); })()`;
+/** Visible npc:say bubbles (police corgi) and their text. */
+const NPC = `(() => { const on = $h('.tb.is-npc').filter((n) => getComputedStyle(n).visibility !== 'hidden'); return 'npc=' + on.length + ' ' + on.map((n) => n.textContent).join('|'); })()`;
+/** WRECKED splash: tint layer present, and the title's exit offset (px). */
+const WRECK = `(() => { const s = $h('.ci-wrecked')[0]; if (!s) return 'wrecked=0'; const t = s.querySelector('.sx-title'); const x = parseFloat((t ? t.style.transform : '').replace('translateX(', '')) || 0; return 'wrecked=1 cine=' + s.classList.contains('ci-cine') + ' tint=' + (s.querySelector('.sx-tint') ? 1 : 0) + ' away=' + Math.round(-x); })()`;
 /** Pairwise overlaps between the visible boxes of two selectors (same selector = among themselves). */
 const OVERLAPS = (a, b, label) => `(() => {
   const vis = (n) => { for (let e = n; e; e = e.parentElement) { const cs = getComputedStyle(e); if (cs.visibility === 'hidden' || cs.display === 'none' || +cs.opacity < 0.05) return false; if (e.id === 'hud') break; } return true; };
@@ -72,7 +80,7 @@ const SCENES = {
     F('koStart'), S(12), F('koPeak', { chain: 1 }), S(12), F('koEnd'), S(12),
     X(`'ko-on-stage=' + $h('.brh-cutins > .ci-ko').filter((n) => +(n.style.opacity || 1) > 0.05).length`, 'ko-on-stage=0'),
   ],
-  wrecked: [F('crash', { cause: 'traffic' }), S(26)],
+  wrecked: [F('crash', { cause: 'traffic' }), S(26), X(WRECK, 'wrecked=1 cine=false tint=1')],
   bandWreck: [
     F('skill'), S(6), F('crash', { cause: 'traffic' }), S(12), F('skill', { id: 'pelican.wing', slot: 3 }), S(4),
     X(`$h('.brh-cutins > .ci').map((n) => n.className + '@' + (n.style.opacity || 1)).join(' ')`, 'ci-wrecked'),
@@ -93,7 +101,22 @@ const SCENES = {
   final: [F('finalStretch'), S(24)],
   achievement: [
     F('rivalSkill'), S(4), F('achievement', { id: 'first_ko' }), S(4), F('achievement', { id: 'goose' }), S(20),
-    X(`$h('.chip').map((n) => n.textContent).join(' / ')`, '成就解锁 ACHIEVEMENT开饭了', '和平从来不是选项'),
+    X(ACH, 'ach=1 开饭了'), S(70), X(ACH, 'ach=1 和平从来不是选项'),
+  ],
+  // One 成就解锁 chip at a time: five at once → three in turn, then one "还有 2 个成就" summary.
+  achQueue: [
+    ...['first_ko', 'goose', 'double', 'thief', 'one_more'].map((id) => F('achievement', { id })), S(10), X(ACH, 'ach=1 开饭了'),
+    S(76), X(ACH, 'ach=1 和平从来不是选项'), S(76), X(ACH, 'ach=1 一鱼两吃'), S(76), X(ACH, 'ach=1 还有 2 个成就'),
+  ],
+  // Full SP with nobody in reach (ultTarget false): grey "SHOWTIME 无目标", no READY; back to READY 0.3 s after a target.
+  ultIdle: [P('cruise'), P('spIdle'), S(30), X(ULT, 'cl=is-full,is-idle p=-,is-idle')],
+  ultBack: [P('cruise'), P('spIdle'), S(30), P('spTarget'), S(8), X(ULT, 'is-idle'), S(20), X(ULT, 'cl=is-full,- p=is-ready,-')],
+  npcSay: [F('npcSay', { ds: 9, x: 2.2 }), S(16), X(NPC, 'npc=1 ')],
+  npcGone: [F('npcSay', { ds: 9, x: 2.2 }), S(10), F('npcGone'), S(4), X(NPC, 'npc=0')],
+  // WRECKED over its cinematic: no red wash (fx draws red edges); on cine end the lettering snaps out (≤ 0.15 s).
+  wreckedCine: [
+    F('koStart'), S(18), F('wreckedPeak'), S(20), X(WRECK, 'wrecked=1 cine=true tint=0'),
+    F('koEnd'), S(4), X(WRECK, 'wrecked=1'), S(9), X(WRECK, 'wrecked=0'),
   ],
   tags: [E('__hud.place(1, 6, -2.5); __hud.place(2, 11, 2.2); __hud.place(3, 17, 0.4)'), F('angry', { id: 2 }), S(30)],
   taunt: [E('__hud.place(2, 9, 2)'), F('taunt', { id: 2 }), S(14)],

@@ -1,6 +1,11 @@
 /* Splash cut-ins (KNOCK OUT / WRECKED / BUSTED / FINISH) and SHOWTIME. Stage px (1920×1080). */
 .sx-flash { left: -60%; top: -60%; width: 220%; height: 220%; background: var(--paper); opacity: 0; }
-.sx-tint { left: -60%; top: -60%; width: 220%; height: 220%; background: rgba(229, 25, 28, 0.28); opacity: 0; }
+/* WRECKED without a cinematic: red only toward the screen edges, the central ~60 % (the rider) stays clear.
+   Sized past the stage so it reaches the viewport edges at 16:10 too (radii in stage px around its centre). */
+.sx-tint {
+  left: -60%; top: -60%; width: 220%; height: 220%; opacity: 0;
+  background: radial-gradient(ellipse 1220px 690px at 50% 50%, transparent 66%, rgba(229, 25, 28, 0.3) 84%, rgba(229, 25, 28, 0.55) 100%);
+}
 .sx-band {
   left: -400px; top: 300px; width: 2720px; height: 370px; background: var(--red); transform-origin: 50% 50%;
   box-shadow: 0 -16px 0 0 var(--ink), 0 16px 0 0 var(--ink);

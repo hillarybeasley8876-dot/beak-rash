@@ -49,18 +49,25 @@ export const ordinal = (n: number): string => {
   return `${n}${s}`;
 };
 
-const KO_GRADE_CAP = 3; // KOs past this add nothing to the grade (SHOWTIME chains hand out 8-13 a race)
+const KO_GRADE_CAP = 3;  // KOs past this add nothing to the grade (SHOWTIME chains hand out 8-13 a race)
+const LEAD_POINTS = 4;   // grade points per second of lead over 2nd place: a clean, dominant win reaches S too
+const LEAD_CAP = 12;     // … up to a 3 s lead
 
-/** S…D from place (relative to field size), KOs (capped) and wrecks; DNF is always D. KOs lift a grade but never
- * buy one: S needs a top-2 finish, A the podium. */
-export function gradeFor(r: RaceResult, field: number): Grade {
+/** S…D from place (relative to field size), KOs (capped), the winning margin and wrecks; DNF is always D.
+ *  KOs lift a grade but never buy one: S needs a win (with KOs or a clear lead), a win is at least A, and
+ *  A otherwise needs the podium. `results` = the whole field (its 2nd place gives the winning margin). */
+export function gradeFor(r: RaceResult, results: readonly RaceResult[]): Grade {
   const fallback: Grade = { grade: 'D', title: '咸鱼' };
   const pick = (g: Grade['grade']): Grade => GRADES.find((x) => x.grade === g) ?? fallback;
   if (r.time === null) return pick('D');
+  const field = results.length;
   const placeScore = field <= 1 ? 80 : (80 * (field - r.place)) / (field - 1);
-  const score = placeScore + Math.min(r.kos, KO_GRADE_CAP) * 8 - r.wrecked * 6;
-  if (score >= 92 && r.place <= 2) return pick('S');
-  if (score >= 70 && r.place <= 3) return pick('A');
+  // Winning margin over 2nd place (a 2nd place that never finished counts as the full bonus).
+  const second = r.place === 1 ? results.find((x) => x.place === 2) : undefined;
+  const margin = !second ? 0 : second.time === null ? Infinity : Math.max(0, second.time - r.time);
+  const score = placeScore + Math.min(r.kos, KO_GRADE_CAP) * 8 + Math.min(LEAD_CAP, margin * LEAD_POINTS) - r.wrecked * 6;
+  if (r.place === 1) return pick(score >= 92 ? 'S' : 'A');
+  if (score >= 65 && r.place <= 3) return pick('A');
   return pick(score >= 45 ? 'B' : score >= 22 ? 'C' : 'D');
 }
 
@@ -102,7 +109,7 @@ export function applyRewards(save: SaveStore, config: RaceConfig | undefined, re
   const before = save.data.coins;
   const ev = careerEvent(config);
   const reward: Reward = {
-    coins: me?.coins ?? 0, breakdown: me ? breakdown(me) : [], grade: me ? gradeFor(me, results.length) : { grade: 'D', title: '咸鱼' },
+    coins: me?.coins ?? 0, breakdown: me ? breakdown(me) : [], grade: me ? gradeFor(me, results) : { grade: 'D', title: '咸鱼' },
     place: me && me.time !== null ? me.place : null,
     newBest: false, firstFinish: false, unlocked: null, clear: null, balanceBefore: before, balanceAfter: before,
   };

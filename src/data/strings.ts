@@ -44,7 +44,7 @@ export const HOWTO_SKILL_TIPS: Record<string, string> = {
 export const HOWTO_BASICS: string[] = [
   '踩踏冲刺，漂移过弯，松开漂移键吃加速。',
   '左右扇人，重击打掉武器，空手就能抢过来。',
-  '攒满 SP 就按 P：SHOWTIME，一锅端。',
+  '攒满 SP 就放大招：SHOWTIME，一锅端。',
   '警笛一响就加速：柯基警官专抓慢车。',
 ];
 
@@ -113,12 +113,22 @@ export function calendarFor(trackId: TrackId, date: Date): CalendarLine {
 }
 
 // ---------------------------------------------------------------- grade quotes (results stamp)
-export const GRADE_QUOTES: Record<'S' | 'A' | 'B' | 'C' | 'D', string[]> = {
+export type GradeLetter = 'S' | 'A' | 'B' | 'C' | 'D';
+
+/** Lines that fit every finish able to earn the grade (ui/progress.ts gradeFor: S is always a win, so S may
+ *  claim it; A is a win or a podium, B–D any place). Place-specific lines live in GRADE_QUOTES_PLACE. */
+export const GRADE_QUOTES: Record<GradeLetter, string[]> = {
   S: ['这条路，以后就叫鹈鹕大道。', '路宽，鱼多，你最快。', '连大鹅都闭嘴了。'],
-  A: ['鱼塘里，你说了算。', '再快半秒，就封神了。', '这成绩，够吃一个月的鱼。'],
+  A: ['鱼塘里，你说了算。', '离封神，只差一口气。', '这成绩，够吃一个月的鱼。'],
   B: ['平平无奇，但鱼照吃。', '中规中矩，像一条认真的鱼。', '普通，但普通得很稳。'],
   C: ['状态请假了，明天补上。', '人和车都没事，挺好。', '咕咕表示：欢迎入群。'],
   D: ['下一局，从翻身开始。', '没关系，咸鱼晒晒更香。', '躺平不可耻，记得起来就行。'],
+};
+
+/** Extra lines for one finish only, mixed into the grade's pool: `win` = 1st place, `podium` = 2nd / 3rd. */
+export const GRADE_QUOTES_PLACE: Partial<Record<GradeLetter, { win?: string[]; podium?: string[] }>> = {
+  A: { win: ['赢是赢了，还不够凶。', '冠军到手，下回连鹅一起收。'], podium: ['再快半秒，就封神了。', '领奖台上，嘴最大的是你。'] },
+  B: { podium: ['上台了，鱼照领。'] },
 };
 
 // ---------------------------------------------------------------- announcer callouts

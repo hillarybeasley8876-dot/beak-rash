@@ -19,9 +19,9 @@ export const ROWS: RowDef[] = [
   { kind: 'meter', key: 'voice', cn: '语音', en: 'VOICE', desc: '解说员和各位选手嘴炮的音量。' },
   { kind: 'choice', key: 'quality', cn: '画质', en: 'QUALITY', desc: '低：老电脑救星。高：鹈鹕毛根根分明。重启游戏后生效。', options: [['低', 'low'], ['中', 'medium'], ['高', 'high']] },
   { kind: 'meter', key: 'shake', cn: '镜头震动', en: 'SHAKE', desc: '被扇的时候，屏幕要不要跟着一起抖。' },
-  { kind: 'choice', key: 'autoPedal', cn: '自动踩踏', en: 'AUTO-PEDAL', desc: '不用一直按 W，专心打架就好。按 S 照样刹车。', options: [['关', false], ['开', true]] },
+  { kind: 'choice', key: 'autoPedal', cn: '自动踩踏', en: 'AUTO-PEDAL', desc: '不用一直按着踩踏，专心打架就好。刹车照样管用。', options: [['关', false], ['开', true]] },
   { kind: 'choice', key: 'slowmo', cn: '慢镜头', en: 'SLOW-MO', desc: '击倒时的升格慢镜头。完整版最燃，关掉最快。', options: [['完整', 'full'], ['简短', 'short'], ['关闭', 'off']] },
-  { kind: 'motion', cn: '动态效果', en: 'MOTION', desc: '界面抖动、砸字和转场。减弱：只留淡入淡出。跟随系统：听系统“减弱动态效果”的。', options: [['跟随系统', 'system'], ['减弱', 'reduced'], ['完整', 'full']] },
+  { kind: 'motion', cn: '动态效果', en: 'MOTION', desc: '抖动、砸字、转场和比赛闪屏。减弱：只留淡入淡出。跟随系统：听系统的。', options: [['跟随系统', 'system'], ['减弱', 'reduced'], ['完整', 'full']] },
   { kind: 'action', id: 'reset', cn: '重置存档', en: 'RESET SAVE', desc: '小鱼干、车库、巡回赛进度全部清零。慎点。' },
 ];
 

@@ -6,6 +6,7 @@ import { approach, clamp, clamp01 } from '../../../core/math';
 import { ROSTER } from '../../../data/roster';
 import type { Session } from '../../../core/contracts';
 import type { RiderId, RiderState } from '../../../core/types';
+import { reducedMotion } from '../anim';
 import { SPECIES_GLYPH } from '../badge';
 import { el, px, w, type W } from '../dom';
 import { newPoint, type Projector } from './project';
@@ -196,7 +197,7 @@ export class EdgeWarnings {
     c.root.cls('is-hot', hot);
     c.glyph.text(hot ? c.hotGlyph : SPECIES_GLYPH[c.r.character]);
     c.glyph.tf(`rotate(${(-rot).toFixed(1)}deg)`);
-    const pulse = hot ? 1 + 0.12 * Math.sin(c.hot * 30) : 1;
+    const pulse = hot && !reducedMotion() ? 1 + 0.12 * Math.sin(c.hot * 30) : 1;
     const sc = k * (0.7 + 0.35 * c.vis) * pulse;
     c.root.tf(`translate(${px(c.x)}, ${px(c.y)})`);
     c.inner.tf(`rotate(${rot.toFixed(1)}deg) scale(${sc.toFixed(3)})`);

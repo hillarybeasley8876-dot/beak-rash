@@ -2,7 +2,7 @@
 // burst, ransom title slammed glyph by glyph, brush subtitle, portrait cards sliding in from the sides.
 import '../css/splash.css';
 import type { CharacterId } from '../../../core/types';
-import { enter, envelope, exit, fadeOut, jitter, pop, reducedMotion, slam } from '../anim';
+import { enter, envelope, exit, fadeOut, jitter, pop, reducedMotion, slam, snapOut } from '../anim';
 import { PortraitCard, type Mood } from '../badge';
 import { el } from '../dom';
 import { setRansom, type RansomScheme } from '../ransom';
@@ -11,6 +11,12 @@ import { ordinal } from '../place';
 import type { CutIn } from './types';
 
 export interface CardSpec { id: CharacterId; mood: Mood; name?: string; cross?: boolean }
+
+/** s: in its last LEAVE s the lettering slashes out along the band (director.ts HURRY leaves a hurried splash
+ *  the same), so it never fades in place over the rider the chase view brings back. */
+const LEAVE = 0.15;
+/** px (stage) the lettering travels on its way out. */
+const LEAVE_PX = 2200;
 
 export interface SplashSpec {
   cls: string;
@@ -26,6 +32,7 @@ export interface SplashSpec {
   place?: number;
   stamp?: boolean;
   flash?: boolean;
+  /** Red edge vignette (centre clear) for a splash with no cinematic behind it (fx draws its own red edges). */
   tint?: boolean;
   /** Band tilt in degrees (default −9; cinematic splashes sit flatter in the lower part of the frame). */
   tilt?: number;
@@ -74,9 +81,12 @@ export function splashCut(spec: SplashSpec): CutIn {
     place.textContent = String(spec.place);
     el('small', '', place, ordinal(spec.place));
   }
-  const preGlyphs = spec.pre ? setRansom(el('div', 'sx-pre', root), spec.pre, { seed: spec.seed + 7, scheme: 'mono' }) : [];
+  const pre = spec.pre;
+  const preEl = pre ? el('div', 'sx-pre', root) : null;
+  const preGlyphs = preEl && pre ? setRansom(preEl, pre, { seed: spec.seed + 7, scheme: 'mono' }) : [];
   const stamp = spec.stamp ? el('div', 'sx-stamp', root, spec.title) : null;
-  const glyphs = stamp ? [] : setRansom(el('div', 'sx-title', root), spec.title, { seed: spec.seed, scheme: spec.scheme });
+  const titleEl = stamp ? null : el('div', 'sx-title', root);
+  const glyphs = titleEl ? setRansom(titleEl, spec.title, { seed: spec.seed, scheme: spec.scheme }) : [];
   const cn = spec.cn ? el('div', 'sx-cn', root, spec.cn) : null;
   const sub = spec.sub ? el('div', 'sx-sub', root, spec.sub) : null;
   const { dur } = spec;
@@ -94,18 +104,23 @@ export function splashCut(spec: SplashSpec): CutIn {
       const in2 = enter(t, 0.13, 0.04);
       band2.style.transform = `rotate(5deg) translateX(${((in2 - 1) * 2600 + outT * 2600).toFixed(0)}px)`;
       const spin = reducedMotion() ? 0 : t * 14;
-      burst.style.transform = `scale(${(pop(t - 0.05, 0.16) * (1 + outT * 0.3)).toFixed(3)}) rotate(${spin.toFixed(1)}deg)`;
+      const snap = snapOut(t, dur, LEAVE);
+      const away = snap > 0 ? `translateX(${(-snap * LEAVE_PX).toFixed(0)}px) ` : '';
+      // The star behind the lettering collapses with it (no grey ghost fading over the scene).
+      burst.style.transform = `scale(${(pop(t - 0.05, 0.16) * (1 + outT * 0.3) * (1 - snap)).toFixed(3)}) rotate(${spin.toFixed(1)}deg)`;
       burst.style.opacity = fade.toFixed(3);
       const slideL = enter(t, 0.16, 0.04);
       if (left) left.style.transform = `translateX(${((slideL - 1) * 800 - outT * 900).toFixed(0)}px) rotate(-7deg)`;
       if (right) right.style.transform = `translateX(${((1 - slideL) * 800 + outT * 900).toFixed(0)}px) rotate(7deg)`;
-      if (place) place.style.transform = `rotate(-8deg) scale(${slam(t - 0.08, 0.16, 2.2).toFixed(3)})`;
+      if (place) place.style.transform = `${away}rotate(-8deg) scale(${slam(t - 0.08, 0.16, 2.2).toFixed(3)})`;
       animateGlyphs(preGlyphs, t, 0.04, 0.025);
       animateGlyphs(glyphs, t, 0.08, 0.03);
-      if (stamp) stamp.style.transform = `translateX(-50%) rotate(${(-12 + 3 * enter(t, 0.3)).toFixed(1)}deg) scale(${slam(t - 0.1, 0.12, 2.6).toFixed(3)})`;
-      if (cn) cn.style.transform = `translateX(-50%) rotate(-6deg) scale(${slam(t - 0.24, 0.14, 1.9).toFixed(3)})`;
+      if (preEl) preEl.style.transform = away || 'none';
+      if (titleEl) titleEl.style.transform = away || 'none';
+      if (stamp) stamp.style.transform = `${away}translateX(-50%) rotate(${(-12 + 3 * enter(t, 0.3)).toFixed(1)}deg) scale(${slam(t - 0.1, 0.12, 2.6).toFixed(3)})`;
+      if (cn) cn.style.transform = `${away}translateX(-50%) rotate(-6deg) scale(${slam(t - 0.24, 0.14, 1.9).toFixed(3)})`;
       if (cn) cn.style.opacity = t < 0.24 ? '0' : '1';
-      if (sub) sub.style.transform = `translateX(${(-50 - (1 - enter(t, 0.14, 0.32)) * 120).toFixed(1)}%) skewX(-12deg)`;
+      if (sub) sub.style.transform = `${away}translateX(${(-50 - (1 - enter(t, 0.14, 0.32)) * 120).toFixed(1)}%) skewX(-12deg)`;
       if (sub) sub.style.opacity = t < 0.32 ? '0' : '1';
       root.style.opacity = fadeOut(t, dur, 0.12).toFixed(3);
     },

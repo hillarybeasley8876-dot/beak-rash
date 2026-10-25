@@ -63,6 +63,11 @@ export class WorldOverlay {
     if (this.session) this.bubbles.show(this.session, e.riderId, e.text);
   }
 
+  /** A line from a non-rider riding an obstacle (the police corgi): a bubble that follows that obstacle. */
+  onNpcSay(e: GameEvents['npc:say']): void {
+    if (this.session) this.bubbles.showNpc(this.session, e.obstacleId, e.character, e.text);
+  }
+
   onHit(e: GameEvents['combat:hit']): void {
     const s = this.session;
     if (!s) return;

@@ -55,6 +55,12 @@
 }
 .cl.is-full .cl-ready { visibility: inherit; animation: brh-ready 0.6s ease-in-out infinite alternate; }
 @keyframes brh-ready { from { scale: 1; } to { scale: 1.06; } }
-@media (prefers-reduced-motion: reduce) {
-  .cl.is-full .cl-ready, .cl.is-low .cl-row.cl-hp .cl-fill { animation: none; }
-}
+/* Full SP but nobody in reach (skills.ts UltState 'idle'): a flat grey plate, no glow, no pulse, no key. */
+.cl-idle { display: none; align-items: baseline; gap: 12px; white-space: nowrap; }
+.cl-idle b { font: 400 30px/1 "Anton", sans-serif; letter-spacing: 1px; color: #8b8b94; }
+.cl-idle i { font: 400 28px/1 "ZCOOL QingKe HuangYou", sans-serif; font-style: normal; color: var(--paper); }
+.cl-idle i::before { content: "·"; margin-right: 12px; color: #8b8b94; }
+.cl.is-idle .cl-ready { animation: none; box-shadow: 0 0 0 3px #8b8b94, 0 0 0 6px var(--ink); }
+.cl.is-idle .cl-ready > .rn, .cl.is-idle .cl-ready > kbd { display: none; }
+.cl.is-idle .cl-idle { display: flex; }
+.brh.is-reduced .cl.is-full .cl-ready, .brh.is-reduced .cl.is-low .cl-row.cl-hp .cl-fill { animation: none; }

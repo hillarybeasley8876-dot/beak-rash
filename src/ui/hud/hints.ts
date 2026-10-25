@@ -1,9 +1,10 @@
 // First-race control prompts: contextual key chips at the bottom centre during a profile's first races —
 // hold throttle for the launch during the countdown, swing / heavy when a rival is in reach, drift before
-// the first sharp bend, hop before the first crest or ramp, SHOWTIME once SP is full. Glyphs follow the
-// device in use (glyphs.ts). A prompt the player has already acted on never shows; each shows at most
-// MAX_SHOWS times per app session and leaves as soon as the player does it. While a cut-in, cinematic or
-// warning owns the screen the prompt waits (hidden, its clock frozen).
+// the first sharp bend, hop before the first crest or ramp, SHOWTIME once SP is full and someone is in
+// reach (never while a cast would be denied). Glyphs follow the device in use (glyphs.ts). A prompt the
+// player has already acted on never shows; each shows at most MAX_SHOWS times per app session and leaves
+// as soon as the player does it. While a cut-in, cinematic or warning owns the screen the prompt waits
+// (hidden, its clock frozen).
 import './css/hints.css';
 import type { Session } from '../../core/contracts';
 import type { RiderState, TrackFrame } from '../../core/types';
@@ -56,7 +57,8 @@ export class Hints {
   private crests: number[] = [];
   private frame: TrackFrame | undefined;
 
-  constructor(parent: HTMLElement, private ultCost: () => number) {
+  /** `ultReady`: SP is full and a SHOWTIME cast would find victims (the cluster's debounced ultTarget). */
+  constructor(parent: HTMLElement, private ultReady: () => boolean) {
     this.root = el('div', 'ht', parent);
     this.rootW = w(this.root);
     this.card = el('div', 'ht-card', this.root);
@@ -106,16 +108,18 @@ export class Hints {
     if (next) this.show(next);
   }
 
-  /** The moment a prompt belongs to is over: GO for the launch, the player went down for the others. */
+  /** The moment a prompt belongs to is over: GO for the launch, the player went down for the others, and
+   *  SHOWTIME once a cast would be denied (nobody in reach any more). */
   private stale(id: HintId, s: Session): boolean {
     if (id === 'launch') return s.phase !== 'countdown';
+    if (id === 'ult' && !this.ultReady()) return true;
     return s.phase !== 'racing' || s.player.mode !== 'racing';
   }
 
   private trigger(s: Session, p: RiderState): HintId | null {
     if (s.phase === 'countdown') return this.ready('launch') ? 'launch' : null;
     if (s.phase !== 'racing' || p.mode !== 'racing' || s.time < SETTLE) return null;
-    if (this.ready('ult') && p.sp >= this.ultCost()) return 'ult';
+    if (this.ready('ult') && this.ultReady()) return 'ult';
     if (this.ready('swing') && this.rivalInReach(s, p)) return 'swing';
     if (this.ready('hop') && p.speed > 6 && this.crests.some((c) => c - p.s > CREST_NEAR && c - p.s < CREST_FAR)) return 'hop';
     if (this.ready('drift') && this.bendAhead) return 'drift';

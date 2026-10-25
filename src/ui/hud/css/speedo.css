@@ -37,7 +37,5 @@
 .spd-tag.draft.is-ready .spd-tag-k { background: var(--ink); color: var(--paper); box-shadow: inset 0 0 0 3px var(--paper); }
 .spd-tag.draft.is-ready { box-shadow: 5px 5px 0 var(--red), 0 0 0 3px var(--paper); }
 @keyframes brh-chev { to { background-position: 40px 0; } }
-@media (prefers-reduced-motion: reduce) {
-  .spd.is-drift .spd-spark, .spd-tag.boost .spd-tag-f { animation: none; }
-  .spd.is-drift .spd-spark { opacity: 1; }
-}
+.brh.is-reduced .spd.is-drift .spd-spark, .brh.is-reduced .spd-tag.boost .spd-tag-f { animation: none; }
+.brh.is-reduced .spd.is-drift .spd-spark { opacity: 1; }

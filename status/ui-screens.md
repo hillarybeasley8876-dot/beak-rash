@@ -322,3 +322,31 @@ Checklist ([x] = done + verified, [-] = skipped with reason, [ ] = open):
 - API notes: ScreenCtx.pressGap() removed (unused); nav.ts exports isDirection(); p5 artImage(rel, cls, onFail?,
   stand?) keeps art hidden until decoded (+ optional stand-in); portrait() takes { drawn: true }.
 
+
+## r3 polish (2026-10-25)
+Owner ui (screens + HUD), reviews game-r2-*; screens part (acc2 fixes re-verified, then polished). [x] = done + verified.
+- [x] e2e#2 grades: gradeFor(r, results) — KO bonus capped at 3, + up to 12 for the lead over 2nd (4/s), S only
+  for a win (score ≥ 92), a win is at least A, A otherwise needs the podium (≥ 65), B ≥ 45, C ≥ 22. Table
+  (shots/r3-ui/grades.mjs): 1st A (0-1 KO) / S (2+ KOs or a 3 s lead); 2nd A; 3rd B (0 KO) / A; 4th B; 8th D-C;
+  DNF D. Quotes: GRADE_QUOTES stay place-neutral per grade (3 each, content-lint shape), new GRADE_QUOTES_PLACE
+  adds win / podium lines (A, B); '你最快' & co. only on a win. ui-results.mjs now asserts table + quotes.
+- [x] e2e#6 records: cell stays 被击倒 (KOs suffered; the save has no crash count) + hover note; grid tightens
+  (.is-dense) past 42 entries — fits 54 at 1280×720 / 1920×1200 (records-dense.mjs).
+- [x] int#3 quit (acc2) re-verified 1280 + 1920: 7th step 退出游戏 QUIT, confirm default 再骑会, 退出 → quit() ×1,
+  Esc → title.  [x] int#5 focus memory across reload (menu 快速比赛, track 03) re-verified.
+- [x] int#6 pad copy: HOW TO opens on the GAMEPAD tab for a pad player; HOWTO_BASICS SP line device-neutral
+  (攒满 SP 就放大招); loading skips the 6 tips that name keyboard keys for pad players; 自动踩踏 desc and the
+  error-screen hint device-neutral / per device. Menu blurb + pause steer (acc2) re-verified.
+- [x] int#7 cold start (acc2) re-verified: title.webp held 3.5 s → drawn hero shown, art hidden until decoded,
+  then shown; request order title > menu > garage > loading (cold.mjs).
+- [x] perf#6 loading (acc2) re-verified: .br-road-dash animates transform only (br-road-run, will-change);
+  after a 0.7 s main-thread task the % text = bar (53 % / 53 %).
+- 设置 › 动态效果 desc now says it covers race flashes too (fits 3 lines, clear of the sticker).
+- Tools: ui-results / ui-comfort take --out; probes in shots/r3-ui/*.mjs.
+
+### r3 requests
+- content: data/tips.ts has 6 keyboard-only tips (按住 Shift, 刹车键在 S, 按 C, 按 B, J 往左扇…, 按 P) that pad
+  players never draw now; pad-worded twins or device-neutral rewrites would give them back.
+- economy / content: achievements that should not count (silent tutorial ticks) must leave ACHIEVEMENTS (or
+  get a flag ui can filter) so the records N/total stays honest; the sheet fits up to 54 entries.
+- race / core (optional, still open): a save.stats crash counter if the sheet should show 翻车.

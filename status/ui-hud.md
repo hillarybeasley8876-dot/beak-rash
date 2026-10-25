@@ -284,3 +284,30 @@ Plan (reviews/game-r1-*.json, owner ui-hud). [x] = done + verified. Resume: skip
   ≤ 2 shows per prompt per app session, never again once the player has done the action.
 - content / ui-screens (interaction critic): device-neutral copy outside the HUD ('攒满 SP 就按 P' in HOWTO_BASICS, the menu
   blurb 'J 往左扇，L 往右扇'); the HUD itself now shows pad glyphs live.
+
+## r3 polish (2026-10-25)
+Owner ui (screens + HUD), reviews game-r2-*; HUD part. [x] = done + verified.
+- [x] e2e#1 SHOWTIME vs RiderState.ultTarget: skills.ts debounces ultTarget (0.3 s both ways) into UltState
+  charging / ready / idle; idle = grey P diamond (no glow / pop), SP plate "SHOWTIME · 无目标" (no READY, no pulse,
+  no key); the first-race 'ult' prompt only triggers on 'ready' and leaves when it turns idle. Real race (combat
+  writes ultTarget each step; field moved 300 m ahead): idle 3 s → no prompt; targets back → still idle at +10 f,
+  READY + prompt by +40 f; flag flipping every 0.1 s → stays READY. shots/r3-ui/hud-real.mjs, sheet-real1.jpg.
+- [x] ae#2 WRECKED: no HUD tint over the KO cinematic (fx draws red edges); without a cinematic .sx-tint is an
+  edge vignette (centre ~60 % clear). splashCut lettering (title / pre / cn / sub / stamp / place) snaps out
+  along the band in its last 0.15 s (anim.ts snapOut, ease-out; the star collapses), so a hurried WRECKED is
+  off-screen ~0.07 s after cine:ko end. Pixel probe (wreck.mjs coast + mountain, testWrecked): pelican bright
+  px R−G 2-4 with the HUD on = off at 0.25-0.9 s (centre ΔR 0); title x −655 at 0.9 s, −2176…−256 at 1.0 s.
+- [x] e2e#5 achievement chips queue: one 成就解锁 chip at a time, 1.25 s each, ≤ 2 waiting, the rest fold
+  into one "还有 N 个成就 · 赛后结算里慢慢看" chip; frozen with the HUD in cinematics. Real race: 3 at once →
+  开饭了 | 和平… | 一鱼两吃 in turn.
+- [x] npc:say → world bubbles (bubbles.ts showNpc): anchored to session.obstacles by id (top + 0.35 m), dropped
+  when the obstacle is gone / inactive, same pool / MAX_FLOAT / docking / avoidance as taunts, police-blue name
+  label. Real police (race police.ts now emits npc:say): spawn line docks right while the corgi is behind,
+  floats beside it alongside; POLICE_LINES warmed in fonts.ts.
+- [x] int#2 motion: core reducedMotion() drives .brh.is-reduced (set each frame) — every HUD CSS loop (jitter,
+  READY pulse, low-HP / last-use blinks, siren, lamp, 1ST star, drift sparks, boost stripes) keys off it instead
+  of the OS media query; rear/side chevron pulse gated. Real race KO: 完整 max HUD scale 2.20 + READY pulse,
+  减弱 1.00 + no pulse; 完整 → 减弱 from pause › 设置 mid-race → 1.00. shots/r3-ui/motion.mjs.
+- Sandbox: new driver poses spIdle / spTarget, cuts npcSay / npcGone; asserting scenes ultIdle, ultBack,
+  achQueue, npcSay, npcGone, wreckedCine (+ wrecked asserts the vignette, achievement asserts the queue).
+  `node sandbox/hud.shots.mjs --out shots/r3-ui/hud`: all PASS, errors [].

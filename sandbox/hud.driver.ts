@@ -2,9 +2,12 @@
 // drive every cut-in, so sandbox/hud.shots.mjs can screenshot each state deterministically.
 import { Vector3 } from 'three';
 import type { Game } from '../src/core/game';
-import type { RiderState, WeaponId } from '../src/core/types';
+import type { Obstacle, RiderState, WeaponId } from '../src/core/types';
 import { SKILLS } from '../src/data/skills';
-import { ROSTER } from '../src/data/roster';
+import { POLICE_LINES, ROSTER } from '../src/data/roster';
+
+/** The police corgi's obstacle id in race/police.ts (npc:say speakers are followed by obstacle id). */
+const NPC_ID = 900;
 
 export interface HudDriver {
   pose(name: string): void;
@@ -41,6 +44,9 @@ const POSES: Record<string, Pose> = {
   draftReady: (p) => Object.assign(p, { draft: 0.92 }),
   lowhp: (p) => Object.assign(p, { hp: Math.round(p.maxHp * 0.18) }),
   spfull: (p) => Object.assign(p, { sp: 100 }),
+  /** SP full but nobody in combat's SHOWTIME window (a cast would be denied): RiderState.ultTarget false. */
+  spIdle: (p) => Object.assign(p, { sp: 100, ultTarget: false }),
+  spTarget: (p) => Object.assign(p, { ultTarget: true }),
   cooldowns: (p) => Object.assign(p, { cooldowns: [3.4, 7.6, 0.4] }),
   weapon: (p) => Object.assign(p, { weapon: 'saltfish' as WeaponId, weaponUses: 5 }),
   slipper: (p) => Object.assign(p, { weapon: 'slipper' as WeaponId, weaponUses: 1 }),
@@ -135,6 +141,24 @@ export function installDriver(game: Game, hooks: HudHooks): void {
       bus.emit('projectile:spawn', { id: Number(o.id ?? 1), owner: r.id, target: s.player.id, kind: String(o.kind ?? 'pelican.torpedo'), pos: posOf(r) });
     },
     projEnd: (o) => bus.emit('projectile:end', { id: Number(o.id ?? 1), hit: null, pos: posOf(sess().player) }),
+    /** npc:say from a stand-in police obstacle `ds` m ahead at lateral `x` (created on first use). */
+    npcSay: (o) => {
+      const s = sess();
+      let ob = s.obstacles.find((x) => x.id === NPC_ID);
+      if (!ob) {
+        const fresh: Obstacle = { id: NPC_ID, kind: 'police', s: 0, x: 0, speed: 0, halfWidth: 0.45, halfLength: 0.9, height: 1.6, solid: false, active: true };
+        s.obstacles.push(fresh);
+        ob = fresh;
+      }
+      Object.assign(ob, { s: s.player.s + Number(o.ds ?? 8), x: Number(o.x ?? 2), speed: s.player.speed, active: true });
+      bus.emit('npc:say', { obstacleId: NPC_ID, character: 'corgi', text: String(o.text ?? POLICE_LINES.alert[0] ?? '哔——！') });
+    },
+    /** The police obstacle leaves the session (despawn): its bubble must go with it. */
+    npcGone: () => {
+      const s = sess();
+      const i = s.obstacles.findIndex((x) => x.id === NPC_ID);
+      if (i >= 0) s.obstacles.splice(i, 1);
+    },
     denied: (o) => bus.emit('skill:denied', { riderId: sess().player.id, slot: Number(o.slot ?? 1), reason: (String(o.reason ?? 'cooldown')) as 'cooldown' }),
     pick: (o) => {
       // Like combat's equip(): the weapon arrives with its remaining uses, then the pick event fires.

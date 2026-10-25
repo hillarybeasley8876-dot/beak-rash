@@ -40,7 +40,7 @@ export function koSplash(chain: number, attacker: CharacterId | null, victim: Ch
 export function wreckedSplash(player: CharacterId, cause: CrashCause, by: CharacterId | null, cine: boolean): CutIn {
   const lay = cineLayout(cine);
   const cut = splashCut({
-    cls: `ci-wrecked${lay.cls}`, title: 'WRECKED', scheme: 'hot', dur: 0.9, seed: nextSeed(), tint: true, tilt: lay.tilt,
+    cls: `ci-wrecked${lay.cls}`, title: 'WRECKED', scheme: 'hot', dur: 0.9, seed: nextSeed(), tint: !cine, tilt: lay.tilt,
     cn: CRASH_CN[cause], sub: by ? `by ${ROSTER[by].name}` : undefined,
     right: { id: player, mood: 'hurt', cross: false },
   });

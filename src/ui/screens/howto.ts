@@ -30,7 +30,9 @@ export const howtoScreen: ScreenFactory = (ctx) => {
   };
   body.append(...pages);
   f.stage.append(bar, body);
-  const nav = ctx.nav(new Nav(tabs.map((el, i) => ({ el, onFocus: () => showPage(i) })), { layout: 'horizontal', start: recall('howto'), sfx: ctx.sfx }));
+  // First visit this session: open on the map of the device in use (keyboard, or the gamepad tab).
+  const first = ctx.app.input.lastDevice === 'gamepad' ? 1 : 0;
+  const nav = ctx.nav(new Nav(tabs.map((el, i) => ({ el, onFocus: () => showPage(i) })), { layout: 'horizontal', start: recall('howto', first), sfx: ctx.sfx }));
   return {
     root: f.root,
     onAction: (a) => {

@@ -61,6 +61,8 @@
   translate: 5px 5px;
 }
 .tb-who { position: absolute; left: -10px; top: -16px; padding: 3px 7px 1px; background: var(--red); color: var(--paper); font: 400 17px/1 "ZCOOL QingKe HuangYou", sans-serif; transform: rotate(-8deg); box-shadow: 0 0 0 2px var(--ink); }
+/* npc:say speakers (the police corgi): police-blue name label. */
+.tb.is-npc .tb-who { background: #1F4FD1; }
 .tb-tail { position: absolute; left: 50%; bottom: -20px; width: 30px; height: 24px; translate: -30% 0; background: var(--paper); clip-path: polygon(0 0, 100% 0, 18% 100%); }
 
 /* Damage numbers. */

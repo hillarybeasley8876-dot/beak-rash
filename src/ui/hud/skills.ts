@@ -9,6 +9,13 @@ import { el, w, type W } from './dom';
 import { keyGlyphs, SLOT_KEYS, type HudKey } from './glyphs';
 
 const DENY_TEXT: Record<'cooldown' | 'sp' | 'state', string> = { cooldown: '冷却中', sp: 'SP 不足', state: '现在不行' };
+/** s RiderState.ultTarget must hold a new value before the HUD follows it (a rival at the window's edge
+ *  must not make SHOWTIME READY flicker). */
+const TARGET_HOLD = 0.3;
+
+/** SHOWTIME: 'charging' (SP short), 'ready' (full, a cast would find victims), 'idle' (full, nobody in
+ *  combat's planUlt window: a cast now would be denied with 无目标！). */
+export type UltState = 'charging' | 'ready' | 'idle';
 
 /** Skills in the player's U/I/O slots and the ult, derived from data/skills.ts. */
 export function playerKit(character: CharacterId): { slots: Array<SkillDef | null>; ult: SkillDef | null } {
@@ -93,14 +100,16 @@ class UltDiamond extends Diamond {
     this.fillW = w(el('div', 'sk-ultfill', this.boxEl));
   }
 
-  update(sp: number, cost: number, dt: number): void {
+  /** `armed`: a cast now would find victims (debounced ultTarget); full SP without it greys the diamond. */
+  update(sp: number, cost: number, armed: boolean, dt: number): void {
     const f = clamp01(sp / Math.max(1, cost));
     this.shown = this.shown < 0 ? f : approach(this.shown, f, dt * 3);
     this.fillW.style('--fill', this.shown.toFixed(3));
-    const ready = f >= 1;
+    const ready = f >= 1 && armed;
     if (ready && !this.ready) this.popT = 0;
     this.ready = ready;
     this.root.cls('is-ready', ready);
+    this.root.cls('is-idle', f >= 1 && !armed);
     this.animate(dt);
   }
 }
@@ -110,6 +119,10 @@ export class SkillRow {
   private diamonds: SkillDiamond[] = [];
   private ult: UltDiamond | null = null;
   private ultCost = 100;
+  private sp = 0;
+  /** Debounced RiderState.ultTarget (TARGET_HOLD) and how long the raw flag has disagreed with it. */
+  private target = true;
+  private targetT = 0;
 
   constructor(parent: HTMLElement, character: CharacterId) {
     this.root = el('div', 'sk', parent);
@@ -121,13 +134,21 @@ export class SkillRow {
     }
   }
 
-  get ultCostSp(): number {
-    return this.ultCost;
+  /** What the SP bar and the P diamond say about SHOWTIME this frame. */
+  get ultState(): UltState {
+    if (!this.ult || this.sp < this.ultCost) return 'charging';
+    return this.target ? 'ready' : 'idle';
   }
 
   update(r: RiderState, dt: number): void {
+    this.sp = r.sp;
+    if (r.ultTarget === this.target) this.targetT = 0;
+    else if ((this.targetT += dt) >= TARGET_HOLD) {
+      this.target = r.ultTarget;
+      this.targetT = 0;
+    }
     this.diamonds.forEach((d, i) => d.update(r.cooldowns[i] ?? 0, dt));
-    this.ult?.update(r.sp, this.ultCost, dt);
+    this.ult?.update(r.sp, this.ultCost, this.target, dt);
   }
 
   /** skill:denied for the player. Slots 1–3 are the U/I/O skills (SkillDef.slot); anything else is the ult. */

@@ -22,6 +22,11 @@
 .br-rec-name { font-family: var(--f-cn-block); font-weight: 400; font-size: 26px; line-height: 1.1; }
 .br-rec-desc { font-size: 18px; line-height: 1.25; color: #55555e; }
 .br-rec-cell:not(.is-earned) .br-rec-name, .br-rec-cell:not(.is-earned) .br-rec-desc { color: #8a8a93; }
+/* More than 42 achievements (8-9 rows): shorter cells, same 6 columns. */
+.br-rec-sheet.is-dense { padding-top: 22px; }
+.br-rec-sheet.is-dense .br-rec-grid { gap: 6px 14px; }
+.br-rec-sheet.is-dense .br-rec-cell { min-height: 74px; padding: 3px 10px; }
+.br-rec-sheet.is-dense .br-rec-desc { font-size: 16px; line-height: 1.2; }
 .br-rec-foot { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 14px; font-family: var(--f-cn-block); font-size: 24px; }
 /* Career-screen chip that opens the sheet. */
 .br-car-rec { position: absolute; right: 70px; top: 128px; display: flex; align-items: center; gap: 10px; padding: 4px 16px 2px; background: var(--red); color: var(--white); font-family: var(--f-cn-block); font-size: 26px; transform: skewX(var(--skew)); box-shadow: 5px 5px 0 var(--white); cursor: pointer; pointer-events: auto; animation: br-in-right 0.3s var(--ease-out) 0.08s both; }
