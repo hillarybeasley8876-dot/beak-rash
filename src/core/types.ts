@@ -127,6 +127,7 @@ export interface RiderState {
   draft: number;       // 0..1 slipstream amount
   trick: TrickState | null; // air trick in progress (SPEC §16); views rotate the rider + bike by it
   trickChain: number;  // tricks completed in the current air (0 on the ground)
+  gliding: boolean;    // umbrella glide in progress (sim-owned, SPEC §15); views open the umbrella overhead
   // --- race (owned by gameplay/race) ---
   mode: RiderMode;
   modeTime: number;    // seconds in current mode

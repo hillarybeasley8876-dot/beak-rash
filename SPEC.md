@@ -361,16 +361,18 @@ below are the starting point. Everything stays kind and cartoonish (pillar 5): n
 
 ## 16. Air tricks (sim unit; poses = actors; trails/landing burst = fx)
 - A trick starts on a FRESH drift press while airborne (not a drift held from the ground), ≥ 0.25 s after take-off,
-  not stunned and not gliding: drift + steer |s| > 0.6 → `spin` (360° yaw, dir = sign, 0.55 s); drift + up/throttle
-  → `backflip` (−360° pitch, 0.65 s); drift + down/brake → `frontflip` (+360° pitch, 0.65 s); drift alone held 0.2 s →
-  `superman` (rider stretches off the bars; held while drift is held; counts after 0.3 s; must be released ≥ 0.15 s
-  before landing). After a trick finishes another may start (RiderState.trickChain + 1).
+  not stunned and not gliding. Throttle never picks a trick (keyboard players hold W all race): drift + steer
+  |s| > 0.6 → `spin` (360° yaw, dir = sign, 0.55 s); drift + brake > 0.5 → `backflip` ("pull back", −360° pitch, 0.65 s);
+  drift + hop pressed → `frontflip` (+360° pitch, 0.65 s); drift alone held 0.2 s → `superman` (rider stretches off the
+  bars; held while drift is held; counts after 0.3 s; must be released ≥ 0.15 s before landing). After a trick
+  finishes, a new fresh drift press starts the next (RiderState.trickChain + 1).
 - Visual only: the trick rotates the rider + bike view around its centre (actors reads RiderState.trick); physics yaw
   and the landing alignment are unaffected. Landing with a trick < 85 % done, or still in superman, = crash cause
   'trick'; ≥ 85 % snaps to done. Landing with ≥ 1 trick done: `rider:trick {phase:'land'}` → boost +20 % for
   0.6 s × (1 + 0.2 · (count − 1)), SP +8 per trick (combat), STYLE points (§17). Fails emit `rider:trick {phase:'fail'}`.
 - AI show-offs (cat, shiba, seagull, pigeon) spin on airs ≥ 0.6 s 40 % of the time (race AI sets the controls).
-- Inputs: keyboard Shift + A/D/W/S (or arrows); pad RB + stick/d-pad (up/down = stick or RT/LT).
+- Inputs: keyboard Shift + A/D (spin), Shift + S (backflip), Shift + Space (frontflip), Shift alone (superman);
+  pad RB + stick/d-pad, RB + LT, RB + A, RB alone.
 
 ## 17. STYLE chains (new module `gameplay/style`, player only)
 - Actions (base points): drift boost L1/L2/L3 50/100/180 · slingshot 80 · near miss 60 · PERFECT landing 80 ·

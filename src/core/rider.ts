@@ -13,7 +13,7 @@ export function createRiderState(
     id, character, bike, isPlayer, name: def.name,
     s: 0, x: 0, y: 0, speed: 0, vx: 0, vy: 0, yaw: 0, lean: 0,
     airborne: false, airTime: 0, drifting: false, driftCharge: 0, boostTime: 0, boostPower: 0,
-    surface: 'road', draft: 0, trick: null, trickChain: 0,
+    surface: 'road', draft: 0, trick: null, trickChain: 0, gliding: false,
     mode: 'grid', modeTime: 0, place: id + 1, progress: 0, finishTime: null, rubber: 1,
     hp: maxHp, maxHp, sp: 0, weapon: 'none', weaponUses: Infinity, ultTarget: true, statuses: [], mods: defaultMods(), action: null,
     cooldowns: [0, 0, 0], combo: 0, comboTimer: 0, kos: 0, wrecked: 0,
