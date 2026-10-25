@@ -7,9 +7,10 @@
 //   node tools/gen-tts.mjs [--force] [--only ann_ko,goose_taunt_0] [--dry]
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { execFileSync, spawnSync } from 'node:child_process';
 
-const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, 'public/assets/voice');
 const MANIFEST = path.join(ROOT, 'src/data/voice.ts');
 const API = 'https://ys-api.xaminim.com/api/minimax_tts';
@@ -31,6 +32,7 @@ const SPEAKERS = {
   seagull: { voice: 'Chinese (Mandarin)_Southern_Young_Man', fallback: 'male-qn-qingse', speed: 1.15, emotion: 'happy' },
   sloth: { voice: 'Chinese (Mandarin)_Humorous_Elder', fallback: 'audiobook_male_1', speed: 1.0, emotion: 'neutral' },
   corgi: { voice: 'Chinese (Mandarin)_Straightforward_Boy', fallback: 'clever_boy', speed: 1.1, emotion: 'angry' },
+  truck: { voice: 'Chinese (Mandarin)_Southern_Young_Man', fallback: 'male-qn-qingse', speed: 1.05, emotion: 'angry' },
 };
 
 // id, speaker, kind, text (= the on-screen line it voices), say (spoken form, if different).
@@ -54,6 +56,9 @@ const LINES = [
   ['ann_onemore', 'announcer', 'announcer', 'ONE MORE！', 'One more！'],
   ['ann_lead', 'announcer', 'announcer', '领先了！'],
   ['ann_nearmiss', 'announcer', 'announcer', '好险！'],
+  ['ann_wanted3', 'announcer', 'announcer', '三颗星，全城通缉！'],
+  ['ann_nemesis', 'announcer', 'announcer', '宿敌登场！'],
+  ['ann_alliance', 'announcer', 'announcer', '围剿！'],
   ['pelican_taunt_0', 'pelican', 'taunt', '嘴大吃四方！'],
   ['pelican_taunt_1', 'pelican', 'taunt', '让一让，鹈鹕要过了！'],
   ['pelican_ko_0', 'pelican', 'ko', '一口一个！'],
@@ -131,6 +136,109 @@ function addRosterLines() {
   }
 }
 addRosterLines();
+
+// ---------------------------------------------------------------- r4 lines (SPEC §14–§21)
+// A spoken line must equal the on-screen line exactly (the voice player matches the bubble's
+// text), so the r4 lines are read from the data files instead of being copied here.
+
+/** The 8 rival species (the pelican is the player, the corgi is the police). */
+const RIVAL_SPECIES = ['goose', 'capybara', 'cat', 'shiba', 'pigeon', 'penguin', 'seagull', 'sloth'];
+
+/** The body of a `name: { ... }` block in a data file. */
+function blockOf(file, name) {
+  const src = fs.readFileSync(path.join(ROOT, file), 'utf8');
+  const at = src.indexOf(name);
+  if (at < 0) return '';
+  const open = src.indexOf('{', at);
+  let depth = 0;
+  for (let k = open; k < src.length; k++) {
+    if (src[k] === '{') depth++;
+    else if (src[k] === '}' && --depth === 0) return src.slice(open + 1, k);
+  }
+  return '';
+}
+
+/** The `key: [ 'a', 'b' ]` groups of a block. */
+function listsOf(body) {
+  const out = new Map();
+  for (const m of body.matchAll(/(\w+):\s*\[([\s\S]*?)\]/g)) {
+    out.set(m[1], [...m[2].matchAll(/'((?:[^'\\]|\\.)*)'/g)].map((x) => x[1]));
+  }
+  return out;
+}
+
+/** The `key: 'text'` pairs of a block. */
+function textsOf(body) {
+  return [...body.matchAll(/(\w+):\s*'((?:[^'\\]|\\.)*)'/g)].map((m) => [m[1], m[2]]);
+}
+
+/** The quoted lines of a `name: [ ... ]` list in a file. */
+function listOf(file, name) {
+  const src = fs.readFileSync(path.join(ROOT, file), 'utf8');
+  const body = src.match(new RegExp(`${name}[^=]*=\\s*\\[([\\s\\S]*?)\\]`))?.[1] ?? '';
+  return [...body.matchAll(/'((?:[^'\\]|\\.)*)'/g)].map((m) => m[1]);
+}
+
+/** The corgi officer's Police 2.0 lines (data/police-lines.ts): it says them as npc:say bubbles. */
+function addPoliceLines() {
+  const file = 'src/data/police-lines.ts';
+  const src = fs.readFileSync(path.join(ROOT, file), 'utf8');
+  const groups = [
+    ['windup', 'windup'], ['strike', 'strike'], ['backup', 'backup'], ['roadblock', 'roadblock'],
+    ['down', 'down'], ['bribeYes', 'bribeyes'], ['bribeNoW3', 'bribenow3'],
+    ['bribeNoCoins', 'bribenocoins'], ['bribeNoThird', 'bribenothird'],
+  ];
+  for (const [name, id] of groups) {
+    const body = src.match(new RegExp(`${name}:\\s*\\[([\\s\\S]*?)\\]`))?.[1] ?? '';
+    [...body.matchAll(/'((?:[^'\\]|\\.)*)'/g)].forEach((m, i) => {
+      LINES.push([`corgi_police_${id}_${i}`, 'corgi', 'taunt', m[1]]);
+    });
+  }
+}
+
+/** The nemesis / alliance lines (data/rival-lines.ts): each species speaks with its own voice. */
+function addRivalLines() {
+  const file = 'src/data/rival-lines.ts';
+  const nemesis = listsOf(blockOf(file, 'NEMESIS_LINES'));
+  for (const s of RIVAL_SPECIES) (nemesis.get(s) ?? []).forEach((text, i) => LINES.push([`nemesis_${s}_${i}`, s, 'taunt', text]));
+  const alliance = textsOf(blockOf(file, 'ALLIANCE_LINES'));
+  for (const [s, text] of alliance) if (RIVAL_SPECIES.includes(s)) LINES.push([`alliance_${s}`, s, 'taunt', text]);
+  const down = textsOf(blockOf(file, 'NEMESIS_DOWN_LINES'));
+  for (const [s, text] of down) if (RIVAL_SPECIES.includes(s)) LINES.push([`nemesisdown_${s}`, s, 'ko', text]);
+  const grudge = textsOf(blockOf(file, 'GRUDGE_LINES'));
+  for (const [s, text] of grudge) if (RIVAL_SPECIES.includes(s)) LINES.push([`grudge_${s}`, s, 'taunt', text]);
+  const src = fs.readFileSync(path.join(ROOT, file), 'utf8');
+  // One line for every species: the goose's voice carries it.
+  const betrayal = /BETRAYAL_LINE\s*=\s*'((?:[^'\\]|\\.)*)'/.exec(src)?.[1];
+  if (betrayal) LINES.push(['betrayal', 'goose', 'taunt', betrayal]);
+  const strike = /NEMESIS_STRIKE_LINE\s*=\s*'((?:[^'\\]|\\.)*)'/.exec(src)?.[1];
+  if (strike) LINES.push(['nemesis_strike', 'goose', 'taunt', strike]);
+}
+
+/** The track-event announcements (data/event-lines.ts) and the shouts of the event's owners. */
+function addEventLines() {
+  const file = 'src/data/event-lines.ts';
+  for (const m of blockOf(file, 'EVENT_LINES').matchAll(/(\w+):\s*\{([\s\S]*?)\}/g)) {
+    const warn = /warn:\s*'((?:[^'\\]|\\.)*)'/.exec(m[2])?.[1] ?? '';
+    if (warn) LINES.push([`ann_event_${m[1]}`, 'announcer', 'announcer', warn]);
+  }
+  listOf(file, 'STALL_LINES').forEach((text, i) => LINES.push([`stall_${i}`, 'sloth', 'taunt', text]));
+  listOf(file, 'FISH_TRUCK_LINES').forEach((text, i) => LINES.push([`fishtruck_${i}`, 'truck', 'taunt', text]));
+}
+
+/** The easter-egg lines that are spoken (data/secret-lines.ts): the goose's poem, the sloth's sigh. */
+function addSecretLines() {
+  const body = blockOf('src/data/secret-lines.ts', 'SECRET_LINES');
+  for (const [key, speaker] of [['goose', 'goose'], ['sloth', 'sloth']]) {
+    const text = new RegExp(`${key}:\\s*'((?:[^'\\\\]|\\\\.)*)'`).exec(body)?.[1];
+    if (text) LINES.push([`secret_${key}`, speaker, 'taunt', text]);
+  }
+}
+
+addPoliceLines();
+addRivalLines();
+addEventLines();
+addSecretLines();
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

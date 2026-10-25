@@ -1,6 +1,6 @@
 // Audio sandbox: every song / stinger / sfx / voice on a button, live meters, and the offline
 // render-check API (window.__audioCheck) used by tools/audio-check.mjs.
-import { renderAllSfx, renderSfx, renderSong, renderStinger, formSeconds, songInfo } from '../src/audio/check';
+import { renderAllSfx, renderSfx, renderSong, renderStinger, formSeconds, songInfo, songWindows } from '../src/audio/check';
 import { hookMask, stems } from '../src/audio/check-mix';
 import { tone } from '../src/audio/check-tone';
 import { fadeOutCheck, retriggerChecks, stingerIdleChecks } from '../src/audio/check-onsets';
@@ -24,6 +24,7 @@ declare global {
       sfx: string[];
       renderSfx: typeof renderSfx;
       renderAllSfx: typeof renderAllSfx;
+      songWindows: typeof songWindows;
       stems: typeof stems;
       hookMask: typeof hookMask;
       tone: typeof tone;
@@ -45,6 +46,7 @@ window.__audioCheck = {
   sfx: Object.keys(SFX),
   renderSfx,
   renderAllSfx,
+  songWindows,
   stems,
   hookMask,
   tone,

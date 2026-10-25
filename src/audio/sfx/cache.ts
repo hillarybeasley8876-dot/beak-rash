@@ -35,6 +35,11 @@ export class SfxCache {
     return list[this.next % list.length] ?? null;
   }
 
+  /** How many sounds are ready and how many are still queued (the diagnostics). */
+  state(): { takes: number; pending: number; seconds: number } {
+    return { takes: this.takes.size, pending: this.queue.length, seconds: +this.seconds.toFixed(1) };
+  }
+
   /**
    * Render `id` in the background (once); `dur` = its length at pitch 1 (null = not known yet);
    * `pitch` bakes a fixed tape speed into the takes (a variant played at rate 1, e.g. heavy hits).

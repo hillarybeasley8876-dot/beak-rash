@@ -251,12 +251,13 @@ export class Band {
     return (this.strings ??= new SampledPad(this));
   }
 
-  /** A lead voice; `prev` = the last note it played before this band existed (a bar render's legato). */
+  /** A lead voice; `prev` = the last note it played before this band existed (a bar render's legato).
+   *  `slot` 1 is the second instance of the same instrument (the harmony line under the hook). */
   lead(voice: LeadVoice, slot = 0, prev?: { midi: number; end: number }): Lead {
     const key = `${voice}${slot}`;
     let l = this.leads.get(key);
     if (!l) {
-      l = new Lead(this, voice);
+      l = new Lead(this, voice, slot);
       if (prev) l.follow(prev.midi, prev.end);
       this.leads.set(key, l);
     }

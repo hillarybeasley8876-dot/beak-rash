@@ -2,14 +2,21 @@
 // square layer through an envelope band-pass), square synth (low-pass) and a breathy FM-free flute
 // (three sine partials + band-passed breath). Delayed vibrato from the band's shared LFO. An
 // octave-down double (lead2 shadowing the hook) is one extra oscillator inside the same voice.
+// 'pluck' is the Chinese string: slot 0 is a struck zheng (a modal burst: bright attack, fast
+// decay, re-struck for every note), slot 1 the bowed erhu (a sustained tone that slides into the
+// next note). Both are built per note — a string rings, it does not keep a running oscillator.
 import { layerWave } from '../../dsp/curves';
-import { adsr, anchor, filter, holdAt, settle } from '../../dsp/env';
+import { adsr, anchor, filter, holdAt, perc, settle } from '../../dsp/env';
 import { midiToHz } from '../theory';
 import { NoiseVoice, osc, type Gate } from './voice';
 import type { Band } from '../band';
 import type { LeadVoice } from '../types';
 
 const FLUTE_PARTIALS: Array<[number, number]> = [[1, 1], [2, 0.3], [3, 0.12]];
+/** The struck string: [ratio, level, decay (s)] — a bright attack partial over a fast-decaying body. */
+const ZHENG_PARTIALS: Array<[number, number, number]> = [[1, 1, 0.5], [2, 0.5, 0.34], [3.01, 0.3, 0.22], [4.03, 0.22, 0.05]];
+/** The bowed string: [ratio, level, decay] — the fundamental saw carries the bow noise. */
+const BOWED_PARTIALS: Array<[number, number, number]> = [[1, 1, 1], [2, 0.34, 1], [3, 0.16, 1]];
 
 interface Sub { o: OscillatorNode; level: GainNode; gate: Gate }
 
@@ -28,12 +35,13 @@ export class Lead {
   private lastMidi = 0;
   private lastEnd = -Infinity;
 
-  constructor(private b: Band, readonly voice: LeadVoice, dest: AudioNode = b.input('lead')) {
+  constructor(private b: Band, readonly voice: LeadVoice, readonly slot = 0, private readonly dest: AudioNode = b.input('lead')) {
     const ctx = b.ctx;
     this.amp = new GainNode(ctx, { gain: 0 });
     this.gate = b.gate(this.amp, dest);
     this.vib = new GainNode(ctx, { gain: 0 });
     b.lfo(voice === 'flute' ? 5.1 : 5.6).connect(this.vib);
+    if (voice === 'pluck') return;   // a string is built per note, not kept running
     if (voice === 'flute') {
       for (const [mul, level] of FLUTE_PARTIALS) {
         const o = osc(b, 'sine');
@@ -75,6 +83,10 @@ export class Lead {
 
   /** `double` = level of an octave-down double relative to the note (0 = none). */
   note(t: number, midi: number, dur: number, vel: number, scoop: boolean, double = 0): void {
+    if (this.voice === 'pluck') {
+      this.pluck(t, midi, dur, vel, scoop);
+      return;
+    }
     const f = midiToHz(midi);
     this.b.underLead(t, dur);
     const sub = double > 0 ? this.subOsc() : this.sub;
@@ -129,6 +141,48 @@ export class Lead {
     }
     // Levels matched per voice: each sits ≈ −5 LU under a full race mix (audio-check stems).
     this.gate.open(adsr(this.amp.gain, t, dur, (this.voice === 'wah' ? 0.3 : 0.105) * vel, 0.006, 0.2, 0.72, 0.08, true));
+  }
+
+  /**
+   * A note on the Chinese string. Slot 0 is the struck zheng: a modal burst (a bright attack
+   * partial over a body that decays in half a second), re-struck for every note. Slot 1 is the
+   * bowed erhu: a sustained tone that slides into the next note and carries a delayed vibrato.
+   */
+  private pluck(t: number, midi: number, dur: number, vel: number, scoop: boolean): void {
+    const ctx = this.b.ctx;
+    const f = midiToHz(midi);
+    const bowed = this.slot === 1;
+    this.b.underLead(t, dur);
+    const out = new GainNode(ctx, { gain: 1 });
+    out.connect(this.dest);
+    // The bowed line slides into the next note; the zheng is re-struck (no glide).
+    const glide = bowed && !scoop && t < this.lastEnd + 0.06 && Math.abs(midi - this.lastMidi) <= GLIDE_MAX && midi !== this.lastMidi;
+    const from = scoop ? Math.pow(2, -1.5 / 12) : glide ? Math.pow(2, (this.lastMidi - midi) / 12) : 1;
+    const partials = bowed ? BOWED_PARTIALS : ZHENG_PARTIALS;
+    partials.forEach(([ratio, level, decay], k) => {
+      const target = f * ratio;
+      const o = new OscillatorNode(ctx, { type: bowed ? (ratio === 1 ? 'sawtooth' : 'triangle') : 'triangle', frequency: target });
+      const pg = new GainNode(ctx, { gain: 0 });
+      o.connect(pg).connect(out);
+      if (from !== 1) {
+        o.frequency.setValueAtTime(target * from, t);
+        o.frequency.exponentialRampToValueAtTime(target, t + (scoop ? 0.07 : GLIDE));
+      }
+      if (bowed) {
+        this.vib.connect(o.detune);
+        const end = adsr(pg.gain, t, dur, level * 0.11 * vel, 0.06, 0.25, 0.72, 0.14);
+        o.start(t);
+        o.stop(end + 0.02);
+      } else {
+        const end = perc(pg.gain, t, level * 0.15 * vel, 0.002, decay);
+        o.start(t);
+        o.stop(end + 0.02);
+      }
+      if (k === partials.length - 1) o.onended = () => out.disconnect();
+    });
+    if (bowed) this.vibrato(t, dur);
+    this.lastMidi = midi;
+    this.lastEnd = t + dur;
   }
 
   private vibrato(t: number, dur: number): void {

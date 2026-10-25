@@ -18,7 +18,7 @@ import { withPage, parseArgs, BASE } from './lib.mjs';
 import { gameCheck } from './audio-check-game.mjs';
 import { robustCheck } from './audio-check-robust.mjs';
 import { startCheck } from './audio-check-start.mjs';
-import { cpuCheck } from './audio-check-cpu.mjs';
+import { cpuCheck, isLoaded, machineLoad } from './audio-check-cpu.mjs';
 import { adaptiveCheck } from './audio-check-adaptive.mjs';
 import { barksCheck } from './audio-check-barks.mjs';
 
@@ -30,7 +30,10 @@ const PEAK_MAX = -1;        // dBFS
 // budget is the realtime gate (audio-check-cpu.mjs). The render time is wall-clock: on a loaded machine
 // (other agents, browsers) it inflates, so above one runnable thread per core overruns are warnings.
 const CPU_MAX = 6;
-const LOADED = os.loadavg()[0] > os.cpus().length;
+// The machine's load, measured (os.loadavg() is always [0,0,0] on Windows): above 70 % busy the
+// render times inflate, so a cpu overrun is a warning, not a failure. No threshold is loosened.
+let loaded = false;
+const sampleLoad = async () => { loaded = await isLoaded(); };
 
 function verdict(s, { music }) {
   const bad = [];
@@ -38,7 +41,7 @@ function verdict(s, { music }) {
   if (s.clipped > 0) bad.push(`${s.clipped} clipped`);
   if (s.clicks > 0) bad.push(`${s.clicks} clicks`);
   if (music && s.dropouts > 0) bad.push(`${s.dropouts} dropouts`);
-  if (music && s.cpuNet > CPU_MAX && !LOADED) bad.push(`cpu ${s.cpuNet}%`);
+  if (music && s.cpuNet > CPU_MAX && !loaded) bad.push(`cpu ${s.cpuNet}%`);
   if (music && s.rmsDb < -30) bad.push(`too quiet ${s.rmsDb}`);
   return bad;
 }
@@ -52,15 +55,19 @@ const RUN_OFFLINE = !args.game && !args.cpu;
 const RUN_GAME = !args.offline && !args.only && !args.cpu;
 const RUN_CPU = !args.offline && !args.only;
 if (RUN_OFFLINE) await withPage(async (page, h) => {
+  await sampleLoad();
   await page.goto(BASE + '/sandbox/audio.html', { waitUntil: 'load', timeout: 60000 });
   await page.waitForFunction(() => window.__audioCheck?.ready === true, null, { timeout: 60000 });
   const { songs, stingers, sfx } = await page.evaluate(() => ({
     songs: window.__audioCheck.songs, stingers: window.__audioCheck.stingers, sfx: window.__audioCheck.sfx ?? [],
   }));
   const only = typeof args.only === 'string' ? args.only.split(',') : null;
-  console.log(`songs: ${songs.length}  stingers: ${stingers.length}  sfx: ${sfx.length}  load ${os.loadavg()[0].toFixed(1)} / ${os.cpus().length} cores${LOADED ? ' (loaded: cpu overruns are warnings)' : ''}`);
+  const busy = await machineLoad(300);
+  console.log(`songs: ${songs.length}  stingers: ${stingers.length}  sfx: ${sfx.length}  load ${(busy * 100).toFixed(0)}% busy / ${os.cpus().length} cores${loaded ? ' (loaded: cpu overruns are warnings)' : ''}`);
   for (const id of songs) {
     if (only && !only.includes(id)) continue;
+    // The load before each song's renders: a busy box inflates the render times.
+    await sampleLoad();
     const runs = await page.evaluate(async ([songId, secs]) => {
       const c = window.__audioCheck;
       const song = await c.renderSong(songId, secs);
@@ -161,6 +168,7 @@ if (RUN_OFFLINE) await withPage(async (page, h) => {
 });
 
 if (RUN_GAME) {
+  await sampleLoad();
   failures.push(...await gameCheck(args), ...await startCheck(args), ...await adaptiveCheck(args), ...await barksCheck(args));
   failures.push(...await robustCheck(args));
 }

@@ -28,6 +28,9 @@ export interface Host {
   /** A rival's voice line (or its animal call when no clip exists), only near the player.
    *  `wait` = s the line may wait for the bark channel (held KO lines) instead of being dropped. */
   bark(riderId: RiderId, kind: BarkKind, text?: string, wait?: number): void;
+  /** A line from a speaker that is not a session rider but rides an Obstacle (the police corgi,
+   *  a market-stall owner): its own clip, placed where the obstacle is now. */
+  npcVoice(obstacleId: number, text: string, character: string): void;
   stinger(id: StingerId): void;
   song(id: string | null, fade?: number): void;
   /** Race countdown n = 3, 2, 1 (count-in; the song waits), 0 = GO (bar 1 of section A). */

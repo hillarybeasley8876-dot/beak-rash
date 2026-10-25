@@ -5,6 +5,7 @@ import { Vector3 } from 'three';
 import { BikeLoops } from './sfx/loops';
 import { Siren } from './sfx/siren';
 import { place } from './sfx/spatial';
+import { WeatherLoops, type WeatherLoop } from './sfx/weather';
 import type { Session } from '../core/contracts';
 import type { RiderState, TrackFeature } from '../core/types';
 import type { Engine } from './engine';
@@ -17,6 +18,7 @@ const TOP3_HOLD = 2;
 export class SessionWatcher {
   private session: Session | null = null;
   private loops: BikeLoops | null = null;
+  private weather: WeatherLoops | null = null;
   private siren: Siren | null = null;
   private alertUntil = 0;
   private alertLevel = 0;
@@ -27,6 +29,8 @@ export class SessionWatcher {
   private wantSince = 0;
   private space = -1;
   private v = new Vector3();
+  /** The weather ambience right now (the debug state shows it). */
+  private ambience: { loop: WeatherLoop; level: number } = { loop: 'none', level: 0 };
 
   constructor(private h: Host, private engine: Engine, private setIntensity: (level: number) => void) {}
 
@@ -57,6 +61,18 @@ export class SessionWatcher {
       this.space = inTunnel;
       this.engine.setSfxSpace(inTunnel);
     }
+    // The weather ambience: only while the race runs, and quieter under a tunnel's roof. The loops
+    // are built on the first rainy / windy race (a clear race never pays for them).
+    const weather = this.weatherFor(session);
+    const running = onTrack && session.phase !== 'intro' && timeScale > 0.02;
+    const weatherLevel = running ? weather.level : 0;
+    this.ambience = { loop: weather.loop, level: weatherLevel };
+    if (weather.loop !== 'none') {
+      this.weather ??= new WeatherLoops(this.engine);
+      this.weather.update(weather.loop, weatherLevel, inTunnel > 0);
+    } else if (this.weather) {
+      this.weather.update('none', 0, false);
+    }
     // Once the player has finished, the music holds where it is until the results crossfade.
     if (session.phase !== 'finished' && p.mode !== 'finished') {
       this.steer(session.phase !== 'racing' ? 0 : p.progress >= 0.85 ? 2 : p.place <= 3 ? 1 : 0, now);
@@ -81,11 +97,20 @@ export class SessionWatcher {
     this.loops?.update({ speed: 0, pedal: 0, surface: 'road', drift: 0, boost: false, airborne: false, active: false, timeScale: 0 });
     this.siren?.stop();
     this.siren = null;
+    this.weather?.update('none', 0, false);
+    this.ambience = { loop: 'none', level: 0 };
+  }
+
+  /** The weather ambience right now (the debug state shows it). */
+  weatherState(): { loop: WeatherLoop; level: number } {
+    return this.ambience;
   }
 
   private swap(session: Session | null): void {
     this.loops?.stop();
     this.loops = null;
+    this.weather?.stop();
+    this.weather = null;
     this.siren?.stop();
     this.siren = null;
     this.prev.clear();
@@ -99,6 +124,15 @@ export class SessionWatcher {
     this.tunnels = session ? session.track.features.filter((f) => f.kind === 'tunnel') : [];
     if (this.space !== 0) this.engine.setSfxSpace(0);
     this.space = 0;
+  }
+
+  /** The ambience this race gets: rain, a wind bed, or nothing (the desert always blows a little). */
+  private weatherFor(session: Session): { loop: WeatherLoop; level: number } {
+    const w = session.track.weather ?? session.config.weather;
+    if (w === 'rain') return { loop: 'rain', level: 1 };
+    if (w === 'snow' || w === 'fog') return { loop: 'wind', level: 1 };
+    if (session.track.id === 'gobi') return { loop: 'wind', level: 0.45 };
+    return { loop: 'none', level: 0 };
   }
 
   private updateSiren(session: Session, p: RiderState, timeScale: number, now: number): void {

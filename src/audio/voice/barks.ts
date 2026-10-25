@@ -1,6 +1,9 @@
 // Character barks: which line a rival says (the bubble's own clip, else a random voiced line of
 // that kind, else the species call), only near the player, placed by the camera and faded with
 // track distance (re-placed every frame while it plays). The bell taunt (叮) is the bike bell.
+// Speakers that are not session riders (the police corgi, a stall owner) ride an Obstacle: their
+// line is placed where that obstacle is, and it fades out when the obstacle is gone.
+import { Vector3 } from 'three';
 import { Rng } from '../../core/rng';
 import { ROSTER } from '../../data/roster';
 import type { RiderId } from '../../core/types';
@@ -13,6 +16,7 @@ const FAR = 45;
 
 export class Barks {
   private rng = new Rng(0xa0d10);
+  private v = new Vector3();
 
   constructor(private h: Host, private voices: VoicePlayer) {}
 
@@ -46,5 +50,31 @@ export class Barks {
     const fade = d <= NEAR ? 1 : d >= FAR ? 0 : 1 - (d - NEAR) / (FAR - NEAR);
     const p = this.h.place(riderId);
     return { gain: Math.min(1, p.gain * 1.15) * fade, pan: p.pan };
+  }
+
+  /**
+   * A line from a speaker that rides an Obstacle (the police corgi, a market-stall owner): its
+   * own clip if one was generated, else the species call. The line is placed where the obstacle
+   * is and fades out when the obstacle is gone.
+   */
+  sayObstacle(obstacleId: number, text: string, character: string): void {
+    const s = this.h.session();
+    if (!s) return;
+    const follow = (): { gain: number; pan: number } | null => this.placeObstacle(obstacleId);
+    const at = follow();
+    if (!at || at.gain < 0.04) return;
+    const id = this.voices.idFor(text);
+    if (id && this.voices.play(id, { channel: 'bark', pan: at.pan, gain: at.gain, follow, priority: 1 }) !== 'none') return;
+    if (this.h.cooldown(`call${obstacleId}`, 2)) this.h.play(`animal.${character}`, null, { volume: 0.8 });
+  }
+
+  /** Where an obstacle-riding speaker is now (null = gone or out of range). */
+  private placeObstacle(obstacleId: number): { gain: number; pan: number } | null {
+    const s = this.h.session();
+    const o = s?.obstacles.find((x) => x.id === obstacleId);
+    if (!s || !o) return null;
+    s.track.toWorld(o.s, o.x, 1.2, this.v);
+    const p = this.h.place({ x: this.v.x, y: this.v.y, z: this.v.z });
+    return { gain: p.gain, pan: p.pan };
   }
 }

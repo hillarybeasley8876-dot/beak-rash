@@ -51,7 +51,9 @@ class Layer {
       this.plugged = true;
     }
     if (Math.abs(v - this.value) > Math.max(0.002, this.value * 0.03)) {
-      steer(this.gain.gain, this.engine.now, v, tau);
+      // A smooth exponential approach, not a ramp: the bike loops' gains carry no ramps, and a
+      // cancelAndHoldAtTime per layer per frame is expensive (the timeline is recomputed).
+      this.gain.gain.setTargetAtTime(v, this.engine.now, Math.max(0.001, tau));
       this.value = v;
     }
     if (v <= 0.0005 && this.plugged && this.gain.gain.value < 0.0005) {
@@ -127,15 +129,19 @@ export class BikeLoops {
   private lastAt = -Infinity;
   private lastKey = '';
 
-  /** Move a parameter (60 ms ramp) only when it changed by > 1 %; ramps land exactly on their value
-   *  (a playbackRate approaching 1 asymptotically would keep its source resampling). */
+  /** Move a parameter (a smooth approach, no cancel) only when it changed by > 2 %; a source that
+   *  lands exactly on 1 does not resample (≈ 3× cheaper on the audio thread). */
   private tune(p: AudioParam, value: number): void {
     const prev = this.tuned.get(p);
-    if (prev === value || (prev !== undefined && value !== 1 && Math.abs(value - prev) <= Math.abs(prev) * 0.01)) return;
+    if (prev === value || (prev !== undefined && value !== 1 && Math.abs(value - prev) <= Math.abs(prev) * 0.02)) return;
     this.tuned.set(p, value);
     const now = this.engine.now;
-    holdAt(p, now);
-    p.linearRampToValueAtTime(value, now + 0.06);
+    if (value === 1) {
+      holdAt(p, now);
+      p.setValueAtTime(1, now);
+      return;
+    }
+    p.setTargetAtTime(value, now, 0.02);
   }
 
   update(st: LoopState): void {

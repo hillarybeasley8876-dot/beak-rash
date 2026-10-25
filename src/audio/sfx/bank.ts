@@ -7,6 +7,7 @@ import { filter, holdAt } from '../dsp/env';
 import { ANIMAL_SFX } from './animals';
 import { SfxCache } from './cache';
 import { COMBAT_SFX } from './combat';
+import { R4_SFX } from './r4';
 import { SKILL_SFX } from './skills';
 import { BIKE_SFX, UI_SFX } from './ui-bike';
 import { WORLD_SFX } from './world';
@@ -14,7 +15,7 @@ import type { Engine } from '../engine';
 import type { SfxFn } from './kit';
 
 export const SFX: Record<string, SfxFn> = {
-  ...UI_SFX, ...BIKE_SFX, ...COMBAT_SFX, ...SKILL_SFX, ...ANIMAL_SFX, ...WORLD_SFX,
+  ...UI_SFX, ...BIKE_SFX, ...COMBAT_SFX, ...SKILL_SFX, ...ANIMAL_SFX, ...WORLD_SFX, ...R4_SFX,
 };
 
 export interface PlayOpts {
@@ -35,6 +36,9 @@ export const PREWARM_RACE = [
   'hit.pan', 'hit.leek', 'hit.umbrella', 'hit.selfie', 'hit.slipper', 'hit.keyboard', 'hit.baton', 'hit.crit', 'hit.block', 'bike.hop',
   'bike.land', 'bike.nearmiss', 'bike.crash', 'bike.drift.start', 'bike.drift.level', 'bike.miniturbo', 'bike.boost',
   'pickup.coin', 'pickup.fish', 'obstacle.hit', 'traffic.horn.car', 'traffic.horn.van', 'skill.cast', 'skill.hit',
+  // The r4 cues that repeat during a race (the rest are rare and rendered on their first play).
+  'police.windup', 'police.swing', 'police.wanted', 'combat.parry', 'combat.throw', 'trick.start', 'trick.land',
+  'style.chain', 'style.bank', 'race.event.warn', 'race.event.geese', 'secret.quack',
 ];
 
 /**
@@ -86,6 +90,11 @@ export class SfxPlayer {
       const fn = SFX[id];
       if (fn) this.cache?.request(id, fn, null);
     }
+  }
+
+  /** The cache's state: how many sounds are ready and how many are still being rendered. */
+  cacheState(): { takes: number; pending: number; seconds: number } {
+    return this.cache?.state() ?? { takes: 0, pending: 0, seconds: 0 };
   }
 
   /** Play a sound now; returns its length (0 if unknown, culled or voice-limited). */

@@ -14,7 +14,7 @@
 //   chords one or more symbols per bar, bars separated by '|': 'Dm9 | G13 | Bbmaj7 A7#9'
 
 export type Channel = 'drums' | 'bass' | 'keys' | 'clav' | 'brass' | 'lead' | 'pad' | 'fx';
-export type LeadVoice = 'wah' | 'flute' | 'synth';
+export type LeadVoice = 'wah' | 'flute' | 'synth' | 'pluck';
 
 export interface Lanes {
   chords?: string;

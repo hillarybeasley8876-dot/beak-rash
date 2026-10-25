@@ -8,6 +8,7 @@ import { Vector3 } from 'three';
 import { AUDIO_RATE, Engine, type Volumes } from './engine';
 import { wireCombat } from './events-combat';
 import { wireRace } from './events-race';
+import { wireR4 } from './events-r4';
 import { prepareDrumSamples } from './music/instruments/drum-samples';
 import { prepareSampleBanks } from './music/instruments/banks';
 import { prepareLoopBuffers } from './sfx/loop-buffers';
@@ -99,6 +100,7 @@ export class AudioRuntime implements AudioSystem, Host {
       if (me) this.finishPlace = me.time === null ? Infinity : me.place;
     });
     wireCombat(app.bus, this);
+    wireR4(app.bus, this);
     app.bus.on('police:alert', ({ level }) => this.rt?.watcher.alert(level, this.now()));
     this.pump = new Pump({
       clock: () => (this.live && this.rt ? this.rt.ctx.currentTime : null),
@@ -317,6 +319,10 @@ export class AudioRuntime implements AudioSystem, Host {
     if (this.live) this.rt?.barks.say(riderId, kind, text, wait);
   }
 
+  npcVoice(obstacleId: number, text: string, character: string): void {
+    if (this.live) this.rt?.barks.sayObstacle(obstacleId, text, character);
+  }
+
   stinger(id: StingerId): void {
     if (!this.live || !this.rt) return;
     this.rt.conductor.stinger(id);
@@ -366,7 +372,12 @@ export class AudioRuntime implements AudioSystem, Host {
       latency: rt?.ctx.baseLatency ?? 0, song: c?.playing ?? null, intensity: c?.level ?? 0, muffle: rt?.engine.muffled ?? 0,
       wanted: this.wanted?.id ?? null, songsStarted: c?.created ?? 0, lookahead: this.pump.mode, stalled: this.pump.stalled,
       mainThreadPct: this.since ? +((spent / Math.max(1, performance.now() - this.since)) * 100).toFixed(3) : 0,
+      updateMs: +this.spentMs.toFixed(1),
+      pumpMs: +this.pump.spentMs.toFixed(1),
       sync: c?.sync() ?? null,
+      musicLive: c?.live ?? false,
+      weather: rt?.watcher.weatherState() ?? { loop: 'none', level: 0 },
+      sfxCache: rt?.sfx.cacheState() ?? null,
     };
   }
 

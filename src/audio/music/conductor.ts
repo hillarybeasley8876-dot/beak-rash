@@ -98,6 +98,11 @@ export class Conductor {
     this.current?.setIntensity(level);
   }
 
+  /** The music is playing live notes (not the pre-rendered bars): the main thread is behind. */
+  get live(): boolean {
+    return this.current !== null && this.current.liveUntil > this.engine.now;
+  }
+
   /** Strip the low end out of the music (0 = full range); `tau` = how fast. */
   dropBass(amount: number, tau = 0.05): void {
     this.current?.band.dropBass(amount, tau);

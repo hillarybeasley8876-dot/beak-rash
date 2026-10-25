@@ -6,6 +6,7 @@ import { Conductor } from './music/conductor';
 import { SONGS } from './music/songs';
 import { SFX, SfxPlayer } from './sfx/bank';
 import type { StingerId } from './music/stingers';
+import type { Channel } from './music/types';
 
 export interface RenderStats {
   id: string;
@@ -186,5 +187,44 @@ export function renderSfx(id: string, seconds = 2.5): Promise<RenderStats> {
 export async function renderAllSfx(): Promise<RenderStats[]> {
   const out: RenderStats[] = [];
   for (const id of Object.keys(SFX)) out.push(await renderSfx(id, id.startsWith('skill.capybara') || id.startsWith('skill.penguin') ? 3 : 2.5));
+  return out;
+}
+
+/** The raw render of a song (the window analysis below needs the samples, not the stats). */
+export async function renderSongBuffer(
+  id: string, seconds: number, opts: { section?: number; intensity?: number; mix?: Partial<Record<Channel, number>> } = {},
+): Promise<AudioBuffer> {
+  const ctx = new OfflineAudioContext(2, Math.floor(SR * seconds), SR);
+  const engine = new Engine(ctx, DEFAULT_VOLUMES);
+  const c = new Conductor(engine);
+  c.play(id, 0.02, { at: 0, section: opts.section, mix: opts.mix });
+  if (opts.intensity) c.setIntensity(opts.intensity);
+  c.schedule(0.25);
+  for (let t = 0.1; t < seconds - 0.05; t += 0.1) {
+    void ctx.suspend(t).then(() => {
+      c.schedule(t + 0.25);
+      return ctx.resume();
+    });
+  }
+  return ctx.startRendering();
+}
+
+/** The RMS (dB) of every 100 ms window of a song render: where a section goes quiet. */
+export async function songWindows(
+  id: string, seconds: number, opts: { section?: number; intensity?: number; mix?: Partial<Record<Channel, number>> } = {},
+): Promise<number[]> {
+  const buf = await renderSongBuffer(id, seconds, opts);
+  const win = Math.floor(SR * 0.1);
+  const out: number[] = [];
+  for (let i = 0; i + win <= buf.length; i += win) {
+    // The mono mix, like the dropout check (check.ts analyse): a decorrelated pair is quieter.
+    let e = 0;
+    for (let j = i; j < i + win; j++) {
+      const l = buf.getChannelData(0)[j] ?? 0;
+      const r = buf.getChannelData(1)[j] ?? 0;
+      e += ((l + r) / 2) ** 2;
+    }
+    out.push(+(10 * Math.log10(e / win + 1e-12)).toFixed(1));
+  }
   return out;
 }

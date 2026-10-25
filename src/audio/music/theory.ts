@@ -129,7 +129,10 @@ export function degreeOffset(degree: string, chord: Chord): number | null {
   return v === undefined ? null : v;
 }
 
-export type Mode = 'major' | 'minor' | 'dorian';
+export type Mode = 'major' | 'minor' | 'dorian' | 'phrygian';
+
+/** The minor-ish modes (a minor third on the tonic); 'phrygian' has a major third, like 'major'. */
+export const isMinorMode = (mode: Mode): boolean => mode === 'minor' || mode === 'dorian';
 
 export interface Tonality {
   /** Tonic pitch class 0..11. */
@@ -137,9 +140,11 @@ export interface Tonality {
   mode: Mode;
 }
 
-/** 'A major' / 'C minor' / 'D Dorian' → tonic pitch class + mode (stingers are built in the song's key). */
+/** 'A major' / 'C minor' / 'D Dorian' / 'E phrygian dominant' → tonic pitch class + mode (the
+ *  stingers are built in the song's key). */
 export function parseKey(key: string): Tonality {
-  const m = /^([A-G][#b]?)\s+(major|minor|dorian)\b/i.exec(key.trim());
+  const m = /^([A-G][#b]?)\s+(major|minor|dorian|phrygian dominant)\b/i.exec(key.trim());
   if (!m || m[1] === undefined || m[2] === undefined) throw new Error(`[audio] bad key "${key}"`);
-  return { tonic: pitchClass(m[1]), mode: m[2].toLowerCase() as Mode };
+  const mode = m[2].toLowerCase() === 'phrygian dominant' ? 'phrygian' : (m[2].toLowerCase() as Mode);
+  return { tonic: pitchClass(m[1]), mode };
 }

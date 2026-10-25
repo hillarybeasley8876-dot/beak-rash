@@ -1,6 +1,6 @@
 // Stingers: short composed phrases over (and ducking) the current song, built in the song's key
 // (tonic + mode) so they never fight it. The Conductor lands them on the song's grid.
-import { voiceChord, type Chord, type Mode, type Tonality } from './theory';
+import { isMinorMode, voiceChord, type Chord, type Mode, type Tonality } from './theory';
 import { filter, perc } from '../dsp/env';
 import type { Band } from './band';
 
@@ -25,7 +25,7 @@ export const STING_TIMING: Record<StingerId, { grid: number; duck: boolean }> = 
 export const isStinger = (id: string): id is StingerId => id in STING_TIMING;
 
 /** Tonic triad quality per mode: major third or minor third. */
-const third = (m: Mode): number => (m === 'major' ? 4 : 3);
+const third = (m: Mode): number => (isMinorMode(m) ? 3 : 4);
 
 /** Lowest midi note ≥ `low` whose pitch class is `semis` above the tonic. */
 const pc = (k: Tonality, semis: number, low: number): number => low + ((((k.tonic + semis - low) % 12) + 12) % 12);
@@ -33,7 +33,7 @@ const pc = (k: Tonality, semis: number, low: number): number => low + ((((k.toni
 /** The mode's tonic colour chord, open five-note voicing: 6/9 in major, m9 in minor / dorian. */
 function tonicChord(k: Tonality, low = 52): number[] {
   const r = pc(k, 0, low);
-  return (k.mode === 'major' ? [0, 7, 16, 21, 26] : [0, 7, 15, 22, 26]).map((s) => r + s);
+  return (isMinorMode(k.mode) ? [0, 7, 15, 22, 26] : [0, 7, 16, 21, 26]).map((s) => r + s);
 }
 
 /** Triad on the degree `root` semitones above the tonic (close position from `low`). */
@@ -167,7 +167,7 @@ export const STINGERS: Record<StingerId, Sting> = {
   onemore(b, t, { key }) {
     // Pickup into the tonic: V–I in major, bVII–i in minor / dorian (both diatonic).
     b.brass.stab(t, triad(key, key.mode === 'major' ? 7 : 10, false, 62), 0.06, LOUD);
-    b.brass.stab(t + 0.12, triad(key, 0, key.mode !== 'major', 62), 0.22, LOUD, 'rip');
+    b.brass.stab(t + 0.12, triad(key, 0, isMinorMode(key.mode), 62), 0.22, LOUD, 'rip');
     b.drums.clap(t + 0.12, 1);
     return 0.5;
   },
