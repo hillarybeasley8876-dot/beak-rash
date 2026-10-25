@@ -1,5 +1,7 @@
 // Track catalogue (names/blurbs for menus). Layout and scenery live in world/ (track unit).
 import type { TrackId } from '../core/types';
+import { INFO as GOBI } from './track-content/gobi';
+import { INFO as WATERTOWN } from './track-content/watertown';
 
 export interface TrackInfo {
   id: TrackId;
@@ -24,6 +26,8 @@ export const TRACKS: Record<TrackId, TrackInfo> = {
     id: 'mountain', name: '落日山道', nameEn: 'SUNSET PASS', blurb: '十八弯，弯弯有大鹅。',
     weather: '黄昏 · 山风', lengthKm: 3.6, difficulty: 3,
   },
+  watertown: WATERTOWN,
+  gobi: GOBI,
 };
 
 export const TRACK_ORDER: TrackId[] = ['coast', 'city', 'mountain'];

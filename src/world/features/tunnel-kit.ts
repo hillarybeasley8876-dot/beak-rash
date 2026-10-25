@@ -11,6 +11,8 @@ import type { MeshBuf } from '../geom';
 import type { PropBatch } from '../kit/batch';
 import { box } from '../kit/shapes';
 import { quad, SHELL_LIGHT, vaultY, WALL_H } from './tunnel';
+import { TUNNEL as GOBI_TUNNEL } from '../env/gobi-look';
+import { TUNNEL as WATERTOWN_TUNNEL } from '../env/watertown-look';
 
 export interface TunnelStyle {
   /** Hazard chevrons on the dado this far (m) inside each portal. */
@@ -28,6 +30,8 @@ export const TUNNEL_STYLES: Record<TrackId, TunnelStyle | null> = {
   coast: { hazard: 24, trays: true, signals: 48, exits: 30 },
   mountain: { hazard: 24, trays: true, signals: 60, exits: 36 },
   city: null,
+  watertown: WATERTOWN_TUNNEL,
+  gobi: GOBI_TUNNEL,
 };
 
 const COL = {

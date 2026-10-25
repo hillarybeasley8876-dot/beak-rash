@@ -1,6 +1,8 @@
 // Meme text for billboards, road signs and grades (content unit). Billboards ≤ 14 字 (a space is the
 // preferred line break), signs ≤ 10 字. Achievements live in data/achievements.ts (re-exported here).
 import type { TrackId } from '../core/types';
+import * as GOBI from './track-content/gobi';
+import * as WATERTOWN from './track-content/watertown';
 
 export { ACHIEVEMENTS, type AchievementDef } from './achievements';
 
@@ -33,6 +35,8 @@ export const TRACK_BILLBOARDS: Record<TrackId, string[]> = {
     '弯道多 漂移券免费领', '落日很美 但别看太久', '山顶有亭 亭里有鹅', '日落打卡点 出片率100%',
     '上坡靠腿 下坡靠胆', '隧道是山的喉囊', '海拔越高 鱼越贵', '观景台 前方 2 公里',
   ],
+  watertown: WATERTOWN.BILLBOARDS,
+  gobi: GOBI.BILLBOARDS,
 };
 
 /**
@@ -52,6 +56,8 @@ export const TRACK_SIGNS: Record<TrackId, string[]> = {
   coast: ['海滩 → 别冲', '码头 鱼多', '灯塔 ←', '浪大 慢骑'],
   city: ['单行道 别回头', '霓虹路段 注意反光', '地铁口 鸽子多', '积水路段 水花加分'],
   mountain: ['连续下坡 别躺平', '前方隧道 请开灯', '观景台 鹅已就位', '落石区 其实是落鱼'],
+  watertown: WATERTOWN.SIGNS,
+  gobi: GOBI.SIGNS,
 };
 
 export interface Grade { grade: 'S' | 'A' | 'B' | 'C' | 'D'; title: string }

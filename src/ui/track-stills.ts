@@ -6,8 +6,10 @@ import { h, svg, trackArtSvg } from './p5';
 import cityUrl from './assets/track-city.webp';
 import coastUrl from './assets/track-coast.webp';
 import mountainUrl from './assets/track-mountain.webp';
+import { STILL_URL as gobiUrl } from './tracks/gobi';
+import { STILL_URL as watertownUrl } from './tracks/watertown';
 
-const STILLS: Record<TrackId, string> = { coast: coastUrl, city: cityUrl, mountain: mountainUrl };
+const STILLS: Record<TrackId, string> = { coast: coastUrl, city: cityUrl, mountain: mountainUrl, watertown: watertownUrl, gobi: gobiUrl };
 
 /** 6-level posterise (comic print look), referenced by kit.css as url(#br-poster). */
 const POSTER = `<svg width="0" height="0" aria-hidden="true" style="position:absolute"><filter id="br-poster" color-interpolation-filters="sRGB">

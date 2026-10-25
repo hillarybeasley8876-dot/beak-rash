@@ -1,5 +1,7 @@
 // Code-drawn track scenes for track cards (flat sticker style, thick ink). 400×260 viewBox.
 import type { TrackId } from '../../core/types';
+import * as gobi from '../tracks/gobi';
+import * as watertown from '../tracks/watertown';
 
 const INK = '#0b0b0f';
 
@@ -59,12 +61,12 @@ function mountain(): string {
   <path d="M300 240 l16 -44 l16 44 Z M330 246 l14 -36 l14 36 Z M276 248 l12 -30 l12 30 Z" fill="#1d4a3a" stroke="${INK}" stroke-width="4" stroke-linejoin="round"/>`;
 }
 
-const SCENES: Record<TrackId, () => string> = { coast, city, mountain };
+const SCENES: Record<TrackId, () => string> = { coast, city, mountain, watertown: watertown.scene, gobi: gobi.scene };
 let serial = 0;
 
 /** Each call gets unique gradient ids so several cards of one track can share a page. */
 export function trackArtSvg(id: TrackId): string {
   const n = ++serial;
-  const body = SCENES[id]().replace(/(cs|ct|mt)-sky/g, `$1-sky${n}`);
+  const body = SCENES[id]().replace(/(cs|ct|mt|wt|gb)-sky/g, `$1-sky${n}`);
   return `<svg viewBox="0 0 400 260" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${body}</svg>`;
 }

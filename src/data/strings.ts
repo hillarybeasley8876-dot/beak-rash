@@ -1,6 +1,8 @@
 // UI copy owned by the content unit: how-to, credits, loading-calendar 宜/忌, grade quotes, announcer
 // callouts and wreck lines. Screens/HUD read these; keep keys stable (add, never rename).
 import type { CrashCause, TrackId } from '../core/types';
+import { CALENDAR_LINES as GOBI_CALENDAR } from './track-content/gobi';
+import { CALENDAR_LINES as WATERTOWN_CALENDAR } from './track-content/watertown';
 
 // ---------------------------------------------------------------- how to play
 export interface HowtoRow { keys: string; text: string }
@@ -103,6 +105,8 @@ export const CALENDAR: Record<TrackId, CalendarLine[]> = {
     { good: '特种兵骑行', bad: '中途下车' }, { good: '腾空', bad: '空中犹豫' }, { good: '等日落', bad: '等鸽子' },
     { good: '问路', bad: '问大鹅' },
   ],
+  watertown: WATERTOWN_CALENDAR,
+  gobi: GOBI_CALENDAR,
 };
 
 /** Today's 宜/忌 for a track: stable for the whole day, different from day to day. */

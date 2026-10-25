@@ -5,6 +5,8 @@ import type { TerrainField } from '../terrain/field';
 import { dressCoast } from './coast';
 import { dressCity } from './city';
 import { dressMountain } from './mountain';
+import { dressGobi } from './gobi';
+import { dressWatertown } from './watertown';
 
 type Dressing = (ctx: WorldCtx, field: TerrainField) => Promise<void>;
 
@@ -12,6 +14,8 @@ const DRESSINGS: Record<TrackId, Dressing> = {
   coast: dressCoast,
   city: dressCity,
   mountain: dressMountain,
+  watertown: dressWatertown,
+  gobi: dressGobi,
 };
 
 export function dressingFor(id: TrackId): Dressing {

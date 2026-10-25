@@ -8,7 +8,8 @@ export type CharacterId =
 
 export type BikeId = 'roadbike' | 'erba' | 'shared' | 'fixie' | 'mtb' | 'tandem' | 'kidbike'
   | 'llm'; // 大模型限定款: secret, unlocked by the Konami code (SPEC §21); not in BIKE_ORDER until unlocked
-export type TrackId = 'coast' | 'city' | 'mountain';
+export type TrackId = 'coast' | 'city' | 'mountain'
+  | 'watertown' | 'gobi'; // r4 (SPEC §20): per-track content lives in */track-content, env/<id>-look, ui/tracks; hidden until in TRACK_ORDER
 export type WeaponId =
   | 'none' | 'saltfish' | 'baguette' | 'pan' | 'leek' | 'umbrella' | 'selfie' | 'slipper' | 'keyboard'
   | 'baton'; // police only (SPEC §14): never in crates or rival loadouts

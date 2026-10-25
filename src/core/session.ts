@@ -41,7 +41,7 @@ export class RaceSession implements Session {
 
   static async create(app: AppContext, config: RaceConfig): Promise<RaceSession> {
     const rng = new Rng(config.seed ^ 0x5eed);
-    const track = await app.modules.createTrack(app, config.trackId, rng);
+    const track = await app.modules.createTrack(app, config.trackId, rng, { weather: config.weather, reverse: config.reverse, route: config.route });
     const session = new RaceSession(app, config, track);
     session.world.add(track.group);
     // Built in slices, yielding a frame whenever one has used its budget (the loading screen keeps moving).

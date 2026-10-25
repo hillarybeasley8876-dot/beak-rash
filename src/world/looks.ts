@@ -1,5 +1,7 @@
 // Environment looks per track (sky, fog, sun, ambient, grading hints for fx).
 import type { EnvLook, TrackId } from '../core/types';
+import * as GOBI from './env/gobi-look';
+import * as WATERTOWN from './env/watertown-look';
 
 const COAST_LOOK: EnvLook = {
   name: 'Pelican Bay noon',
@@ -38,6 +40,8 @@ const MOUNTAIN_LOOK: EnvLook = {
 };
 
 export function lookFor(id: TrackId): EnvLook {
+  if (id === 'watertown') return WATERTOWN.LOOK;
+  if (id === 'gobi') return GOBI.LOOK;
   return id === 'city' ? CITY_LOOK : id === 'mountain' ? MOUNTAIN_LOOK : COAST_LOOK;
 }
 
@@ -71,6 +75,8 @@ const ROAD_LOOKS: Record<TrackId, RoadLook> = {
     base: '#5f5c6a', tones: [[1.07, 1.06, 1.08], [0.92, 0.92, 0.94]], line: 0.24,
     marks: { every: [70, 130], patch: 4, manhole: 1, arrow: 3, word: 2 },
   },
+  watertown: WATERTOWN.ROAD,
+  gobi: GOBI.ROAD,
 };
 
 export function roadLookFor(id: TrackId): RoadLook {

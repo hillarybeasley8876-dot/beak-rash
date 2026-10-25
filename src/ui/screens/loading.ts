@@ -11,6 +11,8 @@ import { PAD_TIPS, TIPS } from '../../data/tips';
 import { TRACKS, TRACK_ORDER } from '../../data/tracks';
 import { artImage, artReady, backdrop, h, jagged, ransom, riderIconSvg, svg, torn, wait } from '../p5';
 import { frame, type ScreenFactory } from '../screen';
+import { WEATHER_ICON as GOBI_ICON } from '../tracks/gobi';
+import { WEATHER_ICON as WATERTOWN_ICON } from '../tracks/watertown';
 
 const WEEK_EN = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const WEEK_CN = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
@@ -20,6 +22,8 @@ const WEATHER_ICON: Record<TrackId, string> = {
   coast: '<svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="13" fill="#e5191c" stroke="#0b0b0f" stroke-width="4"/><g stroke="#0b0b0f" stroke-width="5" stroke-linecap="round"><path d="M32 4v8M32 52v8M4 32h8M52 32h8M12 12l6 6M46 46l6 6M12 52l6-6M46 18l6-6"/></g></svg>',
   city: '<svg viewBox="0 0 64 64"><path d="M40 8a22 22 0 1 0 16 34A18 18 0 0 1 40 8z" fill="#0b0b0f"/><g stroke="#e5191c" stroke-width="5" stroke-linecap="round"><path d="M14 46l-4 10M26 48l-4 10M38 48l-4 10"/></g></svg>',
   mountain: '<svg viewBox="0 0 64 64"><path d="M14 40a18 18 0 0 1 36 0z" fill="#e5191c" stroke="#0b0b0f" stroke-width="4"/><path d="M4 44h56M10 52h44" stroke="#0b0b0f" stroke-width="5" stroke-linecap="round"/></svg>',
+  watertown: WATERTOWN_ICON,
+  gobi: GOBI_ICON,
 };
 
 /** One 宜/忌 row; long entries shrink so they never run into the weekday box. */
