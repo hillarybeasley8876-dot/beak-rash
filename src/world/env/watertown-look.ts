@@ -1,21 +1,23 @@
-// 江南水乡 WATER TOWN look (r4, SPEC §20): sky, fog, sun, ambient, grading, asphalt and tunnel style.
-// Scaffold values (an overcast drizzle palette) — the watertown track job owns this file and tunes it.
+// 江南水乡 WATER TOWN look (r4, SPEC §20): a soft drizzle over a canal town. Overcast sky, cool
+// mist, a dim sun high in the cloud, wet stone-grey asphalt.
 import type { EnvLook } from '../../core/types';
 import type { TunnelStyle } from '../features/tunnel-kit';
 import type { RoadLook } from '../looks';
 
 export const LOOK: EnvLook = {
   name: 'Water Town drizzle',
-  sky: { top: '#8fa3b5', horizon: '#d6dfe4', bottom: '#e8eef0' },
-  fog: { color: '#c3cfd6', near: 160, far: 700 },
-  sun: { dir: { x: 0.3, y: -0.86, z: -0.4 }, color: '#f2f0ea', intensity: 1.5 },
-  ambient: { sky: '#d9e3e8', ground: '#9aa58f', intensity: 1.15 },
-  grade: { saturation: 0.98, contrast: 1.04, tint: '#f4f7f6', bloom: 0.12, night: false },
+  sky: { top: '#93a4b2', horizon: '#c9d4da', bottom: '#dfe6e8' },
+  fog: { color: '#c2cdd4', near: 140, far: 620 },
+  // The sun is high but soft: a drizzle sun through the cloud, a touch from the left.
+  sun: { dir: { x: 0.34, y: -0.86, z: -0.38 }, color: '#f4f2ec', intensity: 1.25 },
+  ambient: { sky: '#dbe4e9', ground: '#9a9a92', intensity: 1.25 },
+  grade: { saturation: 0.92, contrast: 1.03, tint: '#f1f5f5', bloom: 0.14, night: false },
 };
 
+/** Wet stone-grey asphalt: the town's lanes are paved, not tarmac. */
 export const ROAD: RoadLook = {
-  base: '#5a5d61', tones: [[1.05, 1.05, 1.06], [0.93, 0.93, 0.95]], line: 0.18,
-  marks: { every: [70, 130], patch: 2, manhole: 3, arrow: 2, word: 2 },
+  base: '#585a5e', tones: [[1.05, 1.05, 1.06], [0.93, 0.94, 0.96]], line: 0.2,
+  marks: { every: [70, 130], patch: 3, manhole: 3, arrow: 2, word: 2 },
 };
 
 export const TUNNEL: TunnelStyle | null = null;
