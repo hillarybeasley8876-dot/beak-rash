@@ -1,8 +1,9 @@
 // Water Town bridges and water: the humpback stone arch that carries the road over a canal (the
 // jumpCrest features) and the canal / river surfaces.
-import { Color, Vector3 } from 'three';
+import { Color, Matrix4, Vector3 } from 'three';
 import type { TrackFeature } from '../../../core/types';
 import type { MeshBuf } from '../../geom';
+import { box, trs } from '../../kit/shapes';
 import type { Dress } from '../dress';
 import { quad } from './props';
 
@@ -83,6 +84,48 @@ export function humpbackArch(d: Dress, f: TrackFeature): void {
     const e = Math.min(s + 4, s1);
     const y0 = deckOf(s), y1 = deckOf(e);
     quad(buf, pt(s, -W, y0, A), pt(s, W, y0, B), pt(e, W, y1, Cc), pt(e, -W, y1, D), PAL.stoneDark);
+  }
+}
+
+/**
+ * The stone bridge over a canal: stone piers, beams and a deck, in place of the shared red steel
+ * arch. The water is only a couple of metres under the road here, so the bridge is a low slab on
+ * piers with the stone parapets along its edges (the shared 'parapet' edge draws them).
+ */
+export function stoneBridge(d: Dress, f: TrackFeature): void {
+  const q = d.ctx.q;
+  const s0 = f.s0, s1 = f.s1, mid = (s0 + s1) / 2;
+  const fr = q.frameVis(mid);
+  // The heights are relative to the road: the deck's underside half a metre under the tarmac and
+  // the canal bed well below the water.
+  const deck = -0.5;
+  const bed = -1.8 - fr.pos.y;
+  const half = d.ctx.L.halfWidth;
+  const piers = Math.max(3, Math.round((s1 - s0) / 19));
+  const buf = d.b.props.at(fr.pos.x, fr.pos.z);
+  const p = new Vector3();
+  for (let i = 0; i <= piers; i++) {
+    const s = s0 + ((s1 - s0) * i) / piers;
+    const f2 = q.frameVis(s);
+    const ry = Math.atan2(f2.tangent.x, f2.tangent.z);
+    for (const side of [-1, 1] as const) {
+      const x = side * (half - 0.6);
+      q.toWorld(s, x, (deck + bed) / 2, p);
+      box(buf, trs(p.x, p.y, p.z, ry, 1.6, deck - bed, 1.5, new Matrix4()), i % 2 ? PAL.stone : PAL.stoneLight);
+    }
+  }
+  // The deck: a stone slab under the road, with a fascia along its edges.
+  for (let s = s0; s < s1; s += 6) {
+    const e = Math.min(s + 6, s1);
+    const xa = -(half + 0.6), xb = half + 0.6;
+    const a = q.toWorld(s, xa, deck, new Vector3()), b = q.toWorld(s, xb, deck, new Vector3());
+    const c = q.toWorld(e, xb, deck, new Vector3()), d2 = q.toWorld(e, xa, deck, new Vector3());
+    quad(buf, a, d2, c, b, PAL.stoneDark);
+    for (const [x, col] of [[xa, PAL.stone], [xb, PAL.stoneLight]] as Array<[number, Color]>) {
+      const a2 = q.toWorld(s, x, deck, new Vector3()), b2 = q.toWorld(s, x, deck - 0.7, new Vector3());
+      const c2 = q.toWorld(e, x, deck - 0.7, new Vector3()), d3 = q.toWorld(e, x, deck, new Vector3());
+      quad(buf, a2, b2, c2, d3, col);
+    }
   }
 }
 

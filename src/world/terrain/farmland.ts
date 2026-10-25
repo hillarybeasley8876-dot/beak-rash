@@ -3,7 +3,17 @@
 // a rotated grid, one crop colour per field, furrows and dark hedge borders.
 import { Color } from 'three';
 import { smoothstep } from '../../core/math';
+import type { TrackId } from '../../core/types';
 import type { Noise2 } from './noise';
+
+/** Tracks whose far hills carry the farmland patchwork. The Gobi is desert and the water town is a
+ *  canal town: no quilt. */
+export const FARM_TRACKS: readonly TrackId[] = ['coast', 'city', 'mountain'];
+
+/** True when the far hills of this track are painted as farmland. */
+export function farmAllowed(id: TrackId): boolean {
+  return FARM_TRACKS.includes(id);
+}
 
 /** Crop colours (wheat, young crop, lavender, olive grove, ploughed earth, sunflowers), toned 28 % toward
  *  grey-green so the quilt sits behind the near scenery instead of shouting over it. */

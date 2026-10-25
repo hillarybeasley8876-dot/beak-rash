@@ -10,7 +10,8 @@ import { loadBillboardArt } from '../../scenery/signs/art';
 import type { TerrainField } from '../../terrain/field';
 import { makeGobiCtx, type GobiCtx } from './gctx';
 import { buildTurbineRotors, pumpjack, turbine, type TurbineSite } from './industry';
-import { dunes, horizonPeaks, mesas, saltLake, scatter, shoulderTufts } from './land';
+import { dunes, distantMesas, mesas, saltLake, scatter, shoulderTufts } from './land';
+import { sandstorm } from './sandstorm';
 import { billboards, billboardAt, camelCaravan, chevrons, distanceMarkers, dustDevils, poles, roadSign, warning } from './roadside';
 import { caravanserai, oasis, startGantry, truckStop } from './town';
 
@@ -113,7 +114,8 @@ export async function dressGobi(ctx: WorldCtx, field: TerrainField): Promise<voi
   }
 
   buildTurbineRotors(g, turbines);
-  horizonPeaks(g);
+  distantMesas(g);
+  sandstorm(g);
   await breathe();
   ctx.progress(0.5);
 

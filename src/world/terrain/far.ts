@@ -5,8 +5,9 @@ import { BufferAttribute, BufferGeometry, Color, Mesh } from 'three';
 import { smoothstep } from '../../core/math';
 import type { WorldCtx } from '../ctx';
 import type { GroundDef } from '../layout/types';
-import { farmWeight } from './farmland';
+import { farmAllowed, farmWeight } from './farmland';
 import { terrainMat } from './material';
+import { borderSink } from './tracks';
 import type { TerrainField, WorldSample } from './field';
 import { NEAR_EXTENT, ribbonReach, type NearRibbon } from './near';
 import { groundColor, isShore, profileY, tintNoise } from './profile';
@@ -60,6 +61,10 @@ export type FarHeight = (wx: number, wz: number) => number;
 
 export function buildFarTerrain(ctx: WorldCtx, field: TerrainField, ribbons: NearRibbon[] = []): FarHeight {
   const { L } = ctx;
+  // The farmland quilt and the border's fall-away are per track (terrain/tracks.ts): the Gobi is
+  // desert, so its far hills are sand and its horizon is a dry basin, not an ocean.
+  const farm = farmAllowed(ctx.id);
+  const sink = borderSink(ctx.id);
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
   for (let i = 0; i < L.n; i += 4) {
     minX = Math.min(minX, L.px[i] ?? 0); maxX = Math.max(maxX, L.px[i] ?? 0);
@@ -92,13 +97,13 @@ export function buildFarTerrain(ctx: WorldCtx, field: TerrainField, ribbons: Nea
       // Far beyond the fog the land sinks into the sea along a ragged coastline, so the world
       // reads as a headland rather than a rectangle from the air.
       const edge = Math.min(i, j, vx - 1 - i, vz - 1 - j) * CELL + field.noise.fbm(wx / 300, wz / 300, 2) * 160;
-      H[k] = h + (-26 - h) * (1 - smoothstep(60, 420, edge));
+      H[k] = h + (sink - h) * (1 - smoothstep(60, 420, edge));
       U[k] = smp.u;
       M[k] = smp.bump ? smp.bump.mat : smp.g.mat;
       S[k] = isShore(smp.g) || smp.bump ? 1 : 0;
     }
   }
-  const mat = terrainMat(ctx, true);
+  const mat = terrainMat(ctx, farm);
   const color = new Color();
   for (let cj = 0; cj < nz; cj += CHUNK) {
     for (let ci = 0; ci < nx; ci += CHUNK) {
@@ -130,7 +135,7 @@ export function buildFarTerrain(ctx: WorldCtx, field: TerrainField, ribbons: Nea
       geo.computeVertexNormals();
       const nrm = geo.getAttribute('normal').array as Float32Array;
       const col = new Float32Array(cols * rows * 3);
-      const farm = new Float32Array(cols * rows);
+      const farmW = new Float32Array(cols * rows);
       for (let j = 0; j < rows; j++) {
         for (let i = 0; i < cols; i++) {
           const k = (cj + j) * vx + (ci + i), v = j * cols + i;
@@ -139,11 +144,11 @@ export function buildFarTerrain(ctx: WorldCtx, field: TerrainField, ribbons: Nea
           groundColor(m, H[k] ?? 0, nrm[v * 3 + 1] ?? 1, Math.max(0, U[k] ?? 0), field.noise.get(wx / 23, wz / 23), S[k] === 1, color,
             tintNoise(field.noise, wx, wz));
           col[v * 3] = color.r; col[v * 3 + 1] = color.g; col[v * 3 + 2] = color.b;
-          farm[v] = farmWeight(field.noise, wx, wz, U[k] ?? 0, nrm[v * 3 + 1] ?? 1, H[k] ?? 0, S[k] === 1);
+          farmW[v] = farm ? farmWeight(field.noise, wx, wz, U[k] ?? 0, nrm[v * 3 + 1] ?? 1, H[k] ?? 0, S[k] === 1) : 0;
         }
       }
       geo.setAttribute('color', new BufferAttribute(col, 3));
-      geo.setAttribute('farm', new BufferAttribute(farm, 1));
+      if (farm) geo.setAttribute('farm', new BufferAttribute(farmW, 1));
       geo.computeBoundingSphere();
       const mesh = new Mesh(ctx.own(geo), mat);
       mesh.name = `far:${ci},${cj}`;

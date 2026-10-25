@@ -12,10 +12,11 @@ import { loadBillboardArt } from '../../scenery/signs/art';
 import { SignAtlas } from '../../scenery/signs/atlas';
 import type { TerrainField } from '../../terrain/field';
 import { finishArchAt, flags, gantryAt, stands } from '../coast/event';
-import { banners, roadSign, warning } from '../coast/signage';
+import { banners, chevrons, roadSign, warning } from '../coast/signage';
 import { finishDressYielding, makeDress, repaintWhenFontsLoad } from '../dress';
-import { humpbackArch, waterSheet } from './bridges';
+import { humpbackArch, stoneBridge, waterSheet } from './bridges';
 import * as P from './places';
+import { quaySteps } from './quay';
 
 const BANNERS = ['暴力鹈鹕 BEAK RASH', '江南水乡 欢迎你', '今日宜：撞人', '小桥流水 骑车小心', 'V我50 小鱼干', 'SHOWTIME!'];
 const GANTRY = ['START', '暴力鹈鹕 · 江南水乡', 'BEAK RASH', '小桥流水 骑车小心'];
@@ -43,6 +44,7 @@ function marks(d: ReturnType<typeof makeDress>): void {
       case 'teahouse': P.teahouse(d, m.s, side); break;
       case 'pagoda': P.pagoda(d, m.s, m.x); break;
       case 'sign': roadSign(d, m.s, side, String(m.data.sign ?? '')); break;
+      case 'chevrons': chevrons(d, side, m.s, m.s + len); break;
       case 'warnCrest': warning(d, m.s, side, '桥', '石桥 慢行'); break;
       case 'startGantry': gantryAt(d, m.s, GANTRY[0] ?? 'START', GANTRY[1] ?? '', GANTRY[2] ?? '', GANTRY[3] ?? ''); break;
       case 'finishGantry': finishArchAt(d, m.s, FINISH[0] ?? 'FINISH', FINISH[1] ?? '', FINISH[2] ?? '', FINISH[3] ?? ''); break;
@@ -52,7 +54,7 @@ function marks(d: ReturnType<typeof makeDress>): void {
   }
 }
 
-/** The water: the canal strips along the quays, the river under the steel bridges and the side
+/** The water: the canal strips along the quays, the river under the stone bridges and the side
  *  canals under the humpback stone bridges. */
 function water(d: ReturnType<typeof makeDress>): void {
   const q = d.ctx.q;
@@ -64,7 +66,7 @@ function water(d: ReturnType<typeof makeDress>): void {
       if (!isQuay && s0 >= 0) {
         waterSheet(d, s0, s, (ss) => {
           const b = d.field.bound(ss, side);
-          return side < 0 ? [-b - 7, -b] : [b, b + 7];
+          return side < 0 ? [-b - 10, -b + 0.4] : [b - 0.4, b + 10];
         });
         s0 = -1;
       }
@@ -74,12 +76,39 @@ function water(d: ReturnType<typeof makeDress>): void {
     if (f.kind === 'jumpCrest') {
       waterSheet(d, f.s0 - 2, f.s1 + 2, (ss) => {
         const b = d.field.bound(ss, 1);
-        return [-b - 7, b + 7];
+        return [-b - 8, b + 8];
       });
     } else if (f.kind === 'bridge') {
       waterSheet(d, f.s0 - 4, f.s1 + 4, () => [-32, 32], 10);
     }
   }
+}
+
+/** The stone landings down to the water, every few metres along the quays. */
+function quays(d: ReturnType<typeof makeDress>): void {
+  const q = d.ctx.q;
+  for (const side of [-1, 1] as const) {
+    for (let s = 30; s < q.length - 20; s += 34) {
+      if (q.edgeKindAt(s, side) !== 'quay') continue;
+      if (d.rng.chance(0.45)) continue;
+      quaySteps(d, side, s + d.rng.range(-4, 4));
+    }
+  }
+}
+
+/**
+ * The shared 'bridge' feature draws a red steel through-arch (a P5 landmark). The water town
+ * takes those meshes out of the scene and draws its own stone bridges over the canals instead.
+ */
+function hideSteelBridges(ctx: WorldCtx): void {
+  let n = 0;
+  for (const child of [...ctx.group.children]) {
+    if (child.name.startsWith('structures:')) {
+      ctx.group.remove(child);
+      n++;
+    }
+  }
+  ctx.log(`watertown: took ${n} shared steel bridge meshes out of the scene (the town draws its own stone bridges)`);
 }
 
 export async function dressWatertown(ctx: WorldCtx, field: TerrainField): Promise<void> {
@@ -88,14 +117,20 @@ export async function dressWatertown(ctx: WorldCtx, field: TerrainField): Promis
   const d = makeDress(ctx, field, new SignAtlas(2048, 3072, true), ctx.rng.fork(0x77e0));
   await breathe();
   ctx.progress(0.06);
+  hideSteelBridges(ctx);
   marks(d);
   await breathe();
   ctx.progress(0.4);
-  // The humpback stone bridges: a stone arch under every jump crest.
-  for (const f of ctx.L.features) if (f.kind === 'jumpCrest') humpbackArch(d, f);
+  // The humpback stone bridges: a stone arch under every jump crest, and a stone bridge over
+  // every canal crossing.
+  for (const f of ctx.L.features) {
+    if (f.kind === 'jumpCrest') humpbackArch(d, f);
+    else if (f.kind === 'bridge') stoneBridge(d, f);
+  }
   await breathe();
   ctx.progress(0.52);
   water(d);
+  quays(d);
   await breathe();
   ctx.progress(0.6);
   // The start and the finish: gantries, stands, flags and banners behind the barriers.

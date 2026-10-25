@@ -34,6 +34,9 @@ export interface GobiCtx {
   nod: Array<{ obj: Object3D; phase: number; amp: number; speed: number }>;
   /** The side of the road a helper means, mirrored when the road runs the other way (SPEC §20). */
   side(side: -1 | 1): -1 | 1;
+  /** True when a world point is at least `dist` from every stretch of the road. The desert highway
+   *  curls back on itself, so a prop placed beside one leg can land on another. */
+  clearOfRoad(x: number, z: number, dist: number): boolean;
   /** Draw a sign face once per key (repeated signs share their atlas cell). */
   face(key: string, draw: () => AtlasRect | null): AtlasRect | null;
 }
@@ -46,6 +49,7 @@ export function makeGobiCtx(ctx: WorldCtx, field: TerrainField, rng: Rng): GobiC
   const faceTex = ctx.own(atlas.texture(ctx.app.renderer));
   const faceMat = ctx.own(new MeshBasicMaterial({ map: faceTex, color: 0xf2f2f2 }));
   const cells = new Map<string, AtlasRect | null>();
+  const L = ctx.L;
   return {
     ctx, group, field, rng, atlas, faceTex,
     place: new Placer(ctx, field),
@@ -57,6 +61,15 @@ export function makeGobiCtx(ctx: WorldCtx, field: TerrainField, rng: Rng): GobiC
     spin: [],
     nod: [],
     side: (sd) => (sd * ctx.mirror) as -1 | 1,
+    clearOfRoad(x, z, dist) {
+      const d2 = dist * dist;
+      const { px, pz, n } = L;
+      for (let i = 0; i < n; i += 4) {
+        const dx = (px[i] ?? 0) - x, dz = (pz[i] ?? 0) - z;
+        if (dx * dx + dz * dz < d2) return false;
+      }
+      return true;
+    },
     face(key, draw) {
       if (!cells.has(key)) cells.set(key, draw());
       return cells.get(key) ?? null;

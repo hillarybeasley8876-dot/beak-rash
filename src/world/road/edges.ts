@@ -16,6 +16,8 @@ const PAL = {
   red: C('#e5191c'), white: C('#f3f1ea'), steel: C('#c9d1d9'), steelDark: C('#8d97a3'), post: C('#56606b'),
   wall: C('#f4eee0'), cap: C('#d6c4a2'), stoneA: C('#bcae96'), stoneB: C('#a99a82'), stoneC: C('#cbbfa6'),
   concrete: C('#d9d8d1'), kerb: C('#cfc2aa'), black: C('#1c1c22'), yellow: C('#ffd21f'),
+  /** The water town: whitewashed walls, dark tile caps and granite kerb blocks. */
+  granite: C('#9ea5a7'), graniteDark: C('#868d90'), plaster: C('#f1ebdd'), tile: C('#3c4149'),
 };
 
 const BARRIER: Profile = [[0, 0], [0, 0.07], [0.1, 0.3], [0.16, 0.82], [0.44, 0.82], [0.5, 0.3], [0.6, 0.07], [0.6, 0]];
@@ -25,6 +27,15 @@ const STONE: Profile = [[0, 0], [0.05, 0.52], [0.13, 0.6], [0.47, 0.6], [0.55, 0
 const PARAPET: Profile = [[0, 0], [0, 0.86], [0.04, 0.92], [0.34, 0.92], [0.38, 0.86], [0.38, 0]];
 const KERB: Profile = [[0, 0], [0, 0.16], [0.04, 0.2], [0.3, 0.2], [0.3, 0]];
 const COPING: Profile = [[0, 0], [0, 0.05], [0.38, 0.05], [0.38, -0.25]];
+/** The water town's street edge: a long granite kerb, then a low whitewashed wall with a dark tile cap. */
+const WT_STREET: Profile = [
+  [0, 0], [0, 0.18], [0.3, 0.18], [0.3, 0],
+  [0.6, 0], [0.6, 0.52], [0.68, 0.6], [1.0, 0.6], [1.08, 0.52], [1.08, 0],
+];
+/** The water town's bridge parapet: a low stone wall with a coping, no railings. */
+const WT_PARAPET: Profile = [[0, 0], [0, 0.78], [0.06, 0.86], [0.36, 0.86], [0.42, 0.78], [0.42, 0]];
+/** The water town's quay: a stone coping with a lip, overhanging the drop into the canal. */
+const WT_QUAY: Profile = [[0, 0], [0, 0.09], [0.42, 0.09], [0.46, 0.02], [0.46, -0.3]];
 
 /** Runs of one edge kind along a side: [kind, s0, s1]. */
 function runs(ctx: WorldCtx, side: -1 | 1): Array<[EdgeKind, number, number]> {
@@ -71,9 +82,20 @@ export function buildEdges(ctx: WorldCtx, field: TerrainField): void {
           ex(SEAWALL, (f) => (f >= 1 && f <= 3 ? PAL.cap : PAL.wall));
           break;
         case 'stone':
-          ex(STONE, (f, s) => (f >= 2 && f <= 2 ? PAL.cap : [PAL.stoneA, PAL.stoneB, PAL.stoneC][Math.floor(s / 1.3) % 3] ?? PAL.stoneA));
+          // The water town's lanes: a granite kerb and a whitewashed wall with a tile cap.
+          if (ctx.id === 'watertown') {
+            ex(WT_STREET, (f, s) => (f <= 2 ? (Math.floor(s / 2.4) % 2 === 0 ? PAL.granite : PAL.graniteDark)
+              : f === 3 ? PAL.kerb : f <= 5 ? PAL.plaster : f <= 7 ? PAL.tile : PAL.plaster));
+          } else {
+            ex(STONE, (f, s) => (f >= 2 && f <= 2 ? PAL.cap : [PAL.stoneA, PAL.stoneB, PAL.stoneC][Math.floor(s / 1.3) % 3] ?? PAL.stoneA));
+          }
           break;
         case 'parapet':
+          if (ctx.id === 'watertown') {
+            // A stone parapet on the town's bridges: no railings, no red posts.
+            ex(WT_PARAPET, (f) => (f >= 1 && f <= 3 ? PAL.stoneC : PAL.stoneA));
+            break;
+          }
           ex(PARAPET, (f) => (f >= 1 && f <= 3 ? PAL.white : PAL.concrete));
           along(side, s0 + 1, s1 - 1, 2.5, 0.19, (x, y, z, ry) => box(batch.at(x, z), trs(x, y + 1.02, z, ry, 0.07, 0.22, 0.07, m), PAL.red));
           extrudeEdge(ctx, batch, side, s0, s1, [[0.12, 1.12], [0.12, 1.2], [0.26, 1.2], [0.26, 1.12]], bound, () => PAL.red, { closed: true });
@@ -86,6 +108,16 @@ export function buildEdges(ctx: WorldCtx, field: TerrainField): void {
           });
           break;
         case 'quay':
+          if (ctx.id === 'watertown') {
+            // A stone quay: the coping at the kerb and the wall that drops into the canal.
+            ex(WT_QUAY, (f) => (f === 1 ? PAL.stoneC : f <= 3 ? PAL.stoneA : PAL.stoneB));
+            // Mooring posts stand in the canal, a little above the water.
+            along(side, s0 + 4, s1 - 4, 13, 0.8, (x, y, z) => {
+              pile(batch.at(x, z), x, y - 1.1, z);
+              cylinder(batch.at(x, z), trs(x, y - 1.1, z, 0, 0.13, 0.55, 0.13, m), PAL.black, 8);
+            });
+            break;
+          }
           // Bollards stand on mooring piles 0.7 m off the coping, clear of the drop line.
           ex(COPING, () => PAL.kerb);
           along(side, s0 + 3, s1 - 3, 11, 0.7, (x, y, z) => {

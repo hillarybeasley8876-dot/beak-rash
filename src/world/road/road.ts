@@ -10,12 +10,15 @@ import { CURB_BLOCK, CURB_W } from '../layout/query';
 import { SURFACES, type SideSamples } from '../layout/sides';
 import { roadLookFor } from '../looks';
 import { roadDetail } from './detail';
+import { flagstoneTexture, FLAGSTONE_PERIOD } from './flagstone';
 import { racingLine } from './line';
 import { ROAD_PERIOD, asphaltTexture, grainTexture } from './textures';
 
 const SHOULDER_COLORS: Record<string, string> = {
   road: '#73767d', curb: '#73767d', grass: '#7dbb52', sand: '#f1dfab', dirt: '#b98d5a', water: '#4fb6c9', wall: '#8a8a8a',
 };
+/** Per-track shoulder colour: the water town's lane ends in a stone apron, not asphalt. */
+const SHOULDER_OVERRIDE: Record<string, string> = { watertown: '#8f8b80' };
 const CURB_H = 0.03;
 
 /** Visual s range of the road (run-up before the start, run-off after the finish). */
@@ -30,8 +33,11 @@ export function buildRoad(ctx: WorldCtx): Float32Array {
   const rows = Math.round(s1 - s0) + 1;
   const hw = L.halfWidth;
   const fr = q.frameVis(0);
-  // ---- asphalt (vertex colours: large-scale tone drift so the 12 m texture period never reads)
+  // ---- the surface (vertex colours: large-scale tone drift so the texture period never reads)
   const look = roadLookFor(ctx.id);
+  // The water town's lanes are paved with flagstones, not tarmac: no paint, no lane lines.
+  const stone = ctx.id === 'watertown';
+  const period = stone ? FLAGSTONE_PERIOD : ROAD_PERIOD;
   const asphalt = new GridGeo(rows, 2);
   const tone = new Color();
   const line = racingLine(L);
@@ -39,7 +45,7 @@ export function buildRoad(ctx: WorldCtx): Float32Array {
   for (let r = 0; r < rows; r++) {
     const s = s0 + r;
     q.frameVis(s, fr);
-    const v = s / ROAD_PERIOD;
+    const v = s / period;
     asphalt.set(r, 0, frameOffset(fr, -hw, 0), fr.up, 0, v);
     asphalt.set(r, 1, frameOffset(fr, hw, 0), fr.up, 1, v);
     const base = 0.97 + 0.04 * Math.sin(s * 0.071 + 1.3) + 0.025 * Math.sin(s * 0.173 + 0.4) + 0.015 * Math.sin(s * 0.41 + 2.1);
@@ -48,9 +54,9 @@ export function buildRoad(ctx: WorldCtx): Float32Array {
     asphalt.color(r, 1, tone.setScalar(base + skew));
     aLine[r * 2] = aLine[r * 2 + 1] = line[q.sampleAt(s)] ?? 0;
   }
-  const asphaltTex = ctx.own(asphaltTexture(app.renderer, hw, look.base));
+  const asphaltTex = ctx.own(stone ? flagstoneTexture(app.renderer, hw) : asphaltTexture(app.renderer, hw, look.base));
   const roadMat = ctx.own(new MeshToonMaterial({ map: asphaltTex, gradientMap: toonRamp(), vertexColors: true }));
-  ctx.own(roadDetail(roadMat, look, hw, ROAD_PERIOD));
+  if (!stone) ctx.own(roadDetail(roadMat, look, hw, period));
   const roadGeo = ctx.own(asphalt.build({ colors: true }));
   roadGeo.setAttribute('aLine', new BufferAttribute(aLine, 1));
   const road = new Mesh(roadGeo, roadMat);
@@ -73,7 +79,7 @@ export function buildRoad(ctx: WorldCtx): Float32Array {
       const inner = side < 0 ? b : a, outer = side < 0 ? a : b;
       g.set(r, 0, frameOffset(fr, inner, 0), fr.up, inner / 4, s / 4);
       g.set(r, 1, frameOffset(fr, outer, 0), fr.up, outer / 4, s / 4);
-      c.set(shoulderColor(sd, i));
+      c.set(shoulderColor(sd, i, ctx.id));
       g.color(r, 0, c);
       g.color(r, 1, c);
     }
@@ -86,7 +92,9 @@ export function buildRoad(ctx: WorldCtx): Float32Array {
   return line;
 }
 
-function shoulderColor(sd: SideSamples, i: number): string {
+function shoulderColor(sd: SideSamples, i: number, id: string): string {
+  const over = SHOULDER_OVERRIDE[id];
+  if (over) return over;
   return SHOULDER_COLORS[SURFACES[sd.surface[i] ?? 0] ?? 'road'] ?? '#777777';
 }
 

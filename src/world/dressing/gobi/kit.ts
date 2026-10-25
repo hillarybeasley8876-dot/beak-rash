@@ -67,7 +67,8 @@ export function grid(
   }
 }
 
-/** Crescent dune: a long sand mound whose crest line wanders. `yaw` is the long axis. */
+/** Crescent dune: a long sand mound whose crest line wanders, with wind ripples across its face.
+ *  `yaw` is the long axis. */
 export function dune(buf: MeshBuf, x: number, y: number, z: number, len: number, wid: number, h: number, yaw: number): void {
   const dx = Math.cos(yaw), dz = Math.sin(yaw);
   const ax = -dz, az = dx;
@@ -75,9 +76,12 @@ export function dune(buf: MeshBuf, x: number, y: number, z: number, len: number,
     const q = Math.sin(Math.PI * u) ** 0.7;
     const crest = 0.22 * Math.sin(u * 5.2);
     const t = (v - 0.5 - crest) * 2;
-    return h * q * Math.max(0, 1 - t * t) ** 1.25;
+    const body = h * q * Math.max(0, 1 - t * t) ** 1.25;
+    // The wind ripples: low ridges running along the dune, fading out at its edges.
+    const ripple = Math.sin(u * 21 + v * 2.4) * 0.045 * h * q;
+    return body + ripple;
   };
-  grid(buf, 22, 12, (u, v, out) => {
+  grid(buf, 30, 16, (u, v, out) => {
     const along = (u - 0.5) * len;
     const across = (v - 0.5) * wid;
     out.set(x + dx * along + ax * across, y + height(u, v), z + dz * along + az * across);
@@ -101,14 +105,6 @@ export function butte(buf: MeshBuf, x: number, y: number, z: number, r: number, 
     y0 += hh;
   }
   cylinder(buf, trs(x, y0 - 0.3, z, yaw, r * 0.6, 0.9, r * 0.56, m), C.rockLit, 16);
-}
-
-/** Distant snow-capped peak: three stacked cones. */
-export function peak(buf: MeshBuf, x: number, y: number, z: number, r: number, h: number, snow: number): void {
-  const yaw = (x + z) * 0.7;
-  cone(buf, trs(x, y, z, yaw, r, h, r, m), C.peakRock, 12);
-  cone(buf, trs(x, y + h * 0.5, z, yaw + 0.4, r * 0.5, h * 0.5, r * 0.5, m), C.snow, 12);
-  if (snow > 0) cone(buf, trs(x, y + h * 0.66, z, yaw + 0.8, r * 0.36 * snow, h * 0.36, r * 0.36 * snow, m), C.snow, 10);
 }
 
 /** Weathered boulder: a squashed, faceted lump. */

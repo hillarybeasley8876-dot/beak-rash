@@ -1,9 +1,11 @@
 // Toon sea: one big plane at sea level following the camera. Colour bands by water depth (from the
 // terrain height map), animated foam at the shoreline + wave bands rolling in, sun glints, fog.
 // Every band edge and toon dash is anti-aliased with fwidth (no staircases or shimmer far off).
-import { Color, Mesh, PlaneGeometry, ShaderMaterial, UniformsLib, UniformsUtils, Vector3 } from 'three';
+import { Mesh, PlaneGeometry, ShaderMaterial, UniformsLib, UniformsUtils, Vector3 } from 'three';
 import type { WorldCtx } from '../ctx';
+import { weatherFor } from '../weather/look';
 import { HEIGHT_OFFSET, type HeightMap } from './heightmap';
+import { seaPalette } from './sea-look';
 
 const VERT = /* glsl */`
 #include <fog_pars_vertex>
@@ -85,15 +87,15 @@ void main() {
 
 export function buildSea(ctx: WorldCtx, hm: HeightMap): void {
   const sunDir = new Vector3(-ctx.look.sun.dir.x, -ctx.look.sun.dir.y, -ctx.look.sun.dir.z).normalize();
-  const night = ctx.look.grade.night;
+  const pal = seaPalette(ctx.id, ctx.look, weatherFor(ctx.id, ctx.look));
   const mat = ctx.own(new ShaderMaterial({
     vertexShader: VERT, fragmentShader: FRAG, fog: true,
     uniforms: UniformsUtils.merge([UniformsLib.fog, {
       uHeight: { value: null }, uXform: { value: hm.xform }, uTexel: { value: hm.texel }, uTime: { value: 0 },
-      uDeep: { value: new Color(night ? '#10184a' : '#1b78c2') },
-      uMid: { value: new Color(night ? '#1d2c78' : '#1fa6d3') },
-      uShallow: { value: new Color(night ? '#2c4aa0' : '#5fdbd6') },
-      uFoam: { value: new Color(night ? '#7d86c8' : '#ffffff') },
+      uDeep: { value: pal.deep },
+      uMid: { value: pal.mid },
+      uShallow: { value: pal.shallow },
+      uFoam: { value: pal.foam },
       uSunDir: { value: sunDir }, uCam: { value: new Vector3() },
     }]),
   }));

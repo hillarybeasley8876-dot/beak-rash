@@ -38,11 +38,11 @@ export function houses(d: Dress, side: -1 | 1, s0: number, s1: number): void {
   const { place, rng, b } = d;
   let n = 0;
   for (let s = s0 + rng.range(2, 7); s < s1 - 6; s += rng.range(9, 13)) {
-    for (const [row, u0, u1] of [[0, 3.4, 4.8], [1, 8.6, 11.5]] as Array<[number, number, number]>) {
+    for (const [row, u0, u1] of [[0, 3.0, 4.6], [1, 6.4, 8.6]] as Array<[number, number, number]>) {
       if (row === 1 && !rng.chance(0.75)) continue;
       const u = rng.range(u0, u1);
       const sp = place.spot(s + row * rng.range(3, 7), side, u);
-      const w = rng.range(5.5, 8.5) * (row ? 1.15 : 1), dd = rng.range(4.5, 6.5) * (row ? 1.15 : 1);
+      const w = rng.range(5, 7.5) * (row ? 1.15 : 1), dd = rng.range(4, 5.6) * (row ? 1.15 : 1);
       const cx = sp.pos.x + Math.sin(sp.faceRoad) * dd * 0.5;
       const cz = sp.pos.z + Math.cos(sp.faceRoad) * dd * 0.5;
       if (place.slopeRange(sp, w, dd) > 2.6 || !place.free(cx, cz, Math.max(w, dd) * 0.6, 4)) continue;
@@ -58,7 +58,7 @@ export function willows(d: Dress, side: -1 | 1, s0: number, s1: number): void {
   const { place, rng, b } = d;
   let n = 0;
   for (let s = s0 + rng.range(2, 9); s < s1 - 4; s += rng.range(9, 15)) {
-    const u = rng.range(6.4, 9.5);
+    const u = rng.range(10, 13.5);
     const sp = place.spot(s, side, u);
     const cx = sp.pos.x + Math.sin(sp.faceRoad) * 0.5, cz = sp.pos.z + Math.cos(sp.faceRoad) * 0.5;
     if (!place.free(cx, cz, 2.2, 1.2)) continue;

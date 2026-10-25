@@ -12,29 +12,30 @@ const G = (g: Partial<GroundDef>): GroundDef => ({
 
 // ---- side presets
 /** Start / finish apron: painted ground behind red-and-white barriers. */
-const apronL: SideDef = { shoulder: 3.2, surface: 'road', edge: 'barrier', ground: G({ step: 0, stepW: 1, flat: 16, slope: 0.06, target: 2.6, rough: 0.3, mat: 'paved' }) };
+const apronL: SideDef = { shoulder: 3.2, surface: 'road', edge: 'barrier', ground: G({ step: 0, stepW: 1, flat: 16, slope: 0.06, target: 2.6, rough: 0.3, mat: 'stone' }) };
 const apronR: SideDef = { ...apronL };
-/** Old-town lane: a low whitewashed wall (the shared 'stone' edge) with the houses behind it. */
-const laneL: SideDef = { shoulder: 1.1, surface: 'road', edge: 'stone', ground: G({ step: 0.14, stepW: 0.5, flat: 5, slope: 0.05, target: 2.4, rough: 0.3, mat: 'paved' }) };
+/** Old-town lane: a granite kerb and a low whitewashed wall (the shared 'stone' edge) with the
+ *  houses right behind it. */
+const laneL: SideDef = { shoulder: 0.9, surface: 'road', edge: 'stone', ground: G({ step: 0.14, stepW: 0.5, flat: 5, slope: 0.05, target: 2.4, rough: 0.3, mat: 'stone' }) };
 const laneR: SideDef = { ...laneL };
-/** Canal side: a quay edge (no barrier — the water is right there) with the water below the bank. */
-const quayL: SideDef = { shoulder: 2.4, surface: 'road', edge: 'quay', ground: G({ abs: true, step: -1.3, stepW: 0.35, flat: 0, slope: 0.22, target: 1.7, rough: 0.2, mat: 'paved' }) };
+/** Canal side: a stone quay (no barrier — the water is right there) with a 9 m canal beyond it. */
+const quayL: SideDef = { shoulder: 1.6, surface: 'road', edge: 'quay', ground: G({ abs: true, step: -1.4, stepW: 0.06, flat: 9, slope: 0.25, target: 2.2, rough: 0.2, mat: 'stone' }) };
 const quayR: SideDef = { ...quayL };
 /** Humpback stone bridge: the ground drops away under the road (the canal runs underneath). */
-const humpL: SideDef = { shoulder: 0.9, surface: 'road', edge: 'parapet', ground: G({ abs: true, detached: true, step: -1.3, stepW: 0, flat: 0, slope: 0.24, target: 1.7, rough: 0.15, mat: 'paved' }) };
+const humpL: SideDef = { shoulder: 0.8, surface: 'road', edge: 'parapet', ground: G({ abs: true, detached: true, step: -1.3, stepW: 0, flat: 0, slope: 0.24, target: 1.7, rough: 0.15, mat: 'stone' }) };
 const humpR: SideDef = { ...humpL };
-/** Steel canal bridge (the shared 'bridge' feature draws the arch): open water under the deck. */
-const bridgeL: SideDef = { shoulder: 1, surface: 'road', edge: 'parapet', ground: G({ abs: true, detached: true, step: -1.4, stepW: 0, flat: 0, slope: 0.05, target: -2.6, rough: 0.2, mat: 'paved' }) };
+/** Stone canal bridge: open water under the deck. */
+const bridgeL: SideDef = { shoulder: 0.9, surface: 'road', edge: 'parapet', ground: G({ abs: true, detached: true, step: -1.4, stepW: 0, flat: 0, slope: 0.05, target: -2.6, rough: 0.2, mat: 'stone' }) };
 const bridgeR: SideDef = { ...bridgeL };
 /** Market lane: a kerb with bollards and planters on the town side. */
-const stallL: SideDef = { shoulder: 1.8, surface: 'road', edge: 'stalls', ground: G({ step: 0.1, stepW: 0.6, flat: 5, slope: 0.08, target: 2.4, rough: 0.3, mat: 'paved' }) };
+const stallL: SideDef = { shoulder: 1.5, surface: 'road', edge: 'stalls', ground: G({ step: 0.1, stepW: 0.6, flat: 5, slope: 0.08, target: 2.4, rough: 0.3, mat: 'stone' }) };
 const stallR: SideDef = { ...stallL };
 
 export const WATERTOWN: LayoutDef = {
   id: 'watertown',
   heading: 0,
   elevation: 1.6,
-  halfWidth: 4.8,
+  halfWidth: 3.6,
   pre: 160,
   post: 300,
   left: apronL,
@@ -64,7 +65,7 @@ export const WATERTOWN: LayoutDef = {
     },
     {
       len: 64, name: 'lanes', radius: -48, ease: 30, left: laneL, right: laneR,
-      features: [{ kind: 'pickupRow', at: 26, len: 15, x0: -3.5, x1: 3.5, data: { kind: 'coin' } }],
+      features: [{ kind: 'pickupRow', at: 26, len: 15, x0: -3.2, x1: 3.2, data: { kind: 'coin' } }],
       marks: [
         { kind: 'house', at: 0, x: -1, data: { len: 64 } },
         { kind: 'house', at: 0, x: 1, data: { len: 64 } },
@@ -86,8 +87,8 @@ export const WATERTOWN: LayoutDef = {
     {
       len: 280, name: 'canal', radius: 520, ease: 60, left: quayL, right: laneR,
       features: [
-        { kind: 'pickupRow', at: 120, len: 15, x0: 3.5, x1: -1.5, data: { kind: 'coin' } },
-        { kind: 'puddle', at: 196, len: 7, x0: 1, x1: 4.5 },
+        { kind: 'pickupRow', at: 120, len: 15, x0: 3.2, x1: -1.5, data: { kind: 'coin' } },
+        { kind: 'puddle', at: 196, len: 7, x0: 1, x1: 3.3 },
       ],
       marks: [
         { kind: 'willow', at: 0, x: -1, data: { len: 280 } },
@@ -110,7 +111,7 @@ export const WATERTOWN: LayoutDef = {
     { len: 8, name: 'hump', rise: 1.6, vEase: 8, ease: 8, sideEase: 6, left: humpL, right: humpR },
     {
       len: 8, name: 'hump', rise: -1.6, vEase: 8, ease: 8, sideEase: 6, left: humpL, right: humpR,
-      features: [{ kind: 'jumpCrest', at: -8, len: 16, x0: -4.8, x1: 4.8 }],
+      features: [{ kind: 'jumpCrest', at: -8, len: 16, x0: -3.6, x1: 3.6 }],
     },
     {
       len: 70, name: 'hump', rise: -2, left: quayL, right: laneR, sideEase: 8,
@@ -123,9 +124,9 @@ export const WATERTOWN: LayoutDef = {
     {
       len: 310, name: 'market', left: quayL, right: stallR,
       features: [
-        { kind: 'pickupRow', at: 70, len: 12, x0: -3.5, x1: -3.5, data: { kind: 'fish' } },
-        { kind: 'puddle', at: 140, len: 6, x0: -4.5, x1: -1.5 },
-        { kind: 'boostPad', at: 190, len: 6, x0: 1.2, x1: 4.4, data: { power: 0.3, time: 1 } },
+        { kind: 'pickupRow', at: 70, len: 12, x0: -3.2, x1: -3.2, data: { kind: 'fish' } },
+        { kind: 'puddle', at: 140, len: 6, x0: -3.3, x1: -1.5 },
+        { kind: 'boostPad', at: 190, len: 6, x0: 1.2, x1: 3.3, data: { power: 0.3, time: 1 } },
         { kind: 'pickupRow', at: 214, len: 12, x0: 3, x1: 3, data: { kind: 'crate' } },
       ],
       marks: [
@@ -158,9 +159,9 @@ export const WATERTOWN: LayoutDef = {
     {
       len: 440, name: 'sweeper', radius: 240, bank: 3, ease: 80, left: quayL, right: laneR,
       features: [
-        { kind: 'pickupRow', at: 110, len: 15, x0: 3.5, x1: -1.5, data: { kind: 'coin' } },
+        { kind: 'pickupRow', at: 110, len: 15, x0: 3.2, x1: -1.5, data: { kind: 'coin' } },
         { kind: 'puddle', at: 200, len: 8, x0: -4.5, x1: -1 },
-        { kind: 'boostPad', at: 280, len: 6, x0: -4.4, x1: -1.4, data: { power: 0.3, time: 1 } },
+        { kind: 'boostPad', at: 280, len: 6, x0: -3.3, x1: -1.4, data: { power: 0.3, time: 1 } },
       ],
       marks: [
         { kind: 'willow', at: 0, x: -1, data: { len: 380 } },
@@ -181,7 +182,7 @@ export const WATERTOWN: LayoutDef = {
     { len: 8, name: 'hump', rise: 1.6, vEase: 8, ease: 8, sideEase: 6, left: humpL, right: humpR },
     {
       len: 8, name: 'hump', rise: -1.6, vEase: 8, ease: 8, sideEase: 6, left: humpL, right: humpR,
-      features: [{ kind: 'jumpCrest', at: -8, len: 16, x0: -4.8, x1: 4.8 }],
+      features: [{ kind: 'jumpCrest', at: -8, len: 16, x0: -3.6, x1: 3.6 }],
     },
     {
       len: 70, name: 'hump', rise: -2, left: laneL, right: laneR, sideEase: 8,
@@ -222,7 +223,7 @@ export const WATERTOWN: LayoutDef = {
     {
       len: 100, name: 'bridge', left: bridgeL, right: bridgeR,
       features: [
-        { kind: 'bridge', at: 12, len: 76, x0: -5.8, x1: 5.8 },
+        { kind: 'bridge', at: 12, len: 76, x0: -4.2, x1: 4.2 },
         { kind: 'pickupRow', at: 58, len: 12, x0: 3, x1: 3, data: { kind: 'can' } },
       ],
       marks: [
@@ -241,7 +242,7 @@ export const WATERTOWN: LayoutDef = {
     },
     {
       len: 30, name: 'corners',
-      features: [{ kind: 'pickupRow', at: 10, len: 12, x0: -3.5, x1: -3.5, data: { kind: 'fish' } }],
+      features: [{ kind: 'pickupRow', at: 10, len: 12, x0: -3.2, x1: -3.2, data: { kind: 'fish' } }],
       marks: [{ kind: 'house', at: 0, x: 1, data: { len: 30 } }],
     },
     {
@@ -258,7 +259,7 @@ export const WATERTOWN: LayoutDef = {
     // ---- 2562 – 2662: the second canal crossing.
     {
       len: 100, name: 'bridge', left: bridgeL, right: bridgeR,
-      features: [{ kind: 'bridge', at: 12, len: 76, x0: -5.8, x1: 5.8 }],
+      features: [{ kind: 'bridge', at: 12, len: 76, x0: -4.2, x1: 4.2 }],
       marks: [
         { kind: 'boat', at: 24, x: -1, data: { len: 60 } },
         { kind: 'boat', at: 24, x: 1, data: { len: 60 } },
@@ -269,9 +270,9 @@ export const WATERTOWN: LayoutDef = {
     {
       len: 320, name: 'promenade', radius: -180, ease: 60, left: stallL, right: quayR,
       features: [
-        { kind: 'pickupRow', at: 90, len: 15, x0: 3.5, x1: -1.5, data: { kind: 'coin' } },
-        { kind: 'puddle', at: 150, len: 7, x0: 1, x1: 4.5 },
-        { kind: 'boostPad', at: 200, len: 6, x0: 1.2, x1: 4.4, data: { power: 0.3, time: 1 } },
+        { kind: 'pickupRow', at: 90, len: 15, x0: 3.2, x1: -1.5, data: { kind: 'coin' } },
+        { kind: 'puddle', at: 150, len: 7, x0: 1, x1: 3.3 },
+        { kind: 'boostPad', at: 200, len: 6, x0: 1.2, x1: 3.3, data: { power: 0.3, time: 1 } },
       ],
       marks: [
         { kind: 'stalls', at: 0, x: -1, data: { len: 240 } },
@@ -283,7 +284,7 @@ export const WATERTOWN: LayoutDef = {
     // ---- 2942 – 3042: the third canal crossing, straight into the finishing straight.
     {
       len: 100, name: 'bridge', left: bridgeL, right: bridgeR,
-      features: [{ kind: 'bridge', at: 12, len: 76, x0: -5.8, x1: 5.8 }],
+      features: [{ kind: 'bridge', at: 12, len: 76, x0: -4.2, x1: 4.2 }],
       marks: [
         { kind: 'boat', at: 26, x: -1, data: { len: 60 } },
         { kind: 'boat', at: 26, x: 1, data: { len: 60 } },

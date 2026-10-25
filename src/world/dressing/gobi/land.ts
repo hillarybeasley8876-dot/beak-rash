@@ -1,7 +1,7 @@
 // The gobi landscape: dune ridges, rock buttes, the salt pan, distant snow peaks and the dry scatter
 // (scrub bushes, boulders) that keeps the verges from being bare gradients.
 import type { GobiCtx } from './gctx';
-import { boulder, butte, dune, peak, rockCluster, saltPan, scrub } from './kit';
+import { boulder, butte, dune, rockCluster, saltPan, scrub } from './kit';
 
 /** Yaw of the road at s (the direction of travel). */
 function roadYaw(g: GobiCtx, s: number): number {
@@ -16,6 +16,8 @@ export function dunes(g: GobiCtx, s: number, side: -1 | 1, len: number): void {
     const u = g.rng.range(22, 62);
     const sp = g.place.spot(ss, side, u);
     if (!g.place.free(sp.pos.x, sp.pos.z, 12, 6)) continue;
+    // The highway curls back on itself: a dune must not land on another stretch of road.
+    if (!g.clearOfRoad(sp.pos.x, sp.pos.z, 42)) continue;
     const h = g.rng.range(3.5, 9);
     dune(g.props.at(sp.pos.x, sp.pos.z), sp.pos.x, sp.pos.y - 0.4, sp.pos.z, g.rng.range(30, 62), g.rng.range(16, 30), h, yaw + g.rng.range(-0.3, 0.3));
   }
@@ -28,6 +30,7 @@ export function mesas(g: GobiCtx, s: number, side: -1 | 1, count: number): void 
     const u = g.rng.range(150, 330);
     const sp = g.place.spot(ss, side, u);
     if (!g.place.free(sp.pos.x, sp.pos.z, 30, 20)) continue;
+    if (!g.clearOfRoad(sp.pos.x, sp.pos.z, 90)) continue;
     const y = g.ctx.groundWorld(sp.pos.x, sp.pos.z);
     butte(g.props.at(sp.pos.x, sp.pos.z), sp.pos.x, y - 0.5, sp.pos.z, g.rng.range(16, 30), g.rng.range(26, 52), g.rng);
   }
@@ -52,16 +55,23 @@ export function saltLake(g: GobiCtx, s: number, len: number): void {
   }
 }
 
-/** Distant snow-capped peaks on the horizon (far batch, no outline). */
-export function horizonPeaks(g: GobiCtx): void {
+/**
+ * Distant mesas on the desert plain: big rock buttes that give the horizon its scale. They are
+ * placed well away from every stretch of the road (the highway curls back on itself) and stay low
+ * enough to read as far-off land, not as a wall over the track.
+ */
+export function distantMesas(g: GobiCtx): void {
   const L = g.ctx.L;
-  for (let s = 120; s < L.length; s += g.rng.range(240, 420)) {
+  for (let s = 160; s < L.length; s += g.rng.range(260, 430)) {
     for (const side of [-1, 1] as const) {
-      if (!g.rng.chance(0.55)) continue;
-      const sp = g.place.spot(s, side, g.rng.range(600, 1050));
+      if (!g.rng.chance(0.6)) continue;
+      const sp = g.place.spot(s, side, g.rng.range(430, 900));
+      if (!g.clearOfRoad(sp.pos.x, sp.pos.z, 400)) continue;
+      if (!g.place.free(sp.pos.x, sp.pos.z, 40, 30)) continue;
       const y = g.ctx.groundWorld(sp.pos.x, sp.pos.z);
-      const h = g.rng.range(180, 280);
-      peak(g.far.at(sp.pos.x, sp.pos.z), sp.pos.x, y - 6, sp.pos.z, h * g.rng.range(0.4, 0.56), h, g.rng.range(0.6, 1));
+      if (!Number.isFinite(y)) continue;
+      const h = g.rng.range(45, 95);
+      butte(g.far.at(sp.pos.x, sp.pos.z), sp.pos.x, y - 1, sp.pos.z, h * g.rng.range(0.4, 0.6), h, g.rng);
     }
   }
 }

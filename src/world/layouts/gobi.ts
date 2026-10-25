@@ -6,7 +6,11 @@
 // Road: 16 m wide (halfWidth 8), sand shoulders (surface 'sand' slows a rider who drifts wide) and a
 // guard rail beyond them; barrier at the start / finish, a stone dyke at the salt lake.
 import { smoothstep } from '../../core/math';
+import type { TrackFrame } from '../../core/types';
 import type { GroundDef, LayoutDef, SideDef } from '../layout/types';
+
+/** Scratch frame for the terrain modifier (it is called once per far-grid vertex). */
+const scratch = {} as TrackFrame;
 
 const G = (g: Partial<GroundDef>): GroundDef => ({
   step: 0, stepW: 2, flat: 4, slope: 0.3, target: 30, rough: 3, abs: false, detached: false, mat: 'sand', ...g,
@@ -39,11 +43,14 @@ export const GOBI: LayoutDef = {
   right: apronR,
   terrainMod: (field) => ({
     room: () => Infinity,
-    // Keep the far plain high and dry: the shared far grid paints farmland on flat ground
-    // between 4 and 115 m, which has no business in the Gobi.
+    // The desert plain follows the road's own height: a fixed lift left a grey slab hanging over
+    // the horizon wherever the road ran lower. Beyond the near ribbon it rolls with long dunes.
     height: (s, side, u, wx, wz, h) => {
       const k = smoothstep(180, 340, u);
-      return h * (1 - k) + Math.max(h, 122) * k;
+      const roadY = field.q.frameVis(s, scratch).pos.y;
+      const roll = field.noise.fbm(wx / 240, wz / 240, 3) * 8 + field.noise.fbm(wx / 80, wz / 80, 2) * 3;
+      const plain = roadY - 5 + roll;
+      return h * (1 - k) + plain * k;
     },
   }),
   bumps: [

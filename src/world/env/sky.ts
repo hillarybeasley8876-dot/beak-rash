@@ -6,6 +6,7 @@ import {
 import { Rng } from '../../core/rng';
 import type { WorldCtx } from '../ctx';
 import { MeshBuf } from '../geom';
+import { weatherFor } from '../weather/look';
 
 const DOME_R = 1800;
 
@@ -84,7 +85,20 @@ export function restoreLookSky(ctx: WorldCtx): void {
   }
 }
 
-/** Four cartoon cloud silhouettes drawn into one canvas (white body, sky-tinted shade band, soft outline). */
+/** The cloud colours of one weather: a bright top over a shaded band, or a flat overcast grey. */
+interface CloudSkin { top: string; shade: string }
+
+function cloudSkin(ctx: WorldCtx): CloudSkin {
+  const w = weatherFor(ctx.id, ctx.look);
+  const horizon = new Color(ctx.look.sky.horizon);
+  if (w === 'rain') return { top: '#8d99a3', shade: '#6d7883' };
+  if (w === 'fog') return { top: '#c6cbce', shade: '#a7adb1' };
+  if (w === 'snow') return { top: '#d9e2ea', shade: '#b4c0cb' };
+  if (w === 'dusk') return { top: '#ffe6bd', shade: horizon.lerp(new Color('#c98a5e'), 0.5).getStyle() };
+  return { top: '#ffffff', shade: horizon.lerp(new Color('#9fb6d8'), 0.55).getStyle() };
+}
+
+/** Four cartoon cloud silhouettes drawn into one canvas (a light body, a sky-tinted shade band, soft outline). */
 function cloudAtlas(ctx: WorldCtx): CanvasTexture {
   const W = 1024, H = 128;
   const c = document.createElement('canvas');
@@ -93,7 +107,8 @@ function cloudAtlas(ctx: WorldCtx): CanvasTexture {
   const g = c.getContext('2d');
   if (!g) throw new Error('[track] 2D canvas unavailable');
   const rng = new Rng(0xc10d);
-  const shade = new Color(ctx.look.sky.horizon).lerp(new Color('#9fb6d8'), 0.55).getStyle();
+  const skin = cloudSkin(ctx);
+  const shade = skin.shade;
   for (let k = 0; k < 4; k++) {
     const ox = k * 256, base = 116;
     const puffs: Array<[number, number, number]> = [];
@@ -117,7 +132,7 @@ function cloudAtlas(ctx: WorldCtx): CanvasTexture {
     g.beginPath();
     g.rect(ox, 0, 256, base - 16);
     g.clip();
-    g.fillStyle = '#ffffff';
+    g.fillStyle = skin.top;
     g.translate(0, -7);
     body(-4);
     g.restore();

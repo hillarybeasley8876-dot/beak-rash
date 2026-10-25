@@ -1,10 +1,16 @@
 // Weather = a modifier on the track's own base look (SPEC §20): 'clear' returns the base look
 // untouched, every other weather darkens / cools / pulls the fog in and re-grades it. Colours are
 // mixed in sRGB space (the space the looks are written in) and written back as hex.
-import type { EnvLook, Weather } from '../../core/types';
+import type { EnvLook, TrackId, Weather } from '../../core/types';
+import { LOOK as GOBI_LOOK } from '../env/gobi-look';
+import { LOOK as WATERTOWN_LOOK } from '../env/watertown-look';
+import { lookFor } from '../looks';
 import { TUNE } from './table';
 
 type Rgb = [number, number, number];
+
+/** Tracks whose rain is a soft drizzle rather than a storm (the water town's misty lanes). */
+const SOFT_RAIN = new Set<EnvLook>([WATERTOWN_LOOK]);
 
 function rgb(hex: string): Rgb {
   const n = parseInt(hex.slice(1), 16);
@@ -44,35 +50,58 @@ export function weatherLook(base: EnvLook, weather: Weather): EnvLook {
   return snowLook(base);
 }
 
+/** Every weather a track can be built with, in the order the table lists them. */
+const WEATHERS: readonly Weather[] = ['clear', 'rain', 'fog', 'dusk', 'snow'];
+
+/** Two looks are the same when every field matches (the looks are plain data). */
+function sameLook(a: EnvLook, b: EnvLook): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/**
+ * The weather a look was built with: the track's own base look put through each weather in turn and
+ * compared with the look at hand. The env builders (the sea, the clouds) only see the look, so this
+ * is how they know whether it is raining.
+ */
+export function weatherFor(id: TrackId, look: EnvLook): Weather {
+  const base = lookFor(id);
+  for (const w of WEATHERS) if (sameLook(weatherLook(base, w), look)) return w;
+  return 'clear';
+}
+
 /** Rain: greyer and darker, a dimmer and cooler sun, a wet road (weather/wet.ts). */
 function rainLook(base: EnvLook): EnvLook {
   const r = TUNE.rain;
   const night = base.grade.night;
   const overcast = night ? '#1b202b' : '#5c6874';
   const horizon = night ? '#2b3140' : '#7d8894';
+  // The water town rains softly: a misty drizzle, not a storm (its base look is the drizzle look).
+  const soft = SOFT_RAIN.has(base);
+  const darken = soft ? r.darken * 0.4 : r.darken;
+  const grey = soft ? r.grey * 0.55 : r.grey;
   return {
     ...base,
     name: `${base.name} · 雨 rain`,
     sky: {
-      top: mix(shade(base.sky.top, 1 - r.darken), overcast, r.grey),
-      horizon: mix(shade(base.sky.horizon, 1 - r.darken * 0.45), horizon, r.grey),
-      bottom: mix(shade(base.sky.bottom, 1 - r.darken * 0.7), horizon, r.grey * 0.8),
+      top: mix(shade(base.sky.top, 1 - darken), overcast, grey),
+      horizon: mix(shade(base.sky.horizon, 1 - darken * 0.45), horizon, grey),
+      bottom: mix(shade(base.sky.bottom, 1 - darken * 0.7), horizon, grey * 0.8),
     },
-    fog: { ...base.fog, color: mix(base.fog.color, overcast, r.grey * 0.85) },
+    fog: { ...base.fog, color: mix(base.fog.color, overcast, grey * 0.85) },
     sun: {
       ...base.sun,
       color: mix(base.sun.color, '#9fb0c4', night ? 0.5 : 0.75),
-      intensity: base.sun.intensity * (night ? 0.8 : r.sunMul),
+      intensity: base.sun.intensity * (night ? 0.8 : soft ? 0.8 : r.sunMul),
     },
     ambient: {
-      sky: mix(base.ambient.sky, night ? '#4a5464' : '#8d99a6', 0.5),
-      ground: mix(base.ambient.ground, night ? '#3a3f4a' : '#6a6a66', 0.5),
-      intensity: base.ambient.intensity * r.ambientMul,
+      sky: mix(base.ambient.sky, night ? '#4a5464' : '#8d99a6', soft ? 0.3 : 0.5),
+      ground: mix(base.ambient.ground, night ? '#3a3f4a' : '#6a6a66', soft ? 0.3 : 0.5),
+      intensity: base.ambient.intensity * (soft ? 1.08 : r.ambientMul),
     },
     grade: {
-      saturation: base.grade.saturation * (night ? r.nightSatMul : r.satMul),
+      saturation: base.grade.saturation * (night ? r.nightSatMul : soft ? 0.86 : r.satMul),
       contrast: base.grade.contrast * r.contrastMul,
-      tint: mix(base.grade.tint, r.tint, 0.6),
+      tint: mix(base.grade.tint, r.tint, soft ? 0.35 : 0.6),
       bloom: Math.max(base.grade.bloom, 0.2),
       night: base.grade.night,
     },
@@ -106,10 +135,12 @@ function duskLook(base: EnvLook): EnvLook {
 /** Fog: the fog closes in (near and far × 0.35) and turns to a light grey of the sky. */
 function fogLook(base: EnvLook): EnvLook {
   const f = TUNE.fog;
-  const grey = mix(greyOf(base.sky.horizon), '#e6e9ea', f.grey * 0.65);
+  // The desert's fog is a sandstorm: a warm, dusty haze instead of the coast's cold grey.
+  const sandy = base === GOBI_LOOK;
+  const grey = sandy ? '#d8b483' : mix(greyOf(base.sky.horizon), '#e6e9ea', f.grey * 0.65);
   return {
     ...base,
-    name: `${base.name} · 雾 fog`,
+    name: `${base.name} · ${sandy ? '沙暴 sandstorm' : '雾 fog'}`,
     sky: {
       top: mix(base.sky.top, grey, f.skyBlend),
       horizon: mix(base.sky.horizon, grey, f.skyBlend * 0.95),
@@ -121,7 +152,7 @@ function fogLook(base: EnvLook): EnvLook {
     grade: {
       saturation: base.grade.saturation * f.satMul,
       contrast: base.grade.contrast * f.contrastMul,
-      tint: mix(base.grade.tint, '#dfe6ec', 0.5),
+      tint: mix(base.grade.tint, sandy ? '#e8c79a' : '#dfe6ec', 0.5),
       bloom: Math.max(base.grade.bloom, 0.2),
       night: base.grade.night,
     },

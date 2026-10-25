@@ -10,9 +10,9 @@ export const WPAL = {
   wall: [C('#f4f0e6'), C('#efe9db'), C('#f7f3ea'), C('#ece5d4')],
   wallShade: C('#e2dbca'),
   plinth: C('#b9b2a4'),
-  tile: C('#3c4149'),
-  tileLight: C('#4c525b'),
-  ridge: C('#2b2f36'),
+  tile: C('#33373d'),
+  tileLight: C('#434951'),
+  ridge: C('#23262b'),
   wood: C('#6b4630'),
   woodDark: C('#4a2f21'),
   glass: C('#2b3138'),
@@ -20,6 +20,7 @@ export const WPAL = {
   willowLight: C('#87b356'),
   willowDark: C('#4f7a33'),
   stone: C('#c9c2b2'),
+  sign: C('#8d3a2c'),
 };
 
 const m = new Matrix4(), lm = new Matrix4();
@@ -54,8 +55,8 @@ export interface HouseOpts {
  * (x, y, z) = the ground at the front centre; the front faces local −Z.
  */
 export function wtHouse(buf: MeshBuf, x: number, y: number, z: number, ry: number, rng: Rng, o: HouseOpts = {}): void {
-  const w = o.w ?? rng.range(5.5, 8.5);
-  const d = o.d ?? rng.range(4.5, 6.5);
+  const w = o.w ?? rng.range(5, 7.5);
+  const d = o.d ?? rng.range(4, 5.6);
   const floors = o.floors ?? rng.int(1, 2);
   const fh = 3, h = floors * fh;
   const base = trs(x, y, z, ry, 1, 1, 1, new Matrix4());
@@ -64,7 +65,7 @@ export function wtHouse(buf: MeshBuf, x: number, y: number, z: number, ry: numbe
   box(buf, new Matrix4().multiplyMatrices(base, trs(0, h / 2 + 0.2, d / 2, 0, w, h, d, lm)), wall);
 
   // ---- the roof: two slopes from the eave to the ridge, the eave corners turned up.
-  const W = w / 2 + 0.7, E = 0.7, rise = 1.75;
+  const W = w / 2 + 0.75, E = 0.8, rise = 2.1;
   const xs = [-W, -W * 0.52, W * 0.52, W];
   const flare = (xi: number): number => 0.5 * (Math.abs(xi) / W) ** 2;
   const eaveY = (xi: number): number => h + 0.2 + flare(xi);
@@ -97,20 +98,21 @@ export function wtHouse(buf: MeshBuf, x: number, y: number, z: number, ry: numbe
     if (z <= d / 2) return yF + (yM - yF) * ((z + E) / (d / 2 + E));
     return yM + (yF - yM) * ((z - d / 2) / (d / 2 + E));
   };
+  const STEPS = 4;
   for (const sx of [-1, 1]) {
     const x0 = sx * W, x1 = sx * (W + 0.3);
     for (const [za, zb] of [[-E, d / 2], [d / 2, d + E]] as Array<[number, number]>) {
-      for (let k = 0; k < 3; k++) {
-        const s0 = za + ((zb - za) * k) / 3, s1 = za + ((zb - za) * (k + 1)) / 3;
-        const yTop = roofY(s1) + 0.5, yBot = roofY(s0) - 0.4;
+      for (let k = 0; k < STEPS; k++) {
+        const s0 = za + ((zb - za) * k) / STEPS, s1 = za + ((zb - za) * (k + 1)) / STEPS;
+        const yTop = roofY(s1) + 0.55, yBot = roofY(s0) - 0.4;
         const a = p(base, x0, yBot, s0), b = p(base, x0, yTop, s0);
         const c = p(base, x0, yTop, s1), e = p(base, x0, yBot, s1);
         const a2 = p(base, x1, yTop, s0), b2 = p(base, x1, yTop, s1);
         if (sx > 0) {
-          quad(buf, a, b, c, e, wall);
+          quad(buf, a, b, c, e, WPAL.wallShade);
           quad(buf, b, a2, b2, c, WPAL.tile);
         } else {
-          quad(buf, a, e, c, b, wall);
+          quad(buf, a, e, c, b, WPAL.wallShade);
           quad(buf, b, c, b2, a2, WPAL.tile);
         }
       }
@@ -118,25 +120,39 @@ export function wtHouse(buf: MeshBuf, x: number, y: number, z: number, ry: numbe
   }
   // Ridge cap and the dark eave boards.
   box(buf, new Matrix4().multiplyMatrices(base, trs(0, ridgeY(0) + 0.05, d / 2, 0, W * 2 - 0.3, 0.18, 0.34, lm)), WPAL.ridge);
-  for (const z of [-E + 0.05, d + E - 0.05]) {
-    box(buf, new Matrix4().multiplyMatrices(base, trs(0, eaveY(0) - 0.12, z, 0, W * 2 - 0.2, 0.16, 0.12, lm)), WPAL.ridge);
+  for (const z of [-E + 0.08, d + E - 0.08]) {
+    box(buf, new Matrix4().multiplyMatrices(base, trs(0, eaveY(0) - 0.2, z, 0, W * 2 - 0.2, 0.34, 0.2, lm)), WPAL.ridge);
   }
   if (o.plain) return;
-  // Lattice windows and a door on the front.
   const cols = Math.max(2, Math.floor(w / 2.6));
-  for (let f = 0; f < floors; f++) {
+  const dx = -w / 2 + (w / cols) * (Math.floor(cols / 2) + 0.5);
+  // The wooden shopfront (铺面): a panelled timber front under the white wall, with a counter
+  // board, the door in the middle bay and a small hanging sign beside it.
+  box(buf, new Matrix4().multiplyMatrices(base, trs(0, 1.35, -0.07, 0, w - 0.16, 1.7, 0.14, lm)), WPAL.wood);
+  box(buf, new Matrix4().multiplyMatrices(base, trs(0, 2.28, -0.12, 0, w - 0.02, 0.26, 0.26, lm)), WPAL.woodDark);
+  box(buf, new Matrix4().multiplyMatrices(base, trs(0, 0.44, -0.12, 0, w - 0.02, 0.22, 0.26, lm)), WPAL.woodDark);
+  for (let i = 0; i <= cols; i++) {
+    const px = -w / 2 + (w / cols) * i;
+    box(buf, new Matrix4().multiplyMatrices(base, trs(px, 1.35, -0.16, 0, 0.15, 1.7, 0.12, lm)), WPAL.woodDark);
+  }
+  const cx = dx - 1.7 * Math.sign(dx || 1);
+  box(buf, new Matrix4().multiplyMatrices(base, trs(cx, 1.0, -0.3, 0, 2.1, 0.14, 0.5, lm)), WPAL.wood);
+  // The door in the middle bay and a small hanging shop sign beside it.
+  box(buf, new Matrix4().multiplyMatrices(base, trs(dx, 1.35, -0.2, 0, 1.15, 2.3, 0.14, lm)), WPAL.woodDark);
+  box(buf, new Matrix4().multiplyMatrices(base, trs(dx, 2.55, -0.24, 0, 1.45, 0.16, 0.3, lm)), WPAL.wood);
+  const sx2 = dx + 1.5 * Math.sign(dx || 1);
+  box(buf, new Matrix4().multiplyMatrices(base, trs(sx2, 1.85, -0.5, 0, 0.85, 0.62, 0.08, lm)), WPAL.sign);
+  box(buf, new Matrix4().multiplyMatrices(base, trs(sx2, 2.28, -0.38, 0, 0.06, 0.34, 0.06, lm)), WPAL.woodDark);
+  // Lattice windows on the upper floor.
+  for (let f = 1; f < floors; f++) {
     for (let i = 0; i < cols; i++) {
       const wx = -w / 2 + (w / cols) * (i + 0.5);
-      if (f === 0 && i === Math.floor(cols / 2)) continue;
-      const wy = 0.2 + f * fh + 1.75;
+      const wy = 0.2 + f * fh + 1.05;
       box(buf, new Matrix4().multiplyMatrices(base, trs(wx, wy, -0.06, 0, 0.95, 1.15, 0.12, lm)), WPAL.glass);
       box(buf, new Matrix4().multiplyMatrices(base, trs(wx, wy, -0.13, 0, 0.07, 1.15, 0.06, lm)), WPAL.wood);
       box(buf, new Matrix4().multiplyMatrices(base, trs(wx, wy - 0.62, -0.12, 0, 1.05, 0.09, 0.22, lm)), WPAL.woodDark);
     }
   }
-  const dx = -w / 2 + (w / cols) * (Math.floor(cols / 2) + 0.5);
-  box(buf, new Matrix4().multiplyMatrices(base, trs(dx, 1.25, -0.07, 0, 1.15, 2.3, 0.14, lm)), WPAL.woodDark);
-  box(buf, new Matrix4().multiplyMatrices(base, trs(dx, 2.5, -0.1, 0, 1.45, 0.16, 0.3, lm)), WPAL.wood);
 }
 
 /** Willow: a leaning trunk, a soft canopy and long drooping strands. */
@@ -173,23 +189,41 @@ export function wtWillow(buf: MeshBuf, x: number, y: number, z: number, rng: Rng
   }
 }
 
-/** Far house for the roofline: a white box with a dark hip roof, no details. */
+/** Far house for the roofline: a white box with a dark pitched roof and a stepped gable (马头墙). */
 export function wtFarHouse(buf: MeshBuf, x: number, y: number, z: number, ry: number, rng: Rng, scale = 1): void {
-  const w = rng.range(6, 12) * scale, d = rng.range(5, 9) * scale, h = rng.range(3.4, 6.4) * scale;
+  const w = rng.range(6, 11) * scale, d = rng.range(5, 8) * scale, h = rng.range(3.4, 5.6) * scale;
   const base = trs(x, y, z, ry, 1, 1, 1, new Matrix4());
-  box(buf, new Matrix4().multiplyMatrices(base, trs(0, h / 2, d / 2, 0, w, h, d, lm)), rng.pick(WPAL.wall));
-  const W = w / 2 + 0.5, D = d / 2 + 0.5, rise = 1.2 * scale;
+  const wall = rng.pick(WPAL.wall);
+  box(buf, new Matrix4().multiplyMatrices(base, trs(0, h / 2, d / 2, 0, w, h, d, lm)), wall);
+  const W = w / 2 + 0.4, E = 0.5, rise = 1.7 * scale;
+  // The pitched roof: two slopes from the eave to the ridge.
   const ridge = p(base, 0, h + rise, d / 2);
-  for (const [z0, z1, front] of [[-D, d / 2, true], [d / 2, d + D, false]] as Array<[number, number, boolean]>) {
+  for (const [z0, z1, front] of [[-E, d / 2, true], [d / 2, d + E, false]] as Array<[number, number, boolean]>) {
     const a = p(base, -W, h, z0), b = p(base, W, h, z0);
     const c = p(base, W, h, z1), dd = p(base, -W, h, z1);
     if (front) quad(buf, a, dd, c, b, WPAL.tile);
     else quad(buf, a, b, c, dd, WPAL.tile);
   }
   for (const sx of [-1, 1]) {
-    const x = sx * W;
-    const a = p(base, x, h, -D), b = p(base, x, h, d + D);
+    const x2 = sx * W;
+    const a = p(base, x2, h, -E), b = p(base, x2, h, d + E);
     if (sx < 0) tri(buf, a, b, ridge, WPAL.wallShade);
     else tri(buf, b, a, ridge, WPAL.wallShade);
+    // The stepped gable over the roof end: three white steps with a dark tile cap.
+    const roofY = (z: number): number => (z <= d / 2
+      ? h + rise * ((z + E) / (d / 2 + E))
+      : h + rise * (1 - (z - d / 2) / (d / 2 + E)));
+    for (let k = 0; k < 3; k++) {
+      const z0 = -E + ((d + 2 * E) * k) / 3, z1 = -E + ((d + 2 * E) * (k + 1)) / 3;
+      const y1 = roofY(z1) + 0.3 * scale, y0 = roofY(z0) - 0.3 * scale;
+      const q0 = p(base, x2, y0, z0), q1 = p(base, x2, y1, z0);
+      const q2 = p(base, x2, y1, z1), q3 = p(base, x2, y0, z1);
+      if (sx < 0) quad(buf, q0, q3, q2, q1, WPAL.wallShade);
+      else quad(buf, q0, q1, q2, q3, WPAL.wallShade);
+      const c0 = p(base, x2, y1, z0), c1 = p(base, x2, y1, z1);
+      const c2 = p(base, x2, y1 + 0.25 * scale, z1), c3 = p(base, x2, y1 + 0.25 * scale, z0);
+      if (sx < 0) quad(buf, c0, c3, c2, c1, WPAL.tile);
+      else quad(buf, c0, c1, c2, c3, WPAL.tile);
+    }
   }
 }

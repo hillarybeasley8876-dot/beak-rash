@@ -113,6 +113,11 @@ function pickKind(rng: Rng, w: RoadLook['marks']): 'patch' | 'manhole' | 'arrow'
 /** Build the road marks for the track (one mesh, one material); `line` = racing-line x per layout sample. */
 export function buildRoadMarks(ctx: WorldCtx, look: RoadLook, line: Float32Array): void {
   const { L, q } = ctx;
+  // The water town's lanes are paved in flagstone: no tar patches, no arrows, no painted words.
+  if (ctx.id === 'watertown') {
+    ctx.log('road marks: none (the water town lanes are paved in stone)');
+    return;
+  }
   const hw = L.halfWidth, laneHalf = hw / 4;
   const lanes = [-3 * laneHalf, -laneHalf, laneHalf, 3 * laneHalf];
   const right = [laneHalf, 3 * laneHalf];
