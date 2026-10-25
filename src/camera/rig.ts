@@ -11,6 +11,7 @@ import { listenRig } from './listeners';
 import { boostKick, RIG, type RigState } from './rig-state';
 import { round, simDebug } from '../sim/debug';
 import type { AppContext, CameraRig } from '../core/contracts';
+import { reducedMotion } from '../core/motion';
 import type { RiderState } from '../core/types';
 
 export { RIG } from './rig-state';
@@ -31,7 +32,6 @@ export function createCameraRig(app: AppContext): CameraRig {
   const anchor: Anchor = { pos: new Vector3(), quat: new Quaternion() };
   const pure = { pos: new Vector3(), quat: new Quaternion(), fov: camera.fov }; // chase pose before blend / shake
   const watch = { power: 0, time: 0, mul: 1 };
-  const reducedMotion = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null;
 
   const rig: CameraRig = {
     camera,
@@ -53,7 +53,7 @@ export function createCameraRig(app: AppContext): CameraRig {
       // Paused: shakes, kicks and buzz hold still behind the menu (hit-stop and slow-mo keep real time).
       const live = app.clock.getScale('pause') > 0;
       if (live) fx.update(dtReal);
-      fx.strength = clamp01(app.save.data.settings.shake) * (reducedMotion?.matches ? 0.35 : 1);
+      fx.strength = clamp01(app.save.data.settings.shake) * (reducedMotion() ? 0.35 : 1);
       if (rig.mode === 'free') return;
       const session = st.session;
       if (!session) {

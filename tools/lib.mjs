@@ -2,21 +2,24 @@
 // launches GPU Chromium (or WebKit), and exposes helpers that drive the game via window.__br.
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { chromium, webkit } from 'playwright';
 
-const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const LOCKS = path.join(ROOT, '.locks');
 const SLOTS = 5;
 export const BASE = process.env.BR_BASE ?? 'http://127.0.0.1:5300';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// GPU ANGLE backend per OS: Metal on macOS, D3D11 on Windows, the platform default elsewhere.
+const ANGLE = { darwin: ['--use-angle=metal'], win32: ['--use-angle=d3d11'] }[process.platform] ?? [];
 
 // Integrator notice (2026-10-18): every agent that Read ~30-45 full-size PNG screenshots died with
 // "Request timed out" (the request body grows with each image). Printed on stderr so JSON stdout stays clean.
 console.error(
   '[lib] IMAGE BUDGET (integrator): agents that Read 30+ full-size screenshots die with "Request timed out". ' +
-    'Before you Read a screenshot, convert it: sips -Z 1280 -s format jpeg -s formatOptions 70 in.png --out in.jpg ' +
-    '(or combine shots into one contact sheet), and Read at most ~15 images in total for your whole task.',
+    'Before you Read a screenshot, convert it: python tools/thumb.py in.png (-> in.jpg, 1280 px wide) or ' +
+    'python tools/thumb.py a.png b.png ... -o sheet.jpg (one contact sheet), and Read at most ~15 images in total for your whole task.',
 );
 
 async function acquireSlot() {
@@ -29,9 +32,18 @@ async function acquireSlot() {
         fs.writeFileSync(path.join(dir, 'pid'), String(process.pid));
         return () => fs.rmSync(dir, { recursive: true, force: true });
       } catch {
-        // Slot taken: reclaim it if its owner process is gone.
-        const pid = Number(fs.readFileSync(path.join(dir, 'pid'), 'utf8') || 0);
-        try { if (pid) process.kill(pid, 0); } catch { fs.rmSync(dir, { recursive: true, force: true }); }
+        // Slot taken: reclaim it only when its owner is gone. No pid yet means another process is between
+        // mkdir and write, so leave the slot alone unless it has been empty for more than 10 s.
+        const pidFile = path.join(dir, 'pid');
+        let pid = 0;
+        try { pid = Number(fs.readFileSync(pidFile, 'utf8')) || 0; } catch { /* not written yet */ }
+        let stale;
+        if (pid) {
+          try { process.kill(pid, 0); stale = false; } catch (e) { stale = e.code !== 'EPERM'; }
+        } else {
+          try { stale = Date.now() - fs.statSync(dir).mtimeMs > 10_000; } catch { stale = false; }
+        }
+        if (stale) fs.rmSync(dir, { recursive: true, force: true });
       }
     }
     if (waited === 0) console.log('[lib] waiting for a browser slot…');
@@ -46,7 +58,7 @@ export async function withPage(fn, { size = '1280x720', browser = 'chromium', dp
   const engine = browser === 'webkit' ? webkit : chromium;
   const b = await engine.launch(browser === 'webkit' ? {} : {
     channel: 'chromium',
-    args: ['--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'],
+    args: [...ANGLE, '--enable-gpu', '--ignore-gpu-blocklist', '--autoplay-policy=no-user-gesture-required'],
   });
   const cleanup = async () => { await b.close().catch(() => undefined); release(); };
   process.once('SIGINT', () => void cleanup().then(() => process.exit(130)));

@@ -131,6 +131,7 @@ export interface RiderState {
   sp: number;          // 0..100 skill/ult meter
   weapon: WeaponId;
   weaponUses: number;  // hits left on the held weapon (Infinity for 'none'); combat owns it
+  ultTarget: boolean;  // a SHOWTIME cast now would find victims (combat's planUlt window); combat owns it, HUD reads it
   statuses: StatusEffect[];
   mods: RiderMods;
   action: RiderAction | null;

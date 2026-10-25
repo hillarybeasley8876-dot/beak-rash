@@ -1,6 +1,7 @@
 // Desktop shell: serves the built game from an app:// origin (ES modules need a real origin) and opens
-// one dark, menu-less window. F11 / Cmd+Ctrl+F toggles fullscreen; the game itself handles everything else.
-const { app, BrowserWindow, protocol, net, Menu, globalShortcut } = require('electron');
+// one dark window (menu-less except macOS's minimal app menu, so Cmd+Q/H/M work). F11, Alt+Enter and
+// Cmd+Ctrl+F toggle fullscreen while the window has focus; the game itself handles everything else.
+const { app, BrowserWindow, protocol, net, Menu } = require('electron');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 
@@ -22,7 +23,9 @@ function createWindow() {
   win.once('ready-to-show', () => win.show());
   win.loadURL('app://game/index.html');
   win.webContents.on('before-input-event', (event, input) => {
-    if (input.type === 'keyDown' && input.key === 'F11') {
+    if (input.type !== 'keyDown') return;
+    const key = input.key.toLowerCase();
+    if (key === 'f11' || (input.alt && key === 'enter') || (input.meta && input.control && key === 'f')) {
       win.setFullScreen(!win.isFullScreen());
       event.preventDefault();
     }
@@ -30,7 +33,9 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  Menu.setApplicationMenu(null);
+  Menu.setApplicationMenu(process.platform === 'darwin'
+    ? Menu.buildFromTemplate([{ role: 'appMenu' }, { role: 'editMenu' }, { role: 'windowMenu' }])
+    : null);
   protocol.handle('app', (request) => {
     const url = new URL(request.url);
     const rel = decodeURIComponent(url.pathname).replace(/^\/+/, '') || 'index.html';
@@ -39,10 +44,6 @@ app.whenReady().then(() => {
     return net.fetch(pathToFileURL(file).toString());
   });
   createWindow();
-  globalShortcut.register('CommandOrControl+Control+F', () => {
-    const win = BrowserWindow.getFocusedWindow();
-    if (win) win.setFullScreen(!win.isFullScreen());
-  });
 });
 
 app.on('window-all-closed', () => app.quit());

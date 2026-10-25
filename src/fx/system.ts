@@ -8,6 +8,7 @@ import { createKit, type BurstOpts } from './presets/kit';
 import { RiderTracker } from './react/tracker';
 import { PostState } from './state';
 import type { AppContext, FxSystem, Session } from '../core/contracts';
+import { reducedMotion } from '../core/motion';
 import type { Vec3Like } from '../core/types';
 import type { FxContext } from './context';
 
@@ -25,7 +26,7 @@ export interface FxInternals extends FxContext {
 
 export function createFxCore(app: AppContext): { fx: FxSystem; ctx: FxInternals } {
   const post = new PostState();
-  post.reducedFlashes = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  post.reducedFlashes = reducedMotion();
   const pipeline = new PostPipeline(app.renderer, app.quality);
   const particles = new Particles(app.quality);
   app.scene.add(particles.group);
@@ -70,6 +71,7 @@ export function createFxCore(app: AppContext): { fx: FxSystem; ctx: FxInternals 
       for (const part of ctx.parts) part.attach?.(s);
     },
     update(dtSim, dtReal) {
+      post.reducedFlashes = reducedMotion(); // 设置 › 动态效果 can change mid-race (pause menu)
       post.tick(dtReal);
       camPos.copy(app.camera.position);
       if (session) tracker.update(session, dtSim, camPos);

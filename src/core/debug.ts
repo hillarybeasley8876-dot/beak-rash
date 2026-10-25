@@ -56,7 +56,8 @@ export function installDebug(game: Game, errors: string[]): DebugApi {
     start: (config) => game.startRace(config),
     show: (screen, props) => game.app.ui.show(screen, props),
     setControls: (c) => {
-      game.app.input.scripted = c ? { ...c } : null;
+      // Drop undefined fields: a script passing {steer: undefined} must get the default, not NaN rider state.
+      game.app.input.scripted = c ? Object.fromEntries(Object.entries(c).filter(([, v]) => v !== undefined)) : null;
     },
     press: (action) => game.app.input.press(action),
     manual: (on) => {

@@ -6,7 +6,8 @@ set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 cd "$ROOT"
 [[ " $* " == *" --no-build "* ]] || npm run build
-STAGE=$(mktemp -d "$HOME/m/beak-rash-web.XXXXXX")
+mkdir -p "$ROOT/.locks"
+STAGE=$(mktemp -d "$ROOT/.locks/web.XXXXXX")  # inside the repo (ignored), not on the system drive
 trap 'rm -rf "$STAGE"' EXIT
 cp -R dist/. "$STAGE/"
 # Hashed JS/CSS/fonts never change under the same name; public/ art and voices keep Vercel's revalidation.
