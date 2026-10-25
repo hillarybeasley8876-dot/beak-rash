@@ -21,6 +21,9 @@ const WARMUP_LABEL = '鹈鹕热身 WARM-UP';
 export class Game {
   readonly app: AppContext;
   readonly achievements: ReturnType<Modules['createAchievements']>;
+  /** r4 per-session modules (SPEC §17, §21): STYLE chains and easter eggs, attached like achievements. */
+  readonly style: ReturnType<Modules['createStyle']>;
+  readonly secrets: ReturnType<Modules['createSecrets']>;
   session: RaceSession | null = null;
   lastConfig: RaceConfig | null = null;
   /** Manual stepping mode (tests): the RAF loop renders but does not advance time. */
@@ -65,6 +68,8 @@ export class Game {
     app.audio = modules.createAudio(app);
     this.app = app;
     this.achievements = modules.createAchievements(app);
+    this.style = modules.createStyle(app);
+    this.secrets = modules.createSecrets(app);
     this.wireFlow();
     this.resize();
     window.addEventListener('resize', () => this.resize());
@@ -124,6 +129,8 @@ export class Game {
       this.app.ui.attach(session);
       this.app.audio.attach?.(session);
       this.achievements.attach(session);
+      this.style.attach(session);
+      this.secrets.attach(session);
       await this.warmUp(retire);
       await this.show('race', { config });
     } catch (err) {
@@ -179,6 +186,8 @@ export class Game {
     this.app.ui.attach(null);
     this.app.audio.attach?.(null);
     this.achievements.attach(null);
+    this.style.attach(null);
+    this.secrets.attach(null);
     session.world.removeFromParent();
     this.app.clock.clearScale('pause');
     this.app.audio.setMuffle(0);
