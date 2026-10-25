@@ -1,4 +1,5 @@
-// Race logic (contract createRaceLogic): flow, AI, standings, results. Traffic and police plug in here.
+// Race logic (contract createRaceLogic): flow, AI, standings, results. Traffic, police, rivals (SPEC §18) and track
+// events (SPEC §19) plug in here.
 import type { RaceLogic, RaceResult, Session } from '../../core/contracts';
 import { createAi } from './ai';
 import { rollForm } from './ai/form';
@@ -7,9 +8,11 @@ import { exposeRaceDebug } from './debug';
 import { createFlow, INTRO_TIME } from './flow';
 import { regrid } from './grid';
 import { startIntroCamera, type IntroCamera } from './intro-camera';
+import { createEventDirector } from './events';
 import { createPolice } from './police';
 import { buildResults, finalTimes, saveStats } from './results';
 import { createSpectator } from './spectate';
+import { createRivals } from './rivals';
 import { createStandings } from './standings';
 import { createTraffic } from './traffic';
 
@@ -23,6 +26,8 @@ export function createRaceLogic(session: Session): RaceLogic {
   const ai = createAi(session, form);
   const traffic = session.config.traffic ? createTraffic(session) : null;
   const police = session.config.police ? createPolice(ctx) : null;
+  const rivals = createRivals(ctx, ai);
+  const events = createEventDirector(ctx, traffic);
   let finalResults: RaceResult[] | null = null;
   let intro: IntroCamera | null = null;
   let started = false;
@@ -63,6 +68,8 @@ export function createRaceLogic(session: Session): RaceLogic {
       flow.preStep(dt);
       traffic?.preStep(dt);
       police?.preStep(dt);
+      rivals.preStep(dt);
+      events.preStep(dt);
       ai.preStep(dt, flow.countdownTime);
     },
     postStep(dt) {
@@ -71,6 +78,8 @@ export function createRaceLogic(session: Session): RaceLogic {
       flow.postStep(dt);
       traffic?.sync();
       police?.sync();
+      rivals.postStep(dt);
+      events.postStep(dt);
     },
     results: () => finalResults ?? buildResults(standings.order),
     dispose() {
@@ -79,6 +88,8 @@ export function createRaceLogic(session: Session): RaceLogic {
       ai.dispose();
       traffic?.dispose();
       police?.dispose();
+      rivals.dispose();
+      events.dispose();
       undebug();
     },
   };
