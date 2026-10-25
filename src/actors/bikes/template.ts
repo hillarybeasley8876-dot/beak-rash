@@ -4,7 +4,7 @@
 // the bone rest transforms and marker positions (local to their parent bone).
 import { Euler, Matrix4, Quaternion, Vector3 } from 'three';
 import type { BikeId, Quality } from '../../core/types';
-import { segScale, type Seg } from './build/geo';
+import { farSeg, segScale, type Seg } from './build/geo';
 import { PartSet, type BuiltGroup } from './build/partset';
 
 export type GroupName =
@@ -57,13 +57,16 @@ const QUALITY_SCALE: Record<Quality, number> = { high: 1, medium: 0.75, low: 0.5
 
 export class BikeBuilder {
   readonly seg: Seg;
-  private readonly frame = new PartSet();
+  private readonly frame: PartSet;
   private readonly groups = new Map<GroupName, GroupRec>();
   private readonly marks = new Map<MarkerName, { parent: Parent; pos: Vector3 }>();
   private readonly periods = new Map<GroupName, number>();
 
-  constructor(readonly quality: Quality) {
-    this.seg = segScale(QUALITY_SCALE[quality]);
+  /** `far`: the distance LOD — same groups, pivots and markers, a third of the segments, no detail parts
+   *  (PartSet.detail), whatever the quality. */
+  constructor(readonly quality: Quality, readonly far = false) {
+    this.seg = far ? farSeg : segScale(QUALITY_SCALE[quality]);
+    this.frame = new PartSet(far);
   }
 
   /** Declare a moving group pivoting at `pos` with rest rotation `rot` (both bike space). */
@@ -71,7 +74,7 @@ export class BikeBuilder {
     if (this.groups.has(name)) throw new Error(`[bikes] group ${name} declared twice`);
     if (parent && !this.groups.has(parent)) throw new Error(`[bikes] group ${name}: parent ${parent} not declared yet`);
     const world = new Matrix4().compose(pos, new Quaternion().setFromEuler(rot), new Vector3(1, 1, 1));
-    const rec: GroupRec = { name, parent, world, parts: new PartSet() };
+    const rec: GroupRec = { name, parent, world, parts: new PartSet(this.far) };
     this.groups.set(name, rec);
     return rec.parts;
   }

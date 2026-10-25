@@ -118,8 +118,12 @@ export function createPhysics(session: Session): PhysicsSystem {
       r.speed = Math.max(0, r.speed + (imp.forward ?? 0));
       r.vx += lat;
       // The shove carries the rider for a moment instead of being eaten by the 0.07 s grip lag; steering back
-      // toward the hitter is muted during it, steering away is not.
-      if (sr && Math.abs(lat) >= T.knockMin) startCarry(sr, T.knockTime, T.knockSteer, T.knockTau, lat > 0 ? -1 : 1);
+      // toward the hitter is muted during it, steering away is not. The nose swings with the shove at the bump
+      // rate (yawEaseRate) instead of snapping to the new velocity angle in one frame.
+      if (sr && Math.abs(lat) >= T.knockMin) {
+        startCarry(sr, T.knockTime, T.knockSteer, T.knockTau, lat > 0 ? -1 : 1);
+        sr.yawEase = Math.max(sr.yawEase, T.knockEaseTime);
+      }
       if (imp.up) r.vy = Math.max(r.vy, 0) + imp.up;
       if (sr && (Math.abs(lat) >= 3 || (imp.forward ?? 0) <= -3)) endDrift(ctx, sr, false);
     },
@@ -135,12 +139,14 @@ export function createPhysics(session: Session): PhysicsSystem {
       poser.pose(r, simOf(r)?.pitch ?? 0, outPos, outQuat);
     },
     dispose() {
+      // Only this race's hook: a newer race may already have published its own rows.
       const dbg = simDebug();
-      if (dbg) dbg.riders = noRows;
+      if (dbg && dbg.riders === rows) dbg.riders = noRows;
     },
   };
 
+  const rows = riderRows(riders);
   const dbg = simDebug();
-  if (dbg) dbg.riders = riderRows(riders);
+  if (dbg) dbg.riders = rows;
   return physics;
 }

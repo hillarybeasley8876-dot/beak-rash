@@ -22,9 +22,9 @@ export function basket(ps: PartSet, c: V3, w: number, h: number, d: number, rimC
   ].map((p) => p.add(new Vector3(c.x, 0, c.z)));
   ps.add(tube(rim, 0.009, seg(24, 12), seg(6, 4), true), { color: rimColor, outline: 0.012 });
   for (const sx of [-1, 1]) {
-    ps.add(cyl(v(c.x + sx * w / 2, c.y, c.z - d / 2), v(c.x + sx * w / 2, y, c.z - d / 2), 0.006, 0.006, 4), { color: rimColor });
+    ps.detail.add(cyl(v(c.x + sx * w / 2, c.y, c.z - d / 2), v(c.x + sx * w / 2, y, c.z - d / 2), 0.006, 0.006, 4), { color: rimColor });
   }
-  if (mount.length > 1) ps.add(tube(mount, 0.008, seg(8, 4), 6), { color: '#3a3d44', outline: 0.008 });
+  if (mount.length > 1) ps.detail.add(tube(mount, 0.008, seg(8, 4), 6), { color: '#3a3d44', outline: 0.008 });
   return c.clone();
 }
 
@@ -33,11 +33,12 @@ export function lamp(ps: PartSet, at: V3, dir: V3, mount: V3, shell: string, seg
   ps.add(lathe([[0.006, -r * 1.1], [r * 0.7, -r * 0.8], [r, -r * 0.1], [r * 1.02, 0]], seg(16, 10), at, dir), { color: shell, outline: 0.012 });
   const lens = at.clone().addScaledVector(dir, 0.004);
   ps.add(ellip(v(0, 0, 0), r * 0.92, r * 0.92, r * 0.3, seg(14, 8), seg(6, 4)).lookAt(dir).translate(lens.x, lens.y, lens.z), { color: '#fff6b8', glow: true });
-  ps.add(cyl(at.clone().addScaledVector(dir, -r), mount, 0.007, 0.007, 6), { color: '#3a3d44', outline: 0.006 });
+  ps.detail.add(cyl(at.clone().addScaledVector(dir, -r), mount, 0.007, 0.007, 6), { color: '#3a3d44', outline: 0.006 });
 }
 
 /** Folded side stand on the left chainstay. */
 export function kickstand(ps: PartSet, pivot: V3, tip: V3, color: string, seg: Seg): void {
+  if (ps.far) return;
   ps.add(cyl(pivot, tip, 0.011, 0.008, seg(10, 6), true), { color, outline: 0.008 });
   ps.add(sph(pivot, 0.016, seg(8, 5), seg(5, 4)), { color, outline: 0.008 });
   ps.add(ellip(tip, 0.012, 0.008, 0.022, seg(8, 5), seg(5, 3)), { color, outline: 0.008 });
@@ -69,7 +70,7 @@ export function rearPlate(ps: PartSet, at: V3, w: number, h: number, mount: V3):
   ps.add(box(at, w, h, 0.006), { color: '#f5f5f0', outline: 0.008 });
   decal(ps, 'plate', at.clone().add(v(0, 0, 0.0035)), v(0, 0, 1), v(0, 1, 0), w, h);
   for (const s of [-1, 1]) {
-    ps.add(cyl(at.clone().add(v(s * w * 0.3, h * 0.3, -0.003)), mount.clone().add(v(s * 0.012, 0, 0)), 0.0045, 0.0045, 6), { color: '#3a3d44', outline: 0.003 });
+    ps.detail.add(cyl(at.clone().add(v(s * w * 0.3, h * 0.3, -0.003)), mount.clone().add(v(s * 0.012, 0, 0)), 0.0045, 0.0045, 6), { color: '#3a3d44', outline: 0.003 });
   }
 }
 
@@ -77,7 +78,7 @@ export function rearPlate(ps: PartSet, at: V3, w: number, h: number, mount: V3):
  *  colour cap, or 'decal' for the LED lens from the atlas. */
 export function tailLight(ps: PartSet, at: V3, mount: V3, len: number, r: number, lens: string, seg: Seg): void {
   ps.add(pill(at.clone().setX(at.x - len / 2), at.clone().setX(at.x + len / 2), r, seg(12, 8)), { color: '#2a2c31', outline: 0.008 });
-  ps.add(cyl(mount, at, 0.006, 0.006, 6), { color: '#3a3d44', outline: 0.004 });
+  ps.detail.add(cyl(mount, at, 0.006, 0.006, 6), { color: '#3a3d44', outline: 0.004 });
   const face = at.clone().add(v(0, 0, r + 0.0015));
   if (lens === 'decal') ps.add(facing(new PlaneGeometry(len * 0.98, r * 1.9), face, v(0, 0, 1), v(0, 1, 0)), { decal: decalUv('taillight'), glow: true });
   else ps.add(ellip(face.add(v(0, 0, -0.004)), len * 0.4, r * 0.7, 0.007, seg(12, 8), seg(6, 4)), { color: lens, glow: true });

@@ -423,3 +423,18 @@ Requests (core, SPEC wording; acceptance round 1):
 - SPEC section 6 drift: "a release keeps |vx| <= v tan 20 deg for 1 s; a release with L1+ keeps the drift's bite for the
   rest of that bend (exit carve: curve push capped at 0.7 x grip authority)".
 - Acceptance round 1 complete: A1 (major) and both minors fixed and verified.
+
+## r3 polish (2026-10-25)
+Slice r3-perf (integrator's polish round; probes + logs in shots/r3-perf/).
+- [x] game-r2-feel#0 combat knocks snapped the hero's heading (16.8-25 deg in one frame; bumps and walls were eased) ->
+      physics.ts applyImpulse(): a lateral impulse >= knockMin also arms sr.yawEase for knockEaseTime 0.3 s (tuning.ts), so
+      the nose swings with the shove at yawEaseRate (300 deg/s) and still reads as a hit (peak ~20 deg in 4 frames, after the
+      hit-stop). Real combat (shots/r3-perf/knock.mjs: coast s2, goose pinned 1.5 m left with a pan, heavy swing, no body
+      contact): max yaw step 24.4 -> 5.0 deg/frame at 60 fps, 24.8 -> 2.08 at 144 fps; direct 9 m/s impulse 25.9 -> 5.0.
+      feel-telemetry 'knock' case extended (feel-scenarios-abuse.mjs): heavy/light/heavy@144 yaw step + peak yaw, 5 new
+      checks (heavyYawStepDeg 5, lightYawStepDeg 5, heavy144YawStepDeg 2.08, heavyPeakYawDeg 19.8, lightPeakYawDeg 8.1);
+      knock displacements unchanged (0.599 / 1.685 / 0.476).
+- [x] core request (acceptance r1) physics.dispose() reset __br.sim.riders unconditionally -> it only resets the hook it
+      published (identity guard). Verified: after an in-page restart __br.sim.riders() lists 8 rows (police-events.mjs).
+- Checks: node tools/feel-telemetry.mjs 181/181 (shots/r3-perf/tele/metrics.json); race-soak coast/city/mountain SOAK OK;
+  tsc 0 errors in src/sim, src/camera.

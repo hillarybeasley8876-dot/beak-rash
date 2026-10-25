@@ -43,15 +43,16 @@ function card(ps: PartSet, id: 'spokes' | 'blur', hub: V3, r: number, side: 1 | 
 export function wheel(b: BikeBuilder, side: 'R' | 'F', hub: V3, w: WheelSpec): void {
   const name = side === 'R' ? 'wheelR' : 'wheelF';
   const ps = b.parts(name), seg = b.seg;
-  const tubular = Math.max(w.knobs ? 28 : 32, seg(w.knobs ? 32 : w.R >= 0.25 ? 44 : 36));
-  ps.add(tyreGeo(hub, w.R, w.tyre, tubular, Math.max(4, seg(w.knobs ? 6 : 5))), { color: w.tyreColor ?? TYRE, outline: 0.024 });
+  // Far LOD: 16-sided tyre and rim (a wheel is ~12 px across at 35 m); spokes and blur cards stay (2 triangles each).
+  const tubular = b.far ? 16 : Math.max(w.knobs ? 28 : 32, seg(w.knobs ? 32 : w.R >= 0.25 ? 44 : 36));
+  ps.add(tyreGeo(hub, w.R, w.tyre, tubular, b.far ? 4 : Math.max(4, seg(w.knobs ? 6 : 5))), { color: w.tyreColor ?? TYRE, outline: 0.024 });
   const rOut = w.R - w.tyre * 1.55, rIn = rOut - (w.rimDepth ?? 0.02), hw = w.tyre * 0.72;
-  const ring = Math.max(28, seg(36));
+  const ring = b.far ? 16 : Math.max(28, seg(36));
   rimGeos(hub, rOut, rIn, hw, w.rim, ring, !!w.rimAccent).forEach((g, i) => {
     ps.add(g, { color: i === 2 && w.rimAccent ? w.rimAccent : w.rimColor, outline: 0.008 });
   });
   const hubW = w.hubW ?? 0.045;
-  ps.add(lathe([[0.024, -hubW], [0.016, -hubW + 0.01], [0.016, hubW - 0.01], [0.024, hubW]], seg(12, 8), hub), { color: w.hubColor ?? '#c3c8d0', outline: 0.008 });
+  ps.detail.add(lathe([[0.024, -hubW], [0.016, -hubW + 0.01], [0.016, hubW - 0.01], [0.024, hubW]], seg(12, 8), hub), { color: w.hubColor ?? '#c3c8d0', outline: 0.008 });
   const spokes = b.alias(side === 'R' ? 'spokesR' : 'spokesF', name, name);
   const blur = b.alias(side === 'R' ? 'blurR' : 'blurF', name);
   const blurColor = w.mag ? w.rimColor : w.spokeColor ?? '#cfd3da';
@@ -68,19 +69,19 @@ export function wheel(b: BikeBuilder, side: 'R' | 'F', hub: V3, w: WheelSpec): v
   if (w.knobs) {
     const tread = b.alias(side === 'R' ? 'treadR' : 'treadF', name), n = Math.max(16, seg(24)) & ~1;
     b.period(side === 'R' ? 'treadR' : 'treadF', (Math.PI * 2) / n);
-    tread.add(treadBlocks(hub, w.R, w.tyre, n, 0.011), { color: w.tyreColor ?? TYRE, outline: 0.01 });
+    tread.detail.add(treadBlocks(hub, w.R, w.tyre, n, 0.011), { color: w.tyreColor ?? TYRE, outline: 0.01 });
   }
   if (w.drum) {
-    ps.add(lathe([[0.012, -hubW - 0.018], [0.05, -hubW - 0.014], [0.052, -hubW + 0.004], [0.022, -hubW + 0.012]], seg(14, 8), hub), { color: w.drum, outline: 0.01 });
+    ps.detail.add(lathe([[0.012, -hubW - 0.018], [0.05, -hubW - 0.014], [0.052, -hubW + 0.004], [0.022, -hubW + 0.012]], seg(14, 8), hub), { color: w.drum, outline: 0.01 });
   }
   if (w.rotor) {
     const rx = hub.clone().setX(hub.x - hubW - 0.006);
-    ps.add(lathe([[0.078, 0.002], [0.055, 0.002]], seg(28, 14), rx), { color: '#c9ced6', outline: 0.006 });
-    ps.add(lathe([[0.055, -0.002], [0.078, -0.002]], seg(28, 14), rx), { color: '#c9ced6', outline: 0.006 });
+    ps.detail.add(lathe([[0.078, 0.002], [0.055, 0.002]], seg(28, 14), rx), { color: '#c9ced6', outline: 0.006 });
+    ps.detail.add(lathe([[0.055, -0.002], [0.078, -0.002]], seg(28, 14), rx), { color: '#c9ced6', outline: 0.006 });
     for (let k = 0; k < 3; k++) {
       const d = v(0, Math.sin((k / 3) * Math.PI * 2), Math.cos((k / 3) * Math.PI * 2));
-      spokes.add(bar(rx.clone().addScaledVector(d, 0.018), rx.clone().addScaledVector(d, 0.058), 0.006, 0.012), { color: '#55585f' });
+      spokes.detail.add(bar(rx.clone().addScaledVector(d, 0.018), rx.clone().addScaledVector(d, 0.058), 0.006, 0.012), { color: '#55585f' });
     }
   }
-  if (w.cog) ps.add(gear(v(hub.x + w.cog.x, hub.y, hub.z), w.cog.r, w.cog.teeth, 0.006, seg), { color: '#a9afb8', outline: 0.006 });
+  if (w.cog) ps.detail.add(gear(v(hub.x + w.cog.x, hub.y, hub.z), w.cog.r, w.cog.teeth, 0.006, seg), { color: '#a9afb8', outline: 0.006 });
 }

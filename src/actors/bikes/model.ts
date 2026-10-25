@@ -1,11 +1,12 @@
 // One bike instance: shared cached geometry drawn as ONE rigidly skinned mesh (+ its outline hull) over a
 // per-instance bone hierarchy (frame → wheels, crank → pedals, headset → steer → front wheel …).
-// Markers hang off the bones, so they follow wheels, cranks and the bars exactly.
+// Markers hang off the bones, so they follow wheels, cranks and the bars exactly. A second, low-poly level (the
+// far LOD: no spokes detail / chain / cranks / cables, see PartSet.detail) rides the same bones; setLod() swaps.
 import { Bone, Group, Matrix4, Object3D, Skeleton, SkinnedMesh, Sphere, type BufferGeometry } from 'three';
 import type { BikeId, Quality } from '../../core/types';
 import { createAnimator } from './animate';
 import { bodyMaterial, depthMaterial, hullMaterial } from './build/material';
-import { acquire } from './cache';
+import { acquire, type BikeTemplate } from './cache';
 import type { GroupName, MarkerName } from './template';
 import type { BikeMarkers, BikeModel } from './types';
 
@@ -26,6 +27,16 @@ function skinned(geo: BufferGeometry, skeleton: Skeleton, bounds: Sphere, isHull
   return mesh;
 }
 
+/** One LOD level over the shared skeleton: [body, hull?]. The far level starts hidden, named `…:far` and tagged
+ *  userData.lod = 'far' (a stand-in of the full one: whoever walks the bike's meshes may skip it). */
+function level(body: BufferGeometry, tpl: BikeTemplate, skeleton: Skeleton, bounds: Sphere,
+  far: boolean): SkinnedMesh[] {
+  const out = [skinned(body, skeleton, bounds, false)];
+  if (tpl.built.hull) out.push(skinned(tpl.built.hull, skeleton, bounds, true));
+  if (far) for (const m of out) { m.name += ':far'; m.userData.lod = 'far'; m.visible = false; }
+  return out;
+}
+
 export function createBikeModel(id: BikeId, opts: { quality: Quality; tint?: string }): BikeModel {
   const lease = acquire(id, opts.quality, opts.tint);
   const { tpl } = lease;
@@ -33,6 +44,7 @@ export function createBikeModel(id: BikeId, opts: { quality: Quality; tint?: str
   root.name = `bike:${id}`;
   root.userData.tris = tpl.tris;
   root.userData.drawCalls = tpl.drawCalls;
+  root.userData.farTris = lease.far.tris;
   const frameBone = new Bone();
   frameBone.name = 'frame';
   root.add(frameBone);
@@ -51,8 +63,9 @@ export function createBikeModel(id: BikeId, opts: { quality: Quality; tint?: str
   const skeleton = new Skeleton(bones, [new Matrix4(), ...tpl.groups.map((g) => g.bindInverse)]);
   const bounds = (tpl.built.geo.boundingSphere ?? new Sphere()).clone();
   bounds.radius += 0.12; // steering / fish sway headroom
-  root.add(skinned(lease.body, skeleton, bounds, false));
-  if (tpl.built.hull) root.add(skinned(tpl.built.hull, skeleton, bounds, true));
+  const [nearBody, nearHull] = level(lease.body, tpl, skeleton, bounds, false);
+  const [farBody, farHull] = level(lease.farBody, lease.far, skeleton, bounds, true);
+  for (const m of [nearBody, nearHull, farBody, farHull]) if (m) root.add(m);
   const marks = new Map<MarkerName, Object3D>();
   for (const m of tpl.markers) {
     const o = new Object3D();
@@ -81,6 +94,12 @@ export function createBikeModel(id: BikeId, opts: { quality: Quality; tint?: str
     wheelbase: tpl.def.wheelbase,
     get crankAngle() { return anim.crankAngle; },
     update(dt, speed, steerAngle) { anim.update(dt, speed, steerAngle); },
+    setLod(far, outline) {
+      if (nearBody) { nearBody.visible = !far; nearBody.castShadow = outline; }
+      if (nearHull) nearHull.visible = !far && outline;
+      if (farBody) { farBody.visible = far; farBody.castShadow = outline; }
+      if (farHull) farHull.visible = far && outline;
+    },
     dispose() {
       if (disposed) return;
       disposed = true;

@@ -65,6 +65,8 @@ const state: SandboxState = {
   dist: Number(params.get('dist') ?? 1.2),
 };
 if (!VIEWS.includes(state.view)) state.view = 'turntable';
+/** ?lod=far: show the distance-LOD model (what a rival beyond ~40 m draws) up close. */
+const farLod = params.get('lod') === 'far';
 
 let bikes: BikeModel[] = [];
 const markerBalls: Object3D[] = [];
@@ -106,6 +108,7 @@ function rebuild(): void {
     } else if (state.view === 'grid') {
       b.root.position.set((i - 3) * 1.25, 0, -6);
     }
+    if (farLod) b.setLod?.(true, true);
     addBalls(b);
     scene.add(b.root);
     bikes.push(b);
@@ -113,7 +116,8 @@ function rebuild(): void {
   for (const ball of markerBalls) ball.visible = state.markers;
   ruler.visible = !many && state.view !== 'chase';
   road.visible = state.view === 'chase' || state.view === 'grid';
-  caption.textContent = state.view === 'lineup' ? 'THE GARAGE · 7 BIKES' : state.view === 'grid' ? '6 M BEHIND · CHASE READ' : state.bike.toUpperCase();
+  caption.textContent = (state.view === 'lineup' ? 'THE GARAGE · 7 BIKES' : state.view === 'grid' ? '6 M BEHIND · CHASE READ' : state.bike.toUpperCase())
+    + (farLod ? ' · FAR LOD' : '');
 }
 
 const caption = document.getElementById('caption') as HTMLElement;

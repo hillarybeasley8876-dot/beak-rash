@@ -160,3 +160,32 @@ Verification (fix round 2): tsc clean for bikes files; `bikes.anim.mjs` all true
   Shots: shots/bikes/fix2/ (s2 tandem chase, s3 fish close-ups, s4–s6 close-ups, s7–s10 chase crops, s11 garage).
 Known limits: the roadbike's tail light + "01" plate sit between the pelican's legs, ~10–12 px wide at 1080p in the
   chase view (the bike itself is narrow from behind); fish head ~0.30 m over the stoker saddle, on the right side.
+
+## r3 polish (2026-10-25)
+Slice r3-perf (integrator's polish round; probes + sheets in shots/r3-perf/).
+- [x] game-r2-perf#5 far bikes had no LOD (7 rivals at 70 m: 21 calls / 146k tris of bikes alone) -> distance LOD:
+      - build: BikeBuilder(quality, far) runs the same def with build/geo.ts farSeg (~1/3 of the high segments, quality minimums
+        ignored) and PartSets whose `detail` view drops full-detail-only parts (cables, cranks + chainrings + pedals, chain,
+        BB shell, lugs, headset cups, steerer, hubs/axles, brakes, bell, levers, cog/rotor/drum, tread blocks, clamps, struts,
+        kickstand, erba springs/rods/rings, fish face/band/straps). Wheels: 16-sided tyre (4 across) + rim; spoke and blur cards
+        stay (2 tris each, same dissolve), so the wheel interior does not change. Same groups -> cache.ts matchBones() maps the
+        far skin indices onto the full build's bones (identity today, guarded).
+      - far tris (bikes.tris.mjs --far): roadbike 884, erba 1146, shared 1194, fixie 864, mtb 856, tandem 1102 (fish body +
+        fins kept), kidbike 1216 (streamers kept) vs 5742-9236 high. One far template per bike id (quality-independent) +
+        tint variants, ref-counted like the full ones; built with the full template (loading screen).
+      - model.ts: far body + hull ride the same skeleton (hidden); BikeModel.setLod?(far, outline) (types.ts, optional)
+        swaps; outline false also drops hull + shadow. actors/lod.ts (additive): RiderLod gets the bike, BIKE_FAR 40 / NEAR 35 m
+        hysteresis, and passes the rider's own hull/shadow band (60 / 52 m) as `outline`; view.ts passes this.bike.
+      - in game (far-bikes.mjs, 7 rivals pinned ahead): bikes at 70 m 21 calls / 145.6k -> 2-8 calls / 5.9-7.1k tris; at
+        40-45 m (far + hull + shadow) 145.6k -> 14-23k; the whole rival group at 70 m coast 200k -> 64k, city 149k -> 67k,
+        mountain 198k -> 62k tris.
+      - pop (lod-pop.mjs + .py, 1080p chase, all 7 models at 35/40/45 m from the camera, the same frame rendered full vs far):
+        mean channel diff 0.82 / 0.74 / 0.70 of 255 over the group crop, p99 24-26; pop-sheet.jpg shows no visible change.
+        Structure: lineup-sheet.jpg (all 7 far models up close in the sandbox, ?lod=far): every part on its bone, colours,
+        fish, basket, rack, streamers.
+- Tools: sandbox/bikes.ts ?lod=far; bikes.tris.mjs --far; bikes.chase.mjs --out <dir>.
+- Checks: bikes.anim.mjs all true; bikes.tris (full counts unchanged); bikes.chase tandem/kidbike/erba 0 errors; race-soak x3
+  OK; tsc 0 errors in src/actors.
+- Known: actors' crash support points (rig/support-points.ts modelSupports) also collect the hidden far mesh's points (a
+  subset of the full hull's; harmless, ~+50 % contacts while a bike tumbles) -> optional request to actors: skip meshes
+  with userData.lod === 'far' there (the far body / hull carry that tag).

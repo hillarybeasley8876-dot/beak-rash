@@ -79,7 +79,8 @@ function boneLocalSupports(mesh: SkinnedMesh): Vector3[][] {
 export function modelSupports(root: Object3D): NodeSupports[] {
   const out: NodeSupports[] = [];
   root.traverse((o) => {
-    if (!(o instanceof Mesh) || o.userData.isOutline) return;
+    // Outlines and the bikes' far-LOD stand-ins (bikes/model.ts) only duplicate the real meshes' points.
+    if (!(o instanceof Mesh) || o.userData.isOutline || o.userData.lod === 'far') return;
     if (o instanceof SkinnedMesh) {
       boneLocalSupports(o).forEach((pts, b) => {
         const node = o.skeleton.bones[b];

@@ -79,7 +79,9 @@ export const fairScenarios = {
     for (const bike of ['roadbike', 'fixie']) {
       await openRace(h, `race=coast&seed=${a.seed ?? 3}&level=1&manual=1&intro=0&traffic=0&police=0&bike=${bike}${stub}`);
       await rideUntil(h, 2);
-      const caps = await h.eval('window.__br.race.ai().filter((b) => b.pace !== null).map((b) => b.pace)');
+      // base = the rival's own pace before catch-up (pace adds the unseen catch-up of riders > 20 m behind the
+      // player at the sample, which depends on where the player is, not on its bike).
+      const caps = await h.eval('window.__br.race.ai().filter((b) => b.base !== null).map((b) => b.base)');
       for (let i = 0; i < 40 && !(await h.eval('!!window.__rl.end')); i++) await h.eval(`window.__runHuman(300, ${DT}, 1000, 'passive')`);
       const res = await h.eval('window.__rl.end ?? window.__br.race.results()');
       const me = res.find((r) => r.isPlayer);

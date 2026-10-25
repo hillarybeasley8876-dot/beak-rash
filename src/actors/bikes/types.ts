@@ -28,6 +28,10 @@ export interface BikeModel {
   update(dt: number, speed: number, steerAngle: number): void;
   /** Crank angle (rad) for pedalling IK phase. */
   readonly crankAngle: number;
+  /** Distance LOD, driven by the rider view (actors/lod.ts, with hysteresis): `far` swaps in the merged low-poly
+   *  bike (no spokes detail, chain, cranks, cables, brakes); `outline` false also drops the ink hull and the shadow.
+   *  Optional: stand-in bikes stay as they are. */
+  setLod?(far: boolean, outline: boolean): void;
   dispose(): void;
 }
 

@@ -1,6 +1,6 @@
-// Police chase scenarios (critic r1–r3): natural chases stay on screen and end visibly; a full-speed player
-// outruns the corgi; a KO by a rival next to the corgi is no BUSTED (a self-inflicted crash still is); alert
-// reasons spawn / lost / busted.
+// Police chase scenarios (critic r1–r3, acceptance r1): natural chases stay on screen and end visibly; a plain
+// full-speed player is let go (an escape needs a real 60 m lead); any wreck next to the corgi is BUSTED (SPEC §9
+// 'slow or crashed', whoever wrecked you); alert reasons spawn / lost / busted.
 import { events, openRace } from '../race-lib.mjs';
 
 const DT = 1 / 30;
@@ -101,7 +101,8 @@ export const chaseScenarios = {
     }
   },
 
-  /** heat 0.95, full throttle, no further offences → alongside, tires, then gives up within 45 s ('lost'). */
+  /** heat 0.95, full throttle, no further offences → alongside, tires, then lets the player go by the 25 s cap
+   *  (acceptance r1: 'lost' credit needs a 60 m lead held 2 s, which riding flat out alone never builds). */
   async outrun(page, h, { check, stub, a }) {
     await openRace(h, `race=coast&seed=${a.seed ?? 11}&level=1&traffic=0&manual=1&intro=0${stub}`);
     await h.eval(`window.__runHuman(600, ${DT}, 1000, 'passive')`);
@@ -110,25 +111,26 @@ export const chaseScenarios = {
     const rows = await ride(h, 60, (p) => p.mode === 'leaving' || p.mode === 'off');
     const alerts = (await events(h, 'police:alert')).map((e) => ({ level: e.p.level, reason: e.p.reason ?? null, t: +(e.time - t0).toFixed(1) }));
     const lost = alerts.find((e) => e.reason === 'lost');
+    const end = alerts.find((e) => e.level === 0);
     const along = rows.filter((r) => r.mode === 'chase' && Math.abs(r.gap) < 4).length / 2;
     const trace = rows.filter((_, i) => i % 6 === 0).map((r) => `${(r.t - t0).toFixed(0)}:${r.mode[0]}${r.gap}${r.tired ? 'T' : ''}/h${r.heat}`).join(' ');
     check('police spawn alert carries reason spawn', alerts[0]?.reason === 'spawn', alerts.slice(0, 2));
-    check('full-speed player loses the corgi within 45 s', !!lost && lost.t <= 45, { lost, alongside: along, trace });
-    // Design: the corgi catches up and rides alongside first; escaping takes a lead built over time (≥ 15 s).
+    check('full-speed player is let go (no escape credit) within 26 s', !!end && end.reason === null && end.t <= 26, { end, alongside: along, trace });
+    // Design: the corgi catches up and rides alongside first, then tires and gives up.
     const tiredAt = rows.find((r) => r.tired)?.t;
-    check('corgi rides alongside ≥ 4 s, and the escape takes ≥ 15 s', along >= 4 && !!lost && lost.t >= 15,
-      { along, tiredAt: tiredAt && +(tiredAt - t0).toFixed(1), lost: lost?.t });
+    check('corgi rides alongside ≥ 4 s before it lets go', along >= 4 && !!end && end.t >= 8,
+      { along, tiredAt: tiredAt && +(tiredAt - t0).toFixed(1), end: end?.t });
     check('no escape credit in the first 8 s of the chase', !lost || lost.t >= 8, lost);
   },
 
-  /** A rival's KO next to the corgi is not BUSTED. */
-  async koNoBust(page, h, { check, stub }) {
+  /** A rival's KO next to the corgi is BUSTED too (acceptance r1: 'slow or crashed', whoever wrecked you). */
+  async koBust(page, h, { check, stub }) {
     const near = await corgiAlongside(h, 12, stub);
     const rival = await h.eval('window.__br.session().riders.find((r) => !r.isPlayer && r.mode === "racing").id');
     await h.eval(`window.__br.ko(0, ${rival})`);
     await ride(h, 7);
     const busted = (await events(h, 'police:busted')).length;
-    check('KO by a rival next to the corgi is no BUSTED', near && busted === 0, { alongside: near, busted, now: await police(h) });
+    check('KO by a rival next to the corgi is BUSTED', near && busted === 1, { alongside: near, busted, now: await police(h) });
   },
 
   /** Crashing yourself next to the corgi is BUSTED (alert reason busted, then a 4 s hold). */

@@ -12,6 +12,7 @@ const R = 0.0055;
 
 /** One housing through `pts`. */
 export function housing(ps: PartSet, pts: V3[], seg: Seg, color = HOUSING): void {
+  if (ps.far) return; // far LOD: no cables
   ps.add(tube(pts, R, seg(3 * (pts.length - 1), 4), seg(6, 4)), { color, outline: 0.004 });
 }
 
@@ -33,7 +34,7 @@ export function rearRun(b: BikeBuilder, L: Layout, from: V3, route: V3[], headR:
   const front = L.onAxis(L.headTop.y + 0.02).add(v(side * (headR + 0.012), 0.0, -headR - 0.02));
   housing(b.parts('steer'), [from, lift, front, guide.clone().add(v(0, 0.012, -0.012)), guide], seg, color);
   const frame = b.parts(null);
-  frame.add(ellip(guide, 0.008, 0.012, 0.01, seg(8, 6), seg(5, 4)), { color: '#3a3d44', outline: 0.004 });
+  frame.detail.add(ellip(guide, 0.008, 0.012, 0.01, seg(8, 6), seg(5, 4)), { color: '#3a3d44', outline: 0.004 });
   housing(frame, [guide, ...route], seg, color);
   return guide;
 }

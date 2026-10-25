@@ -14,6 +14,9 @@ const UP = new Vector3(0, 1, 0);
 /** Quality-scaled segment counter: seg(12) → 12 on high, 9 on medium, 6 on low. */
 export type Seg = (n: number, min?: number) => number;
 export const segScale = (q: number): Seg => (n, min = 3) => Math.max(min, Math.round(n * q));
+/** Far-LOD counter (bikes ≥ 35 m away, where a frame tube is under a pixel wide): about a third of the high
+ *  count; quality minimums above 3 are ignored (a 4-sided tube reads round at that size). */
+export const farSeg: Seg = (n, min = 3) => Math.max(Math.min(min, 3), Math.round(n * 0.35));
 
 const orient = (g: BufferGeometry, from: Vector3, to: Vector3): BufferGeometry =>
   g.applyQuaternion(new Quaternion().setFromUnitVectors(from, to.clone().normalize()));

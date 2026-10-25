@@ -54,9 +54,10 @@ export function saltFish(ps: PartSet, frame: PartSet, seat: V3, post: V3, axis: 
   const s = fishSpine(seat);
   ps.add(fishBody(s, seg), { outline: 0.016 });
   fishFins(ps, s, seg);
-  fishFace(ps, s, seg);
-  band(ps, s, seg);
-  straps(ps, s, seat, post, seg);
+  // Far LOD: the grey body and fins carry the read; face, band and straps are under a pixel there.
+  fishFace(ps.detail, s, seg);
+  band(ps.detail, s, seg);
+  straps(ps.detail, s, seat, post, seg);
   const loop = new TorusGeometry(0.024, 0.0055, 3, seg(12, 8)).applyQuaternion(new Quaternion().setFromUnitVectors(v(0, 0, 1), axis));
-  frame.add(loop.translate(post.x, post.y, post.z), { color: RED, outline: 0.004 });
+  frame.detail.add(loop.translate(post.x, post.y, post.z), { color: RED, outline: 0.004 });
 }

@@ -39,8 +39,8 @@ function grip(ps: PartSet, a: V3, b: V3, r: number, color: string, seg: Seg): vo
 export function stem(ps: PartSet, from: V3, to: V3, color: string, seg: Seg): void {
   const o = { color, outline: BAR_OUTLINE };
   ps.add(cyl(from, to, 0.017, 0.016, seg(10, 6)), o);
-  ps.add(pill(to.clone().setX(-0.03), to.clone().setX(0.03), 0.021, seg(10, 6)), o);
-  ps.add(roundRing(from, v(0, 1, 0), 0.012, 0.021, 0.018, seg(10, 6)), o);
+  ps.detail.add(pill(to.clone().setX(-0.03), to.clone().setX(0.03), 0.021, seg(10, 6)), o);
+  ps.detail.add(roundRing(from, v(0, 1, 0), 0.012, 0.021, 0.018, seg(10, 6)), o);
 }
 
 export function dropBar(ps: PartSet, c: V3, halfW: number, tape: string, seg: Seg): LeverBar {
@@ -49,7 +49,7 @@ export function dropBar(ps: PartSet, c: V3, halfW: number, tape: string, seg: Se
   for (const s of [-1, 1]) {
     const hood = c.clone().add(v(s * w, 0.016, -0.06));
     ps.add(ellip(hood, 0.019, 0.024, 0.04, seg(10, 8), seg(6, 4), new Euler(-0.25, 0, 0)), { color: '#2b2d33', outline: 0.01 });
-    ps.add(tube([c.clone().add(v(s * w, -0.004, -0.088)), c.clone().add(v(s * w, -0.06, -0.09)), c.clone().add(v(s * w, -0.1, -0.078))], 0.0068, seg(6, 4), seg(6, 4)), { color: '#c3c8d0', outline: 0.006 });
+    ps.detail.add(tube([c.clone().add(v(s * w, -0.004, -0.088)), c.clone().add(v(s * w, -0.06, -0.09)), c.clone().add(v(s * w, -0.1, -0.078))], 0.0068, seg(6, 4), seg(6, 4)), { color: '#c3c8d0', outline: 0.006 });
   }
   const exit = (s: number): V3 => c.clone().add(v(s * (w - 0.015), 0.022, -0.07));
   return { gripL: c.clone().add(v(-w, 0.016, -0.056)), gripR: c.clone().add(v(w, 0.016, -0.056)), bell: c.clone().add(v(-0.075, 0.016, 0)), cableL: exit(-1), cableR: exit(1) };
@@ -98,15 +98,17 @@ export function sweptBar(ps: PartSet, c: V3, halfW: number, back: number, rise: 
 /** Brake lever: round clamp + a capsule blade reaching forward of the grip with a ball end. Returns the
  *  housing exit (front of the clamp). */
 export function leverAt(ps: PartSet, at: V3, s: number, seg: Seg, color = '#2b2d33'): V3 {
-  ps.add(cyl(at, at.clone().add(v(0, 0.018, -0.012)), 0.011, 0.011, seg(10, 6), true), { color, outline: 0.006 });
+  const d = ps.detail;
+  d.add(cyl(at, at.clone().add(v(0, 0.018, -0.012)), 0.011, 0.011, seg(10, 6), true), { color, outline: 0.006 });
   const p0 = at.clone().add(v(0, 0.012, -0.022)), p1 = at.clone().add(v(s * 0.045, 0.012, -0.04)), p2 = at.clone().add(v(s * 0.088, 0.006, -0.042));
-  ps.add(tube([p0, p1, p2], 0.0055, seg(6, 4), seg(6, 4)), { color: '#c3c8d0', outline: 0.005 });
-  ps.add(sph(p2, 0.0085, seg(6, 5), seg(4, 3)), { color: '#c3c8d0', outline: 0.005 });
+  d.add(tube([p0, p1, p2], 0.0055, seg(6, 4), seg(6, 4)), { color: '#c3c8d0', outline: 0.005 });
+  d.add(sph(p2, 0.0085, seg(6, 5), seg(4, 3)), { color: '#c3c8d0', outline: 0.005 });
   return at.clone().add(v(-s * 0.004, 0.016, -0.02));
 }
 
 /** Classic thumb bell on top of the bar at `at`: lathed dome, post and a round-ended thumb lever. */
 export function bell(ps: PartSet, at: V3, color: string, seg: Seg): void {
+  if (ps.far) return; // far LOD: no bell (the marker stays)
   ps.add(lathe([[0.028, 0.0], [0.026, 0.008], [0.022, 0.019], [0.014, 0.029], [0.006, 0.0335], [0.0, 0.034]], seg(14, 9), at.clone().add(v(0, 0.012, 0)), new Vector3(0, 1, 0)), { color, outline: 0.006 });
   ps.add(cyl(at.clone().add(v(0, -0.004, 0)), at.clone().add(v(0, 0.014, 0)), 0.008, 0.008, seg(8, 6)), { color: '#55585f' });
   const l0 = at.clone().add(v(0.012, 0.016, 0)), l1 = at.clone().add(v(0.034, 0.024, 0.004));

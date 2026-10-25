@@ -40,12 +40,12 @@ export function diamond(b: BikeBuilder, L: Layout, d: DiamondSpec): DiamondPoint
   lug(ps, topFront, top * 1.12, d.main, seg);
   lug(ps, downFront, down * 1.08, d.main, seg);
   lug(ps, L.bb, down * 1.05, d.main, seg);
-  ps.add(roundRing(L.seat(d.clusterY + 0.028), L.seatDir, seat * 0.6, seat * 1.14, 0.034, seg(14, 8)), { color: '#2b2d33', outline: 0.01 });
+  ps.detail.add(roundRing(L.seat(d.clusterY + 0.028), L.seatDir, seat * 0.6, seat * 1.14, 0.034, seg(14, 8)), { color: '#2b2d33', outline: 0.01 });
   for (const s of [-1, 1]) {
     const drop = v(s * dx, L.hubR.y, L.hubR.z);
     frameTube(ps, v(s * 0.04, L.bb.y, L.bb.z + 0.02), drop, csR, cs, seg, false, csR * 0.8);
     frameTube(ps, cluster.clone().add(v(s * 0.03, -0.015, -0.004)), drop, ssR, stays, seg, false, ssR * 0.85);
-    ps.add(box(drop.clone().add(v(0, -0.004, -0.006)), 0.012, 0.04, 0.045), { color: '#3a3d44', outline: 0.006 });
+    ps.detail.add(box(drop.clone().add(v(0, -0.004, -0.006)), 0.012, 0.04, 0.045), { color: '#3a3d44', outline: 0.006 });
   }
   bbShell(ps, L.bb, d.main.color, seg, d.main.paint);
   return { cluster, topFront, downFront, dropoutX: dx };

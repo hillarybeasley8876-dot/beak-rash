@@ -51,6 +51,10 @@ const CHECKS = [
   ['driftWall', 'k150_neutral_clearSec', 2.5, 9], ['driftWall', 'k150_counter_clearSec', 2.5, 9],
   ['driftWall', 'k150_hold_level', 3, 3],
   ['knock', 'lightDisp', 0.45, 0.8], ['knock', 'heavyDisp', 1.2, 1.8], ['knock', 'lightSteerDisp', 0.45, 0.8],
+  // game review r2: a combat knock (no body contact) eases the heading like a bump (<= 300 deg/s = 5 deg/frame at
+  // 60 fps, 2.1 at 144) and still reads as a hit (the nose swings well past 10 deg)
+  ['knock', 'heavyYawStepDeg', 0, 5.5], ['knock', 'lightYawStepDeg', 0, 5.5], ['knock', 'heavy144YawStepDeg', 0, 2.3],
+  ['knock', 'heavyPeakYawDeg', 15, 50], ['knock', 'lightPeakYawDeg', 6, 20],
   ['snake', 'gainInto', -1, 0.03], ['snake', 'gainCounter', -1, 0.03],
   ['wallEvents', 'minGap_30', 0.25, 9], ['wallEvents', 'minGap_60', 0.25, 9], ['wallEvents', 'minGap_144', 0.25, 9],
   ['wallEvents', 'carry_60', 0.4, 1], ['slope', 'v13', 22.5, 24], ['slope', 'v055', 21, 22],

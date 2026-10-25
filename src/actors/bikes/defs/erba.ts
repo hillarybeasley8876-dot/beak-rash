@@ -22,6 +22,7 @@ const L = layout({
 
 /** Two chrome coil springs under the back of the saddle. */
 function springs(b: BikeBuilder, top: V3): void {
+  if (b.far) return;
   const ps = b.parts(null), turns = 3, n = b.seg(10, 6);
   for (const s of [-1, 1]) {
     const c = top.clone().add(v(s * 0.055, -0.075, 0.075));
@@ -60,12 +61,12 @@ export const erba: BikeDef = {
     const bars = sweptBar(st, clamp, 0.25, 0.16, 0.02, CHROME, '#2a2420', seg);
     bell(st, bars.bell, CHROME, seg);
     for (const [g, s] of [[bars.gripL, -1], [bars.gripR, 1]] as const) {
-      st.add(cyl(g.clone().add(v(-s * 0.07, 0.0, -0.06)), g.clone().add(v(s * 0.01, -0.012, -0.05)), 0.0045, 0.0045, 4), { color: CHROME, outline: 0.003 });
+      st.detail.add(cyl(g.clone().add(v(-s * 0.07, 0.0, -0.06)), g.clone().add(v(s * 0.01, -0.012, -0.05)), 0.0045, 0.0045, 4), { color: CHROME, outline: 0.003 });
     }
     rodBrake(st, L.hubF, rimR, TYRE, 72, clamp.clone().add(v(0.03, -0.01, -0.03)), CHROME, seg);
     const rearTop = d.topFront.clone().add(v(0.035, -0.03, 0.03));
     const bend = d.cluster.clone().add(v(0.035, -0.03, -0.02));
-    frame.add(cyl(rearTop, bend, 0.0042, 0.0042, 4), { color: CHROME, outline: 0.003 });
+    frame.detail.add(cyl(rearTop, bend, 0.0042, 0.0042, 4), { color: CHROME, outline: 0.003 });
     rodBrake(frame, L.hubR, rimR, TYRE, 118, bend, CHROME, seg);
     lamp(st, L.headBot.clone().add(v(0, 0.01, -0.085)), v(0, 0, -1), L.headBot.clone().add(v(0, 0.0, -0.03)), CHROME, seg, 0.042);
     seatpost(frame, L, 0.712, 0.017, CHROME, seg);
@@ -78,7 +79,7 @@ export const erba: BikeDef = {
     reflector(frame, v(0, L.hubR.y + Math.sin(0.2) * 0.372, L.hubR.z + Math.cos(0.2) * 0.372), v(0, 0.2, 1), '#e01b24', 0.075, 0.046);
     const n = new Vector3(0, L.axis.z, -L.axis.y);
     decal(frame, 'badge', L.headMid.clone().addScaledVector(n, 0.033), n, L.axis, 0.05, 0.05);
-    for (const y of [L.headBot.y + 0.005, L.headTop.y - 0.005]) frame.add(cyl(L.onAxis(y - 0.004), L.onAxis(y + 0.004), 0.033, 0.033, seg(16, 8)), { color: GOLD });
+    for (const y of [L.headBot.y + 0.005, L.headTop.y - 0.005]) frame.detail.add(cyl(L.onAxis(y - 0.004), L.onAxis(y + 0.004), 0.033, 0.033, seg(16, 8)), { color: GOLD });
     riderMarkers(b, L, bars);
   },
 };

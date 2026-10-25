@@ -16,7 +16,7 @@ export function frameTube(ps: PartSet, a: V3, b: V3, r: number, look: Look, seg:
 }
 
 export function lug(ps: PartSet, at: V3, r: number, look: Look, seg: Seg): void {
-  ps.add(sph(at, r, seg(12, 8), seg(8, 5)), { color: look.color, paint: look.paint, outline: FRAME_OUTLINE });
+  ps.detail.add(sph(at, r, seg(12, 8), seg(8, 5)), { color: look.color, paint: look.paint, outline: FRAME_OUTLINE });
 }
 
 /** Curved frame tube through points (bent top tubes, step-through frames, stays). */
@@ -28,7 +28,7 @@ export function headTube(ps: PartSet, L: Layout, r: number, look: Look, seg: Seg
   const a = L.headBot.clone().addScaledVector(L.axis, -0.012), b = L.headTop.clone().addScaledVector(L.axis, 0.012);
   ps.add(cyl(a, b, r, r, seg(14, 8)), { color: look.color, paint: look.paint, outline: FRAME_OUTLINE });
   for (const [p, d] of [[a, -1], [b, 1]] as const) {
-    ps.add(roundRing(p.clone().addScaledVector(L.axis, d * 0.007), L.axis, r * 0.6, r * 1.08, 0.016, seg(12, 8)), { color: cupColor, outline: FIT_OUTLINE });
+    ps.detail.add(roundRing(p.clone().addScaledVector(L.axis, d * 0.007), L.axis, r * 0.6, r * 1.08, 0.016, seg(12, 8)), { color: cupColor, outline: FIT_OUTLINE });
   }
 }
 
@@ -45,7 +45,7 @@ export interface ForkSpec {
 /** Fork (steer group): crown under the head tube, blades to the front hub, steerer up to `steererTop`. */
 export function fork(ps: PartSet, L: Layout, f: ForkSpec, steererTop: V3, seg: Seg): void {
   const crown = L.headBot.clone().addScaledVector(L.axis, -0.03);
-  ps.add(cyl(crown, steererTop, 0.017, 0.017, seg(12, 8)), { color: '#3a3d44', outline: FIT_OUTLINE });
+  ps.detail.add(cyl(crown, steererTop, 0.017, 0.017, seg(12, 8)), { color: '#3a3d44', outline: FIT_OUTLINE });
   const crownLook = f.crown ?? f.look;
   // Rounded crown flush with the blades' outer faces (no bar sticking out past them).
   const shoulders = ellip(crown.clone().addScaledVector(L.axis, 0.004), f.halfW + f.r * 0.95, f.r * 1.35, f.r * 1.7, seg(12, 8), seg(8, 5), new Euler(L.rake, 0, 0));
@@ -61,9 +61,9 @@ export function fork(ps: PartSet, L: Layout, f: ForkSpec, steererTop: V3, seg: S
       ps.add(cyl(top, knee, f.r * 0.8, f.r * 0.8, seg(12, 8)), { color: f.stanchion ?? '#d9b44a', outline: 0.012 });
       ps.add(cyl(knee.clone().lerp(top, 0.12), hub, f.r * 1.25, f.r * 1.05, seg(12, 8), true), { color: f.look.color, paint: f.look.paint, outline: FRAME_OUTLINE });
     }
-    ps.add(sph(hub, f.r * 1.1, seg(6, 5), seg(4, 3)), { color: '#3a3d44', outline: 0.008 });
+    ps.detail.add(sph(hub, f.r * 1.1, seg(6, 5), seg(4, 3)), { color: '#3a3d44', outline: 0.008 });
   }
-  ps.add(cyl(L.hubF.clone().setX(-f.halfW), L.hubF.clone().setX(f.halfW), 0.0075, 0.0075, seg(6, 5)), { color: '#8d939c' });
+  ps.detail.add(cyl(L.hubF.clone().setX(-f.halfW), L.hubF.clone().setX(f.halfW), 0.0075, 0.0075, seg(6, 5)), { color: '#8d939c' });
   if (f.kind === 'susp') {
     const k = (t: number, s: number): V3 => crown.clone().setX(s * f.halfW).lerp(L.hubF.clone().setX(s * f.halfW), t);
     ps.add(tube([k(0.5, -1).add(v(0, 0, -0.02)), k(0.47, 0).setX(0).add(v(0, 0.025, -0.045)), k(0.5, 1).add(v(0, 0, -0.02))], f.r * 0.8, seg(8, 4), seg(10, 6)), { color: f.look.color, paint: f.look.paint, outline: 0.012 });
@@ -100,5 +100,5 @@ export function saddle(ps: PartSet, top: V3, kind: SaddleKind, color: string, se
   g.computeVertexNormals();
   g.translate(top.x, top.y - k.ry, top.z + k.rz * 0.2);
   ps.add(g, { color, outline: 0.014 });
-  ps.add(box(v(top.x, top.y - k.ry * 1.62 - 0.004, top.z + 0.01), 0.03, 0.018, 0.052), { color: '#3a3d44', outline: 0.006 });
+  ps.detail.add(box(v(top.x, top.y - k.ry * 1.62 - 0.004, top.z + 0.01), 0.03, 0.018, 0.052), { color: '#3a3d44', outline: 0.006 });
 }

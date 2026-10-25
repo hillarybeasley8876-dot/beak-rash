@@ -8,8 +8,13 @@ import { Clock } from './clock';
 import { createRiderState } from './rider';
 import { Rng } from './rng';
 import { emptyControls } from './types';
+import { nextFrame } from './warmup';
 import type { AppContext, CombatSystem, PhysicsSystem, RaceConfig, RaceLogic, RiderView, Session, Track } from './contracts';
 import type { Controls, Obstacle, RiderId, RiderState } from './types';
+
+/** Main-thread budget (ms) of one loading-screen frame while the race is built: a rider view takes 5–50 ms
+ *  (cold templates), so the eight of them no longer block the loading screen for 0.2–0.3 s in one task. */
+const BUILD_SLICE_MS = 12;
 
 export class RaceSession implements Session {
   readonly riders: RiderState[] = [];
@@ -39,9 +44,17 @@ export class RaceSession implements Session {
     const track = await app.modules.createTrack(app, config.trackId, rng);
     const session = new RaceSession(app, config, track);
     session.world.add(track.group);
-    session.spawnRiders();
+    // Built in slices, yielding a frame whenever one has used its budget (the loading screen keeps moving).
+    let slice = performance.now();
+    const breathe = async (): Promise<void> => {
+      if (performance.now() - slice < BUILD_SLICE_MS) return;
+      await nextFrame();
+      slice = performance.now();
+    };
+    await session.spawnRiders(breathe);
     session.physics = app.modules.createPhysics(session);
     session.combat = app.modules.createCombat(session);
+    await breathe();
     session.logic = app.modules.createRaceLogic(session);
     app.scene.add(session.world);
     return session;
@@ -51,8 +64,8 @@ export class RaceSession implements Session {
     return this.riders[id];
   }
 
-  private spawnRiders(): void {
-    const { config } = this;
+  private async spawnRiders(breathe: () => Promise<void>): Promise<void> {
+    const { app, config } = this;
     const lineup = [
       { character: config.playerCharacter, bike: config.playerBike, isPlayer: true },
       ...config.rivals.map((character, i) => ({
@@ -64,19 +77,22 @@ export class RaceSession implements Session {
     const playerSlot = Math.min(4, lineup.length - 1);
     order.splice(order.indexOf(0), 1);
     order.splice(playerSlot, 0, 0);
-    lineup.forEach((entry, id) => {
+    for (const [id, entry] of lineup.entries()) {
       const r = createRiderState(id, entry.character, entry.bike, entry.isPlayer);
       const slot = order.indexOf(id);
       r.s = 40 - Math.floor(slot / 3) * 7;
       r.x = ((slot % 3) - 1) * 3.2;
       this.riders.push(r);
       this.controls.set(id, emptyControls());
-      const view = this.app.modules.createRiderView(this.app, entry.character, entry.bike, {
-        isPlayer: entry.isPlayer, quality: this.app.quality, track: this.track,
+      const view = app.modules.createRiderView(app, entry.character, entry.bike, {
+        isPlayer: entry.isPlayer, quality: app.quality, track: this.track,
       });
       this.views.set(id, view);
       this.world.add(view.root);
-    });
+      // The bar creeps through the track's READY stage (0.9) toward the warm-up (0.92) as the riders line up.
+      app.bus.emit('flow:loading', { progress: 0.9 + (0.02 * (id + 1)) / lineup.length, label: '' });
+      await breathe();
+    }
     const player = this.riders.find((r) => r.isPlayer);
     if (!player) throw new Error('session: no player rider');
     this.player = player;

@@ -43,6 +43,7 @@ export interface CrankSpec {
 }
 
 export function crankset(ps: PartSet, bb: V3, c: CrankSpec, seg: Seg): void {
+  if (ps.far) return; // far LOD: no drivetrain
   const arm = c.armColor ?? '#2b2d33', ax = c.armX ?? ARM_X;
   ps.add(cyl(v(bb.x - ax, bb.y, bb.z), v(bb.x + ax, bb.y, bb.z), 0.011, 0.011, seg(6, 4)), { color: '#8d939c' });
   ps.add(bar(v(bb.x + ax, bb.y, bb.z), v(bb.x + ax, bb.y + c.crank, bb.z), 0.016, 0.026), { color: arm, outline: 0.01 });
@@ -60,6 +61,7 @@ export function crankset(ps: PartSet, bb: V3, c: CrankSpec, seg: Seg): void {
 
 /** Rounded toy platform pedal centred at `at` with a rear reflector; side −1 = left (spindle points to +X), +1 = right. */
 export function pedal(ps: PartSet, at: V3, side: 1 | -1, color = '#2b2d33', seg?: Seg, armX = ARM_X): void {
+  if (ps.far) return;
   const inner = v(side * armX, at.y, at.z);
   ps.add(cyl(inner, v(at.x + side * 0.03, at.y, at.z), 0.0065, 0.0065, 6), { color: '#9aa0a8' });
   ps.add(ellip(at, 0.04, 0.0125, 0.034, seg ? seg(12, 8) : 12, seg ? seg(6, 4) : 6), { color, outline: 0.01 });
@@ -69,12 +71,13 @@ export function pedal(ps: PartSet, at: V3, side: 1 | -1, color = '#2b2d33', seg?
 /** Static chain loop from the chainring (at bb) to the cog (at hub) in the plane x, facing `side` (+1 = +X):
  *  chunky 8 mm toy links from the atlas, black edges as its outline. */
 export function chain(ps: PartSet, bb: V3, ringR: number, hub: V3, cogR: number, x: number, seg: Seg, side: 1 | -1 = 1, pitch = 0.028): void {
+  if (ps.far) return;
   pitch *= 12 / seg(12, 6); // coarser links on lower quality
   const pts = chainLoop(v(x, bb.y, bb.z), ringR - 0.002, v(x, hub.y, hub.z), cogR - 0.001, 12);
   ps.add(linkStrip(pts, 0.0042, pitch, side > 0 ? AX : AX.clone().negate()), { decal: decalUv('chain'), gloss: 0.3 });
 }
 
 export function bbShell(ps: PartSet, bb: V3, color: string, seg: Seg, paint = 0): void {
-  ps.add(cyl(v(bb.x - 0.045, bb.y, bb.z), v(bb.x + 0.045, bb.y, bb.z), 0.026, 0.026, seg(16, 8), true), { color, outline: 0.016, paint });
+  ps.detail.add(cyl(v(bb.x - 0.045, bb.y, bb.z), v(bb.x + 0.045, bb.y, bb.z), 0.026, 0.026, seg(16, 8), true), { color, outline: 0.016, paint });
 }
 

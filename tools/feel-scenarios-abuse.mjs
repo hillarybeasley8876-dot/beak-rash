@@ -1,6 +1,6 @@
 // Feel scenarios for what the first feel review caught: drifting into walls (hold / neutral / counter on a
-// straight and an R150 bend), knock displacement, drift-snaking vs riding straight, one wall event per
-// approach (+ the bounce carry), and speed on long descents.
+// straight and an R150 bend), knock displacement (+ the eased heading), drift-snaking vs riding straight, one
+// wall event per approach (+ the bounce carry), and speed on long descents.
 import { events, prep, r3, run } from './feel-steps.mjs';
 
 const driftWall = {
@@ -31,22 +31,32 @@ const knock = {
   async run({ page }) {
     const m = {};
     // lightSteer: the victim keeps steering full lock back toward the hitter (an AI pressing in) and must still
-    // be shoved visibly (review r2: 0.29 m before the direction-aware knock clamp)
-    for (const [tag, lat, steer] of [['light', 3.2, 0], ['heavy', 9, 0], ['lightSteer', 3.2, -1]]) {
+    // be shoved visibly (review r2: 0.29 m before the direction-aware knock clamp). YawStepDeg: the largest
+    // heading change in one frame after the knock (game review r2: a heavy combat knock with no body contact
+    // snapped the hero 16.8 deg in one frame; knocks now ease the nose like bumps, <= 300 deg/s).
+    const cases = [['light', 3.2, 0, 60], ['heavy', 9, 0, 60], ['lightSteer', 3.2, -1, 60], ['heavy144', 9, 0, 144]];
+    for (const [tag, lat, steer, fps] of cases) {
       await prep(page, { v: 20, x: 0, wall: 20 });
       await run(page, [{ time: 0.2, controls: { throttle: 1 } }]);
-      m[`${tag}Disp`] = r3(await page.evaluate(([L, st]) => {
+      const res = await page.evaluate(([L, st, hz]) => {
         const ses = window.__br.session();
         const f = window.__feel;
-        ses.physics.applyImpulse(ses.player, { lateral: L });
-        const x0 = ses.player.x;
-        let best = 0;
-        for (let i = 0; i < 60; i++) {
-          f.run([{ time: 1 / 60, controls: { throttle: 1, steer: st } }], 1 / 60, false);
-          best = Math.max(best, ses.player.x - x0);
+        const p = ses.player;
+        ses.physics.applyImpulse(p, { lateral: L });
+        const x0 = p.x;
+        let best = 0, yaw = p.yaw, step = 0, peak = 0;
+        for (let i = 0; i < hz; i++) {
+          f.run([{ time: 1 / hz, controls: { throttle: 1, steer: st } }], 1 / hz, false);
+          best = Math.max(best, p.x - x0);
+          step = Math.max(step, Math.abs(p.yaw - yaw));
+          peak = Math.max(peak, Math.abs(p.yaw));
+          yaw = p.yaw;
         }
-        return best;
-      }, [lat, steer]));
+        return { disp: best, step: step * 180 / Math.PI, peak: peak * 180 / Math.PI };
+      }, [lat, steer, fps]);
+      if (fps === 60) m[`${tag}Disp`] = r3(res.disp);
+      m[`${tag}YawStepDeg`] = r3(res.step);
+      m[`${tag}PeakYawDeg`] = r3(res.peak);
     }
     return { metrics: m };
   },

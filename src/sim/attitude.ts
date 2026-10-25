@@ -1,7 +1,7 @@
 // Visual attitude from the state after this step's integration: yaw = atan2(vx, v) (+ drift slip, oil
-// fishtail, the nose pressed into a wall while scraping; rate-limited for a moment after a bounce flips vx in
-// one step), lean = atan(a_lat/g) smoothed (+ leaning on a scraped wall), pitch to ramps and the air arc plus
-// weight cues: nose dive under braking, squat under acceleration, a compression dip on landing.
+// fishtail, the nose pressed into a wall while scraping; rate-limited for a moment after a bounce or a knock
+// flips vx in one step), lean = atan(a_lat/g) smoothed (+ leaning on a scraped wall), pitch to ramps and the
+// air arc plus weight cues: nose dive under braking, squat under acceleration, a compression dip on landing.
 import { clamp, damp } from '../core/math';
 import { TUNING as T } from './tuning';
 import { slideOf } from './steering';

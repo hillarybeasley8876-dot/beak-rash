@@ -55,9 +55,18 @@ function smoothNormals(g: BufferGeometry): Float32Array {
 export class PartSet {
   private parts: Array<{ geo: BufferGeometry; o: PartOpts }> = [];
 
+  /** `far`: this set belongs to a far-LOD build (see `detail`). */
+  constructor(readonly far = false) {}
+
   add(geo: BufferGeometry, o: PartOpts = {}): this {
     this.parts.push({ geo, o });
     return this;
+  }
+
+  /** This set for full-detail-only parts (cables, cranks + pedals, chain, brakes, bell, hubs, bolts…): a far-LOD
+   *  build drops whatever is added through it (those parts are under a pixel beyond ~35 m). */
+  get detail(): PartSet {
+    return this.far ? DROPPED : this;
   }
 
   get empty(): boolean { return this.parts.length === 0; }
@@ -147,6 +156,14 @@ export class PartSet {
     return { geo, hull, paintIdx: new Uint32Array(paintIdx), paintShade: new Float32Array(paintShade), tris: ni / 3 };
   }
 }
+
+/** Where a far-LOD build's detail parts go: nowhere. */
+class Dropped extends PartSet {
+  override add(): this {
+    return this;
+  }
+}
+const DROPPED = new Dropped(true);
 
 const hsl = { h: 0, s: 0, l: 0 };
 /** Tint colour with very dark tints lifted (sRGB lightness ≥ .3) so a black rival frame still shows its shape. */

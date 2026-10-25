@@ -6,13 +6,14 @@
 // trails you (behind the camera for 2 s) it sprints back once with a line, and the next time it trails it gives
 // up (left far behind before it ever arrived, it first takes one out-of-sight shortcut back). Only a real lead is
 // an escape ('lost' + toast): 60 m held for 2 s, built from its closest approach; every other end (stuck or trailing
-// out of sight, a cooled heat, the 25 s cap) is a let-go with its own toast. No escape in the first 8 s.
+// out of sight, a cooled heat, the 25 s cap) is a let-go with its own line and toot. No escape in the first 8 s.
+// The corgi's lines, whistle, knocks and toot are bus events (npc:say / police:*): ui-hud and audio place them.
 import { Quaternion, Vector3 } from 'three';
 import { clamp } from '../../core/math';
 import { createRiderState } from '../../core/rider';
 import { POLICE_LINES, ROSTER } from '../../data/roster';
 import { WEAPONS } from '../../data/weapons';
-import type { Obstacle } from '../../core/types';
+import type { Obstacle, Vec3Like, WeaponId } from '../../core/types';
 import { topOf } from './ai/control';
 import type { RaceCtx } from './ctx';
 import { createCorgi, knock, resetCorgi, resprint, ride, sprinting, tire, tired, WALK_BACK, type RideWorld } from './police-chase';
@@ -68,7 +69,10 @@ export function createPolice(ctx: RaceCtx): Police {
   const corgi = createCorgi(st);
   const rideWorld: RideWorld = { track, obstacles: session.obstacles, riders: session.riders, playerTop: topOf(player), playerSpeed: 0 };
   const ob: Obstacle = { id: 900, kind: 'police', s: 0, x: 0, speed: 0, halfWidth: 0.45, halfLength: 0.9, height: 1.6, solid: false, active: false };
-  let view: PoliceView | null = null;
+  // Built (hidden) with the race, so core's warm-up compiles and uploads it behind the loading screen; a spawn
+  // only places and shows it.
+  const view = new PoliceView(app, session.world);
+  view.visible = false;
   let mode: Mode = 'off';
   let side: 1 | -1 = 1;
   let modeT = 0, bustT = 0, lostT = 0, whistleCd = 0, cooldown = 0, alertLevel = 0, simAcc = 0, lastReal = app.clock.realTime;
@@ -81,9 +85,10 @@ export function createPolice(ctx: RaceCtx): Police {
   let spoke = false;                          // the chase line (first time alongside) is said
   const pos = new Vector3(), quat = new Quaternion();
 
-  // Corgi speech (content's POLICE_LINES) stays in toasts, only for the arrival, the fine and an escape
-  // (no world-anchored bubble for non-riders yet).
-  const say = (text: string): void => app.ui.toast(`${ROSTER.corgi.name}：${text}`, 'warn');
+  // Corgi speech (content's POLICE_LINES): a bubble over the officer (ui-hud anchors it on obstacle 900).
+  const say = (text: string): void => app.bus.emit('npc:say', { obstacleId: ob.id, character: 'corgi', text });
+  /** Where the officer is (world, body height): whistle, knock and toot sounds come from here. */
+  const at = (): Vec3Like => track.toWorld(st.s, st.x, 1.1, new Vector3());
   const alert = (level: number, reason?: Reason): void => {
     if (level === alertLevel) return;
     alertLevel = level;
@@ -103,7 +108,6 @@ export function createPolice(ctx: RaceCtx): Police {
     minGap = player.s - st.s;
     whistleCd = 2.5;
     rideWorld.playerTop = topOf(player);
-    view ??= new PoliceView(app, session.world);
     view.visible = true;
     ob.active = true;
     if (!session.obstacles.includes(ob)) session.obstacles.push(ob);
@@ -113,7 +117,7 @@ export function createPolice(ctx: RaceCtx): Police {
 
   const despawn = (): void => {
     setMode('off');
-    if (view) view.visible = false;
+    view.visible = false;
     ob.active = false;
     const i = session.obstacles.indexOf(ob);
     if (i >= 0) session.obstacles.splice(i, 1);
@@ -121,7 +125,7 @@ export function createPolice(ctx: RaceCtx): Police {
     alert(0);
   };
 
-  /** The chase ends: an escape ('lost' alert + toast) or a let-go (its own toast and toot, no escape credit). */
+  /** The chase ends: an escape ('lost' alert + toast) or a let-go (its own line and toot, no escape credit). */
   const giveUp = (escaped: boolean): void => {
     setMode('leaving');
     player.heat = Math.min(player.heat, CALM_HEAT);
@@ -129,7 +133,7 @@ export function createPolice(ctx: RaceCtx): Police {
     if (escaped) app.ui.toast(`甩掉了柯基警官！  “${rng.pick(POLICE_LINES.lost)}”`, 'meme');
     else if (player.finishTime === null) {
       say(rng.pick(LET_GO_LINES));
-      app.audio.sfx('traffic.horn.police');
+      app.bus.emit('police:horn', { riderId: player.id, pos: at() });
     }
   };
 
@@ -146,24 +150,25 @@ export function createPolice(ctx: RaceCtx): Police {
 
   const whistle = (): void => {
     whistleCd = WHISTLE_CD;
-    app.audio.sfx('police.whistle');
+    app.bus.emit('police:whistle', { riderId: player.id, pos: at() });
     const slow = player.statuses.find((s) => s.id === 'slow');
     if (slow) slow.time = Math.max(slow.time, 1);
     else player.statuses.push({ id: 'slow', time: 1, strength: 0.15, source: null });
   };
 
-  /** A player swing (side = null: either side) or Wing Dash ram reaching the corgi knocks it back. */
-  const tryKnock = (reach: number, sideSign: number | null, sfx: string): void => {
+  /** A player swing (side = null: either side) or Wing Dash ram (weapon 'none') reaching the corgi knocks it
+   *  back. */
+  const tryKnock = (reach: number, sideSign: number | null, weapon: WeaponId): void => {
     if (mode !== 'chase' || corgi.knockT > 0) return;
     const ds = st.s - player.s, dx = st.x - player.x;
     if (Math.abs(ds) > 1.6 || Math.abs(dx) > reach || (sideSign !== null && Math.sign(dx) !== sideSign)) return;
     knock(corgi, Math.sign(dx) || 1);
     heat.offence(KNOCK_HEAT);
-    app.audio.sfx(sfx);
+    app.bus.emit('police:knock', { riderId: player.id, weapon, pos: at() });
   };
   const offs = [
     app.bus.on('combat:swing', (e) => {
-      if (e.riderId === player.id) tryKnock(WEAPONS[e.weapon].reach, e.heavy ? null : e.side, `hit.${e.weapon}`);
+      if (e.riderId === player.id) tryKnock(WEAPONS[e.weapon].reach, e.heavy ? null : e.side, e.weapon);
     }),
     app.bus.on('skill:cast', (e) => { if (e.riderId === player.id && e.skillId === 'pelican.wing') wingT = WING_TIME; }),
   ];
@@ -258,7 +263,7 @@ export function createPolice(ctx: RaceCtx): Police {
       simAcc += dt;
       cooldown -= dt;
       modeT += dt;
-      if (wingT > 0) { wingT -= dt; tryKnock(1.4, null, 'hit.none'); }
+      if (wingT > 0) { wingT -= dt; tryKnock(1.4, null, 'none'); }
       if (mode === 'chase') chase(dt);
       else if (mode === 'ticket') ticket(dt);
       else if (mode === 'leaving') leave(dt);
@@ -270,7 +275,7 @@ export function createPolice(ctx: RaceCtx): Police {
     },
     sync() {
       const real = app.clock.realTime;
-      if (!view || mode === 'off') { simAcc = 0; lastReal = real; return; }
+      if (mode === 'off') { simAcc = 0; lastReal = real; return; }
       trackPose(track, st.s, st.x, 0, st.yaw, st.lean, pos, quat);
       view.update(st, pos, quat, simAcc, Math.max(0, real - lastReal), mode !== 'leaving');
       simAcc = 0;
@@ -289,7 +294,7 @@ export function createPolice(ctx: RaceCtx): Police {
       if (mode !== 'off') alert(0);
       const i = session.obstacles.indexOf(ob);
       if (i >= 0) session.obstacles.splice(i, 1);
-      view?.dispose();
+      view.dispose();
     },
   };
 }

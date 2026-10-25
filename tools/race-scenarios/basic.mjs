@@ -65,7 +65,10 @@ export const basicScenarios = {
     await h.goto(`/?race=coast&seed=9&manual=1${stub}`);
     await h.step(60);
     await h.eval("window.__br.app.bus.emit('flow:restartRace', {})");
-    await page.waitForFunction(() => window.__br.session()?.phase === 'intro', null, { timeout: 30000 });
+    // The new race is up once core's warm-up (sim frozen behind the loading card) and the card's exit hold are over:
+    // the 400 frames below run in one synchronous loop, so nothing that waits for real time may still be pending.
+    await page.waitForFunction(() => window.__br.session()?.phase === 'intro' && window.__br.app.ui.screen === 'race'
+      && window.__br.game.loading === false, null, { timeout: 60000 });
     await h.step(400);
     const mid = await h.eval('({ n: window.__br.session().obstacles.length, race: !!window.__br.race, phase: window.__br.session().phase })');
     await h.eval("window.__br.app.bus.emit('flow:quitRace', {})");

@@ -116,7 +116,7 @@ export class RiderViewImpl implements RiderView {
     this.offCine = app.bus.on('cine:ko', (e) => {
       this.cine = e.phase !== 'end';
     });
-    this.lod = new RiderLod(this.inst.mesh, this.inst.hull);
+    this.lod = new RiderLod(this.inst.mesh, this.inst.hull, this.bike);
     this.warm = opts.track ? new ShaderWarmup(this.root, this.inst.mesh, this.fade, this.extras, app.renderer.info) : null;
     this.crash = new CrashController({
       root: this.root, body: this.body, mesh: this.inst.mesh, bike: this.bike, bikeHome: this.bike.root.position.clone(), ps: this.ps,

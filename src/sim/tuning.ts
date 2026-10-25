@@ -31,6 +31,8 @@ export const TUNING = {
   knockSteer: 0.05,       // … steering back toward the hitter ×this (steering away keeps full authority) …
   knockTau: 0.3,          // … and the grip lag is at least this (≈ 0.19 s × knock m/s of travel: 9 → 1.7 m)
   knockMin: 0.5,          // m/s lateral impulse below which no carry window opens
+  knockEaseTime: 0.3,     // s a knock eases the heading (yawEaseRate): the nose swings with the shove, never snaps
+                          // (a 9 m/s knock at 20 m/s turns it ≈ 24° in ≈ 0.08 s; this covers swings up to 90°)
   leanLambda: 12,         // 1/s smoothing of the visual lean
   leanMax: 38 * DEG,
   yawMax: 50 * DEG,       // heading cap (velocity angle + drift slip): full-lock drifts stay readable, yet a

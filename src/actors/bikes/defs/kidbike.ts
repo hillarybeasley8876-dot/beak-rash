@@ -86,11 +86,11 @@ export const kidbike: BikeDef = {
       brake.clone().add(v(0.012, 0.03, -0.012)), brake.clone().add(v(0, 0.012, 0))], 0.04, seg, LILAC);
     fender(frame, L.hubR, L.s.R, 12, 108, 0.048, MINT, seg); // pastel rear fender: the balance bike from behind
     seatpost(frame, L, 0.36, 0.019, WHITE, seg);
-    frame.add(roundRing(L.seat(0.372), L.seatDir, 0.019, 0.042, 0.022, seg(14, 8)), { color: WHITE, outline: 0.01 });
+    frame.detail.add(roundRing(L.seat(0.372), L.seatDir, 0.019, 0.042, 0.022, seg(14, 8)), { color: WHITE, outline: 0.01 });
     saddle(frame, L.saddle, 'kid', WHITE, seg);
     reflector(frame, L.seat(0.385).add(v(0, 0, 0.02)), v(0, 0, 1), '#e01b24', 0.03, 0.02);
     const lens = clamp.clone().add(v(0, -0.032, -0.024));
-    st.add(cyl(lens, lens.clone().add(v(0, 0, -0.008)), 0.016, 0.016, seg(12, 8), true), { color: '#f4f4f4', outline: 0.006 });
+    st.detail.add(cyl(lens, lens.clone().add(v(0, 0, -0.008)), 0.016, 0.016, seg(12, 8), true), { color: '#f4f4f4', outline: 0.006 });
     b.marker('saddle', null, L.saddle);
     b.marker('gripL', 'steer', bars.gripL);
     b.marker('gripR', 'steer', bars.gripR);

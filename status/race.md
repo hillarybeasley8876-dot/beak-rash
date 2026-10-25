@@ -361,3 +361,27 @@ Requests (acceptance r1; files outside src/gameplay/race/**, so not edited by th
 Acceptance round 1 complete (A major + B, C minors done).
 - Last checks: decent + autopilot (18, p18): player wins 13, corgi spawned in every race, 2 natural BUSTED (mountain auto s3:
   one slow, one wrecked), 0 errors. `race-podium --seeds 1-8` PASS (max rival share 21 %, every species podiums, 0 errors).
+
+## r3 polish (2026-10-25)
+Slice r3-perf (integrator's polish round; probes + logs in shots/r3-perf/).
+- [x] game-r2-perf#1 police corgi built + compiled mid-race at its first spawn -> police.ts builds the PoliceView hidden in
+      createPolice() (with the race, before core's warm-up compiles/uploads the scene graph, hidden objects included); spawn()
+      only places and shows it. police-progs.mjs (heat forced 2 s after GO, manual 60 fps): programs compiled after GO 5 -> 0
+      on coast / city / mountain; spawn frame 65 / 35 / 44 ms -> 43 / 19 / 19 ms (left: the corgi's first draw, ui-hud's new
+      npc:say bubble ~6 ms, audio's siren/whistle synthesis ~5 ms; CPU profile spawn-profile.mjs).
+- [x] police -> events: whistle -> 'police:whistle' {riderId, pos}, swing / Wing Dash knock -> 'police:knock' {riderId, weapon
+      ('none' for the ram), pos}, let-go toot -> 'police:horn' {riderId, pos} (pos = the corgi, world, 1.1 m up), no
+      app.audio.sfx left; the corgi's lines (arrival, first time alongside, re-sprint, fine, let-go) -> 'npc:say' {obstacleId
+      900, character 'corgi', text}; the escape stays the system toast 甩掉了柯基警官！… police-events.mjs: spawn alert + say,
+      whistle, chase say, knock (weapon none), re-sprint say, let-go say + horn, no corgi toasts, 0 errors.
+- [x] game-r2-perf#3 (core file, this round mine) race build blocked 0.2-0.34 s in one task -> core/session.ts: spawnRiders()
+      is async and the build yields a frame (core/warmup nextFrame) whenever a slice has used 12 ms (after each rider view,
+      before the race logic); flow:loading creeps 0.90 -> 0.92 as the riders line up. build-tasks.mjs, cold page loads: the
+      READY->warm-up long task 338 / 284 / 306 ms -> 64 / <50 / 51 ms (coast / city / mountain); in-page rebuilds <= 70 ms.
+      Restarts: restart.mjs (pause -> restart x2, quit -> city) PASS; core-check 8/8; race-scenarios restart PASS.
+- [x] tools/race-scenarios (now this slice's): outrun expects a let-go within 26 s (no 'lost' without a 60 m lead), koNoBust ->
+      koBust (a rival's KO next to the corgi is BUSTED, acceptance r1 design), restart waits for the warm-up + loading exit
+      (game.loading false) before its synchronous 400 frames, fair.mjs bikes compares b.base (acceptance r1 requests).
+      --only police,visible,selfBust,outrun,koBust,restart: all PASS.
+- Checks: race-soak coast / city / mountain SOAK OK (busted 1 per seed, 0 errors); race-check coast 1800 f 0 errors; tsc 0
+  errors in src/gameplay/race and src/core/session.ts.

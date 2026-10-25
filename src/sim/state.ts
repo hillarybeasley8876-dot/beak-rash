@@ -40,7 +40,7 @@ export interface SimRider {
   carrySteer: number;                // multiplier on steering that points toward the hazard during the carry
   carryTau: number;                  // minimum grip time constant while the grip pulls toward the hazard (s)
   carryDir: -1 | 0 | 1;              // side of the hazard (wall, vehicle, hitter); 0 = clamp every direction
-  yawEase: number;                   // s left of yaw smoothing after a bounce flipped vx in one step
+  yawEase: number;                   // s left of yaw smoothing after a bounce / knock flipped vx in one step
   slidePhase: number;                // oil / puddle fishtail phase (rad)
   // surfaces
   oilTime: number;
