@@ -33,7 +33,7 @@ export function tickThrow(ctx: CombatCtx, r: RiderState, dt: number): void {
     }
     d.aim.t += dt;
     const held = c?.heavyHeld ?? false;
-    if (!held || d.aim.t >= THROW.aimTime) {
+    if (d.aim.t >= 0 && (!held || d.aim.t >= THROW.aimTime)) {
       release(ctx, r);
       return;
     }

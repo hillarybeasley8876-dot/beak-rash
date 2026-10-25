@@ -12,10 +12,11 @@ export const items = [
     const back = cc.until(() => v.mode === 'racing', 900);
     cc.step(30);
     const again = cc.of('combat:ko').length;
-    return { ok: kos.length === 1 && ko.attacker === 0 && ko.victim === 3 && ko.cause === 'ko' && p.kos === k0 + 1 && p.coins === coins0 + 50 &&
-      p.sp - sp0 >= 2.5 + 10 - 1e-6 && p.sp - sp0 < 2.5 + 10 + 1 && v.wrecked === w0 + 1 && crashed === 'crashed' && back >= 0 && again === 1 && Math.abs(v.hp - Math.round(v.maxHp * 0.7)) <= 1,
-      info: { kos: kos.length, ko, crashed, back, hp: v.hp, max: v.maxHp, again } };
-  }],
+    const style = cc.stylePaid();   // the r4 STYLE chain pays a bonus on top of the r3 economy
+    const sp = p.sp - sp0 - style.sp, coins = p.coins - coins0 - style.coins;
+    return { ok: kos.length === 1 && ko.attacker === 0 && ko.victim === 3 && ko.cause === 'ko' && p.kos === k0 + 1 && coins === 50 &&
+      sp >= 2.5 + 10 - 1e-6 && sp < 2.5 + 10 + 1 && v.wrecked === w0 + 1 && crashed === 'crashed' && back >= 0 && again === 1 && Math.abs(v.hp - Math.round(v.maxHp * 0.7)) <= 1,
+      info: { kos: kos.length, ko, crashed, back, hp: v.hp, max: v.maxHp, again, sp, coins, style } };  }],
   ['debug ko() and a wall crash after a hit are credited once', () => {
     const cc = window.__cc; cc.reset(); const c = cc.C(); c.force({ crit: false, block: false, loose: false });
     window.__br.ko(2, 0); cc.step(3);
@@ -64,7 +65,8 @@ export const items = [
     c.spawn('coin', p.s + 8, p.x); c.spawn('fish', p.s + 14, p.x); c.spawn('can', p.s + 20, p.x); c.spawn('crate', p.s + 26, p.x);
     cc.until(() => cc.of('pickup:take').length >= 4, 240);
     const takes = cc.of('pickup:take').map((e) => e.kind), picks = cc.of('combat:weaponPick');
-    const res = { coins: p.coins - coins0, hp: p.hp, sp: Math.round(p.sp), weapon: p.weapon, x: +p.x.toFixed(2) };
+    const style = cc.stylePaid();   // the r4 STYLE chain pays a bonus on top of the r3 economy
+    const res = { coins: p.coins - coins0 - style.coins, hp: p.hp, sp: Math.round(p.sp), weapon: p.weapon, x: +p.x.toFixed(2) };
     c.give(0, 'none'); cc.mark();
     c.spawn('weapon', p.s + 10, p.x, 'umbrella');
     cc.until(() => cc.of('pickup:take').length >= 1, 120);

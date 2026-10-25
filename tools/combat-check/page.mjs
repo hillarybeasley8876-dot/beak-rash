@@ -6,16 +6,21 @@ export function installHelpers() {
     'combat:swing', 'combat:hit', 'combat:ko', 'combat:combo', 'combat:weaponDrop', 'combat:weaponPick',
     'skill:cast', 'skill:hit', 'skill:end', 'skill:denied', 'ult:start', 'ult:impact', 'pickup:take', 'taunt',
     'rider:crash', 'rider:respawn', 'hitstop', 'combat:bell', 'combat:weaponBreak', 'projectile:spawn', 'projectile:end',
-    'rider:land', 'rider:boost', 'cam:shake', 'race:finishLine',
+    'rider:land', 'rider:boost', 'cam:shake', 'race:finishLine', 'combat:throw', 'combat:parry', 'npc:hit',
+    'style:bank', 'rider:trick',
   ];
   const cc = {
     ev: [],
     offs: [],
+    styleSp: 0, styleCoins: 0, styleBanks: 0, styleMarkSp: 0, styleMarkCoins: 0,
     listen() {
       for (const off of cc.offs) off();
       cc.offs = EVENTS.map((t) => br.app.bus.on(t, (p) => cc.ev.push({ t, p: JSON.parse(JSON.stringify(p)), f: br.frames })));
+      br.app.bus.on('style:bank', (e) => { if (e.riderId === 0) { cc.styleCoins += e.coins; cc.styleBanks++; } });
     },
-    mark() { cc.ev.length = 0; },
+    /** Bonus SP actually paid to the player this session (a bank on a full bar pays nothing). */
+    bonusPaid() { return br.combat?.data(0)?.bonusPaid ?? 0; },
+    mark() { cc.ev.length = 0; cc.styleMarkSp = cc.bonusPaid(); cc.styleMarkCoins = cc.styleCoins; },
     of(t, pred) { return cc.ev.filter((e) => e.t === t && (!pred || pred(e.p))).map((e) => e.p); },
     S() { return br.session(); },
     P() { return br.session().player; },
@@ -43,6 +48,17 @@ export function installHelpers() {
       return pred() ? maxFrames : -1;
     },
     has(r, id) { return r.statuses.some((st) => st.id === id && st.time > 0); },
+    /**
+     * The STYLE chain banks since the last mark(): the r4 bonus SP / coins the chain paid the player.
+     * The r3 cases measure the combat economy, so they subtract it (the style bonus is asserted on its own).
+     * `total` is the cumulative amount paid this session (for a measurement window that spans a mark()).
+     */
+    stylePaid() {
+      return {
+        sp: cc.bonusPaid() - cc.styleMarkSp, coins: cc.styleCoins - cc.styleMarkCoins,
+        total: cc.bonusPaid(), banks: cc.styleBanks,
+      };
+    },
     /** Effective top-speed multiplier: mods (skill boosts) × the shared physics boost (drift, pad, rubber band). */
     topMul(r) { return r.mods.speedMul * (1 + (r.boostTime > 0 ? r.boostPower : 0)); },
     /** Restart the race with the same URL config and ride until racing (after finish-line scenarios). */
@@ -56,6 +72,7 @@ export function installHelpers() {
       const c = br.combat;
       const s = cc.S();
       c.unpin();
+      s.obstacles.length = 0;   // the road props of the track events (r4) are not the combat unit's business
       for (const r of s.riders) if (!r.isPlayer) c.pin(r.id, -60 - r.id * 12, 0, true);
       cc.until(() => s.riders.every((r) => r.mode === 'racing') && c.counts().skills === 0, 900);
       c.unpin();

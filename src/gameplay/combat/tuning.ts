@@ -42,6 +42,26 @@ export const FEEDBACK_RANGE = 16;
 export const COMBO = { gap: 1.5, oneMore: 3, oneMoreSp: 2 } as const;
 
 /**
+ * Weapon traits (SPEC §15). The pan parries, the leek's third hit in a row hits harder, the selfie
+ * blinds and the baguette always knocks the weapon loose; the saltfish boomerang and the slipper seeker
+ * are flight rules and live in projectiles/thrown.ts.
+ */
+export const TRAIT = {
+  parry: { window: 0.15, stun: 0.6 },              // s after the press a hit still parries; s the attacker is stunned
+  triple: { window: 1.2, damage: 1.5, knock: 1.5 }, // the 3rd hit in a row: ×1.5 damage, +50 % knock
+  flash: { blind: 0.6 },                           // s the victim is blinded
+  boomerang: {
+    out: 0.18,       // s the saltfish flies away before it curves back
+    catch: 2,        // m from the thrower it is caught
+    window: 1.6,     // s after the release it can still be caught
+    turn: 12,        // rad/s it turns back towards the thrower
+    speedMul: 1.25,  // × its launch speed on the way home (it has to catch a fast rider)
+    lead: 0.15,      // s it aims ahead of the thrower
+  },
+  seeker: { cone: 60, range: 45, turn: 6, boost: 12, height: 6 }, // ±deg, m, rad/s, m/s, m/s per m: the slipper homes hard
+} as const;
+
+/**
  * SP economy (retuned r3: an aggressive player fills the bar about once a minute, not every 15 s). A swing pays
  * more than a skill hit (the skill already did the work); riding well pays as before. Fighting pays nothing with
  * an SP-paid skill (SHOWTIME's own hits and KOs) and for `afterUlt` s after its cast (its stunned victims are easy
@@ -51,6 +71,8 @@ export const SP = {
   max: 100, hit: 2.5, skillHit: 1, hurt: 1.5, ko: 10, draftPerSec: 1, nearMiss: 4, perfect: 8, driftL3: 5, bell: 3,
   repeatWindow: 4, repeatHit: 0.5, // a swing pays `hit` once per window per victim, `repeatHit` in between
   afterUlt: 12,
+  trick: 8,             // SP a rider earns per trick landed (SPEC §16)
+  rewardBudget: 40,     // bonus SP (STYLE banks + tricks) a rider may earn per race
 } as const;
 
 export const KO = { creditWindow: 3, coins: 50, respawnHp: 0.7 } as const;

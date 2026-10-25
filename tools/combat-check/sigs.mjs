@@ -46,7 +46,7 @@ export const sigs = [
     c.give(0, 'leek'); c.pin(7, 0.5, 1.5); cc.step(2); c.cast(7, 1); cc.step(3);
     const stole = cc.R(7).weapon === 'leek' && p.weapon === 'none' && cc.of('combat:weaponPick', (e) => e.stolenFrom === 0).length === 1;
     c.resetCooldowns(7); p.sp = 50; cc.R(7).sp = 0; c.cast(7, 1); cc.step(3);
-    const sp = Math.round(p.sp) <= 31 && cc.R(7).sp >= 19.5;
+    const sp = Math.round(p.sp - cc.stylePaid().sp) <= 31 && cc.R(7).sp >= 19.5;
     c.pin(7, 150, 0); c.resetCooldowns(7); cc.step(2); cc.mark(); c.cast(7, 1); cc.step(2);
     const denied = cc.of('skill:denied', (e) => e.riderId === 7)[0]?.reason === 'state';
     return { ok: stole && sp && denied, info: { stole, sp, denied, psp: p.sp } };

@@ -10,8 +10,12 @@ await withPage(async (page, h) => {
   await race(page, h, { track: 'coast', seed: 3 });
   await capture(page, ['combat:hit', 'combat:parry', 'combat:throw', 'combat:weaponDrop', 'combat:weaponPick', 'npc:hit', 'projectile:end']);
   const ids = await page.evaluate(() => window.__br.session().riders.filter((r) => !r.isPlayer).map((r) => r.id));
-  const [r1, r2, r3, r4] = ids;
+  const [r1, r2, r3] = ids;
+  // the slipper's target must not be the capybara: its chill aura stops the player's swings (and throws)
+  const r4 = await page.evaluate(() => window.__br.session().riders.find((r) => !r.isPlayer && ['cat', 'shiba', 'seagull', 'goose', 'pigeon'].includes(r.character) && r.id > 3)?.id ?? 4);
   const cb = (fn, args) => page.evaluate(([f, a]) => new Function('c', 'a', f)(window.__br.combat, a), [fn, args]);
+  /** Send a rider a case let go far ahead again (an unpinned rider stays right next to the player). */
+  const park = (id) => page.evaluate((i) => { const b = window.__br; b.teleport(i, b.session().player.s + 500, 0); }, id);
   const rider = (id) => page.evaluate((i) => { const r = window.__br.session().rider(i); return { hp: r.hp, sp: r.sp, coins: r.coins, weapon: r.weapon, statuses: r.statuses.map((s) => s.id), action: r.action?.kind ?? null }; }, id);
   // park everyone far AHEAD (they race away) except who a case pins next to the player
   await page.evaluate((list) => { const b = window.__br, s = b.session(); list.forEach((id, i) => b.teleport(id, s.player.s + 500 + i * 12, 0)); }, ids);
@@ -39,6 +43,7 @@ await withPage(async (page, h) => {
   }
   expect(loose === 4, `baguette: 4 of 4 heavy hits knock the pan loose (${loose})`);
   await cb('c.unpin(a[0])', [r1]);
+  await park(r1);
 
   // 3. pan PARRY: a swing pressed just before a rival's heavy hit lands
   await page.evaluate(([a]) => { const b = window.__br; b.teleport(a, b.session().player.s, 1.3); }, [r2]);
@@ -55,6 +60,7 @@ await withPage(async (page, h) => {
   expect(parry.some((x) => x.e.riderId === 0 && x.e.attacker === r2) && me.hp === 100, `pan parry: combat:parry, no damage (hp ${me.hp}, ${JSON.stringify(parry.map((x) => x.e))})`);
   expect(att.statuses.includes('stun'), `pan parry: the attacker is stunned (${JSON.stringify(att.statuses)})`);
   await cb('c.unpin(a[0])', [r2]);
+  await park(r2);
 
   // 4. pan PARRY of a police baton: npc:strike right after the player's swing → npc:hit parried
   await cb('c.give(0, "pan", 6); c.set(0, { hp: 100 }); c.resetCooldowns()', null);
@@ -84,6 +90,7 @@ await withPage(async (page, h) => {
   await hold(page, C, 18);
   expect((await rider(r3)).statuses.includes('blind'), `selfie: the victim is blinded (${JSON.stringify((await rider(r3)).statuses)})`);
   await cb('c.unpin(a[0])', [r3]);
+  await park(r3);
 
   // 7. slipper: thrown, it homes onto a rival well outside a normal throw's cone
   const throwAt = async (weapon) => {
@@ -100,6 +107,7 @@ await withPage(async (page, h) => {
   const slipperHit = await throwAt('slipper');
   expect(!leekHit && slipperHit, `slipper homes (leek ${leekHit ? 'hit' : 'missed'}, slipper ${slipperHit ? 'hit' : 'missed'} a rival 20 m ahead, 9 m aside)`);
   await cb('c.unpin(a[0]); c.clearItems()', [r4]);
+  await park(r4);
 
   // 8. keyboard: about a 25 % crit chance (other weapons 10 %)
   await cb('c.force(null); c.pin(a[0], 0.2, 1.3); c.give(a[0], "none"); c.set(a[0], { hp: 99999 })', [r1]);
@@ -114,8 +122,10 @@ await withPage(async (page, h) => {
   const crits = kb.filter((x) => x.e.crit).length;
   expect(kb.length >= 100 && crits / kb.length >= 0.16 && crits / kb.length <= 0.36, `keyboard: ${crits} crits in ${kb.length} hits (want ~25 %)`);
   await cb('c.unpin(a[0])', [r1]);
+  await park(r1);
 
   // 9. rewards: style:bank pays SP + coins; a trick landing pays SP 8 per trick
+  await cb('c.set(0, { sp: 40 })', null);
   const before = await rider(0);
   await page.evaluate(() => window.__br.app.bus.emit('style:bank', { riderId: 0, total: 600, count: 3, sp: 6, coins: 2, broken: false }));
   await hold(page, C, 2);

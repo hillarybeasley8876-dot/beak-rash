@@ -9,6 +9,7 @@ import { impact, nudge } from './feedback';
 import { koExternal } from './ko';
 import { gainSp } from './sp';
 import { addStatus, statusStrength } from './statuses';
+import { parry, parryArmed } from './traits';
 import { NPC_STRIKE, SHIELD_IMMUNE, SP } from './tuning';
 type Strike = GameEvents['npc:strike'];
 
@@ -41,6 +42,12 @@ function resolveStrike(ctx: CombatCtx, e: Strike): void {
     answer(ctx, e, 0, false, pos);
     return;
   }
+  if (parryArmed(ctx, v)) {
+    // 完美格挡: the pan turns the baton into a parry (no damage, no knock).
+    parry(ctx, v, null, e.obstacleId, pos);
+    answer(ctx, e, 0, false, pos, true);
+    return;
+  }
   const shielded = statusStrength(v, 'shield') >= SHIELD_IMMUNE;
   if (shielded || weaponBlocks(ctx, v)) {
     answer(ctx, e, 0, true, pos);
@@ -58,9 +65,11 @@ function resolveStrike(ctx: CombatCtx, e: Strike): void {
 }
 
 /** Exactly one 'npc:hit' per 'npc:strike'. */
-function answer(ctx: CombatCtx, e: Strike, damage: number, blocked: boolean, pos: { x: number; y: number; z: number }): void {
+function answer(
+  ctx: CombatCtx, e: Strike, damage: number, blocked: boolean, pos: { x: number; y: number; z: number }, parried = false,
+): void {
   ctx.bus.emit('npc:hit', {
-    victim: e.victim, obstacleId: e.obstacleId, damage, blocked, parried: false,
+    victim: e.victim, obstacleId: e.obstacleId, damage, blocked, parried,
     side: e.side, weapon: e.weapon, pos,
   });
 }

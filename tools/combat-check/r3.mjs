@@ -4,7 +4,7 @@
 export const r3 = [
   ['r3 SP: a swing pays 2.5 once per 4 s per rival (0.5 between), a skill hit 1, a KO 10; nothing for 12 s after SHOWTIME', () => {
     const cc = window.__cc; cc.reset(); const c = cc.C(); const p = cc.P(); c.force({ crit: false, block: false, loose: false });
-    const gain = (fn, frames) => { const sp0 = p.sp; fn(); cc.step(frames); return +(p.sp - sp0).toFixed(2); };
+    const gain = (fn, frames) => { const sp0 = p.sp, s0 = cc.stylePaid().total; fn(); cc.step(frames); return +(p.sp - sp0 - (cc.stylePaid().total - s0)).toFixed(2); };
     const swing = (side) => gain(() => { cc.press(side); cc.step(1); }, 100); // 1.7 s apart: no combos
     c.pin(3, 0.2, 1.2); c.pin(2, 0.2, -1.2); cc.step(2);
     const first = swing('attackR'), again = swing('attackR'), other = swing('attackL');
@@ -15,9 +15,10 @@ export const r3 = [
     c.pin(1, -80, 0); c.pin(4, 0.2, 1.2); cc.step(2); cc.R(4).hp = 3;
     const ko = gain(() => { cc.press('attackR'); cc.step(1); cc.until(() => cc.of('combat:ko').length > 0, 60); }, 2);
     c.pin(4, -80, 0); c.pin(3, 14, 1.6); c.pin(2, 22, -1.6); cc.step(2); cc.mark();
+    const ultStyle0 = cc.stylePaid().total;
     p.sp = 100; cc.press('ult'); cc.step(1);
     cc.until(() => cc.of('skill:end', (e) => e.skillId === 'pelican.ult').length > 0, 600);
-    const ult = +p.sp.toFixed(2);
+    const ult = +(p.sp - (cc.stylePaid().total - ultStyle0)).toFixed(2);
     c.pin(3, 0.2, 1.2); c.pin(2, -80, 0); cc.step(2);
     const locked = swing('attackR');
     cc.step(600);

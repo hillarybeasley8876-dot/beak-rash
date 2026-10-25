@@ -6,7 +6,8 @@ import type { Controls, RiderAction, RiderState, Side, WeaponId } from '../../co
 import { consumeUse, knockLoose } from './armory';
 import { active, nearest, posing, targetable, type CombatCtx, type SwingTiming } from './ctx';
 import { applyHit } from './damage';
-import { HEAVY_PHASES, HEAVY_TELL, INPUT_BUFFER, LIGHT_PHASES, MELEE, PRESS_HOLD, SWING_REF, powerMul } from './tuning';
+import { armParry, commitTriple, critChance, parry, parryArmed, traitOf, tripleCount } from './traits';
+import { HEAVY_PHASES, HEAVY_TELL, INPUT_BUFFER, LIGHT_PHASES, MELEE, PRESS_HOLD, SWING_REF, TRAIT, powerMul } from './tuning';
 import { HeavyTell } from './visuals/tell';
 
 /** Swing timing for this weapon; a rival's heavy near the player is telegraphed (longer windup + glint). */
@@ -75,6 +76,7 @@ export function startSwing(ctx: CombatCtx, r: RiderState, heavy: boolean, sideIn
   ctx.rd(r).swingChecked = false; // the throw decision is taken once per swing
   r.invuln = 0; // attacking gives up respawn protection
   r.action = { kind: heavy ? 'heavy' : 'attack', side, t: 0, dur: ph.total, weapon: r.weapon, skillId: null, resolved: false };
+  armParry(ctx, r, ph.total); // the pan arms its parry on the press
   if (tell) ctx.visuals.add(new HeavyTell(ctx.visuals, r, side, ph.windup));
   ctx.view(r)?.cue(heavy ? 'heavy' : 'attack', { side, weapon: r.weapon });
   ctx.bus.emit('combat:swing', { riderId: r.id, side, heavy, weapon: r.weapon });
@@ -141,19 +143,30 @@ function findTarget(ctx: CombatCtx, r: RiderState, side: Side, weapon: WeaponId)
 function strike(ctx: CombatCtx, r: RiderState, v: RiderState, side: Side, weapon: WeaponId, heavy: boolean): void {
   const w = WEAPONS[weapon];
   const d = ctx.rd(r);
+  if (parryArmed(ctx, v)) {
+    // 完美格挡: the pan turns the hit into a parry (the attacker's swing is cancelled and it is stunned).
+    parry(ctx, v, r, null, ctx.pos(v));
+    return;
+  }
   const counter = inWindup(ctx, v);
   const bonus = d.nextCrit;
   d.nextCrit = false;
-  const crit = ctx.force.crit ?? (counter || bonus || ctx.rng.chance(MELEE.critChance));
+  const crit = ctx.force.crit ?? (counter || bonus || ctx.rng.chance(critChance(weapon)));
+  const triple = traitOf(weapon) === 'triple';
+  const chain = triple ? tripleCount(ctx, r, v) : 0;
+  const finisher = triple && chain % 3 === 0; // the third hit in a row: ×1.5 damage, +50 % knock
   const outcome = applyHit(ctx, {
-    attacker: r, victim: v, damage: (heavy ? w.heavyDamage : w.damage) * powerMul(ROSTER[r.character].stats.power),
-    side, weapon, heavy, crit, skillId: null, knock: w.knock * (heavy ? MELEE.heavyKnockMul : 1),
+    attacker: r, victim: v,
+    damage: (heavy ? w.heavyDamage : w.damage) * powerMul(ROSTER[r.character].stats.power) * (finisher ? TRAIT.triple.damage : 1),
+    side, weapon, heavy, crit, skillId: null,
+    knock: w.knock * (heavy ? MELEE.heavyKnockMul : 1) * (finisher ? TRAIT.triple.knock : 1),
     speedLoss: ctx.rng.range(MELEE.speedLoss[0], MELEE.speedLoss[1]), melee: true, impact: heavy ? 'heavy' : 'light',
   });
   if (outcome !== 'landed') {
     if (bonus) d.nextCrit = true;
     return;
   }
+  if (triple) commitTriple(ctx, r, v, chain);
   consumeUse(ctx, r);
   knockLoose(ctx, r, v, heavy);
 }

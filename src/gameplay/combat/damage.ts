@@ -7,7 +7,7 @@ import { finished, targetable, type CombatCtx } from './ctx';
 import { impact, nudge, type ImpactKind } from './feedback';
 import { fightSp, gainSp, hitSp } from './sp';
 import { addStatus, statusStrength } from './statuses';
-import { COMBO, MELEE, SHIELD_IMMUNE, SHIELD_REFLECT, SP } from './tuning';
+import { COMBO, MELEE, SHIELD_IMMUNE, SHIELD_REFLECT, SP, TRAIT } from './tuning';
 
 export interface Hit {
   attacker: RiderState;
@@ -65,6 +65,7 @@ function land(ctx: CombatCtx, h: Hit, pos: Vec3Like): void {
   ctx.session.physics.applyImpulse(v, { lateral: dir * h.knock, forward: -v.speed * h.speedLoss });
   addStatus(v, 'wobble', h.wobble ?? MELEE.wobble, 1, a.id);
   if (h.stun) addStatus(v, 'stun', h.stun, 1, a.id);
+  if (h.skillId === null && WEAPONS[h.weapon].trait === 'flash') addStatus(v, 'blind', TRAIT.flash.blind, 1, a.id);
   reactHit(ctx, v, (dir === 1 ? -1 : 1) as Side, h.heavy || h.crit, Boolean(h.stun));
   v.combo = 0;
   v.comboTimer = 0;

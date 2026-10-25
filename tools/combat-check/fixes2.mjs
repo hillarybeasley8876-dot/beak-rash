@@ -73,8 +73,9 @@ export const fixes2 = [
     const v = cc.R(5); c.pin(5, 10, -1); cc.step(2); v.hp = Math.floor(v.maxHp * 0.2) + 45; p.sp = 100; cc.mark();
     cc.press('ult'); cc.step(1); cc.until(() => cc.of('ult:impact').length > 0, 600); cc.step(10);
     const ko = cc.of('combat:ko', (k) => k.victim === 5)[0], full = cc.of('combat:ko', (k) => k.victim === 1).length;
-    return { ok: kept === 'hit' && bells === 0 && ko?.attacker === 0 && ko.skillId === 'pelican.ult' && full === 0 && p.sp < 1,
-      info: { kept, bells, ko, full, sp: p.sp } };
+    const style = cc.stylePaid();   // the r4 STYLE chain pays a bonus on top of the r3 economy
+    return { ok: kept === 'hit' && bells === 0 && ko?.attacker === 0 && ko.skillId === 'pelican.ult' && full === 0 && p.sp - style.sp < 1,
+      info: { kept, bells, ko, full, sp: p.sp, style } };
   }],
   ['skill boosts keep their own clock: a short drift boost under DOGE ends on time', () => {
     const cc = window.__cc; cc.reset(); const c = cc.C();

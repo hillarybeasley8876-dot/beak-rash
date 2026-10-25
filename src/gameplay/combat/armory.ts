@@ -50,6 +50,11 @@ export function consumeUse(ctx: CombatCtx, r: RiderState): void {
 /** After a landed melee hit: maybe knock the victim's weapon loose (unarmed attackers steal it). */
 export function knockLoose(ctx: CombatCtx, a: RiderState, v: RiderState, heavy: boolean): void {
   if (v.weapon === 'none') return;
+  // 硬核: a baguette's heavy hit always knocks the weapon loose (not 60 %).
+  if (heavy && WEAPONS[a.weapon].trait === 'loosen') {
+    takeWeapon(ctx, a, v);
+    return;
+  }
   if (!ctx.roll(heavy ? WEAPON_RULES.looseHeavy : WEAPON_RULES.looseLight, ctx.force.loose)) return;
   takeWeapon(ctx, a, v);
 }

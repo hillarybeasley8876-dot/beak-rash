@@ -27,7 +27,7 @@ export interface CombatDebug {
   items(near?: number): Array<{ id: number; kind: string; s: number; x: number; y: number; alive: boolean; weapon: WeaponId }>;
   projectiles(): Array<{ id: number; skillId: string; s: number; x: number; y: number; target: number | null }>;
   /** The weapons in the air (SPEC §15). */
-  thrown(): Array<{ id: number; weapon: WeaponId; owner: number; dir: number; s: number; x: number; y: number; age: number }>;
+  thrown(): Array<{ id: number; weapon: WeaponId; owner: number; dir: number; s: number; x: number; y: number; age: number; target: number | null }>;
   running(): Array<{ caster: number; id: string }>;
   data(id: number): RiderCombat | undefined;
   counts(): { visuals: number; projectiles: number; skills: number; items: number; meshes: number };
@@ -84,6 +84,7 @@ export function installCombatDebug(ctx: CombatCtx): () => void {
         d.bellPaid.fill(-Infinity);
         d.hitPaid.fill(-Infinity);
         d.spSpentAt = -Infinity;
+        d.bonusSp = 0;   // the r4 STYLE / trick bonus budget of this race
       }
     },
     force: (rolls) => {
@@ -96,7 +97,7 @@ export function installCombatDebug(ctx: CombatCtx): () => void {
       .filter((it) => near === undefined || Math.abs(it.s - ctx.session.player.s) < near)
       .map((it) => ({ id: it.id, kind: it.kind, s: it.s, x: it.x, y: it.y, alive: it.alive, weapon: it.weapon })),
     projectiles: () => ctx.projectiles.list.map((p) => ({ id: p.id, skillId: p.skillId, s: p.s, x: p.x, y: p.y, target: p.target?.id ?? null })),
-    thrown: () => ctx.thrown.list.map((p) => ({ id: p.id, weapon: p.weapon, owner: p.owner.id, dir: p.dir, s: p.s, x: p.x, y: p.y, age: p.age })),
+    thrown: () => ctx.thrown.list.map((p) => ({ id: p.id, weapon: p.weapon, owner: p.owner.id, dir: p.dir, s: p.s, x: p.x, y: p.y, age: p.age, target: p.target?.id ?? null })),
     running: () => ctx.skills.list(),
     data: (id) => ctx.data[id],
     counts: () => {

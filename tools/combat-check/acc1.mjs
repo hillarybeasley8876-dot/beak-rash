@@ -51,7 +51,7 @@ export const acc1 = [
     const cine = (phase) => br.app.bus.emit('cine:ko', { phase, attacker: 0, victim: 2, chain: 1 });
     c.pin(1, 15, 1.6); cc.step(2); c.unpin(1); cc.mark();
     cine('start'); p.sp = 100; cc.press('ult'); cc.step(40);
-    const during = { starts: cc.of('ult:start').length, denied: cc.of('skill:denied').length, sp: p.sp };
+    const during = { starts: cc.of('ult:start').length, denied: cc.of('skill:denied').length, sp: p.sp - cc.stylePaid().sp };
     cine('end'); cc.step(2);
     const after = cc.of('ult:start').length;
     cc.until(() => cc.of('skill:end', (e) => e.skillId === 'pelican.ult').length > 0, 300);

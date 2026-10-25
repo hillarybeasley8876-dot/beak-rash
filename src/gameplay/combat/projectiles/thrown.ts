@@ -1,14 +1,16 @@
 // Thrown weapons (SPEC §15): a weapon leaves the hand, flies with a soft homing arc, hits a rider or an
 // obstacle, and drops back onto the road where it ends (one use fewer; at 0 it breaks instead).
 import { Quaternion, Vector3, type BufferGeometry, type Mesh } from 'three';
-import { WEAPONS } from '../../../data/weapons';
+import { WEAPONS, type WeaponTrait } from '../../../data/weapons';
 import type { Obstacle, RiderState } from '../../../core/types';
-import { clamp } from '../../../core/math';
+import { clamp, wrapAngle } from '../../../core/math';
+import { equip } from '../armory';
 import { targetable, type CombatCtx } from '../ctx';
 import { applyHit } from '../damage';
 import { toonMesh } from '../meshes/build';
 import { weaponGeometry } from '../meshes/weapon-props';
-import { MELEE, THROW } from '../tuning';
+import { critChance } from '../traits';
+import { MELEE, THROW, TRAIT } from '../tuning';
 import type { ThrowableId } from '../throw';
 import { frameQuat } from '../visuals/frame';
 
@@ -22,6 +24,8 @@ export interface ThrownWeapon {
   readonly weapon: ThrowableId;
   readonly dir: 1 | -1;          // +1 = thrown forward, -1 = thrown backward (lookBack)
   readonly uses: number;        // hits the weapon had left when it left the hand
+  readonly trait: WeaponTrait | null; // the r4 trait of the weapon (SPEC §15)
+  readonly speed0: number;      // its launch speed (m/s): the traits steer on it, they never change it
   target: RiderState | null;    // the rider the weapon homes on (locked at the release)
   s: number; x: number; y: number;
   vs: number; vx: number; vy: number;
@@ -47,7 +51,8 @@ export class ThrownWeaponSystem {
     ctx.root.add(mesh);
     const speed = dir === 1 ? owner.speed + THROW.forwardSpeed : owner.speed - THROW.backSpeed;
     const p: ThrownWeapon = {
-      id: this.nextId++, owner, weapon, dir, uses, target: null,
+      id: this.nextId++, owner, weapon, dir, uses, trait: WEAPONS[weapon].trait ?? null, target: null,
+      speed0: Math.abs(speed),
       s: owner.s, x: owner.x, y: THROW.handHeight,
       vs: speed, vx: 0, vy: THROW.launchVy,
       age: 0, alive: true, mesh, geometry,
@@ -71,10 +76,16 @@ export class ThrownWeaponSystem {
 
   private step(p: ThrownWeapon, dt: number): void {
     p.age += dt;
-    this.steer(p, dt);
+    if (p.trait === 'boomerang') this.steerBoomerang(p, dt);
+    else if (p.trait === 'seeker') this.steerSeeker(p, dt);
+    else this.steer(p, dt);
     p.s += p.vs * dt;
     p.x += p.vx * dt;
     p.y += p.vy * dt;
+    if (p.trait === 'boomerang' && this.inReach(p)) {
+      this.catch(p);
+      return;
+    }
     const victim = this.contact(p);
     if (victim) {
       this.hit(p, victim);
@@ -85,11 +96,84 @@ export class ThrownWeaponSystem {
       this.hitObstacle(p, ob);
       return;
     }
-    if (p.y <= 0 || p.age >= THROW.life) {
+    if (p.y <= 0 || p.age >= this.life(p)) {
       this.end(p, null); // the weapon lands on the road
       return;
     }
     this.place(p);
+  }
+
+  /** How long the weapon stays in the air: the boomerang needs longer to fall after its catch window. */
+  private life(p: ThrownWeapon): number {
+    return p.trait === 'boomerang' ? TRAIT.boomerang.window + 1.2 : THROW.life;
+  }
+
+  /**
+   * 回旋镖: the saltfish flies out, then curves back to its thrower, who may be braking or turning.
+   * It is caught when it comes within TRAIT.boomerang.catch m of them before the window is over.
+   */
+  private steerBoomerang(p: ThrownWeapon, dt: number): void {
+    if (p.age < TRAIT.boomerang.out || p.age > TRAIT.boomerang.window) {
+      p.vy -= THROW.gravity * dt; // out of the window: it gives up and drops onto the road
+      return;
+    }
+    const o = p.owner;
+    const speed = p.speed0 * TRAIT.boomerang.speedMul;
+    const ds = o.s + o.speed * TRAIT.boomerang.lead - p.s, dx = o.x - p.x;
+    const heading = Math.atan2(p.vx, p.vs) +
+      clamp(wrapAngle(Math.atan2(dx, ds) - Math.atan2(p.vx, p.vs)), -TRAIT.boomerang.turn * dt, TRAIT.boomerang.turn * dt);
+    p.vs = Math.cos(heading) * speed;
+    p.vx = Math.sin(heading) * speed;
+    const dy = o.y + 1.2 - p.y;
+    p.vy += (dy * THROW.heightGain - p.vy) * (1 - Math.exp(-THROW.turnRate * dt));
+  }
+
+  /** 必中: the slipper steers hard at the rider it picked (6 rad/s, a wide cone). */
+  private steerSeeker(p: ThrownWeapon, dt: number): void {
+    const t = p.target;
+    if (!t) {
+      p.vy -= THROW.gravity * dt;
+      return;
+    }
+    const speed = p.speed0 + TRAIT.seeker.boost; // 必中: it flies faster than a plain throw
+    const ds = t.s + t.speed * 0.12 - p.s, dx = t.x - p.x;
+    const heading = Math.atan2(p.vx, p.vs) +
+      clamp(wrapAngle(Math.atan2(dx, ds) - Math.atan2(p.vx, p.vs)), -TRAIT.seeker.turn * dt, TRAIT.seeker.turn * dt);
+    p.vs = Math.cos(heading) * speed;
+    p.vx = Math.sin(heading) * speed;
+    const dy = t.y + 1 - p.y;
+    p.vy += (dy * TRAIT.seeker.height - p.vy) * (1 - Math.exp(-TRAIT.seeker.turn * dt));
+  }
+
+  /** The boomerang is back within reach of its thrower. */
+  private inReach(p: ThrownWeapon): boolean {
+    if (p.age < TRAIT.boomerang.out || p.age > TRAIT.boomerang.window) return false;
+    const o = p.owner;
+    return Math.hypot(o.s - p.s, o.x - p.x) <= TRAIT.boomerang.catch;
+  }
+
+  /** 回旋镖: the saltfish comes back to the hand (one use fewer) or drops on the road. */
+  private catch(p: ThrownWeapon): void {
+    const ctx = this.ctx;
+    p.alive = false;
+    const pos = this.at(p);
+    ctx.bus.emit('projectile:end', { id: p.id, hit: null, pos });
+    const uses = p.uses - 1;
+    if (uses <= 0) {
+      ctx.bus.emit('combat:weaponBreak', { riderId: p.owner.id, weapon: p.weapon, pos });
+      ctx.session.app.fx.burst('debris', pos, { count: 14 });
+      ctx.session.app.fx.burst('poof', pos, { scale: 0.5 });
+      return;
+    }
+    if (p.owner.weapon === 'none') {
+      equip(ctx, p.owner, p.weapon, uses);
+      ctx.bus.emit('combat:weaponPick', { riderId: p.owner.id, weapon: p.weapon, stolenFrom: null });
+    } else {
+      const it = ctx.pickups.spawn('weapon', p.s, p.x, p.weapon, THROW.dropGrace);
+      it.uses = uses;
+      ctx.bus.emit('combat:weaponDrop', { riderId: p.owner.id, weapon: p.weapon, pos });
+    }
+    ctx.session.app.fx.burst('poof', pos, { scale: 0.4 });
   }
 
   /** Soft homing: steer toward the target, and hold the flight height while it does. */
@@ -112,10 +196,14 @@ export class ThrownWeaponSystem {
    * The rider the weapon homes on: the one in the throw direction whose line is closest to the weapon's own
    * (the rider you are throwing at), the nearest one when two share that line. The lock is taken at the
    * release, so the weapon does not swerve from one rival to another mid-flight.
+   * 必中: the slipper takes the NEAREST rider anywhere in its wide cone (off-axis riders a plain throw would
+   * miss included) and flies past the ones in the way.
    */
   private pickTarget(p: ThrownWeapon): RiderState | null {
     const ctx = this.ctx;
-    const range = p.dir === 1 ? THROW.range : THROW.backRange;
+    const seeker = p.trait === 'seeker'; // 必中: a wide cone, a long reach
+    const range = seeker ? TRAIT.seeker.range : p.dir === 1 ? THROW.range : THROW.backRange;
+    const cone = (seeker ? TRAIT.seeker.cone : THROW.cone) * DEG;
     let best: RiderState | null = null;
     let bestDx = Infinity;
     let bestD = Infinity;
@@ -126,8 +214,9 @@ export class ThrownWeaponSystem {
       const dx = Math.abs(r.x - p.x);
       const d = Math.hypot(ds, r.x - p.x);
       if (d > range) continue;
-      if (Math.atan2(dx, ds) > THROW.cone * DEG) continue;
-      if (dx < bestDx - 1e-6 || (Math.abs(dx - bestDx) <= 1e-6 && d < bestD)) {
+      if (Math.atan2(dx, ds) > cone) continue;
+      const better = seeker ? d < bestD : dx < bestDx || (Math.abs(dx - bestDx) <= 1e-6 && d < bestD);
+      if (better) {
         bestDx = dx;
         bestD = d;
         best = r;
@@ -173,7 +262,7 @@ export class ThrownWeaponSystem {
   private hit(p: ThrownWeapon, victim: RiderState): void {
     const ctx = this.ctx;
     const w = WEAPONS[p.weapon];
-    const crit = ctx.force.crit ?? ctx.rng.chance(MELEE.critChance);
+    const crit = ctx.force.crit ?? ctx.rng.chance(critChance(p.weapon));
     const outcome = applyHit(ctx, {
       attacker: p.owner, victim,
       damage: w.heavyDamage * THROW.damageMul,

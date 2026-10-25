@@ -26,7 +26,7 @@ export const fixes3 = [
     const same = run([1, 0.35], [2, 0.35]);
     const want = '0.65,0.85,1';
     return { ok: honkThenWhistle.join() === want && whistleThenHonk.join() === want && same.join() === '0.65,0.65,1',
-      info: { honkThenWhistle, whistleThenHonk, same } };
+      info: { honkThenWhistle, whistleThenHonk, same, crashes: cc.of('rider:crash').length, style: cc.stylePaid() } };
   }],
   ['KO credit tie: two lethal hits on one substep credit the first (killing) blow', () => {
     const cc = window.__cc; cc.reset(); const c = cc.C(); c.force({ crit: false, block: false, loose: false });
@@ -47,8 +47,9 @@ export const fixes3 = [
     const gulp = cc.of('pickup:take').length, left = [fish, can, f2, c2].filter((id) => c.items().some((it) => it.id === id && it.alive)).length;
     p.hp = p.maxHp - 30; p.sp = 50; c.spawn('fish', p.s + 8, p.x); c.spawn('can', p.s + 12, p.x); cc.step(60);
     const taken = cc.of('pickup:take').map((e) => e.kind).join();
-    return { ok: ride === 0 && gulp === 0 && left === 4 && taken === 'fish,can' && p.hp === p.maxHp - 5 && p.sp === 70,
-      info: { ride, gulp, left, taken, hp: p.hp, sp: p.sp } };
+    const style = cc.stylePaid();   // the r4 STYLE chain pays a bonus on top of the r3 economy
+    return { ok: ride === 0 && gulp === 0 && left === 4 && taken === 'fish,can' && p.hp === p.maxHp - 5 && p.sp - style.sp === 70,
+      info: { ride, gulp, left, taken, hp: p.hp, sp: p.sp, style } };
   }],
   ['torpedo: a car in the way stops it (no hit, projectile:end hit null); with the road clear it hits', () => {
     const cc = window.__cc; cc.reset(); const c = cc.C(); const p = cc.P(); const s = cc.S();

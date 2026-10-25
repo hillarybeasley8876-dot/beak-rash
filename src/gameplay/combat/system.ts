@@ -14,6 +14,7 @@ import { requestSwing, resolveSwings, runBuffered, tickAction } from './melee';
 import { PickupSystem } from './pickups/pickups';
 import { ProjectileSystem } from './projectiles/projectiles';
 import { ThrownWeaponSystem } from './projectiles/thrown';
+import { listenRewards } from './rewards';
 import { SkillRunner } from './skills/runner';
 import { listenSp, tickSp } from './sp';
 import { applyMods, tickStatuses } from './statuses';
@@ -55,7 +56,7 @@ export function createCombat(session: Session): CombatSystem {
   ctx.thrown = new ThrownWeaponSystem(ctx);
   ctx.pickups = new PickupSystem(ctx, ctx.lib);
   armRivals(ctx);
-  const offs = [listenSp(ctx), listenKo(ctx, (r) => onCrash(ctx, r)), installCombatDebug(ctx), listenExternal(ctx)];
+  const offs = [listenSp(ctx), listenKo(ctx, (r) => onCrash(ctx, r)), installCombatDebug(ctx), listenExternal(ctx), listenRewards(ctx)];
   let disposed = false;
   let visualDt = 0; // sim seconds stepped since the last rendered frame (visuals live in sim time)
 

@@ -69,7 +69,7 @@ export const finish = [
     const poof = cc.of('projectile:end')[0], finishedFirst = p.finishTime !== null;
     cc.R(3).hp = 0; cc.step(3);
     const ko = cc.of('combat:ko', (k) => k.victim === 3)[0];
-    const info = { hit: hit?.victim, spawn, poof, finishedFirst, ko, kos: p.kos - kos0, coins: p.coins - coins0, goose: [goose, cc.R(1).hp] };
+    const info = { hit: hit?.victim, spawn, poof, finishedFirst, ko, kos: p.kos - kos0, coins: p.coins - coins0 - cc.stylePaid().coins, goose: [goose, cc.R(1).hp] };
     await cc.restart();
     return { ok: hit?.victim === 3 && spawn?.target === 1 && poof?.id === spawn.id && poof.hit === null && finishedFirst &&
       info.goose[0] === info.goose[1] && ko?.attacker === null && info.kos === 0 && info.coins === 0, info };

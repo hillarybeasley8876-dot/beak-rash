@@ -19,6 +19,7 @@ import { r3 } from './combat-check/r3.mjs';
 import { sigs } from './combat-check/sigs.mjs';
 import { skills } from './combat-check/skills.mjs';
 import { runSoak } from './combat-check/soak.mjs';
+import { traits } from './combat-check/traits.mjs';
 import { parseArgs, withPage } from './lib.mjs';
 
 const a = parseArgs(process.argv.slice(2));
@@ -27,7 +28,7 @@ const LINEUP = 'goose,cat,capybara,shiba,pigeon,penguin,seagull,sloth,corgi';
 const stubs = a.full ? '' : typeof a.stub === 'string' ? a.stub : 'fx,audio,ui,actors';
 const stub = stubs ? `&stub=${stubs}` : '';
 const url = `/?race=coast&seed=${a.seed ?? 7}&traffic=0&police=0&manual=1&rivals=${LINEUP}${stub}`;
-const all = [...melee, ...items, ...skills, ...sigs, ...fixes, ...fixes2, ...fixes3, ...fixes4, ...acc1, ...finish, ...r3].filter(([name]) => !a.only || name.includes(String(a.only)));
+const all = [...melee, ...items, ...skills, ...sigs, ...fixes, ...fixes2, ...fixes3, ...fixes4, ...acc1, ...finish, ...r3, ...traits].filter(([name]) => !a.only || name.includes(String(a.only)));
 
 // Every console error fails the run unless it is clearly another unit's (its [tag] or a stack in its files);
 // those are listed but don't fail (isolate them with --stub).

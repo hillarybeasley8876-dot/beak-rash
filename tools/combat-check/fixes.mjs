@@ -18,8 +18,9 @@ export const fixes = [
     const kos = cc.of('combat:ko', (k) => k.attacker === 0 && k.skillId === 'pelican.ult').length;
     const land = cc.of('rider:land', (e) => e.riderId === 0).length + cc.of('rider:boost', (e) => e.riderId === 0 && e.kind === 'land').length;
     const hurtSp = ids.map((id) => cc.R(id).sp);
-    return { ok: f > 0 && kos === 4 && p.kos === kos0 + 4 && p.coins === coins0 + 200 && p.sp < 1 && land === 0 && stops === 1 &&
-      hurtSp.every((sp) => sp >= 1.5), info: { kos, sp: p.sp, land, stops, hurtSp } };
+    const style = cc.stylePaid();   // the r4 STYLE chain pays a bonus on top of the r3 economy
+    return { ok: f > 0 && kos === 4 && p.kos === kos0 + 4 && p.coins - style.coins === coins0 + 200 && p.sp - style.sp < 1 && land === 0 && stops === 1 &&
+      hurtSp.every((sp) => sp >= 1.5), info: { kos, sp: p.sp, land, stops, hurtSp, style } };
   }],
   ['bell: no SP on an empty road; combat:bell lists who was angered', () => {
     const cc = window.__cc; cc.reset(); const p = cc.P(); const c = cc.C();
@@ -29,8 +30,9 @@ export const fixes = [
     c.pin(1, 6, 1); cc.step(2);
     cc.press('bell'); cc.step(1); cc.step(2);
     const busy = cc.of('combat:bell')[1];
-    return { ok: empty?.riderId === 0 && empty.angered.length === 0 && sp0 === 0 && busy?.angered.join() === '1' && p.sp === 3 &&
-      cc.of('taunt', (e) => e.riderId === 0).length === 2, info: { empty, sp0, busy, sp: p.sp } };
+    const style = cc.stylePaid();   // the r4 STYLE chain pays a bonus on top of the r3 economy
+    return { ok: empty?.riderId === 0 && empty.angered.length === 0 && sp0 === 0 && busy?.angered.join() === '1' && p.sp - style.sp === 3 &&
+      cc.of('taunt', (e) => e.riderId === 0).length === 2, info: { empty, sp0, busy, sp: p.sp, style } };
   }],
   ['events: combat:weaponBreak; projectile:spawn / end on hit and on poof', () => {
     const cc = window.__cc; cc.reset(); const c = cc.C(); c.force({ crit: false, block: false, loose: false });

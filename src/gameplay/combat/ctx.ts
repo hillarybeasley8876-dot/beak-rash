@@ -27,6 +27,11 @@ export interface RiderCombat {
   bellPaid: number[];                             // combat time the bell last paid SP for provoking rider [id]
   spSpentAt: number;                              // combat time of the last SP-paid cast (fighting pays no SP for a while)
   hitPaid: number[];                              // combat time a swing on rider [id] last paid full SP
+  parryUntil: number;                             // combat time until which a swing press still parries (pan)
+  tripleCount: number[];                          // hits of the current three-hit chain on rider [id] (leek)
+  tripleAt: number[];                             // combat time of the last hit of that chain
+  bonusSp: number;                                // bonus SP (STYLE + tricks) earned this race
+  bonusPaid: number;                              // the same, never reset by the test hooks (combat-check reads it)
   nextCrit: boolean;                              // ONE MORE! grants a guaranteed crit
   koFired: boolean;                               // combat:ko already emitted for this wreck
   hpAtCrash: number;                              // HP when the current wreck started
@@ -64,6 +69,8 @@ export class CombatCtx {
     this.data = session.riders.map(() => ({
       swing: { windup: 0, active: 0, recover: 0, total: 0 }, buffered: null, skillBuf: [], bellBuf: null, bellCd: 0, bellPaid: session.riders.map(() => -Infinity),
       spSpentAt: -Infinity, hitPaid: session.riders.map(() => -Infinity), swingChecked: false, aim: null,
+      parryUntil: -Infinity, tripleCount: session.riders.map(() => 0), tripleAt: session.riders.map(() => -Infinity),
+      bonusSp: 0, bonusPaid: 0,
       nextCrit: false, koFired: false, hpAtCrash: 0, lastAttack: -999, hitByMirror: null, koBy: null, pin: null,
     }));
   }
