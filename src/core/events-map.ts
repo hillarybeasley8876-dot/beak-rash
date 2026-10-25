@@ -61,6 +61,7 @@ export interface GameEvents {
   'police:busted': { riderId: RiderId; fine: number; hold?: number };   // hold = ticket-stop seconds (HUD assumes 4)
   'police:whistle': { riderId: RiderId; pos: Vec3Like };               // the corgi whistles at riderId
   'police:knock': { riderId: RiderId; weapon: WeaponId; pos: Vec3Like }; // riderId's swing knocked the corgi back
+  'police:horn': { riderId: RiderId; pos: Vec3Like };                  // the corgi toots as it lets riderId go
   /** A line from a speaker that is not a session rider but rides an Obstacle (the police corgi): listeners follow
    *  `session.obstacles` by id for the anchor and drop the line once that obstacle is gone. */
   'npc:say': { obstacleId: number; character: CharacterId; text: string };
