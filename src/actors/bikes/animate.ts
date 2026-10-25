@@ -5,6 +5,7 @@
 // the materials as a dither fade) into a slowly turning speed-blur disc, and tread blocks turn at a capped rate.
 import { Euler, Quaternion, Vector3, type Object3D } from 'three';
 import type { BikeTemplate } from './cache';
+import { swayChains } from './defs/llm-chain';
 import { SPOKE_PERIOD } from './parts/wheel';
 import type { GroupName, MarkerName } from './template';
 
@@ -14,7 +15,7 @@ export interface Animator {
 }
 
 const TAU = Math.PI * 2;
-const X = new Vector3(1, 0, 0), Y = new Vector3(0, 1, 0);
+const X = new Vector3(1, 0, 0), Y = new Vector3(0, 1, 0), Z = new Vector3(0, 0, 1);
 const tmpQ = new Quaternion(), tmpE = new Euler();
 const follow = (cur: number, target: number, rate: number, dt: number): number => cur + (target - cur) * (1 - Math.exp(-rate * dt));
 const smooth = (k: number): number => k * k * (3 - 2 * k);
@@ -26,13 +27,21 @@ interface WheelFx { spokes: Spinner | null; blur: Spinner | null; tread: Spinner
 
 export function createAnimator(tpl: BikeTemplate, nodes: Map<GroupName, Object3D>, marks: Map<MarkerName, Object3D>): Animator {
   const { drive, wheelRadius } = tpl.def;
+  // The LLM edition reuses the tandem's spare groups for its own moving parts: 'crank2' is the third wheel
+  // on the top tube and 'pedal2L/R' are the two pedals that got loose, so they are animated apart.
+  const llm = tpl.def.id === 'llm';
   const grab = (n: GroupName): Spinner | null => {
     const node = nodes.get(n);
     return node ? { node, rest: node.quaternion.clone() } : null;
   };
   const wheels = [grab('wheelR'), grab('wheelF')].filter((s): s is Spinner => s !== null);
-  const cranks = [grab('crank'), grab('crank2')].filter((s): s is Spinner => s !== null);
-  const pedals = (['pedalL', 'pedalR', 'pedal2L', 'pedal2R'] as const).map(grab).filter((s): s is Spinner => s !== null);
+  const crankNames: GroupName[] = llm ? ['crank'] : ['crank', 'crank2'];
+  const pedalNames: GroupName[] = llm ? ['pedalL', 'pedalR'] : ['pedalL', 'pedalR', 'pedal2L', 'pedal2R'];
+  const cranks = crankNames.map(grab).filter((s): s is Spinner => s !== null);
+  const pedals = pedalNames.map(grab).filter((s): s is Spinner => s !== null);
+  const third = llm ? grab('crank2') : null;
+  const orbitL = llm ? grab('pedal2L') : null;
+  const orbitR = llm ? grab('pedal2R') : null;
   const periodOf = (n: GroupName, fallback: number): number => tpl.groups.find((g) => g.name === n)?.period ?? fallback;
   const wheelFx: WheelFx[] = (['R', 'F'] as const).map((s) => ({
     spokes: grab(`spokes${s}`), blur: grab(`blur${s}`), tread: grab(`tread${s}`),
@@ -116,6 +125,14 @@ export function createAnimator(tpl: BikeTemplate, nodes: Map<GroupName, Object3D
       }
       const lift = Math.min(1, Math.abs(speed) / 7);
       const flap = Math.min(1, Math.abs(speed) / 4);
+      if (llm) {
+        // The LLM edition: the third wheel on the top tube spins about its axle, the two loose pedals
+        // drift around their own little orbits, and the chain to the rider's neck sways.
+        if (third) set(third, Z, -t * 2.6);
+        if (orbitL) set(orbitL, Y, t * 0.85);
+        if (orbitR) set(orbitR, Y, -t * 0.7);
+        swayChains(t, speed);
+      }
       streamers.forEach((chain, i) => chain.forEach((s, j) => {
         const ph = t * (13 + speed) + i * 1.7 - j * 1.1;
         tmpE.set(DROOP[j] as number * (1 - lift) + (0.14 + 0.08 * j) * Math.sin(ph) * flap, 0.2 * (1 + j) * Math.sin(ph * 0.8 + 0.6) * flap, 0);

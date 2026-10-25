@@ -2,8 +2,8 @@
 // Screenshot the bikes sandbox. Usage:
 //   node sandbox/bikes.shots.mjs --bikes roadbike,erba --views side,turntable,chase [--markers 1] [--quality high]
 //        [--tint "#d9534f"] [--speed 8] [--steer 0.3] [--angle 35] [--frames 30] [--size 1280x720] [--tag x]
-//        [--focus x,y,z --dist 0.9] (orbit close-up) [--clean] (hide the control panel)
-// Writes shots/bikes/<bike>-<view>[-tag].png and prints the sandbox stats per shot.
+//        [--focus x,y,z --dist 0.9] (orbit close-up) [--clean] (hide the control panel) [--out DIR]
+// Writes shots/<DIR>/<bike>-<view>[-tag].png and prints the sandbox stats per shot.
 import { BASE, parseArgs, withPage } from '../tools/lib.mjs';
 
 const a = parseArgs(process.argv.slice(2));
@@ -22,7 +22,7 @@ await withPage(async (page, h) => {
         focus: a.focus ? String(a.focus).split(',').map(Number) : null, dist: Number(a.dist ?? 1.2),
       });
       await page.evaluate((n) => window.__bikes.step(n, 1 / 60), Number(a.frames ?? 30));
-      const file = `shots/bikes/${view === 'lineup' ? 'lineup' : bike}-${view}${tag}.png`;
+      const file = `${a.out ?? 'shots/bikes'}/${view === 'lineup' ? 'lineup' : bike}-${view}${tag}.png`;
       await h.shot(file);
       const stats = await page.evaluate(() => window.__bikes.stats());
       console.log(JSON.stringify({ file, ...stats }));
