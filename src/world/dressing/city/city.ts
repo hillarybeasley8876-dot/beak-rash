@@ -3,9 +3,10 @@
 // sign slots buildings offer to the neon pass.
 import { CanvasTexture } from 'three';
 import type { Mesh } from 'three';
-import { SignAtlas } from '../../scenery/signs/atlas';
+import { breathe } from '../../breathe';
 import type { SignSlot } from '../../scenery/props/city-building';
 import { repaintWhenFontsLoad, type Dress } from '../dress';
+import { SlicedAtlas } from './atlas';
 import { AuxBatch, OUTLINE } from './batch';
 import { Lots } from './lots';
 import { buildingMat, cycleMat, neonMat } from './mats';
@@ -24,8 +25,8 @@ export interface City {
   lots: Lots;
   cb: CityBatches;
   slots: SignSlot[];
-  neonAtlas: SignAtlas;
-  screenAtlas: SignAtlas;
+  neonAtlas: SlicedAtlas;
+  screenAtlas: SlicedAtlas;
   neonTex: CanvasTexture;
   screenTex: CanvasTexture;
 }
@@ -33,7 +34,7 @@ export interface City {
 export function makeCity(d: Dress): City {
   const { ctx } = d;
   // Deferred atlases: faces are recorded while the city builds and painted once the fonts are in (paintAtlases).
-  const neonAtlas = new SignAtlas(2048, 2048, true), screenAtlas = new SignAtlas(2048, 2048, true);
+  const neonAtlas = new SlicedAtlas(), screenAtlas = new SlicedAtlas();
   const neonTex = ctx.own(neonAtlas.texture(ctx.app.renderer));
   const screenTex = ctx.own(screenAtlas.texture(ctx.app.renderer));
   const cb: CityBatches = {
@@ -47,9 +48,9 @@ export function makeCity(d: Dress): City {
   return { d, lots: new Lots(d.place), cb, slots: [], neonAtlas, screenAtlas, neonTex, screenTex };
 }
 
-/** Paint the deferred atlases (shared faces, neon, screens); if the fonts were late, repaint once they arrive. */
-export function paintAtlases(c: City, fontsReady: boolean): void {
-  for (const atlas of [c.d.atlas, c.neonAtlas, c.screenAtlas]) atlas.flush();
+/** Paint the deferred atlases (shared faces, neon, screens) in slices; if the fonts were late, repaint once they arrive. */
+export async function paintAtlases(c: City, faces: SlicedAtlas, fontsReady: boolean): Promise<void> {
+  for (const atlas of [faces, c.neonAtlas, c.screenAtlas]) await atlas.flushSliced();
   if (fontsReady || typeof document === 'undefined' || !document.fonts) return;
   repaintWhenFontsLoad(c.d);
   let live = true;
@@ -60,13 +61,21 @@ export function paintAtlases(c: City, fontsReady: boolean): void {
     c.screenAtlas.repaint();
     c.neonTex.needsUpdate = true;
     c.screenTex.needsUpdate = true;
-    console.info('[track] city atlases repainted after late fonts');
+    c.d.ctx.log('city atlases repainted after late fonts');
   });
 }
 
-/** Upload the atlases and build every city batch. */
-export function finishCity(c: City): Mesh[] {
+/** Upload the atlases and build every city batch, yielding inside and between batches; `onBatch(f)`
+ *  reports the finished fraction of batches. */
+export async function finishCity(c: City, onBatch?: (f: number) => void): Promise<Mesh[]> {
   c.neonTex.needsUpdate = true;
   c.screenTex.needsUpdate = true;
-  return Object.values(c.cb).flatMap((b: AuxBatch) => b.finish());
+  const meshes: Mesh[] = [];
+  const batches = Object.values(c.cb) as AuxBatch[];
+  for (const [k, batch] of batches.entries()) {
+    meshes.push(...await batch.finishYielding());
+    onBatch?.((k + 1) / batches.length);
+    await breathe();
+  }
+  return meshes;
 }

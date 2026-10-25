@@ -13,6 +13,9 @@ const DEPTH_BIAS = -0.0004;
 const TUNNEL_KEEP = { day: 0.4, night: 0.7 } as const;
 const TUNNEL_TAU = 0.1;
 const LOW_FOG = 0.8;
+/** Fog / background objects set by track builds: a restart builds the new track while the old one is still
+ *  alive, so the scene's fog there is the old track's; restoring to it on quit would leave a dead track's fog. */
+const trackEnv = new WeakSet<object>();
 
 /** Fraction of light to keep for a camera at p: `keep` under a tunnel roof, else 1. */
 function tunnelLight(ctx: WorldCtx, keep: number): (p: Vector3) => number {
@@ -76,11 +79,13 @@ export function buildLights(ctx: WorldCtx): () => void {
     sun.target.updateMatrixWorld();
   });
   // Fog + background.
-  const prevFog = app.scene.fog, prevBg = app.scene.background;
+  const prevFog = app.scene.fog && trackEnv.has(app.scene.fog) ? null : app.scene.fog;
+  const prevBg = app.scene.background && trackEnv.has(app.scene.background) ? null : app.scene.background;
   // quality=low pulls the fog in, and with it the fog-distance culling (world/lod.ts).
   const fogK = quality === 'low' ? LOW_FOG : 1;
   const fog = new Fog(look.fog.color, look.fog.near * fogK, look.fog.far * fogK);
   const bg = new Color(look.sky.horizon);
+  trackEnv.add(fog).add(bg);
   app.scene.fog = fog;
   app.scene.background = bg;
   return () => {

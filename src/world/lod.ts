@@ -8,7 +8,7 @@ import type { WorldCtx } from './ctx';
 
 const MARGIN = 40;
 const HULL_FAR = 130;
-const SKIP = new Set(['sky', 'clouds', 'sea', 'gulls', 'road', 'shoulderL', 'shoulderR', 'curbs']);
+const SKIP = new Set(['sky', 'clouds', 'sea', 'gulls', 'road', 'shoulderL', 'shoulderR', 'curbs', 'roadMarks']);
 
 interface Culled { mesh: Mesh; hull: Object3D | null; margin: number }
 

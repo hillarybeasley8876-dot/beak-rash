@@ -326,3 +326,47 @@ track.audit AUDIT OK (road 0 misses / 2.9 cm, walls 0 missing / 0 inside, water 
 the tunnel roof, 1 outside (fix2/sunprobe.mjs) · city / mountain / coast-low / coast-medium sandbox builds: no warnings
 or errors · in-game sheet shots/track/fix2/game-sheet.jpg; close-ups fix2/{acne-cmp,acneviz,tun-b,rock1,beach1,sea1,fin}.jpg.
 
+
+## r3 polish (2026-10-25)
+Issues from reviews/game-r2-aesthetic.json #5/#7/#8/#9 + game-r2-perf.json #4. Probes and sheets: shots/r3-track/.
+- [x] aesthetic#5 asphalt: per-track RoadLook table in looks.ts (base colour, two tones, racing-line darkness, mark weights).
+      New road/detail.ts (patched into the road toon material): lane panels 18-38 m long of worn / fresh asphalt (±7 %,
+      straight seams blended over fwidth), ±3 % two-octave mottle, darker streaky racing-line band (x per row in the
+      aLine attribute from road/line.ts: taut-string line through the corridor, projected SOR on a 6 m grid + smoothing).
+      New road/marks.ts + marks-tex.ts: one merged decal mesh 'roadMarks' (one draw call, 0.6-1.0k tris) with tar / concrete
+      patches, manholes (grouped in the city), worn lane arrows (bend arrows before corners tighter than R 120), skid marks
+      along the racing line at apexes tighter than R 70, and ≤ 6 meme words per track (content TRACK_SIGNS / ROAD_SIGNS,
+      heavy Noto glyphs, read near → far) every 70-150 m, kept clear of features, start / finish and env paint marks.
+      Asphalt base: coast warm grey, mountain cool violet-grey, city unchanged (wet overlay on top). road.py (chase frames,
+      100×60 patches): large-scale luma std coast 2.5-5.0 → 3.7-6.4, mountain 2.9-3.5 → 4.4-5.3; road colour coast
+      (82,85,87) → (82,79,77), mountain (69,58,67) → (68,64,76). Sheets road-before-after.jpg, v4-marks.jpg.
+- [x] aesthetic#7 mountain key: MOUNTAIN_LOOK sun #ffb46e → #ffe0b4, ambient sky #b48ad8 → #aaaadc (the requested
+      #ffc79a / #a6a2e6 measured still salmon-pink: lit hue 13°, chroma 56). Exact player-mask probe (backmask.mjs/.py):
+      lit plumage hue 13° → 29°, chroma 81-83 → 39-43, all-plumage HLS sat ~0.44 → 0.31-0.37 (coast whites read 0.27-0.34
+      by the same measure; HLS sat of near-whites is inflated, the ≤ 0.2 target is not reachable even on the coast);
+      shaded back at the descent neutral (HLS 0.02). Sheet mountain-key.jpg.
+- [x] aesthetic#8 / perf#4 late billboard art: art.ts hands out every image that has not failed after a bounded wait
+      (1.5 s), late ones still decoding (artReady / whenArt); faces.ts cell(…, art) draws a placeholder design in the
+      same 16:9 cell and SignAtlas.redrawCell repaints it when the image lands (debounced re-upload of every live
+      texture made from the atlas; skipped once disposed). Works for SlicedAtlas (city screens) too. lateart.mjs (images
+      delayed 15 s): coast / mountain / city: placeholder in race, art in the same race, 0 errors / 0 warnings.
+- [x] aesthetic#9 tunnels: new features/tunnel-kit.ts (TUNNEL_STYLES per track; city null): yellow / black chevrons over
+      the dado inside both portals, cable trays with brackets and a cable bundle under the spring line, lane-control
+      signals (green ↓ over the riders' lanes, red ✕ over the oncoming ones) every 48 / 60 m, low green exit boxes with an
+      arrow toward the nearer portal. Unlit with the shell's baked light (SHELL_LIGHT), in the existing tube / lamp batches:
+      0 extra calls, +2.0k tris coast / +2.8k mountain. Shell vault darkens to soot at the crown. Coast pools warm and long
+      (DIM 0.4 → 0.58, pool half length 3.1 → 4.6 m, daylight spill 16 m into each mouth: no dark bands). t2-tunnels.jpg.
+- [x] side fixes: env/lights.ts no longer restores a dead track's fog / background after restart + quit (track.race
+      fog check passes again); track.ts splits road / road marks / near / sea / edges / features into separate tasks;
+      billboard text faces draw from their own rng fork (a repaint keeps the design).
+Requests: env-city — dressing/city/faces.ts finishScreenFace draws `art` itself: use `art && artReady(art)` (from
+scenery/signs/art) to choose art vs the red burst and pass `art ? [art] : undefined` as cell()'s 5th argument, so a late
+city_1 lands on the finish screen too (now it would stay dark). fx — a large white quad covers the top right of chase frames
+when a billboard is in view (coast s≈589, 2620; gone with &stub=fx): repro `node shots/r3-track/chase.mjs --track coast --s 589`.
+Shared-file notes (env): TUNNEL_STYLES.mountain can be tuned / nulled when the mountain gets a rock vault; the kit draws
+at the dado (0.14-1.06 m), exit boxes 0.62-0.98 m, trays at WALL_H − 0.1, signals 5.0-5.66 m.
+Verified: tsc 0 errors · track.test coast / city / mountain 0 fails, no leaks · track.audit coast AUDIT OK (road 0 misses /
+2.9 cm, walls 0 missing / 0 inside, water 0 blocked, curbs 0 mismatch, intrusion 0.069; rebuild long task 89-149 ms when
+quiet, up to 189 ms with 7 agents loading the machine: flaky gate) · track.perf coast high max 135 calls / 550k tris (r2 134 /
+547k) · track.fps coast 60 fps at all 7 points · core-check OK · track.race 1 group, fog restored · autopilot races coast /
+city / mountain finished, 0 errors, 0 warnings · late-art test 3 tracks.

@@ -99,5 +99,5 @@ export function neonSigns(c: City, art: HTMLImageElement[]): void {
     else if (sl.kind === 'roof') roof(c, sl, k);
     else screen(c, sl, k, art);
   }
-  console.info(`[track] city neon: ${JSON.stringify(counts)}`);
+  c.d.ctx.log(`city neon: ${JSON.stringify(counts)}`);
 }

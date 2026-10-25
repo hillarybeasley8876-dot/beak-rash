@@ -2,7 +2,7 @@
 // marks + zones into scenery. Landmarks and sky life (marks) claim their footprint first, then the
 // tunnel, portals, start/finish, signage, rock walls, forests and verges.
 import { BILLBOARD_LINES, TRACK_BILLBOARDS } from '../../../data/memes';
-import { breathe } from '../../breathe';
+import { breathe, slicer } from '../../breathe';
 import type { WorldCtx } from '../../ctx';
 import { buildSkyFill } from '../../env/mountain-fill';
 import { gradeMountainTerrain } from '../../env/mountain-grade';
@@ -18,6 +18,7 @@ import { banners, distanceMarkers, loadBillboardArt } from '../coast/signage';
 import { finishDressYielding, makeDress } from '../dress';
 import { rockBatch, rockWalls } from './crags';
 import { boulders, farForest, roadsideTrees } from './forest';
+import { rockLedges } from './ledges';
 import { LEG_TEXTS, switchbackLegs } from './legs';
 import { installMountainLod } from './lod';
 import { MARK_TEXTS, marks } from './marks';
@@ -62,7 +63,7 @@ export async function dressMountain(ctx: WorldCtx, field: TerrainField): Promise
   st.restart();
   const d = makeDress(ctx, field, new SignAtlas(2048, 3072), ctx.rng.fork(0x3a7c));
   const L = ctx.L;
-  marks(d);
+  await marks(d, slicer());
   await st.done('landmarks', 0.24);
   tunnelFitOut(d);
   await st.done('tunnel', 0.3);
@@ -76,14 +77,18 @@ export async function dressMountain(ctx: WorldCtx, field: TerrainField): Promise
       }
     }
   }
-  rockWalls(d, rocks, ['cliff', 'cutting', 'portal'].flatMap((name) => zones(ctx, name)));
+  await st.done('portals, start + finish', 0.34);
+  const walls = ['cliff', 'cutting', 'portal'].flatMap((name) => zones(ctx, name));
+  rockWalls(d, rocks, walls);
+  rockLedges(d, rocks, walls);
+  await st.done('rock walls + ledges', 0.38);
   switchbackLegs(d, rocks);
   distanceMarkers(d);
   billboards(d, art, BANNER_PICKS);
   for (const name of ['cliff', 'cutting', 'bridgeExit', 'summit', 'crest']) {
     for (const z of zones(ctx, name)) boulders(d, z.s0, z.s1);
   }
-  await st.done('walls, legs, signs', 0.42);
+  await st.done('legs, signs, boulders', 0.42);
   roadsideTrees(d, L.sMin, L.sMin + L.n - 1);
   await st.done('roadside trees', 0.52);
   verges(d, 0, ctx.L.length);

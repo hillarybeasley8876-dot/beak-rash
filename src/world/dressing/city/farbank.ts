@@ -73,7 +73,8 @@ function embankment(c: City, s0: number, s1: number): void {
   }
 }
 
-export function farBank(c: City): number {
+/** Embankment, towers and river light columns across the river (see top); `tick` yields. Returns the tower count. */
+export async function farBank(c: City, tick: () => Promise<void>): Promise<number> {
   const { ctx } = c.d;
   const rng = c.d.rng.fork(0xba4c);
   const streaks = new MeshBuf();
@@ -98,6 +99,7 @@ export function farBank(c: City): number {
       const col = (STREAKS[n % STREAKS.length] as Color).clone().multiplyScalar(h > 60 ? 1.1 : 0.7);
       streak(streaks, p.clone().addScaledVector(right, u - EDGE_U + 2), right, along, w * 0.55, EDGE_U - 50, col);
       n++;
+      await tick();
     }
   }
   if (streaks.idx.length) {

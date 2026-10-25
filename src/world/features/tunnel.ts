@@ -16,9 +16,12 @@ export const CROWN = 7.4;
 /** The hill cap spans the tube plus this much on each side (m). */
 const CAP_MARGIN = 3.5;
 const COL = {
-  dado: new Color('#c8102e'), line: new Color('#f4f2ec'), tile: new Color('#e9dfc8'), vault: new Color('#575862'),
+  dado: new Color('#c8102e'), line: new Color('#f4f2ec'), tile: new Color('#e9dfc8'), vault: new Color('#62636d'), soot: new Color('#43444d'),
   concrete: new Color('#cfccc4'), ring: new Color('#e5191c'), lamp: new Color('#fff3c4'), rock: new Color('#cdbb98'),
 };
+/** Baked interior light of the unlit tube (day / night looks); fixtures on the shell use the same. */
+export const SHELL_LIGHT = { day: 0.66, night: 0.55 } as const;
+const vaultTone = new Color();
 
 /** Inner outline (x, y) from the right wall foot, over the crown, to the left wall foot. */
 function tunnelOutline(halfW: number, n = 14): Array<[number, number]> {
@@ -34,7 +37,8 @@ function tunnelOutline(halfW: number, n = 14): Array<[number, number]> {
 function colorFor(y: number, x: number, halfW: number): Color {
   if (Math.abs(x) >= halfW - 0.01 && y <= 1.15) return COL.dado;
   if (Math.abs(x) >= halfW - 0.01 && y <= 1.25) return COL.line;
-  return y <= WALL_H + 0.01 ? COL.tile : COL.vault;
+  // Vault: lamp-lit grey at the spring line darkening to soot at the crown.
+  return y <= WALL_H + 0.01 ? COL.tile : vaultTone.copy(COL.vault).lerp(COL.soot, Math.min(1, (y - WALL_H) / (CROWN - WALL_H)) ** 1.5);
 }
 
 /** Light strips start every LAMP_EVERY m from s0 + 5 (2.4 m long, x = ±2.2): fit-outs align to them. */
@@ -46,13 +50,14 @@ function bake(base: Color, s: number, f: TrackFeature, night: boolean): Color {
   const k = (s - f.s0 - 5) / LAMP_EVERY;
   const under = k - Math.floor(k) < 2.6 / LAMP_EVERY && s < f.s1 - 3;
   const panel = Math.floor((s - f.s0) / 4) % 2 === 0 ? 1 : 0.93;
-  return shaded.copy(base).multiplyScalar((night ? 0.55 : 0.66) * (under ? 1.22 : 1) * panel);
+  return shaded.copy(base).multiplyScalar((night ? SHELL_LIGHT.night : SHELL_LIGHT.day) * (under ? 1.22 : 1) * panel);
 }
 
 const A = new Vector3(), B = new Vector3(), C = new Vector3(), D = new Vector3(), N = new Vector3(), E = new Vector3();
 const DOWN = new Vector3(0, -1, 0);
 
-function quad(buf: MeshBuf, a: Vector3, b: Vector3, c: Vector3, d: Vector3, col: Color, facing: Vector3): void {
+/** Quad a-b-c-d with its normal turned toward `facing` (winding flipped to match). */
+export function quad(buf: MeshBuf, a: Vector3, b: Vector3, c: Vector3, d: Vector3, col: Color, facing: Vector3): void {
   N.subVectors(b, a).cross(E.subVectors(c, a)).normalize();
   const flip = N.dot(facing) < 0;
   if (flip) N.negate();

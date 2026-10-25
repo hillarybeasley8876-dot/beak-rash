@@ -44,7 +44,8 @@ function land(c: City, x: number, z: number, half: number): number {
   return low;
 }
 
-export function farFill(c: City): number {
+/** Fill blocks over the empty street-level land (see top); `tick` yields. Returns the block count. */
+export async function farFill(c: City, tick: () => Promise<void>): Promise<number> {
   const rng = c.d.rng.fork(0xfa11);
   const [x0, x1, z0, z1] = extents(c, 420);
   const lamp = hdr('#ffc27a', 1.8);
@@ -74,6 +75,7 @@ export function farFill(c: City): number {
       }
       n++;
     }
+    await tick();
   }
   return n;
 }

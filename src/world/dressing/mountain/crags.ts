@@ -13,7 +13,7 @@ import type { Dress } from '../dress';
 
 
 /** Height of the rising rock wall above the road edge at (s, side) (0 = none) and its run-in width. */
-function wallAt(d: Dress, s: number, side: -1 | 1): { h: number; stepW: number; edgeY: number } {
+export function wallAt(d: Dress, s: number, side: -1 | 1): { h: number; stepW: number; edgeY: number } {
   const edgeY = d.field.edgeY(s, side);
   if (d.ctx.q.edgeKindAt(s, side) === 'tunnel') return { h: 0, stepW: 0, edgeY };
   const g = d.field.ground(s, side);
@@ -22,18 +22,18 @@ function wallAt(d: Dress, s: number, side: -1 | 1): { h: number; stepW: number; 
 
 const granite = (d: Dress): Color => d.rng.pick([...GRANITE]);
 
-interface FacePt { u: number; y: number }
+export interface FacePt { u: number; y: number }
 const OFF: CragOffset = { out: 0, up: 0 };
 
 /**
  * Rendered wall cross-section at s: (metres beyond the edge, height) at every near-ribbon column out
- * to 12 m, with the crag push-back that terrain/near.ts applies to the face bands (ground() alone
+ * to `reach` m, with the crag push-back that terrain/near.ts applies to the face bands (ground() alone
  * reads the un-pushed face, which stands up to ~5 m nearer the road than the rendered one).
  */
-function faceProfile(d: Dress, s: number, side: -1 | 1, edgeY: number, wallH: number): FacePt[] {
+export function faceProfile(d: Dress, s: number, side: -1 | 1, edgeY: number, wallH: number, reach = 12): FacePt[] {
   const g = d.field.ground(s, side), bound = d.field.bound(s, side);
   const pts: FacePt[] = [{ u: 0, y: edgeY }];
-  for (let c = 1; c < NEAR_U.length && (NEAR_U[c] ?? 99) <= 12; c++) {
+  for (let c = 1; c < NEAR_U.length && (NEAR_U[c] ?? 99) <= reach; c++) {
     const u = NEAR_U[c] ?? 0;
     const y = d.ctx.ground(s, side * (bound + u));
     cragOffset(d.field.noise, s, c, u, y - edgeY, g, wallH, OFF);
@@ -43,7 +43,7 @@ function faceProfile(d: Dress, s: number, side: -1 | 1, edgeY: number, wallH: nu
 }
 
 /** Where the face first reaches height y (metres beyond the edge), or null when the ground stays below y. */
-function uAtHeight(pts: FacePt[], y: number): number | null {
+export function uAtHeight(pts: FacePt[], y: number): number | null {
   for (let i = 1; i < pts.length; i++) {
     const a = pts[i - 1] as FacePt, b = pts[i] as FacePt;
     if (b.y >= y) return a.u + (b.u - a.u) * Math.min(1, Math.max(0, (y - a.y) / Math.max(1e-6, b.y - a.y)));

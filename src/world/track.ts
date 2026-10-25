@@ -16,11 +16,12 @@ import { TrackQuery } from './layout/query';
 import { layoutFor } from './layouts';
 import { publishDebug } from './debug';
 import { installFogCull } from './lod';
-import { lookFor } from './looks';
+import { lookFor, roadLookFor } from './looks';
 import { buildEdges } from './road/edges';
 import { dressingFor } from './dressing';
 import { buildFeatures } from './features';
 import { warmFonts } from './fonts';
+import { buildRoadMarks, roadWords } from './road/marks';
 import { buildRoad } from './road/road';
 import { warmBillboardArt } from './scenery/signs/art';
 import { buildFarTerrain } from './terrain/far';
@@ -65,19 +66,25 @@ export async function createTrack(app: AppContext, id: TrackId, rng: Rng): Promi
   };
   try {
     await stage(0.12, 0.3, '铺路中 ROAD', 'layout');
+    // Painted road words repaint themselves if their font arrives late (features/textures.ts, road/marks.ts).
+    warmFonts(['START', 'FINISH', ...L.marks.filter((m) => m.kind === 'paint').map((m) => String(m.data.text ?? '')), ...roadWords(id).flat()]);
     restoreEnv = buildLights(ctx);
     buildSky(ctx);
-    buildRoad(ctx);
+    const line = buildRoad(ctx);
+    await breathe();   // road, road marks and near terrain are separate tasks (no long stall on a busy machine)
+    buildRoadMarks(ctx, roadLookFor(id), line);
+    await breathe();
     const field = new TerrainField(L, q);
     const ribbons = buildNearTerrain(ctx, field);
     await stage(0.3, 0.48, '堆山中 HILLS', 'road+near');
     const far = buildFarTerrain(ctx, field, ribbons);
     Object.assign(ctx, makeGround(ctx, field, ribbons, far));
     await stage(0.48, 0.62, '灌海水 SEA', 'far');
+    // Sea, edges and features (tunnel shells, bridge) are separate tasks (no long stall on a busy machine).
     buildSea(ctx, renderHeightMap(ctx, group));
+    await breathe();
     buildEdges(ctx, field);
-    // Painted road words repaint themselves if their font arrives late (features/textures.ts).
-    warmFonts(['START', 'FINISH', ...L.marks.filter((m) => m.kind === 'paint').map((m) => String(m.data.text ?? ''))]);
+    await breathe();
     buildFeatures(ctx, field);
     await stage(0.62, 0.9, '摆摊中 PROPS', 'sea+edges+features');
     await dressingFor(id)(ctx, field);

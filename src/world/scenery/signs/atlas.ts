@@ -1,10 +1,13 @@
 // One canvas atlas for every sign face on the track (billboards, road signs, banners, markers),
-// so all signage renders with a single texture and material. Shelf packing, 2048 wide.
+// so all signage renders with a single texture and material. Shelf packing, 2048 wide. A cell can be
+// drawn again later (redrawCell: billboard art that landed late) and the atlas textures re-upload.
 import { CanvasTexture, LinearMipmapLinearFilter, SRGBColorSpace, type WebGLRenderer } from 'three';
 
 export interface AtlasRect { u0: number; v0: number; u1: number; v1: number }
 type Draw = (g: CanvasRenderingContext2D, w: number, h: number) => void;
 interface PaintJob { x: number; y: number; w: number; h: number; draw: Draw }
+/** Cells drawn again (late art) upload together, this long after the last one (ms). */
+const UPLOAD_DEBOUNCE = 150;
 
 export class SignAtlas {
   readonly canvas: HTMLCanvasElement;
@@ -15,6 +18,10 @@ export class SignAtlas {
   /** Deferred atlases record their cells and paint them on flush() (once the fonts are in). */
   private readonly jobs: PaintJob[] = [];
   private flushed = false;
+  /** Textures made from this atlas that are still alive (redrawCell flags them), and how many were made. */
+  private readonly textures = new Set<CanvasTexture>();
+  private made = 0;
+  private uploadTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(readonly size = 2048, readonly height = 2048, readonly deferred = false) {
     this.canvas = document.createElement('canvas');
@@ -59,6 +66,22 @@ export class SignAtlas {
     if (!this.deferred || this.flushed) this.run(job);
   }
 
+  /** Clear and draw one cell again (billboard art that landed late), then re-upload the atlas textures. Skipped
+   *  before a deferred atlas's flush (the flush paints the current state) and once every texture made from
+   *  the atlas is disposed (the track is gone). */
+  redrawCell(x: number, y: number, w: number, h: number, draw: Draw): void {
+    if ((this.deferred && !this.flushed) || (this.made > 0 && !this.textures.size)) return;
+    const job = { x, y, w, h, draw };
+    this.g.clearRect(x, y, w, h);
+    this.run(job);
+    if (this.uploadTimer !== null) clearTimeout(this.uploadTimer);
+    this.uploadTimer = setTimeout(() => {
+      this.uploadTimer = null;
+      for (const t of this.textures) t.needsUpdate = true;
+      console.info('[track] sign atlas repainted: late billboard art landed');
+    }, UPLOAD_DEBOUNCE);
+  }
+
   /** Deferred atlas: paint every recorded cell (once). */
   flush(): void {
     if (this.flushed) return;
@@ -90,6 +113,9 @@ export class SignAtlas {
     t.colorSpace = SRGBColorSpace;
     t.minFilter = LinearMipmapLinearFilter;
     t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+    this.textures.add(t);
+    this.made++;
+    t.addEventListener('dispose', () => this.textures.delete(t));
     return t;
   }
 }

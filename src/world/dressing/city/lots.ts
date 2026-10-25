@@ -51,6 +51,15 @@ export class Lots {
     }
   }
 
+  /** Keep buildings off a footprint (a view corridor) while street props may still stand in it. */
+  reserve(x: number, z: number, yaw: number, w: number, d: number): void {
+    const p = new Vector3();
+    for (const [lx, lz] of this.points(w + 0.6, d + 0.6, CELL)) {
+      this.world(x, z, yaw, lx, lz, p);
+      this.taken.add(this.key(p.x, p.z));
+    }
+  }
+
   /** True when a lot covers the world point. */
   has(x: number, z: number): boolean {
     return this.taken.has(this.key(x, z));

@@ -4,6 +4,7 @@
 import type { Rng } from '../../../core/rng';
 import { FONT } from '../../fonts';
 import type { AtlasRect, SignAtlas } from '../../scenery/signs/atlas';
+import { artReady } from '../../scenery/signs/art';
 import { cell } from '../../scenery/signs/faces';
 import { burst, halftone, label, P5, ransom, star } from '../../scenery/signs/p5draw';
 import { fit, frameTube, tube } from './neon-faces';
@@ -111,10 +112,11 @@ export function muralFace(atlas: SignAtlas, rng: Rng, title: string, body: strin
   });
 }
 
-/** Giant finish screen (16:9): poster art (or a red burst), chequered band, slammed FINISH! word. */
+/** Giant finish screen (16:9): poster art (or a red burst while it decodes or when missing; the atlas
+ *  draws the cell again when late art lands), chequered band, slammed FINISH! word. */
 export function finishScreenFace(atlas: SignAtlas, rng: Rng, art: HTMLImageElement | null, word: string, sub: string): AtlasRect | null {
   return cell(atlas, 768, 432, (g, w, h) => {
-    if (art) {
+    if (art && artReady(art)) {
       const k = Math.max(w / art.width, h / art.height);
       g.drawImage(art, (w - art.width * k) / 2, (h - art.height * k) / 2, art.width * k, art.height * k);
     } else {
@@ -142,5 +144,5 @@ export function finishScreenFace(atlas: SignAtlas, rng: Rng, art: HTMLImageEleme
     label(g, sub, w / 2, h * 0.76, h * 0.07, P5.yellow, FONT.cn, 400);
     star(g, w * 0.1, h * 0.2, h * 0.08, P5.yellow, 0.2);
     star(g, w * 0.9, h * 0.22, h * 0.06, P5.white, -0.3);
-  });
+  }, art ? [art] : undefined);
 }

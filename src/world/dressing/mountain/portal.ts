@@ -1,7 +1,9 @@
 // Sunset Pass tunnel portals (env-mountain). The track's concrete portal sits under a small hill cap;
 // each mouth gets a dressed-stone headwall (pilasters beside the arch, a block band with a cornice
-// above it), stepped stone wing walls along the foot of the cutting, and big granite masses with pines
-// and firs on the cap behind it, so the silhouette rises 25–40 m above the road.
+// above it), stepped stone wing walls along the foot of the cutting, granite masses and tufted ledge
+// slabs covering the face above the cornice, a jagged granite crest along the cap's edge with rocks
+// stacked up both side edges, and big granite masses with pines and firs on the cap behind it, so the
+// silhouette rises 25–40 m above the road with no straight edge.
 import { Color, Matrix4, Vector3 } from 'three';
 import type { TrackFeature } from '../../../core/types';
 import { CROWN, capHalfW, capHeight, tunnelHalfW } from '../../features/tunnel';
@@ -10,6 +12,7 @@ import type { PropBatch } from '../../kit/batch';
 import { box, trs } from '../../kit/shapes';
 import { fir, pine } from '../../scenery/props/mountain-trees';
 import { bevelRock, GRANITE } from '../../scenery/props/mountain-granite';
+import { grassTuft } from '../../scenery/props/cover';
 import type { Dress } from '../dress';
 
 const STONE = [new Color('#b9aa9b'), new Color('#a39489'), new Color('#cbbca9')] as const;
@@ -66,21 +69,70 @@ function wingWalls(d: Dress, s: number, dir: number): void {
   }
 }
 
-/** Granite masses bedded in the upper portal face above the cornice, up to the cap's skyline. */
-function faceMasses(d: Dress, rocks: PropBatch, f: TrackFeature, s: number, dir: number, halfW: number): void {
+/**
+ * Upper portal face, from above the cornice to under the crest: staggered rows of big granite masses
+ * bedded at different depths (no flat face shows between them), and here and there a jutting slab on a
+ * mass's shoulder with a grass tuft on it (ledges stepping up the face).
+ */
+function faceRock(d: Dress, rocks: PropBatch, f: TrackFeature, s: number, dir: number, halfW: number): number {
   const { rng, ctx, field } = d;
   const fr = ctx.q.frameVis(s);
-  const roadY = fr.pos.y, W = halfW + 1.6, low = CROWN + 4.6, yaw = Math.atan2(fr.tangent.x, fr.tangent.z);
-  // A broad band over the arch (not a tower): at most ~7 m above the cornice, spread across the face.
-  for (let k = 0; k < 16; k++) {
-    const x = -W + ((k + rng.range(0.1, 0.9)) / 16) * 2 * W, r = rng.range(2.0, 3.2);
-    const top = Math.min(capHeight(ctx, field, f, s, x) - roadY + 0.4, low + 7);
-    if (top - low < r) continue;
-    const y = rng.range(low + r * 0.75, top - r * 0.25);
-    ctx.q.toWorld(s + dir * r * 0.1, x, y, p);
-    bevelRock(rocks.at(p.x, p.z), p.x, p.y, p.z, r * rng.range(1.0, 1.4), r * rng.range(0.8, 1.1), r * 0.6, yaw + rng.range(-0.3, 0.3), rng,
-      rng.pick([...GRANITE]), false);
+  const roadY = fr.pos.y, W = halfW + 1.6, yaw = Math.atan2(fr.tangent.x, fr.tangent.z);
+  let n = 0;
+  for (let y = CROWN + 5.2, row = 0; row < 6; row++) {
+    const r0 = rng.range(1.9, 2.5);
+    for (let x = -W + (row % 2 ? r0 * 0.85 : 0.2) + rng.range(-0.4, 0.4); x < W + 0.5; x += r0 * rng.range(1.3, 1.7)) {
+      if (y > capHeight(ctx, field, f, s, x) - roadY - 1.2) continue;
+      const r = rng.range(1.6, 2.6);
+      ctx.q.toWorld(s + dir * rng.range(0.1, 0.6), x, y + rng.range(-0.4, 0.4), p);
+      bevelRock(rocks.at(p.x, p.z), p.x, p.y, p.z, r * rng.range(0.9, 1.2), r * rng.range(0.7, 0.95), r * 0.55, yaw + rng.range(-0.35, 0.35), rng,
+        rng.pick([...GRANITE]), false);
+      n++;
+      if (!rng.chance(0.4)) continue;
+      const sx = rng.range(1.0, 1.5), sz = rng.range(0.6, 0.8);
+      ctx.q.toWorld(s + dir * (r * 0.45 + 0.2), x + rng.range(-0.5, 0.5), y + r * 0.62, p);
+      bevelRock(rocks.at(p.x, p.z), p.x, p.y, p.z, sx, rng.range(0.28, 0.4), sz, yaw + rng.range(-0.2, 0.2), rng, rng.pick([...GRANITE]), false);
+      ctx.q.toWorld(s + dir * (r * 0.45 + 0.3), x + rng.range(-0.3, 0.3), y + r * 0.62 + 0.3, p);
+      grassTuft(d.b.cover.at(p.x, p.z), p.x, p.y, p.z, rng, rng.range(0.4, 0.65));
+      n++;
+    }
+    y += r0 * rng.range(1.1, 1.35);
   }
+  return n;
+}
+
+/**
+ * Jagged crest along the cap's front edge over the portal: granite masses poking 1–4 m above it (every
+ * third a spire), tufts and the odd small pine between them, and a stack of rocks up each side edge of
+ * the face where it meets the cutting (no straight edges against the sky or the rock wall).
+ */
+function crest(d: Dress, rocks: PropBatch, f: TrackFeature, s: number, dir: number, halfW: number): number {
+  const { rng, ctx, field } = d;
+  const fr = ctx.q.frameVis(s);
+  const roadY = fr.pos.y, W = halfW + 1.6, yaw = Math.atan2(fr.tangent.x, fr.tangent.z), cap = capHalfW(field, f);
+  let n = 0;
+  for (let x = -W - 0.8, k = 0; x < W + 0.8 && Math.abs(x) <= cap; x += rng.range(1.5, 2.3), k++) {
+    const top = capHeight(ctx, field, f, s, x) - roadY;
+    const r = rng.range(1.1, 1.8), tall = k % 3 === 1 ? rng.range(1.6, 2.2) : rng.range(0.9, 1.3);
+    ctx.q.toWorld(s + dir * r * 0.2, x, top + r * tall * 0.15, p);
+    bevelRock(rocks.at(p.x, p.z), p.x, p.y, p.z, r * rng.range(0.85, 1.15), r * tall, r * 0.85, yaw + rng.range(-0.4, 0.4), rng,
+      rng.pick([...GRANITE]), false);
+    n++;
+    const roll = rng.next();
+    ctx.q.toWorld(s - dir * rng.range(0.6, 1.6), x + rng.range(-0.8, 0.8), top, p);
+    if (roll < 0.45) grassTuft(d.b.cover.at(p.x, p.z), p.x, p.y + 0.1, p.z, rng, rng.range(0.5, 0.8));
+    else if (roll < 0.6) pine(d.b.props.at(p.x, p.z), p.x, p.y - 0.2, p.z, rng, rng.range(0.4, 0.6));
+  }
+  for (const side of [-1, 1]) {
+    const x = side * (W + 0.2), top = capHeight(ctx, field, f, s, x) - roadY;
+    for (let y = CROWN + 4.4; y < top; y += rng.range(1.9, 2.5)) {
+      const r = rng.range(0.9, 1.4);
+      ctx.q.toWorld(s + dir * r * 0.3, x + side * rng.range(-0.3, 0.3), y, p);
+      bevelRock(rocks.at(p.x, p.z), p.x, p.y, p.z, r * 1.1, r * rng.range(0.8, 1.1), r * 0.8, yaw + rng.range(-0.5, 0.5), rng, rng.pick([...GRANITE]), false);
+      n++;
+    }
+  }
+  return n;
 }
 
 /** Granite masses, pines and firs on the cap from 3 to 46 m behind the mouth. */
@@ -103,13 +155,16 @@ function capRidge(d: Dress, rocks: PropBatch, f: TrackFeature, s: number, dir: n
 
 /** Headwall, wing walls, face masses and cap ridge at both mouths of every tunnel. */
 export function portals(d: Dress, rocks: PropBatch): void {
+  let ledges = 0, crests = 0;
   for (const f of d.ctx.L.features.filter((ft) => ft.kind === 'tunnel')) {
     const halfW = tunnelHalfW(d.field, f);
     for (const [s, dir] of [[f.s0, -1], [f.s1, 1]] as Array<[number, number]>) {
       headwall(d, s, dir, halfW);
       wingWalls(d, s, dir);
-      faceMasses(d, rocks, f, s, dir, halfW);
+      ledges += faceRock(d, rocks, f, s, dir, halfW);
+      crests += crest(d, rocks, f, s, dir, halfW);
       capRidge(d, rocks, f, s, dir);
     }
   }
+  d.ctx.log(`portals: ${ledges} face rocks and ledge slabs, ${crests} crest + jamb rocks`);
 }

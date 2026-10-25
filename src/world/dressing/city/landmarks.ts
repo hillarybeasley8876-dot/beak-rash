@@ -65,12 +65,21 @@ export function muralAt(c: City, s: number, side: -1 | 1): void {
   }
 }
 
+/** Lot reserved across the corner before the roundabout's hairpin (m along the road × m deep; no buildings,
+ *  street lamps and kerb props still stand there): riders on the approach see the statue from ~60 m out. */
+const VIEW = { len: 36, depth: 18 } as const;
+
 /** Roundabout island inside the hairpin: kerb ring, flower bed, plinth with a neon ring, statue. */
 export function roundaboutAt(c: City, s: number, x: number): void {
   const { ctx, b } = c.d;
   const p = ctx.q.toWorld(s, x, 0, new Vector3());
   const R = 15;
   c.lots.claimDisc(p.x, p.z, R + 2);
+  const bend = ctx.L.zones.find((z) => s >= z.s0 && s < z.s1);
+  if (bend) {
+    const vp = c.d.place.spot(bend.s0 - VIEW.len / 2, x < 0 ? -1 : 1, 0.5);
+    c.lots.reserve(vp.pos.x, vp.pos.z, vp.faceRoad, VIEW.len, VIEW.depth);
+  }
   const y = STREET;
   cylinder(b.props.at(p.x, p.z), trs(p.x, y, p.z, 0, R, 0.35, R, m), new Color('#9a98a6'), 40);
   cylinder(b.props.at(p.x, p.z), trs(p.x, y, p.z, 0, R - 0.5, 0.5, R - 0.5, m), new Color('#2f6b3a').multiplyScalar(1.3), 40);

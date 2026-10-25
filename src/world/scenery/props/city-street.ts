@@ -11,11 +11,12 @@ import { C } from './city-kit';
 
 const POLE = C('#2a2c36'), STEEL = C('#8a93a3'), HOUSING = C('#16171d'), GLASS = C('#9fd6ff');
 const RED = new Color(1, 0.12, 0.08), AMBER = new Color(1, 0.6, 0.05), GREEN = new Color(0.1, 1, 0.55);
-// Canopies: toon colours (self-lit batch adds an emissive share so they read at night).
-const BLOSSOM = [C('#ff8cc8'), C('#ffa8d8'), C('#ff6fb8')];
-const GINKGO = [C('#ffcc1a'), C('#ffb81a'), C('#ffdd44')];
+// Canopies: three toon tones per tree so neighbouring lobes differ, and a warm dark underside (the violet
+// night ambient turns plain darker pinks purple and darker yellows olive). The batch adds a small emissive share.
+const BLOSSOM = [C('#ff8fb0'), C('#ffb6cc'), C('#f06892')], BLOSSOM_UNDER = C('#93305e');
+const GINKGO = [C('#ffbe1f'), C('#ffd650'), C('#f39c14')], GINKGO_UNDER = C('#a3580f');
 const FAIRY = new Color(2.0, 1.7, 1.2);
-const PLANTER = C('#4c4a55'), BARK = C('#4a3326');
+const PLANTER = C('#5a5866'), BARK = C('#6b4a35');
 const m = new Matrix4(), m2 = new Matrix4();
 
 /** Local → world for a prop frame at (x, y, z) turned by yaw. */
@@ -85,41 +86,49 @@ export function vending(props: MeshBuf, glow: MeshBuf, x: number, y: number, z: 
   box(props, new Matrix4().multiplyMatrices(base, trs(0.36, 1.1, -0.02, 0, 0.14, 0.3, 0.04, m)), HOUSING);
 }
 
+/** Planter tree look: crown centre above the planter top, lobe radius cap and the emissive share of the
+ *  self-lit canopy (low, so the cel bands and ink lines separate the lobes instead of one glowing blob). */
+export const TREE = { crown: [3.0, 3.4] as const, maxLobe: 1.0, canopyLit: 0.15, reach: 1.55 } as const;
+
 /**
- * Planter box with a cherry (pink) or ginkgo (gold) tree. The canopy is a scalloped cluster of smooth
- * blobs in the self-lit toon batch (cel ramp + outline + an emissive share, aux style 5) with darker
- * undersides; warm fairy-light specks are scattered over it (glow).
+ * Planter box with a cherry (pink) or ginkgo (gold) tree. Planter, trunk and fork branches sit in the city's
+ * self-lit batch with the street-glow wash (aux style 0: lit from the shop fronts below); the crown starts
+ * ~2.7 m up (the chase camera looks under it) and is a scalloped cluster of smooth lobes of at most
+ * TREE.maxLobe, cel-shaded with an ink outline and a small emissive share (aux style 5), darker underneath.
+ * Warm fairy-light specks are scattered over it (glow). The crown reaches TREE.reach from the trunk.
  */
-export function planterTree(props: MeshBuf, lit: AuxBuf, glow: MeshBuf, x: number, y: number, z: number, yaw: number, rng: Rng, kind: 'cherry' | 'ginkgo'): void {
+export function planterTree(lit: AuxBuf, glow: MeshBuf, x: number, y: number, z: number, yaw: number, rng: Rng, kind: 'cherry' | 'ginkgo'): void {
   // The planter box is square to the kerb (a turned box poked its corner over the drivable edge).
-  box(props, trs(x, y + 0.3, z, yaw, 1.6, 0.6, 1.6, m), PLANTER);
-  const h = rng.range(2.5, 3.1);
-  cylinder(props, trs(x, y + 0.5, z, 0, 0.2, h * 0.75, 0.2, m), BARK, 7, 1, 0.75);
-  const pal = kind === 'cherry' ? BLOSSOM : GINKGO;
-  const fork = rng.range(0, Math.PI);
-  for (const k of [-1, 1]) {
-    const a = fork + (k > 0 ? 0 : Math.PI);
-    const tip = new Vector3(x + Math.cos(a) * 0.55, y + 0.5 + h * 1.02, z + Math.sin(a) * 0.55);
-    segment(props, new Vector3(x, y + 0.5 + h * 0.62, z), tip, 0.11, BARK);
+  lit.setAux(0);
+  box(lit, trs(x, y + 0.3, z, yaw, 1.6, 0.6, 1.6, m), PLANTER);
+  const h = rng.range(TREE.crown[0], TREE.crown[1]), top = y + 0.5 + h;
+  cylinder(lit, trs(x, y + 0.5, z, 0, 0.21, h * 0.78, 0.21, m), BARK, 8, 1, 0.7);
+  const fork = rng.range(0, Math.PI * 2);
+  for (let k = 0; k < 3; k++) {
+    const a = fork + (k / 3) * Math.PI * 2;
+    segment(lit, new Vector3(x, y + 0.5 + h * 0.6, z), new Vector3(x + Math.cos(a) * 0.6, top - 0.1, z + Math.sin(a) * 0.6), 0.1, BARK);
   }
-  // Central blob, a ring of five lobes (scalloped silhouette) and a crown lobe.
-  const blobs: Array<[number, number, number, number]> = [[0, 0.1, 0, rng.range(1.15, 1.3)], [rng.range(-0.2, 0.2), 0.75, rng.range(-0.2, 0.2), rng.range(0.65, 0.8)]];
+  // Core lobe, a ring of five lobes pushed out to the rim (scalloped silhouette) and a crown lobe on top.
+  const lobe = (r: number): number => Math.min(TREE.maxLobe, r);
+  const blobs: Array<[number, number, number, number]> = [[0, 0.1, 0, lobe(rng.range(0.92, 1.05))]];
   for (let i = 0; i < 5; i++) {
-    const a = fork + (i / 5) * Math.PI * 2 + rng.range(-0.35, 0.35), rr = rng.range(0.7, 0.88);
-    blobs.push([Math.cos(a) * rr, rng.range(-0.25, 0.35), Math.sin(a) * rr, rng.range(0.58, 0.78)]);
+    const a = fork + (i / 5) * Math.PI * 2 + rng.range(-0.3, 0.3), r = lobe(rng.range(0.66, 0.84));
+    const rr = TREE.reach - r;
+    blobs.push([Math.cos(a) * rr, rng.range(-0.18, 0.22), Math.sin(a) * rr, r]);
   }
-  lit.setAux(5, kind === 'cherry' ? 0.42 : 0.36);
+  blobs.push([rng.range(-0.2, 0.2), 0.78, rng.range(-0.2, 0.2), lobe(rng.range(0.62, 0.74))]);
+  const pal = kind === 'cherry' ? BLOSSOM : GINKGO, under = kind === 'cherry' ? BLOSSOM_UNDER : GINKGO_UNDER;
+  lit.setAux(5, TREE.canopyLit);
   for (const [i, [ox, oy, oz, r]] of blobs.entries()) {
-    const col = rng.pick(pal);
     const seg = i === 0 ? 14 : 12;
-    sphere(lit, trs(x + ox, y + 0.5 + h + oy, z + oz, rng.range(0, 3), r, r * 0.84, r, m), col, seg, seg - 4, col.clone().multiplyScalar(0.55));
+    sphere(lit, trs(x + ox, top + oy, z + oz, rng.range(0, 3), r, r * 0.86, r, m), pal[i % pal.length] as Color, seg, seg - 4, under);
   }
   lit.setAux(0);
   // Fairy-light specks scattered over random lobes (never a symmetric pair that reads as eyes).
-  for (let k = 0; k < 11; k++) {
+  for (let k = 0; k < 9; k++) {
     const [ox, oy, oz, r] = blobs[rng.int(0, blobs.length - 1)] ?? [0, 0, 0, 1];
     const a = rng.range(0, Math.PI * 2), e = rng.range(-0.2, 1.1);
-    const lx = x + ox + Math.cos(a) * Math.cos(e) * r * 1.01, ly = y + 0.5 + h + oy + Math.sin(e) * r * 0.85, lz = z + oz + Math.sin(a) * Math.cos(e) * r * 1.01;
+    const lx = x + ox + Math.cos(a) * Math.cos(e) * r * 1.01, ly = top + oy + Math.sin(e) * r * 0.87, lz = z + oz + Math.sin(a) * Math.cos(e) * r * 1.01;
     box(glow, trs(lx, ly, lz, a, 0.05, 0.05, 0.05, m), FAIRY);
   }
 }

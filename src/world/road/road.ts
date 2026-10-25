@@ -1,12 +1,16 @@
-// Road surface: asphalt strip (markings in the texture), shoulders coloured by surface, and the
-// red/white curbs on curves. Rows every 1 m so edges match bounds()/surfaceAt() exactly.
-import { Color, Mesh, MeshToonMaterial, Vector3 } from 'three';
+// Road surface: asphalt strip (markings in the texture; per-track base colour, two-tone tint and worn
+// racing line from road/detail.ts), shoulders coloured by surface, and the red/white curbs on curves.
+// Rows every 1 m so edges match bounds()/surfaceAt(). The road marks (road/marks.ts) follow in their own task.
+import { BufferAttribute, Color, Mesh, MeshToonMaterial, Vector3 } from 'three';
 import { toonRamp } from '../../render/toon';
 import type { TrackFrame } from '../../core/types';
 import type { WorldCtx } from '../ctx';
 import { GridGeo, MeshBuf, frameOffset } from '../geom';
 import { CURB_BLOCK, CURB_W } from '../layout/query';
 import { SURFACES, type SideSamples } from '../layout/sides';
+import { roadLookFor } from '../looks';
+import { roadDetail } from './detail';
+import { racingLine } from './line';
 import { ROAD_PERIOD, asphaltTexture, grainTexture } from './textures';
 
 const SHOULDER_COLORS: Record<string, string> = {
@@ -19,15 +23,19 @@ function roadRange(ctx: WorldCtx): { s0: number; s1: number } {
   return { s0: ctx.L.sMin, s1: ctx.L.sMin + ctx.L.n - 1 };
 }
 
-export function buildRoad(ctx: WorldCtx): void {
+/** Build the road; returns the racing line (x per layout sample) for the road marks. */
+export function buildRoad(ctx: WorldCtx): Float32Array {
   const { q, L, app } = ctx;
   const { s0, s1 } = roadRange(ctx);
   const rows = Math.round(s1 - s0) + 1;
   const hw = L.halfWidth;
   const fr = q.frameVis(0);
   // ---- asphalt (vertex colours: large-scale tone drift so the 12 m texture period never reads)
+  const look = roadLookFor(ctx.id);
   const asphalt = new GridGeo(rows, 2);
   const tone = new Color();
+  const line = racingLine(L);
+  const aLine = new Float32Array(rows * 2);
   for (let r = 0; r < rows; r++) {
     const s = s0 + r;
     q.frameVis(s, fr);
@@ -38,9 +46,14 @@ export function buildRoad(ctx: WorldCtx): void {
     const skew = 0.02 * Math.sin(s * 0.047 + 0.7);
     asphalt.color(r, 0, tone.setScalar(base - skew));
     asphalt.color(r, 1, tone.setScalar(base + skew));
+    aLine[r * 2] = aLine[r * 2 + 1] = line[q.sampleAt(s)] ?? 0;
   }
-  const roadMat = ctx.own(new MeshToonMaterial({ map: ctx.own(asphaltTexture(app.renderer, hw)), gradientMap: toonRamp(), vertexColors: true }));
-  const road = new Mesh(ctx.own(asphalt.build({ colors: true })), roadMat);
+  const asphaltTex = ctx.own(asphaltTexture(app.renderer, hw, look.base));
+  const roadMat = ctx.own(new MeshToonMaterial({ map: asphaltTex, gradientMap: toonRamp(), vertexColors: true }));
+  ctx.own(roadDetail(roadMat, look, hw, ROAD_PERIOD));
+  const roadGeo = ctx.own(asphalt.build({ colors: true }));
+  roadGeo.setAttribute('aLine', new BufferAttribute(aLine, 1));
+  const road = new Mesh(roadGeo, roadMat);
   road.name = 'road';
   road.receiveShadow = true;
   ctx.group.add(road);
@@ -70,6 +83,7 @@ export function buildRoad(ctx: WorldCtx): void {
     ctx.group.add(mesh);
   }
   buildCurbs(ctx, fr);
+  return line;
 }
 
 function shoulderColor(sd: SideSamples, i: number): string {

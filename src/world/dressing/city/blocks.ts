@@ -68,8 +68,8 @@ function lot(c: City, def: WallDef, s: number, side: -1 | 1, rng: Rng): void {
   c.slots.push(...tower(bb, bp.pos.x, STREET, bp.pos.z, yaw, bw, bd, rng.int(14, 40), rng).filter((sl) => sl.kind !== 'fascia'));
 }
 
-/** Front rows along every zone with a wall definition (both sides, river sides skipped). */
-export function streetWalls(c: City): void {
+/** Front rows along every zone with a wall definition (both sides, river sides skipped); `tick` yields. */
+export async function streetWalls(c: City, tick: () => Promise<void>): Promise<void> {
   const { ctx } = c.d;
   const rng = c.d.rng.fork(0xb10c);
   for (const z of ctx.L.zones) {
@@ -85,13 +85,14 @@ export function streetWalls(c: City): void {
         if (!isRiver(c, s, side)) lot(c, def, s, side, rng);
         // Facade-line spacing: shorter steps in s on the outside of a curve, longer on the inside.
         s += step / Math.max(0.35, 1 - side * k * 12);
+        await tick();
       }
     }
   }
 }
 
-/** Tall skyline blocks 45–150 m out (fill the sky above the street walls). */
-export function skyline(c: City): void {
+/** Tall skyline blocks 45–150 m out (fill the sky above the street walls); `tick` yields. */
+export async function skyline(c: City, tick: () => Promise<void>): Promise<void> {
   const { ctx, place } = c.d;
   const rng = c.d.rng.fork(0x5c71);
   const L = ctx.L;
@@ -105,5 +106,6 @@ export function skyline(c: City): void {
       c.lots.claim(sp.pos.x, sp.pos.z, sp.faceRoad, w, dd);
       skylineBlock(c.cb.far.at(sp.pos.x, sp.pos.z), sp.pos.x, STREET, sp.pos.z, sp.faceRoad, w, dd, rng.range(40, 130), rng, c.cb.lights.at(sp.pos.x, sp.pos.z));
     }
+    await tick();
   }
 }

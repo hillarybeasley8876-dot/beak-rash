@@ -1,6 +1,7 @@
 // Coast tunnel lighting overlays: a multiply layer that dims the road + shoulders inside the tube with
-// crisp elliptical pools under every lamp, an additive warm layer on the pool cores and a warm wash
-// on the walls round each wall lamp. Lamp positions are shared with the fixtures (tunnel.ts).
+// long warm elliptical pools under every lamp (they nearly meet, so the road reads as a lit lane with a gentle
+// rhythm, not dark bands), an additive warm layer on the pool cores and a warm wash on the walls round each
+// wall lamp. Lamp positions are shared with the fixtures (tunnel.ts).
 import {
   AddEquation, AdditiveBlending, Color, CustomBlending, DoubleSide, Mesh, MeshBasicMaterial, SrcColorFactor, Vector3, ZeroFactor,
   type Material,
@@ -11,9 +12,10 @@ import { LAMP_EVERY, WALL_H } from '../../features/tunnel';
 import { GridGeo, MeshBuf, rowsBetween } from '../../geom';
 import type { Dress } from '../dress';
 
-const DIM = 0.4;                      // road brightness between the pools (multiply)
-const WARM = new Color('#fff0d6');
-const POOL_ADD = 0.24;                // additive warm light at a pool core
+const DIM = 0.58;                     // road brightness between the pools (multiply)
+const WARM = new Color('#ffd9a0');
+const POOL_ADD = 0.3;                 // additive warm light at a pool core
+const POOL = { len: 4.6, wide: 3.4 } as const;   // pool half length (along s) / half width under the vault strips
 const WASH_ADD = 0.16;                // additive wash peak on the walls
 const VAULT_X = [-2.2, 2.2];
 const WALL_LAMP_Y = WALL_H - 0.35;
@@ -25,8 +27,8 @@ export const vaultLamps = (f: TrackFeature): number[] => {
   return out;
 };
 
-/** 1 inside a unit ellipse with a soft outer quarter, 0 outside (toon-style pool edge). */
-const ellipse = (a: number, b: number): number => 1 - smoothstep(0.72, 1, Math.hypot(a, b));
+/** 1 inside a unit ellipse with a soft outer part, 0 outside (toon-style pool edge). */
+const ellipse = (a: number, b: number): number => 1 - smoothstep(0.6, 1, Math.hypot(a, b));
 
 /** Pool light on the road at (s, x), 0 … 1: ellipses under the vault strips and the wall lamps. */
 function pool(s: number, x: number, lamps: number[], halfW: number): number {
@@ -34,7 +36,7 @@ function pool(s: number, x: number, lamps: number[], halfW: number): number {
   for (const sc of lamps) {
     const ds = s - sc;
     if (Math.abs(ds) > LAMP_EVERY) continue;
-    for (const lx of VAULT_X) l = Math.max(l, ellipse(ds / 3.1, (x - lx) / 3.3));
+    for (const lx of VAULT_X) l = Math.max(l, ellipse(ds / POOL.len, (x - lx) / POOL.wide));
     const dw = ds - LAMP_EVERY / 2;
     for (const side of [-1, 1]) l = Math.max(l, 0.75 * ellipse(dw / 2.3, (x - side * (halfW - 0.5)) / 1.9));
   }
@@ -58,7 +60,8 @@ function roadLight(d: Dress, f: TrackFeature, halfW: number, lamps: number[]): v
   const fr = ctx.q.frameVis(f.s0);
   rows.forEach((s, r) => {
     ctx.q.frameVis(s, fr);
-    const inside = smoothstep(f.s0 - 8, f.s0 + 10, s) * (1 - smoothstep(f.s1 - 10, f.s1 + 8, s));
+    // Daylight spills ~16 m into both mouths (no dark band between the last pool and the portal).
+    const inside = smoothstep(f.s0 - 2, f.s0 + 16, s) * (1 - smoothstep(f.s1 - 16, f.s1 + 2, s));
     for (let k = 0; k < cols; k++) {
       const x = -halfW + (2 * halfW * k) / (cols - 1);
       const l = pool(s, x, lamps, halfW);

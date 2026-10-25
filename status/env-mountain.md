@@ -284,3 +284,29 @@ perf#7 (owner env-city, mountain part: leg blend 342 ms in one task). Plan in or
   - perf#4 (track): turbine rotors and gondolas compile when the fog cull first shows them; covered by the core warm-up
     request (perf#0), nothing mountain-side to change.
 
+## r3 polish (2026-10-25)
+Issue: reviews/game-r2-aesthetic.json#6 (rock walls / tunnel headwall read as plywood). Evidence in shots/r3-env/ (gitignored).
+- [x] rock courses (env/mountain-terrain-mat.ts): the 3.2 m strata + thin bevel/crack lines are replaced by irregular ~4.2 m
+  courses (COURSE_H, line shift +-0.18 course, same wobble), each a lit foot band, its block's tone and a dark crevice band
+  with an ink line under the next course (on 70 % of blocks), ink joints every 4-9 m; lines fade under ~1.5 px, bands beyond
+  150-260 m. The "pinstripe hatching" was shadow acne (receiveShadow off removed it): steep faces turned from the sun now sit
+  in their own shadow without the depth test (faceShadow in a patched lights_fragment_begin; gentle ground unchanged:
+  0-0.07 % pixels differ on 6 route views, rock walls 2-6 %).
+- [x] stepped ledges (new dressing/mountain/ledges.ts): rock shelves on the course lines of every rising rock wall (cliff,
+  cutting, portal; faces read up to 27 m out, the cutting's face stands behind a bench): tread (moss + 115 tufts on some runs),
+  sun-caught chamfer, lip in its run's granite tone, dark underside, buried 1.1 m, ink outline; depth/thickness jitter per
+  row, 5-20 m runs with tapered ends, lip >= 0.45 m off the edge and >= 3.8 m up: 767 m of shelves, 3-5 per wall.
+  crags.ts exports wallAt / faceProfile (+ reach) / uAtHeight.
+- [x] portal headwall (portal.ts): faceMasses -> faceRock (staggered rows of big granite masses up to the crest + tufted ledge
+  slabs, 49) and crest (jagged granite crest along the cap's edge, every third a spire, tufts / small pines, and rock stacks up
+  both side edges where the face meets the cutting, 36): no flat face or straight edge above the cornice.
+- [x] loading: the 'walls, legs, signs' stage is split in three and marks() yields between marks (breathe.ts slicer); in a
+  cold load the mountain's own slices are <= 76 ms (LoAF); 'Promise.resolve src/world/fonts.ts' 126-198 ms = the font set
+  activation after ensureFonts + the start of the landmarks stage (now sliced).
+- Perf (shots/r3-env/mtn.perfspots.mjs, in-game 1920x1080 high, track share incl. shadows) at the wall / portal spots
+  s 1337-1699: 128-168 calls / 324-528k tris -> 133-176 / 338-548k (+4..8 calls, +13..20k tris). perfgame (whole race) max
+  209 calls / 660k tris (was 212 / 706k); sandbox sweep max 193 / 577k (gate 212 / 680k). Real time 60 fps capped, p95 16.8 ms.
+- Sheet shots/r3-env/sheet_mountain_walls.jpg (before | after at s 1437 / 1440 / 1600 / 1650 / 1680 / 1975).
+Verify: tsc 0 errors · track.test mountain 0 fails, rebuild/dispose clean · mountain.perf ok · perfgame ok · intrusion
+(city.intrude --track mountain, rocks + cover): no rock inside the road · autopilot race seed 3: 8/8 finished, P2 179.8 s,
+0 errors · mountain.game / mountain.shots: 0 errors.

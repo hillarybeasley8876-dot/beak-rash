@@ -26,16 +26,53 @@ const CITY_LOOK: EnvLook = {
 // Golden hour (env-mountain): the sun sits ~14° up, 25-35° off the cliff, summit and descent headings
 // (the ridges dip into a saddle under it). Mauve fog so fogged hills read as the first of the layered
 // purple ridges (env/mountain-ridges.ts). Near-neutral tint: the sky and sun carry the warmth, a cool
-// violet ambient ground keeps shadows contrasting with the warm light.
+// violet ambient ground keeps shadows contrasting with the warm light. The key is a pale gold (not
+// orange) and the ambient sky a grey lavender, so sunlit whites (the pelican's back) read cream, not salmon.
 const MOUNTAIN_LOOK: EnvLook = {
   name: 'Sunset Pass golden hour',
   sky: { top: '#3d2f7a', horizon: '#ffc27a', bottom: '#d98a7e' },
   fog: { color: '#c48aa6', near: 170, far: 900 },
-  sun: { dir: { x: -0.1685, y: -0.2419, z: -0.9555 }, color: '#ffb46e', intensity: 2.3 },
-  ambient: { sky: '#b48ad8', ground: '#6a5a9a', intensity: 1.0 },
+  sun: { dir: { x: -0.1685, y: -0.2419, z: -0.9555 }, color: '#ffe0b4', intensity: 2.3 },
+  ambient: { sky: '#aaaadc', ground: '#6a5a9a', intensity: 1.0 },
   grade: { saturation: 1.08, contrast: 1.06, tint: '#fff5ec', bloom: 0.25, night: false },
 };
 
 export function lookFor(id: TrackId): EnvLook {
   return id === 'city' ? CITY_LOOK : id === 'mountain' ? MOUNTAIN_LOOK : COAST_LOOK;
+}
+
+type Rgb = readonly [number, number, number];
+
+/**
+ * Asphalt per track (road/): `base` paints the asphalt texture; `tones` are the light / dark multipliers of
+ * the low-frequency two-tone tint (about ±7 %); `line` darkens the worn racing line; `marks` places one
+ * road mark every `every` m, picked by weight (tar patches, manholes, lane / bend arrows, meme words).
+ */
+export interface RoadLook {
+  base: string;
+  tones: readonly [Rgb, Rgb];
+  line: number;
+  marks: { every: readonly [number, number]; patch: number; manhole: number; arrow: number; word: number };
+}
+
+const ROAD_LOOKS: Record<TrackId, RoadLook> = {
+  // Warm sun-bleached grey: light patches a touch warmer, dark ones a touch cooler.
+  coast: {
+    base: '#5f5e61', tones: [[1.07, 1.06, 1.03], [0.92, 0.92, 0.94]], line: 0.24,
+    marks: { every: [70, 130], patch: 3, manhole: 2, arrow: 2, word: 2 },
+  },
+  // Wet night asphalt (the city's wet overlay sits on top): base unchanged, a quieter tint, mostly manholes.
+  city: {
+    base: '#5b5f68', tones: [[1.04, 1.04, 1.05], [0.95, 0.95, 0.96]], line: 0.12,
+    marks: { every: [70, 130], patch: 1, manhole: 4, arrow: 2, word: 2 },
+  },
+  // Cool violet-grey pass road, patched more often than repainted.
+  mountain: {
+    base: '#5f5c6a', tones: [[1.07, 1.06, 1.08], [0.92, 0.92, 0.94]], line: 0.24,
+    marks: { every: [70, 130], patch: 4, manhole: 1, arrow: 3, word: 2 },
+  },
+};
+
+export function roadLookFor(id: TrackId): RoadLook {
+  return ROAD_LOOKS[id];
 }

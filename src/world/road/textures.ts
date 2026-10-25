@@ -37,16 +37,16 @@ function speckle(g: CanvasRenderingContext2D, w: number, h: number, rng: Rng, n:
 }
 
 /**
- * Asphalt across the full road width (u: −hw..+hw → 0..1), one dash period along v.
- * Edge lines, white lane dashes at ±hw/2 and a double yellow centre line.
+ * Asphalt across the full road width (u: −hw..+hw → 0..1), one dash period along v, on the track's base
+ * colour (looks.ts RoadLook). Edge lines, white lane dashes at ±hw/2 and a double yellow centre line.
  */
-export function asphaltTexture(renderer: WebGLRenderer, halfWidth: number): CanvasTexture {
+export function asphaltTexture(renderer: WebGLRenderer, halfWidth: number, base: string): CanvasTexture {
   const W = 512, H = 512;
   const [c, g] = canvas(W, H);
   const rng = new Rng(0xa5fa17);
   const pxPerM = W / (halfWidth * 2);
   const X = (m: number): number => (m + halfWidth) * pxPerM;
-  g.fillStyle = '#5b5f68';
+  g.fillStyle = base;
   g.fillRect(0, 0, W, H);
   // Worn wheel tracks: slightly darker bands in every lane.
   for (const lane of [-5.25, -1.75, 1.75, 5.25]) {

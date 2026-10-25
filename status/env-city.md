@@ -222,3 +222,31 @@ max 195 calls / 683k tris, medium 193 / 681k, low 122 / 432k · dressing build ~
 with 0 errors at high (seed 3, P2, 169.9 s) and quality=low (seed 7, P1, 170.2 s) · in-game sheet
 shots/env-city/f2/final.jpg (16 tiles, mean luma 60-100, 0 errors) + per-fix shots in shots/env-city/f2/.
 
+## r3 polish (2026-10-25)
+Issues: reviews/game-r2-aesthetic.json#4 (trees), reviews/game-r2-perf.json#2 (dressing freeze); re-checked status/core.md's
+old wet-road seam + arcade black-front items. Evidence in shots/r3-env/ (gitignored).
+- [x] aesthetic#4 trees (props/city-street.ts `TREE`, dressing/city/street.ts): crown = core + 5 rim lobes + crown lobe, every
+  lobe <= 1.0 m (TREE.maxLobe), crown reach 1.55 m, canopy emissive share 0.42/0.36 -> 0.15 (TREE.canopyLit), three tones per
+  tree + warm dark undersides (no purple / olive shadow side), crown starts ~2.7 m up (camera looks under it); planter,
+  trunk (thicker, lighter) and 3 fork branches moved to the city:lit batch with the street-glow wash. Placement: on curves
+  tighter than R 60 (tightest radius within +-16 m) trunks stand 2.5-2.6 m back (3 trees, crown clearance >= 0.95 m); no
+  trees on the roundabout's side from 90 m before the hairpin to its end (9 spots left open); landmarks.ts reserves a
+  36 x 18 m view corridor at the corner before the hairpin (Lots.reserve: no buildings, street props still allowed).
+  Verified: statue probe (shots/r3-env/city.sight.mjs, chase-cam rays to wheel/body/head over s 2640-2725): visible 31 % -> 86 %,
+  0 views blocked by trees (17 before); the statue now shows from s~2660. Sheet shots/r3-env/sheet_city_trees.jpg (before | after).
+- [x] perf#2 dressing freeze: dressCity yields between 13 stages with ctx.progress (copy of dressMountain's stages());
+  streetWalls / skyline / farFill / farBank / life slice their loops (breathe.ts `slicer`, 30 ms); city batches build via
+  AuxBatch.finishYielding; the three deferred atlases are now SlicedAtlas (new dressing/city/atlas.ts: paints its cells
+  in 30 ms slices; the faces atlas alone was a 120 ms flush); shared batches via finishDressYielding. Long tasks in the
+  dressing window (shots/r3-env/longtask.mjs, 1080p, loaded machine): restart 910 / 907 ms -> 80 / 78 ms; cold 1135 ms -> the
+  city's own slices <= 63-72 ms (LoAF attribution, shots/r3-env/loaf.mjs; the 180-365 ms tasks left in a cold window are
+  src/actors/preload.ts). Loading bar: 2 -> 27 updates during the dressing. City info logs now go through ctx.log (?debug).
+- finishScreenFace (faces.ts) uses the track's new art contract (artReady + cell(..., [art])): red-burst placeholder while
+  the poster decodes, redrawn when it lands.
+- Old items: wet-road seams / reflection pop at the underpass NOT reproduced (city.occlude 851 rays, 0 covered; mirror on in
+  515/515 samples s 2120-2761, shots/r3-env/city.wetpop.mjs); arcade black fronts NOT reproduced (city.black worst 0.096).
+  Note: city.black at s 2640 x -6.5 reads 0.27-0.29 with and without the corridor (dark building base + planter at arm's length).
+- Shared-file edit: src/world/breathe.ts + `slicer()` (additive). sandbox/city.intrude.mjs takes --track.
+Verify: tsc 0 errors · track.test city 0 fails, rebuild/dispose clean · city.occlude 0/851 · city.intrude ok · city.black ok ·
+city.perf max 195 calls / 682k tris (unchanged) · real-time 60 fps capped, p95 16.8 ms at s 2742 / 360 / 2466 · autopilot race
+seed 3: 8/8 finished, P1 167.4 s, 0 errors · core-check OK.

@@ -1,13 +1,16 @@
 // City dressing (霓虹夜城): turns layout marks + zones into the night city. Landmarks claim their
-// footprint first, then street walls and towers, street furniture, signage, sky and rain.
+// footprint first, then street walls and towers, street furniture, signage, sky and rain. Every stage
+// (and the long loops inside the heavy ones) yields to the browser and reports progress, so the loading
+// screen keeps painting: no build task runs much over ~60-80 ms.
+import { breathe, slicer } from '../../breathe';
 import type { WorldCtx } from '../../ctx';
 import { ensureFonts } from '../../fonts';
-import { SignAtlas } from '../../scenery/signs/atlas';
 import type { TerrainField } from '../../terrain/field';
 import { loadBillboardArt } from '../coast/signage';
 import { buildRain } from '../../env/city-rain';
 import { buildWetRoad } from '../../env/city-wet';
-import { finishDress, makeDress } from '../dress';
+import { finishDressYielding, makeDress } from '../dress';
+import { SlicedAtlas } from './atlas';
 import { skyline, streetWalls } from './blocks';
 import { REFLECT_LAYER } from './batch';
 import { finishCity, makeCity, paintAtlases, type City } from './city';
@@ -51,19 +54,22 @@ function landmarks(c: City, art: HTMLImageElement[]): void {
   for (const m of c.d.ctx.L.marks.filter((k) => k.kind === 'roundabout')) roundaboutAt(c, m.s, m.x);
 }
 
-/** Stalls, people, kerb props (filling what is left), the night-market gates and lanterns, cables. */
-function life(c: City): void {
+/** Stalls, people, kerb props (filling what is left), the night-market gates and lanterns, cables; `tick` yields. */
+async function life(c: City, tick: () => Promise<void>): Promise<void> {
   const stops = marksOf(c, 'busStop');
   const nStalls = stalls(c);
+  await tick();
   const people = crowds(c, marksOf(c, 'crossing').map((m) => m.s), marksOf(c, 'scramble').map((m) => m.s), stops, marksOf(c, 'subway'));
+  await tick();
   const nTrees = kerbProps(c);
+  await tick();
   for (const m of marksOf(c, 'stalls')) {
     marketGate(c, m.s - 12, '鹈鹕夜市', 'NIGHT MARKET');
     marketGate(c, m.s + m.len + 8, '鹈鹕夜市', 'SEE YOU TONIGHT');
     lanternStrings(c, m.s - 8, m.s + m.len + 4);
   }
   const nCables = cables(c);
-  console.info(`[track] city life: ${people} pedestrians, ${nStalls} stalls, ${nTrees} trees, ${nCables} cable runs`);
+  c.d.ctx.log(`city life: ${people} pedestrians, ${nStalls} stalls, ${nTrees} trees, ${nCables} cable runs`);
 }
 
 /** Road paint and street furniture (after the buildings, so props keep clear of their lots). */
@@ -79,7 +85,22 @@ function streets(c: City, pools: Pools): void {
   const lamps = streetLamps(c, pools);
   retainingWalls(c);
   tunnelFitOut(c);
-  console.info(`[track] city streets: ${lamps} lamps, ${cross.length} crossings`);
+  ctx.log(`city streets: ${lamps} lamps, ${cross.length} crossings`);
+}
+
+/** Stage markers (as in dressMountain): `done` logs the stage's build time (debug), reports progress and
+ *  yields so the loading screen keeps painting; `restart` drops time spent waiting (fonts) from the next stage. */
+function stages(ctx: WorldCtx): { done(name: string, f: number): Promise<void>; restart(): void } {
+  let t = performance.now();
+  return {
+    async done(name, f) {
+      ctx.log(`city ${name}: ${Math.round(performance.now() - t)} ms`);
+      ctx.progress(f);
+      await breathe();
+      t = performance.now();
+    },
+    restart() { t = performance.now(); },
+  };
 }
 
 export async function dressCity(ctx: WorldCtx, field: TerrainField): Promise<void> {
@@ -88,27 +109,42 @@ export async function dressCity(ctx: WorldCtx, field: TerrainField): Promise<voi
   const fonts = ensureFonts([...ALL_CITY_TEXT, ...BANNERS, ...ROAD_SIGNS, '前方起飞 0123456789. KM'], 4000);
   const art = await loadBillboardArt(ctx.id);
   const t0 = performance.now();
-  const d = makeDress(ctx, field, new SignAtlas(2048, 2048, true), ctx.rng.fork(0xc17e));
+  const st = stages(ctx), tick = slicer();
+  const faces = new SlicedAtlas();
+  const d = makeDress(ctx, field, faces, ctx.rng.fork(0xc17e));
   const c = makeCity(d);
   const pools = new Pools(ctx);
   landmarks(c, art);
-  streetWalls(c);
+  await st.done('landmarks', 0.06);
+  await streetWalls(c, tick);
+  await st.done('street walls', 0.16);
   const canyon = billboardCanyon(c, art);
   const boards = streetP5Boards(c), pylons = p5Pylons(c);
   const jump = ctx.L.features.find((f) => f.kind === 'jumpCrest');
   const peak = jump?.data?.peak;
   hazardStripes(c, typeof peak === 'number' ? peak : null, c.d.rng.fork(0x4a2));
-  skyline(c);
-  const blocks = farFill(c) + farBank(c);
+  await st.done('canyon, P5 boards + pylons', 0.22);
+  await skyline(c, tick);
+  await st.done('skyline', 0.28);
+  const blocks = await farFill(c, tick) + await farBank(c, tick);
+  await st.done('far fill + bank', 0.34);
   neonSigns(c, art);
+  await st.done('neon', 0.42);
   streets(c, pools);
-  life(c);
+  await st.done('streets', 0.5);
+  await life(c, tick);
+  await st.done('life', 0.56);
   pools.build();
-  paintAtlases(c, await fonts);
-  const meshes = [...finishCity(c), ...finishDress(d)];
+  const fontsReady = await fonts;
+  st.restart();
+  await paintAtlases(c, faces, fontsReady);
+  await st.done('pools + atlases', 0.62);
+  const cityMeshes = await finishCity(c, (f) => ctx.progress(0.62 + 0.2 * f));
+  const meshes = [...cityMeshes, ...await finishDressYielding(d, (f) => ctx.progress(0.82 + 0.14 * f))];
   // Lamps and lit props glow in the wet road too.
   for (const m of meshes) if (m.name.startsWith('glow:')) m.layers.enable(REFLECT_LAYER);
+  await st.done('batches', 0.96);
   buildWetRoad(ctx, REFLECT_LAYER);
   buildRain(ctx);
-  console.info(`[track] city dressing: ${meshes.length} batched meshes, ${c.slots.length} sign slots, ${blocks} fill blocks, ${canyon} canyon scaffolds, ${boards} P5 boards, ${pylons} P5 pylons, ${Math.round(performance.now() - t0)} ms`);
+  ctx.log(`city dressing: ${meshes.length} batched meshes, ${c.slots.length} sign slots, ${blocks} fill blocks, ${canyon} canyon scaffolds, ${boards} P5 boards, ${pylons} P5 pylons, ${Math.round(performance.now() - t0)} ms`);
 }

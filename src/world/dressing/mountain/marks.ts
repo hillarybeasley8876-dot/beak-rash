@@ -75,9 +75,13 @@ function dispatch(d: Dress, m: Mark): void {
   }
 }
 
-export function marks(d: Dress): void {
+/** Every mark in rank order; `tick` yields between them (landmarks are the heaviest dressing step). */
+export async function marks(d: Dress, tick: () => Promise<void>): Promise<void> {
   const list = [...d.ctx.L.marks].sort((a, b) => rank(a) - rank(b) || a.s - b.s);
-  for (const m of list) if (m.kind !== 'balloon') dispatch(d, m);
+  for (const m of list) {
+    if (m.kind !== 'balloon') dispatch(d, m);
+    await tick();
+  }
   // Balloons share one animated mesh, so their marks are built together.
   balloons(d, list.filter((m) => m.kind === 'balloon').map((m): [number, -1 | 1] => [m.s, m.x < 0 ? -1 : 1]));
 }

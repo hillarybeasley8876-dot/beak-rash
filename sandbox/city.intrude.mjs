@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 // Props / faces that reach into the drivable road below head height (riders and the chase camera
 // would ghost through them). Projects the vertices of the city's dressing batches to track space.
-//   node sandbox/city.intrude.mjs [--ymax 3.5] [--margin 0.05] [--fail 2.5]
+//   node sandbox/city.intrude.mjs [--ymax 3.5] [--margin 0.05] [--fail 2.5] [--track mountain]
 import { BASE, parseArgs, withPage } from '../tools/lib.mjs';
 
 const a = parseArgs(process.argv.slice(2));
 await withPage(async (page) => {
-  await page.goto(`${BASE}/sandbox/track.html?track=city&s=60&quality=high`, { waitUntil: 'load', timeout: 60000 });
-  await page.waitForFunction(() => window.__trk?.ready === true, null, { timeout: 60000 });
+  await page.goto(`${BASE}/sandbox/track.html?track=${a.track ?? 'city'}&s=60&quality=high`, { waitUntil: 'load', timeout: 90000 });
+  await page.waitForFunction(() => window.__trk?.ready === true, null, { timeout: 90000 });
   const hits = await page.evaluate(([ymax, margin]) => {
     const t = window.__trk.track;
     const CELL = 12, grid = new Map();

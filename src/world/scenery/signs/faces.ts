@@ -2,77 +2,99 @@
 // road signs, warning signs, chevrons, distance markers and banners.
 import type { Rng } from '../../../core/rng';
 import { FONT } from '../../fonts';
+import { artReady, whenArt } from './art';
 import type { AtlasRect, SignAtlas } from './atlas';
 import { burst, halftone, label, P5, ransom, star } from './p5draw';
 
 type G = CanvasRenderingContext2D;
 
-export function cell(atlas: SignAtlas, w: number, h: number, draw: (g: G, w: number, h: number) => void): AtlasRect | null {
+/** Allocate and paint a w × h face. `art`: billboard images the draw uses; while one is still decoding the
+ *  draw must paint a placeholder (check artReady) — the atlas draws the cell again when it lands. */
+export function cell(
+  atlas: SignAtlas, w: number, h: number, draw: (g: G, w: number, h: number) => void, art?: readonly HTMLImageElement[],
+): AtlasRect | null {
   const c = atlas.alloc(w, h);
   if (!c) {
     console.warn(`[track] sign atlas full; skipping a ${w}×${h} sign face`);
     return null;
   }
   atlas.paint(c.x, c.y, c.w, h, draw);
+  for (const img of art ?? []) {
+    if (artReady(img)) continue;
+    void whenArt(img).then((landed) => {
+      if (landed) atlas.redrawCell(c.x, c.y, c.w, h, draw);
+    });
+  }
   return c.rect;
 }
 
 /** Billboard with generated poster art (16:9): full-bleed art, ransom-note line on a jagged band
- *  across the calm top of the poster, thick ink frame with a red corner star. */
+ *  across the calm top of the poster, thick ink frame with a red corner star. Art still decoding: the
+ *  text design fills the same 16:9 cell until it lands (the atlas then draws the cell again). */
 function artBillboard(atlas: SignAtlas, rng: Rng, text: string, art: HTMLImageElement): AtlasRect | null {
   return cell(atlas, 512, 288, (g, w, h) => {
-    const k = Math.max(w / art.width, h / art.height);
-    // Keep the top of the poster (its calm band is reserved for our text).
-    g.drawImage(art, (w - art.width * k) / 2, 0, art.width * k, art.height * k);
-    const bandH = h * 0.38;
-    g.save();
-    g.translate(w / 2, 14 + bandH / 2);
-    g.rotate(-0.04);
-    g.fillStyle = P5.red;
-    g.beginPath();
-    g.moveTo(-w * 0.47, -bandH / 2 + 6); g.lineTo(w * 0.47, -bandH / 2 - 2); g.lineTo(w * 0.45, bandH / 2 + 4); g.lineTo(-w * 0.46, bandH / 2 + 8);
-    g.closePath();
-    g.fill();
-    g.fillStyle = P5.black;
-    g.beginPath();
-    g.moveTo(-w * 0.45, -bandH / 2); g.lineTo(w * 0.455, -bandH / 2 - 6); g.lineTo(w * 0.44, bandH / 2 - 2); g.lineTo(-w * 0.44, bandH / 2 + 2);
-    g.closePath();
-    g.fill();
-    g.restore();
-    ransom(g, rng, text, w * 0.08, 10, w * 0.84, bandH + 6);
-    g.fillStyle = P5.red;
-    g.beginPath(); g.moveTo(w, h); g.lineTo(w - 70, h); g.lineTo(w, h - 70); g.closePath(); g.fill();
-    star(g, w - 22, h - 22, 13, P5.white, 0.2);
-    g.lineWidth = 12;
-    g.strokeStyle = P5.black;
-    g.strokeRect(6, 6, w - 12, h - 12);
-  });
+    if (artReady(art)) artPoster(g, w, h, rng.fork(1), text, art);
+    else textBillboard(g, w, h, rng.fork(2), text);
+  }, [art]);
 }
 
-/** 2:1 meme billboard: red field + halftone, white jagged panel, ransom-note line, stars, tag. */
+/** Poster art filling the cell (top kept), the line on a red / black band, red corner, ink frame. */
+function artPoster(g: G, w: number, h: number, rng: Rng, text: string, art: HTMLImageElement): void {
+  const k = Math.max(w / art.width, h / art.height);
+  // Keep the top of the poster (its calm band is reserved for our text).
+  g.drawImage(art, (w - art.width * k) / 2, 0, art.width * k, art.height * k);
+  const bandH = h * 0.38;
+  g.save();
+  g.translate(w / 2, 14 + bandH / 2);
+  g.rotate(-0.04);
+  g.fillStyle = P5.red;
+  g.beginPath();
+  g.moveTo(-w * 0.47, -bandH / 2 + 6); g.lineTo(w * 0.47, -bandH / 2 - 2); g.lineTo(w * 0.45, bandH / 2 + 4); g.lineTo(-w * 0.46, bandH / 2 + 8);
+  g.closePath();
+  g.fill();
+  g.fillStyle = P5.black;
+  g.beginPath();
+  g.moveTo(-w * 0.45, -bandH / 2); g.lineTo(w * 0.455, -bandH / 2 - 6); g.lineTo(w * 0.44, bandH / 2 - 2); g.lineTo(-w * 0.44, bandH / 2 + 2);
+  g.closePath();
+  g.fill();
+  g.restore();
+  ransom(g, rng, text, w * 0.08, 10, w * 0.84, bandH + 6);
+  g.fillStyle = P5.red;
+  g.beginPath(); g.moveTo(w, h); g.lineTo(w - 70, h); g.lineTo(w, h - 70); g.closePath(); g.fill();
+  star(g, w - 22, h - 22, 13, P5.white, 0.2);
+  g.lineWidth = 12;
+  g.strokeStyle = P5.black;
+  g.strokeRect(6, 6, w - 12, h - 12);
+}
+
+/** Meme billboard (2:1, or 16:9 with art; see artBillboard): P5 text design or poster art. Each draw uses
+ *  its own fork of `rng`, so a repaint (late fonts / art) gives the same design. */
 export function billboardFace(atlas: SignAtlas, rng: Rng, text: string, art: HTMLImageElement | null): AtlasRect | null {
   if (art) return artBillboard(atlas, rng, text, art);
-  return cell(atlas, 512, 256, (g, w, h) => {
-    const variant = rng.int(0, 2);
-    g.fillStyle = variant === 1 ? P5.black : P5.red;
-    g.fillRect(0, 0, w, h);
-    halftone(g, 0, 0, w, h, variant === 1 ? '#3a0a0e' : '#9e0f13', 12);
-    burst(g, rng, w * 0.04, h * 0.06, w * 0.92, h * 0.88, 14, P5.white);
-    g.save();
-    g.translate(w / 2, h / 2);
-    g.rotate(-0.1);
-    burst(g, rng, -w * 0.42, -h * 0.36, w * 0.84, h * 0.72, 12, variant === 2 ? P5.yellow : P5.black);
-    g.restore();
-    ransom(g, rng, text, w * 0.12, h * 0.2, w * 0.76, h * 0.6);
-    star(g, w * 0.1, h * 0.18, 18, P5.yellow, rng.range(0, 1));
-    star(g, w * 0.9, h * 0.82, 14, P5.white, rng.range(0, 1));
-    g.fillStyle = P5.black;
-    g.fillRect(w - 112, h - 30, 108, 26);
-    label(g, '鹈鹕湾', w - 58, h - 17, 18, P5.white, FONT.cn, 400);
-    g.lineWidth = 10;
-    g.strokeStyle = P5.black;
-    g.strokeRect(5, 5, w - 10, h - 10);
-  });
+  return cell(atlas, 512, 256, (g, w, h) => textBillboard(g, w, h, rng.fork(2), text));
+}
+
+/** Text billboard: red field + halftone, white jagged panel, ransom-note line, stars, tag. */
+function textBillboard(g: G, w: number, h: number, rng: Rng, text: string): void {
+  const variant = rng.int(0, 2);
+  g.fillStyle = variant === 1 ? P5.black : P5.red;
+  g.fillRect(0, 0, w, h);
+  halftone(g, 0, 0, w, h, variant === 1 ? '#3a0a0e' : '#9e0f13', 12);
+  burst(g, rng, w * 0.04, h * 0.06, w * 0.92, h * 0.88, 14, P5.white);
+  g.save();
+  g.translate(w / 2, h / 2);
+  g.rotate(-0.1);
+  burst(g, rng, -w * 0.42, -h * 0.36, w * 0.84, h * 0.72, 12, variant === 2 ? P5.yellow : P5.black);
+  g.restore();
+  ransom(g, rng, text, w * 0.12, h * 0.2, w * 0.76, h * 0.6);
+  star(g, w * 0.1, h * 0.18, 18, P5.yellow, rng.range(0, 1));
+  star(g, w * 0.9, h * 0.82, 14, P5.white, rng.range(0, 1));
+  g.fillStyle = P5.black;
+  g.fillRect(w - 112, h - 30, 108, 26);
+  label(g, '鹈鹕湾', w - 58, h - 17, 18, P5.white, FONT.cn, 400);
+  g.lineWidth = 10;
+  g.strokeStyle = P5.black;
+  g.strokeRect(5, 5, w - 10, h - 10);
 }
 
 /** Rectangular road sign: white plate, black rim, red band with a star. */

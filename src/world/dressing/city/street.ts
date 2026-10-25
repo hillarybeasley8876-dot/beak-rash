@@ -3,7 +3,7 @@
 // scooters in the strip between the bollard kerb and the shop fronts.
 import { Color } from 'three';
 import { Rng } from '../../../core/rng';
-import { busShelter, planterTree, scooter, streetLamp, trafficLight, vending } from '../../scenery/props/city-street';
+import { busShelter, planterTree, scooter, streetLamp, trafficLight, TREE, vending } from '../../scenery/props/city-street';
 import { postSign } from '../../scenery/signs/boards';
 import { roadSignFace } from '../../scenery/signs/faces';
 import type { City } from './city';
@@ -110,22 +110,47 @@ function kerbSpot(c: City, s: number, side: -1 | 1, us: number[], r: number): Re
   return null;
 }
 
+/** Curves tighter than this (m) swing the chase camera over the kerb: trees stand further back there. */
+const TIGHT_R = 60;
+
+/** Tightest radius (m) of the road within ±16 m of s. */
+function tightest(c: City, s: number): number {
+  let k = 0;
+  for (let ds = -16; ds <= 16; ds += 4) k = Math.max(k, Math.abs(c.d.ctx.q.frameVis(s + ds).curvature));
+  return k > 1e-6 ? 1 / k : Infinity;
+}
+
+/** The roundabout statue's sightline: no trees on its side from 90 m before its hairpin to the hairpin's end. */
+function statueView(c: City, s: number, side: -1 | 1): boolean {
+  const { L } = c.d.ctx;
+  return L.marks.some((m) => {
+    if (m.kind !== 'roundabout' || Math.sign(m.x) !== side) return false;
+    const z = L.zones.find((zz) => m.s >= zz.s0 && m.s < zz.s1);
+    return !!z && s > z.s0 - 90 && s < z.s1;
+  });
+}
+
 function trees(c: City, rng: Rng): number {
   const { ctx, b } = c.d;
-  let count = 0;
+  let count = 0, tight = 0, view = 0, clear = Infinity;
   for (const z of ctx.L.zones) {
     const kind = TREES[z.name];
     if (!kind) continue;
     for (const side of [-1, 1] as const) {
       for (let s = z.s0 + 10 + rng.range(0, 5); s < z.s1 - 6; s += rng.range(15, 21)) {
-        const mt = kerbSpot(c, s, side, [1.3, 1.0], 1.0);
+        if (statueView(c, s, side)) { view++; continue; }
+        // On tight curves the trunk stands >= 2.5 m back (the crown then clears the drivable edge by ~1 m).
+        const isTight = tightest(c, s) < TIGHT_R;
+        const mt = kerbSpot(c, s, side, isTight ? [2.6, 2.5] : [1.3, 1.0], 1.0);
         if (!mt) continue;
         const { x, z: wz } = mt.sp.pos;
-        planterTree(b.props.at(x, wz), c.cb.lit.at(x, wz), b.glow.at(x, wz), x, mt.y, wz, mt.sp.faceRoad, rng, kind);
+        planterTree(c.cb.lit.at(x, wz), b.glow.at(x, wz), x, mt.y, wz, mt.sp.faceRoad, rng, kind);
         count++;
+        if (isTight) { tight++; clear = Math.min(clear, mt.sp.u - TREE.reach); }
       }
     }
   }
+  ctx.log(`city trees: ${count} (${tight} set back on curves under R ${TIGHT_R}, crown clearance >= ${tight ? clear.toFixed(2) : '-'} m; ${view} spots left open for the statue)`);
   return count;
 }
 

@@ -1,6 +1,7 @@
 // City batches: like kit/PropBatch, plus a per-vertex `aux` vec4 the city shaders read (window
 // style / seed / lit ratio, neon intensity / flicker, light cycles), and an optional reflection layer.
 import { BufferAttribute, Mesh, type BufferGeometry, type Material } from 'three';
+import { breathe } from '../../breathe';
 import type { WorldCtx } from '../../ctx';
 import { MeshBuf, makeHull } from '../../geom';
 import { hullMat, OUTLINE } from '../../mats';
@@ -62,30 +63,42 @@ export class AuxBatch {
     return buf;
   }
 
-  finish(): Mesh[] {
-    const { ctx, opts } = this;
-    const width = opts.outline ?? 0;
+  /** Build one mesh (+ hull) per non-empty cell, yielding to the browser whenever a run of cells took
+   *  longer than `sliceMs` (keeps the loading screen painting). */
+  async finishYielding(sliceMs = 30): Promise<Mesh[]> {
     const meshes: Mesh[] = [];
+    let t0 = performance.now();
     for (const [key, buf] of this.cells) {
-      if (buf.idx.length === 0) continue;
-      const geo = ctx.own(buf.build());
-      const mesh = new Mesh(geo, opts.material);
-      mesh.name = `${this.name}:${key}`;
-      mesh.castShadow = opts.castShadow ?? false;
-      mesh.receiveShadow = opts.receiveShadow ?? false;
-      if (opts.renderOrder !== undefined) mesh.renderOrder = opts.renderOrder;
-      if (opts.reflect) mesh.layers.enable(REFLECT_LAYER);
-      if (width > 0) {
-        const hull = new Mesh(ctx.own(makeHull(geo, width)), hullMat(ctx));
-        hull.name = `${mesh.name}:hull`;
-        hull.userData.isOutline = true;
-        mesh.add(hull);
+      const mesh = this.build(key, buf);
+      if (mesh) meshes.push(mesh);
+      if (performance.now() - t0 > sliceMs) {
+        await breathe();
+        t0 = performance.now();
       }
-      ctx.group.add(mesh);
-      meshes.push(mesh);
     }
     this.cells.clear();
     return meshes;
+  }
+
+  private build(key: string, buf: AuxBuf): Mesh | null {
+    if (buf.idx.length === 0) return null;
+    const { ctx, opts } = this;
+    const width = opts.outline ?? 0;
+    const geo = ctx.own(buf.build());
+    const mesh = new Mesh(geo, opts.material);
+    mesh.name = `${this.name}:${key}`;
+    mesh.castShadow = opts.castShadow ?? false;
+    mesh.receiveShadow = opts.receiveShadow ?? false;
+    if (opts.renderOrder !== undefined) mesh.renderOrder = opts.renderOrder;
+    if (opts.reflect) mesh.layers.enable(REFLECT_LAYER);
+    if (width > 0) {
+      const hull = new Mesh(ctx.own(makeHull(geo, width)), hullMat(ctx));
+      hull.name = `${mesh.name}:hull`;
+      hull.userData.isOutline = true;
+      mesh.add(hull);
+    }
+    ctx.group.add(mesh);
+    return mesh;
   }
 }
 
