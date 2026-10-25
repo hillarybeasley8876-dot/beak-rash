@@ -21,12 +21,19 @@ vec3 prefilter(vec3 c) {
   soft = soft * soft / (4.0 * uKnee + 1e-4);
   return c * (max(soft, br - uThreshold) / max(br, 1e-4));
 }
+// A NaN / Inf texel upstream (a material whose math breaks on one GPU backend, half-float overflow) would
+// smear through the whole mip chain as a solid white block: drop it, and cap real highlights before they bloom.
+vec3 tap(vec2 uv) {
+  vec3 c = texture2D(tInput, uv).rgb;
+  if (any(isnan(c)) || any(isinf(c))) return vec3(0.0);
+  return clamp(c, 0.0, 64.0);
+}
 void main() {
   vec2 o = uTexel;
-  vec3 a = texture2D(tInput, vUv + vec2(-o.x, -o.y)).rgb;
-  vec3 b = texture2D(tInput, vUv + vec2(o.x, -o.y)).rgb;
-  vec3 c = texture2D(tInput, vUv + vec2(-o.x, o.y)).rgb;
-  vec3 d = texture2D(tInput, vUv + vec2(o.x, o.y)).rgb;
+  vec3 a = tap(vUv + vec2(-o.x, -o.y));
+  vec3 b = tap(vUv + vec2(o.x, -o.y));
+  vec3 c = tap(vUv + vec2(-o.x, o.y));
+  vec3 d = tap(vUv + vec2(o.x, o.y));
   // Karis average: tames single-pixel fireflies (specks of sun glint) before they bloom.
   float wa = 1.0 / (1.0 + fxLuma(a)), wb = 1.0 / (1.0 + fxLuma(b));
   float wc = 1.0 / (1.0 + fxLuma(c)), wd = 1.0 / (1.0 + fxLuma(d));
