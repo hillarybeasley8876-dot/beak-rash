@@ -35,8 +35,10 @@
 .br-cal-luck .is-bad i { background: var(--ink); }
 .br-cal-luck span { font-family: var(--f-cn-block); font-weight: 400; font-size: 42px; line-height: 1; white-space: nowrap; }
 .br-cal-luck .is-long span { font-size: 32px; }
-.br-cal-weather { position: absolute; left: 34px; bottom: 50px; display: flex; align-items: center; gap: 16px; font-family: var(--f-cn-block); font-weight: 400; font-size: 46px; }
+.br-cal-weather { position: absolute; left: 34px; bottom: 74px; display: flex; align-items: center; gap: 16px; font-family: var(--f-cn-block); font-weight: 400; font-size: 46px; }
 .br-cal-icon { width: 76px; height: 76px; }
+/* The race's modifiers (weather / direction / route): absent on a plain race. */
+.br-cal-mods { position: absolute; left: 34px; bottom: 18px; font-family: var(--f-cn-block); font-weight: 400; font-size: 32px; color: var(--red); }
 
 .br-load-title { position: absolute; left: 830px; top: 120px; width: 1000px; }
 .br-load-course { display: inline-block; padding: 4px 22px 0; background: var(--red); font-family: var(--f-display); font-weight: 400; font-size: 46px; letter-spacing: 0.1em; transform: skewX(var(--skew)); animation: br-in-right 0.3s var(--ease-out) both; }

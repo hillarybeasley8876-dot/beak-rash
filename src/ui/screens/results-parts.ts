@@ -7,6 +7,7 @@ import { ROSTER } from '../../data/roster';
 import { GRADE_QUOTES, GRADE_QUOTES_PLACE } from '../../data/strings';
 import { fishSvg, h, headSvg, jagged, portrait, reducedMotion, starSvg, svg } from '../p5';
 import { ordinal, type Reward } from '../progress';
+import type { RaceReport } from '../race-tracker';
 
 export const fmtTime = (t: number | null): string => {
   if (t === null) return 'DNF';
@@ -87,6 +88,25 @@ export function gradeBlock(reward: Reward, seed: number): HTMLDivElement {
       h('div', { class: 'br-grade-ink' }, h('b', { text: reward.grade.grade }))),
     h('div', { class: 'br-grade-title' }, h('small', { text: 'RANK' }), h('span', { text: reward.grade.title })),
     quote ? h('div', { class: 'br-grade-quote', text: quote }) : null);
+}
+
+/** The race report (SPEC §14, §17, §18): the nemesis, the STYLE chain and the police — a line only
+ *  when the thing actually happened. The +150 of the nemesis is already in the player's coins. */
+export function raceReport(report: RaceReport, results: RaceResult[]): HTMLDivElement | null {
+  const lines: Array<[string, string]> = [];
+  if (report.nemesis) {
+    const name = ROSTER[report.nemesis]?.name ?? '';
+    const down = report.nemesisBonus > 0 ? ` · 已击倒 +${report.nemesisBonus} 小鱼干` : '';
+    lines.push(['nemesis', `宿敌 ${name}${down}`]);
+  }
+  const style = results.find((r) => r.isPlayer)?.styleBest ?? 0;
+  if (style > 0) lines.push(['style', `最佳连段 ${style.toLocaleString('en-US')}`]);
+  const police: string[] = [];
+  if (report.corgisDown > 0) police.push(`放倒柯基 ×${report.corgisDown}`);
+  if (report.bribes > 0) police.push(`V我50 ×${report.bribes}`);
+  if (police.length) lines.push(['police', police.join(' · ')]);
+  if (!lines.length) return null;
+  return h('div', { class: 'br-res-report' }, ...lines.map(([line, text]) => h('div', { data: { line }, text })));
 }
 
 export interface CoinCounter {

@@ -11,6 +11,7 @@ import { CREDITS, CREDIT_OUTRO } from '../../data/strings';
 import { HINT_BACK, HINT_NAV, artImage, backdrop, h, jagged, pelicanSvg, portrait, ransom, reducedMotion, starSvg, svg } from '../p5';
 import { CUPS, FINALE } from '../copy';
 import { frame, type ScreenFactory } from '../screen';
+import { findUiEgg } from './eggs';
 import { takeFinale } from './finale';
 
 const SPEED = 70;       // px/s in stage units
@@ -100,6 +101,7 @@ export const creditsScreen: ScreenFactory = (ctx) => {
     if (thanksShown) return;
     thanksShown = true;
     f.stage.append(thanks);
+    findUiEgg(ctx.app, 'credits_thanks');   // 彩蛋 §21 #9: the egg is saved the first time only
   };
   /** Any input (key, pad button, click, wheel) restarts the idle countdown. */
   const armIdle = (): void => {

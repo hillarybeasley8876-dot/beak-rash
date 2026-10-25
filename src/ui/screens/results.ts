@@ -13,7 +13,7 @@ import { applyRewards, careerEvent, cupName, isCareerFinal, type Reward } from '
 import { frame, type ScreenFactory } from '../screen';
 import { achievementChips, achievementPanel } from './results-achievements';
 import { DEMO_ACHIEVEMENTS, demoResults, leaveRace, nextRace } from './results-flow';
-import { coinCounter, gradeBlock, podium, standingsTable } from './results-parts';
+import { coinCounter, gradeBlock, podium, raceReport, standingsTable } from './results-parts';
 
 const LOCK_MS = 900;   // after the reveal: the RESULTS slam lands before the row can arm
 const QUIET_MS = 700;  // the row arms only after this long without a key / pad press (a 450 ms hop rhythm
@@ -58,6 +58,9 @@ export const resultsScreen: ScreenFactory = (ctx) => {
     h('div', { class: 'br-res-reward' }, gradeBlock(reward, seed), counter.el),
     ach.el,
   );
+  // The race report (nemesis / STYLE / police): only the lines whose thing happened.
+  const report = raceReport(ctx.tracker.raceReport(), results);
+  if (report) f.stage.append(report);
   if (demo) f.stage.append(h('div', { class: 'br-tag is-yellow br-res-demo', text: 'DEMO 示例数据' }));
 
   const next = nextRace(ctx, config);

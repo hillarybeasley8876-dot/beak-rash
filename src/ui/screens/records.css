@@ -12,7 +12,8 @@
 .br-rec-facts span { display: flex; align-items: baseline; gap: 8px; padding: 2px 12px 0; background: var(--ink); color: var(--white); transform: skewX(var(--skew)); box-shadow: 4px 4px 0 var(--red); }
 .br-rec-facts i { font-style: normal; font-family: var(--f-cn-block); font-size: 20px; }
 .br-rec-facts b { font-family: var(--f-display); font-weight: 400; font-size: 30px; }
-.br-rec-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px 14px; }
+.br-rec-body { display: flex; align-items: flex-start; gap: 26px; }
+.br-rec-grid { flex: 1 1 auto; min-width: 0; min-height: 0; display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px 14px; max-height: 780px; overflow-y: auto; }
 .br-rec-cell { display: grid; grid-template-columns: 50px 1fr; align-content: center; column-gap: 10px; min-height: 86px; padding: 6px 10px; background: rgba(11, 11, 15, 0.07); transform: skewX(var(--skew)); }
 .br-rec-cell > * { transform: skewX(calc(var(--skew) * -1)); }
 .br-rec-cell.is-earned { background: rgba(229, 25, 28, 0.12); box-shadow: inset 4px 0 0 var(--red); }
@@ -22,12 +23,31 @@
 .br-rec-name { font-family: var(--f-cn-block); font-weight: 400; font-size: 26px; line-height: 1.1; }
 .br-rec-desc { font-size: 18px; line-height: 1.25; color: #55555e; }
 .br-rec-cell:not(.is-earned) .br-rec-name, .br-rec-cell:not(.is-earned) .br-rec-desc { color: #8a8a93; }
-/* More than 42 achievements (8-9 rows): shorter cells, same 6 columns. */
+/* More than 42 achievements (8+ rows): shorter cells, same 6 columns, one-line descriptions. */
 .br-rec-sheet.is-dense { padding-top: 22px; }
-.br-rec-sheet.is-dense .br-rec-grid { gap: 6px 14px; }
-.br-rec-sheet.is-dense .br-rec-cell { min-height: 74px; padding: 3px 10px; }
-.br-rec-sheet.is-dense .br-rec-desc { font-size: 16px; line-height: 1.2; }
+.br-rec-sheet.is-dense .br-rec-grid { gap: 6px 12px; }
+.br-rec-sheet.is-dense .br-rec-cell { min-height: 58px; padding: 3px 8px; grid-template-columns: 40px 1fr; }
+.br-rec-sheet.is-dense .br-rec-icon { width: 40px; height: 40px; }
+.br-rec-sheet.is-dense .br-rec-icon b { font-size: 20px; }
+.br-rec-sheet.is-dense .br-rec-name { font-size: 19px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.br-rec-sheet.is-dense .br-rec-desc { font-size: 15px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .br-rec-foot { display: flex; align-items: center; justify-content: flex-end; gap: 10px; margin-top: 14px; font-family: var(--f-cn-block); font-size: 24px; }
+/* ---------- the 彩蛋 section (SPEC §21) ---------- */
+.br-eggs { flex: 0 0 500px; padding-left: 22px; border-left: 4px solid var(--ink); }
+.br-eggs-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 10px; }
+.br-eggs-head > b { font-family: var(--f-cn-block); font-size: 34px; }
+.br-eggs-head .br-rec-en { font-size: 22px; }
+.br-eggs-count { display: inline-flex; align-items: baseline; padding: 0 12px; background: var(--red); color: var(--white); transform: skewX(var(--skew)); box-shadow: 4px 4px 0 var(--ink); }
+.br-eggs-count b { font-family: var(--f-display); font-weight: 400; font-size: 30px; line-height: 1.1; }
+.br-eggs-count i { font-style: normal; font-size: 20px; opacity: 0.85; }
+.br-eggs-grid { display: flex; flex-direction: column; gap: 6px; }
+.br-egg { display: flex; align-items: baseline; gap: 10px; padding: 4px 10px 5px; background: rgba(11, 11, 15, 0.07); border-left: 6px solid rgba(11, 11, 15, 0.2); }
+.br-egg.is-found { background: rgba(229, 25, 28, 0.12); border-left-color: var(--red); }
+.br-egg-name { flex: 0 0 132px; font-family: var(--f-cn-block); font-weight: 400; font-size: 22px; line-height: 1.15; }
+.br-egg-desc { font-size: 16px; line-height: 1.2; color: #55555e; }
+.br-egg:not(.is-found) .br-egg-name { color: #8a8a93; }
+.br-egg:not(.is-found) .br-egg-desc { color: #8a8a93; }
+
 /* Career-screen chip that opens the sheet. */
 .br-car-rec { position: absolute; right: 70px; top: 128px; display: flex; align-items: center; gap: 10px; padding: 4px 16px 2px; background: var(--red); color: var(--white); font-family: var(--f-cn-block); font-size: 26px; transform: skewX(var(--skew)); box-shadow: 5px 5px 0 var(--white); cursor: pointer; pointer-events: auto; animation: br-in-right 0.3s var(--ease-out) 0.08s both; }
 .br-car-rec b { font-family: var(--f-display); font-weight: 400; font-size: 30px; }

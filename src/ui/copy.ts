@@ -1,6 +1,7 @@
 // UI copy owned by ui-screens (menu blurbs, career cups). Kind, meme-flavoured; credits, how-to and
 // calendar copy come from the content unit's data/strings.ts.
 import type { ScreenId } from '../core/contracts';
+import type { Weather } from '../core/types';
 
 export interface MenuEntry { cn: string; en: string; to: ScreenId; blurb: string; padBlurb?: string }
 
@@ -18,6 +19,14 @@ export const MENU_QUIT = {
   cn: '退出游戏', en: 'QUIT', blurb: '存档随时自动保存，放心下班。',
   ask: '退出游戏？', askText: '存档已经自动保存。鹈鹕也是要下班的。', yes: '退出', no: '再骑会',
 };
+
+/** Weather names (SPEC §20): the quick-race picker, the career chips and the loading card. */
+export const WEATHER_CN: Record<Weather, string> = {
+  clear: '晴', rain: '雨', snow: '雪', fog: '雾', dusk: '黄昏',
+};
+
+/** The picker's extra entry: the race rolls one of the track's own weathers. */
+export const WEATHER_RANDOM_CN = '随机';
 
 export interface Cup { tier: 1 | 2 | 3; cn: string; en: string; motto: string }
 

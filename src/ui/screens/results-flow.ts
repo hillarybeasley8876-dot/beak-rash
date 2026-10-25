@@ -25,7 +25,10 @@ export function nextRace(ctx: ScreenCtx, config: RaceConfig | undefined): Partia
   const ev = careerEvent(config);
   if (ev) {
     const next = CAREER[ev.index];
-    return next && isUnlocked(ctx.app.save, next) ? { trackId: next.trackId, mode: 'career', level: next.tier } : null;
+    // The next event keeps its own race options (cup 2's weather, cup 3's direction or route).
+    return next && isUnlocked(ctx.app.save, next)
+      ? { trackId: next.trackId, mode: 'career', level: next.tier, weather: next.weather, reverse: next.reverse, route: next.route }
+      : null;
   }
   const i = TRACK_ORDER.indexOf(config?.trackId ?? 'coast');
   return { trackId: TRACK_ORDER[(i + 1) % TRACK_ORDER.length] ?? 'coast', mode: 'quick' };

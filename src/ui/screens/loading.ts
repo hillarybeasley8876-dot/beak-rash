@@ -8,7 +8,8 @@ import type { TrackId } from '../../core/types';
 import { LOADING_ART } from '../../data/assets';
 import { calendarFor } from '../../data/strings';
 import { PAD_TIPS, TIPS } from '../../data/tips';
-import { TRACKS, TRACK_ORDER } from '../../data/tracks';
+import { TRACKS, TRACK_ORDER, TRACK_WEATHER } from '../../data/tracks';
+import { WEATHER_CN } from '../copy';
 import { artImage, artReady, backdrop, h, jagged, ransom, riderIconSvg, svg, torn, wait } from '../p5';
 import { frame, type ScreenFactory } from '../screen';
 import { WEATHER_ICON as GOBI_ICON } from '../tracks/gobi';
@@ -56,6 +57,14 @@ export const loadingScreen: ScreenFactory = (ctx) => {
   const f = frame({ id: 'loading', bg });
   const course = String(TRACK_ORDER.indexOf(trackId) + 1).padStart(2, '0');
   const day = calendarFor(trackId, now);
+  // The race's modifiers (SPEC §20): a weather other than the track's own, a reversed run, a seeded
+  // route. A plain race shows nothing.
+  const cfg = ctx.props.config;
+  const own = TRACK_WEATHER[trackId][0] ?? 'clear';
+  const mods: string[] = [];
+  if (cfg?.weather && cfg.weather !== own) mods.push(WEATHER_CN[cfg.weather]);
+  if (cfg?.reverse) mods.push('反向');
+  if (cfg?.route) mods.push(`路线 #${cfg.route}`);
 
   const card = h('div', { class: 'br-cal br-anim-slam', vars: { '--clip': torn('cal', 'bottom', 5, 30) } },
     h('div', { class: 'br-cal-top' }, h('b', { text: String(now.getFullYear()) }), h('span', { text: MONTH_EN[now.getMonth()] ?? '' })),
@@ -65,7 +74,8 @@ export const loadingScreen: ScreenFactory = (ctx) => {
       h('span', { class: 'br-cal-d', text: String(now.getDate()) })),
     h('div', { class: 'br-cal-week' }, h('b', { text: WEEK_EN[now.getDay()] ?? '' }), h('span', { text: WEEK_CN[now.getDay()] ?? '' })),
     h('div', { class: 'br-cal-luck' }, luckRow('good', '宜', day.good), luckRow('bad', '忌', day.bad)),
-    h('div', { class: 'br-cal-weather' }, svg(WEATHER_ICON[trackId], 'br-cal-icon'), h('span', { text: info.weather })));
+    h('div', { class: 'br-cal-weather' }, svg(WEATHER_ICON[trackId], 'br-cal-icon'), h('span', { text: info.weather })),
+    mods.length ? h('div', { class: 'br-cal-mods', data: { line: 'mods' }, text: mods.join(' · ') }) : null);
 
   const title = h('div', { class: 'br-load-title' },
     h('div', { class: 'br-load-course', text: `COURSE ${course}` }),

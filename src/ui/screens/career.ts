@@ -1,23 +1,25 @@
-// career: 3 cups × 3 tracks ladder with locks and best places, detail panel for the focused event,
-// lifetime stats. Enter → flow:startRace (mode career, level = tier). Top 3 unlocks the next event; top 3
-// on a cup's last event stamps the cup CLEAR (all three = 巡回赛通关 chip by the stats). TAB / pad LB·RB (or the
-// 成就 chip) opens the records sheet: every achievement, earned or not, with counters.
+// career: 3 cups × 5 tracks ladder with locks and best places, detail panel for the focused event,
+// lifetime stats. Enter → flow:startRace (mode career, level = tier, with the event's weather /
+// direction / route). Top 3 unlocks the next event; top 3 on a cup's last event stamps the cup CLEAR
+// (all three = 巡回赛通关 chip by the stats). TAB / pad LB·RB (or the 成就 chip) opens the records sheet:
+// every achievement, earned or not, with counters.
 import './career.css';
-import { TRACKS } from '../../data/tracks';
-import { CUPS } from '../copy';
+import { TRACKS, TRACK_ORDER } from '../../data/tracks';
+import { CUPS, WEATHER_CN } from '../copy';
 import { Nav, isDirection } from '../nav';
 import { HINT_BACK, HINT_NAV, HINT_OK, backdrop, h, jagged, keyGlyph, ransom, torn } from '../p5';
-import { CAREER, UNLOCK_PLACE, bestPlace, careerCleared, cupCleared, isCareerFinal, isCupFinal, isUnlocked, ordinal, type CareerEvent } from '../progress';
+import { CAREER, UNLOCK_PLACE, bestPlace, careerCleared, cupCleared, highestOpen, isCareerFinal, isCupFinal, isUnlocked, ordinal, type CareerEvent } from '../progress';
 import { frame, type ScreenFactory } from '../screen';
 import { trackArt } from '../track-stills';
 import { recall, remember } from './memory';
 import { recordsSheet } from './records';
+import { weatherChip } from './weather-ui';
 
 const TIER_STARS = ['★', '★★', '★★★'];
 
-/** One chain-tape sticker over the locked events of a cup row (grid columns 2–4 hold the events). */
+/** One chain-tape sticker over the locked events of a cup row (the events hold the grid's columns 2…n+1). */
 function chainTape(tier: number, firstLockedCol: number, allLocked: boolean): HTMLDivElement {
-  return h('div', { class: 'br-car-chain', style: `grid-row:${tier};grid-column:${firstLockedCol + 2} / 5` },
+  return h('div', { class: 'br-car-chain', style: `grid-row:${tier};grid-column:${firstLockedCol + 2} / ${TRACK_ORDER.length + 2}` },
     h('b', { text: '???' }), h('span', { text: allLocked ? '上一杯通关后开放' : `上一站前 ${UNLOCK_PLACE} 名解锁` }));
 }
 
@@ -44,11 +46,15 @@ export const careerScreen: ScreenFactory = (ctx) => {
     events.forEach((ev) => {
       const open = isUnlocked(save, ev);
       const best = bestPlace(save, ev);
-      const cell = h('div', { class: `br-car-ev is-t${ev.tier}${open ? '' : ' is-locked'}`, vars: { '--clip': jagged(`ev${ev.key}`, { jx: 2, jy: 4, notches: 1 }) } },
+      const cell = h('div', { class: `br-car-ev is-t${ev.tier}${open ? '' : ' is-locked'}`, vars: { '--clip': jagged(`ev${ev.key}`, { jx: 2, jy: 4, notches: 1 }) }, data: { event: ev.key } },
         h('div', { class: 'br-car-art', vars: { '--clip': torn(`ea${ev.key}`, 'bottom', 8, 16) } }, trackArt(ev.trackId)),
         h('span', { class: 'br-car-tier', text: TIER_STARS[ev.tier - 1] ?? '★' }),
         h('div', { class: 'br-car-name', text: TRACKS[ev.trackId].name }),
         best !== null ? h('span', { class: `br-car-best${best === 1 ? ' is-gold' : ''}`, text: `BEST ${ordinal(best)}` }) : h('span', { class: 'br-car-new', text: open ? 'NEW' : '' }),
+        h('div', { class: 'br-car-chips' },
+          h('span', { class: 'br-car-chip is-wx' }, weatherChip(ev.weather)),
+          ev.reverse ? h('span', { class: 'br-car-chip', text: '反向' }) : null,
+          ev.route > 0 ? h('span', { class: 'br-car-chip', text: `路线 #${ev.route}` }) : null),
         h('i', { class: 'br-car-cur' }),
         h('b', { class: 'br-car-sticker', text: open ? 'GO!' : 'LOCKED' }));
       cells.push(cell);
@@ -66,6 +72,9 @@ export const careerScreen: ScreenFactory = (ctx) => {
     h('span', { class: 'br-tag is-red br-car-dtag', text: 'NEXT RACE' }), dName, dEn, dRows, go);
   f.stage.append(grid, detail);
 
+  /** One detail row; the weather row carries the weather id (data-weather) for the menu and the tests. */
+  const row = (k: string, v: string, weather?: string): HTMLDivElement =>
+    h('div', weather ? { data: { weather } } : {}, h('span', { text: k }), h('b', { text: v }));
   const show = (ev: CareerEvent): void => {
     const t = TRACKS[ev.trackId];
     const cup = CUPS[ev.tier - 1];
@@ -74,21 +83,27 @@ export const careerScreen: ScreenFactory = (ctx) => {
     dName.textContent = t.name;
     dEn.textContent = `${cup?.en ?? ''} · ${t.nameEn}`;
     dRows.replaceChildren(
-      ...[['难度', '★'.repeat(t.difficulty) + '☆'.repeat(3 - t.difficulty)], ['天气', t.weather], ['对手等级', `LV.${ev.tier}`],
-        ['最佳名次', best === null ? '—' : ordinal(best)], open ? ['目标', goalFor(ev, cup?.cn ?? '本杯')] : ['解锁条件', '上一站拿到前三名']]
-        .map(([k, v]) => h('div', {}, h('span', { text: k }), h('b', { text: v }))));
+      row('难度', '★'.repeat(t.difficulty) + '☆'.repeat(3 - t.difficulty)),
+      row('天气', WEATHER_CN[ev.weather], ev.weather),
+      row('方向', ev.reverse ? '反向' : '正向'),
+      row('路线', ev.route > 0 ? `路线 #${ev.route}` : '经典路线'),
+      row('对手等级', `LV.${ev.tier}`),
+      row('最佳名次', best === null ? '—' : ordinal(best)),
+      open ? row('目标', goalFor(ev, cup?.cn ?? '本杯')) : row('解锁条件', '上一站拿到前三名'));
     detail.classList.toggle('is-locked', !open);
   };
   const nav = ctx.nav(new Nav(CAREER.map((ev, i) => ({
     el: cells[i]!,
     disabled: () => !isUnlocked(save, ev),
     onDenied: () => ctx.toast('先在上一站拿到前三名', 'warn'),
-    confirm: () => ctx.app.bus.emit('flow:startRace', { config: { trackId: ev.trackId, mode: 'career', level: ev.tier } }),
+    confirm: () => ctx.app.bus.emit('flow:startRace', { config: {
+      trackId: ev.trackId, mode: 'career', level: ev.tier, weather: ev.weather, reverse: ev.reverse, route: ev.route,
+    } }),
     onFocus: () => {
       remember('career', i);
       show(ev);
     },
-  })), { layout: 'grid', columns: 3, start: recall('career', Math.max(0, save.data.career.unlocked - 1)), sfx: ctx.sfx }));
+  })), { layout: 'grid', columns: TRACK_ORDER.length, start: recall('career', Math.max(0, highestOpen(save) - 1)), sfx: ctx.sfx }));
   go.addEventListener('click', () => nav.pointerActivate());
 
   const records = recordsSheet(save, () => setRecords(false));

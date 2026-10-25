@@ -3,17 +3,34 @@
 // saves its own unlocks (see status file).
 import type { RaceConfig, RaceResult } from '../core/contracts';
 import type { SaveStore } from '../core/save';
-import type { TrackId } from '../core/types';
+import type { TrackId, Weather } from '../core/types';
 import { GRADES, type Grade } from '../data/memes';
-import { TRACK_ORDER } from '../data/tracks';
+import { TRACK_ORDER, TRACK_WEATHER } from '../data/tracks';
 import { CUPS } from './copy';
 
 export type Tier = 1 | 2 | 3;
 
-export interface CareerEvent { index: number; tier: Tier; trackId: TrackId; key: string }
+/** One rung of the ladder: a track in a weather, forward or reversed, on the authored layout or a seeded route. */
+export interface CareerEvent {
+  index: number; tier: Tier; trackId: TrackId; key: string;
+  weather: Weather; reverse: boolean; route: number;
+}
 
+/** Cup 3's seeded routes (fixed seeds: every player races the same route). */
+const CUP3_ROUTES: Partial<Record<TrackId, number>> = { city: 4821, watertown: 1337 };
+
+/** The ladder: 3 cups × 5 tracks. Cup 1 = every track in its own weather, forward, the authored layout.
+ *  Cup 2 = every track in one of its other weathers. Cup 3 = reversed or on a fixed seeded route. */
 export const CAREER: CareerEvent[] = ([1, 2, 3] as Tier[]).flatMap((tier) =>
-  TRACK_ORDER.map((trackId, i) => ({ index: (tier - 1) * TRACK_ORDER.length + i + 1, tier, trackId, key: `${tier}-${trackId}` })));
+  TRACK_ORDER.map((trackId, i) => {
+    const own = TRACK_WEATHER[trackId][0] ?? 'clear';
+    const weather = tier === 1 ? own : (TRACK_WEATHER[trackId][1] ?? own);
+    const route = tier === 3 ? (CUP3_ROUTES[trackId] ?? 0) : 0;
+    return {
+      index: (tier - 1) * TRACK_ORDER.length + i + 1, tier, trackId, key: `${tier}-${trackId}`,
+      weather, reverse: tier === 3 && route === 0, route,
+    };
+  }));
 
 export const PLACE_BONUS = [500, 300, 200, 120, 80, 50, 30, 10];
 export const KO_BONUS = 50;
@@ -21,8 +38,25 @@ export const UNLOCK_PLACE = 3;
 /** One-time bonus for the first top-3 finish on a cup's last event (tier 3's is the career clear). */
 export const CLEAR_BONUS: Record<Tier, number> = { 1: 300, 2: 600, 3: 1000 };
 
-export const isUnlocked = (save: SaveStore, ev: CareerEvent): boolean => ev.index <= save.data.career.unlocked;
 export const bestPlace = (save: SaveStore, ev: CareerEvent): number | null => save.data.career.best[ev.key] ?? null;
+
+/** An event is open when it is the first one, when it has a best place of its own, or when the event
+ *  before it has a top-3 best. The rule reads the best places, so a save from the three-track career
+ *  keeps its progress when the ladder grows to five tracks. */
+export const isUnlocked = (save: SaveStore, ev: CareerEvent): boolean => {
+  if (ev.index <= 1) return true;
+  if (bestPlace(save, ev) !== null) return true;
+  const prev = CAREER[ev.index - 2];
+  const prevBest = prev ? bestPlace(save, prev) : null;
+  return prevBest !== null && prevBest <= UNLOCK_PLACE;
+};
+
+/** The highest open event index — the ladder's "unlocked" counter, still written to the save. */
+export const highestOpen = (save: SaveStore): number => {
+  let last = 1;
+  for (const ev of CAREER) if (isUnlocked(save, ev)) last = Math.max(last, ev.index);
+  return last;
+};
 
 /** Last event of its cup: a top-3 finish there clears the cup. */
 export const isCupFinal = (ev: CareerEvent): boolean => ev.index % TRACK_ORDER.length === 0;
@@ -135,6 +169,8 @@ export function applyRewards(save: SaveStore, config: RaceConfig | undefined, re
     d.coins = reward.balanceAfter;
     if (ev && (reward.newBest || reward.firstFinish)) d.career.best[ev.key] = me.place;
     if (reward.unlocked) d.career.unlocked = Math.max(d.career.unlocked, reward.unlocked.index);
+    // The counter follows the ladder's own rule (the new best may have opened the next event).
+    d.career.unlocked = Math.max(d.career.unlocked, highestOpen(save));
   });
   return reward;
 }

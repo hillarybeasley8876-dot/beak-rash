@@ -1,14 +1,15 @@
-.br-tracks-sub { position: absolute; left: 1080px; top: 128px; display: flex; align-items: center; gap: 26px; rotate: -4deg; }
-.br-tracks-sub .br-tag { font-size: 36px; }
-.br-tracks-rule { font-family: var(--f-cn-play); font-weight: 400; font-size: 30px; color: rgba(255, 255, 255, 0.8); }
-.br-tracks-row { position: absolute; left: 150px; top: 318px; width: 1620px; height: 660px; display: flex; gap: 56px; justify-content: center; }
+/* Quick race: five track cards in a row (1280×720 and 1920×1080) + the race-options panel on the right. */
+.br-scr-tracks .br-tracks-sub { position: absolute; left: 1330px; top: 92px; width: 540px; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; rotate: -3deg; }
+.br-scr-tracks .br-tracks-sub .br-tag { font-size: 32px; }
+.br-scr-tracks .br-tracks-rule { font-family: var(--f-cn-play); font-weight: 400; font-size: 24px; color: rgba(255, 255, 255, 0.8); }
+.br-scr-tracks .br-tracks-row { position: absolute; left: 50px; top: 250px; width: 1230px; height: 500px; display: flex; gap: 30px; justify-content: center; }
 
-/* ---------- track card (shared with career) ---------- */
+/* ---------- track card ---------- */
 .br-tc {
   position: relative;
   flex: 0 0 auto;
-  width: 500px;
-  height: 640px;
+  width: 222px;
+  height: 500px;
   color: var(--ink);
   transform: skewX(-6deg);
   transition: transform 0.16s var(--ease-out);
@@ -17,23 +18,46 @@
   animation-delay: calc(var(--i) * 60ms);
 }
 .br-tc::before { content: ''; position: absolute; inset: 0; background: var(--white); clip-path: var(--clip); z-index: -1; }
-.br-tc::after { content: ''; position: absolute; inset: 0; background: var(--ink); clip-path: var(--clip); z-index: -2; transform: translate(14px, 14px); transition: background 0.12s, transform 0.16s var(--ease-out); }
+.br-tc::after { content: ''; position: absolute; inset: 0; background: var(--ink); clip-path: var(--clip); z-index: -2; transform: translate(12px, 12px); transition: background 0.12s, transform 0.16s var(--ease-out); }
 .br-tc.is-focus { transform: skewX(-6deg) translateY(-26px) scale(1.06); z-index: 2; }
 /* Unselected cards keep their white body; only the art dims. */
-.br-tc:not(.is-focus) .br-still-img { filter: var(--still-fx) brightness(0.55) saturate(0.7); }
-.br-tc:not(.is-focus) .br-tc-num { -webkit-text-stroke-color: #2a2a32; color: #d6d6dc; }
-.br-tc.is-focus::after { background: var(--red); transform: translate(20px, 22px); }
-.br-tc-art { position: absolute; left: 14px; right: 14px; top: 14px; height: 320px; clip-path: var(--clip); background: var(--ink); overflow: hidden; }
-.br-tc-num { position: absolute; left: 30px; top: 18px; font-family: var(--f-display); font-weight: 400; font-size: 110px; line-height: 1; color: var(--white); -webkit-text-stroke: 4px var(--ink); paint-order: stroke fill; }
-.br-tc-body { position: absolute; left: 36px; right: 30px; top: 344px; }
-.br-tc-name { font-family: var(--f-cn-block); font-weight: 400; font-size: 58px; line-height: 1.05; }
-.br-tc-en { margin-top: 2px; font-family: var(--f-display); font-weight: 400; font-size: 48px; letter-spacing: 0.04em; color: var(--red); }
-.br-tc-blurb { margin-top: 8px; font-family: var(--f-cn-play); font-weight: 400; font-size: 30px; line-height: 1.3; min-height: 2.6em; }
-.br-tc-meta { display: flex; align-items: center; gap: 18px; margin-top: 14px; font-family: var(--f-cn-heavy); font-size: 24px; }
-.br-tc-meta b { margin-left: auto; font-family: var(--f-display); font-weight: 400; font-size: 34px; }
+.br-tc:not(.is-focus):not(.is-current) .br-still-img { filter: var(--still-fx) brightness(0.55) saturate(0.7); }
+.br-tc:not(.is-focus):not(.is-current) .br-tc-num { -webkit-text-stroke-color: #2a2a32; color: #d6d6dc; }
+.br-tc.is-focus::after { background: var(--red); transform: translate(18px, 20px); }
+/* The card whose options the panel shows stays marked while the rows have the focus. */
+.br-tc.is-current::after { background: var(--red); }
+.br-tc.is-current .br-still-img { filter: none; }
+.br-tc-art { position: absolute; left: 10px; right: 10px; top: 10px; height: 210px; clip-path: var(--clip); background: var(--ink); overflow: hidden; }
+.br-tc-num { position: absolute; left: 18px; top: 12px; font-family: var(--f-display); font-weight: 400; font-size: 66px; line-height: 1; color: var(--white); -webkit-text-stroke: 3px var(--ink); paint-order: stroke fill; }
+.br-tc-body { position: absolute; left: 20px; right: 16px; top: 236px; }
+.br-tc-name { font-family: var(--f-cn-block); font-weight: 400; font-size: 30px; line-height: 1.06; min-height: 2.2em; }
+.br-tc-en { margin-top: 2px; font-family: var(--f-display); font-weight: 400; font-size: 21px; letter-spacing: 0.03em; color: var(--red); }
+.br-tc-blurb { margin-top: 6px; font-family: var(--f-cn-play); font-weight: 400; font-size: 19px; line-height: 1.28; min-height: 3.2em; }
+.br-tc-meta { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-family: var(--f-cn-heavy); font-size: 18px; }
+.br-tc-meta b { margin-left: auto; font-family: var(--f-display); font-weight: 400; font-size: 24px; }
 .br-tc-stars { display: inline-flex; gap: 2px; }
-.br-tc-star { width: 38px; height: 38px; }
-.br-tc-go { position: absolute; right: -46px; top: -54px; width: 170px; height: 170px; opacity: 0; transform: scale(0.4) rotate(-30deg); transition: opacity 0.1s, transform 0.22s var(--ease-slam); pointer-events: none; }
+.br-tc-star { width: 26px; height: 26px; }
+.br-tc-wx { display: inline-flex; margin-top: 10px; }
+.br-tc-go { position: absolute; right: -40px; top: -46px; width: 130px; height: 130px; opacity: 0; transform: scale(0.4) rotate(-30deg); transition: opacity 0.1s, transform 0.22s var(--ease-slam); pointer-events: none; }
 .br-tc-go svg { position: absolute; inset: 0; width: 100%; height: 100%; animation: br-spin 10s linear infinite; }
-.br-tc-go b { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--f-comic); font-weight: 400; font-size: 62px; color: var(--red); text-shadow: 3px 3px 0 var(--ink); transform: skewX(6deg); }
+.br-tc-go b { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--f-comic); font-weight: 400; font-size: 46px; color: var(--red); text-shadow: 3px 3px 0 var(--ink); transform: skewX(6deg); }
 .br-tc.is-focus .br-tc-go { opacity: 1; transform: scale(1) rotate(10deg); }
+
+/* ---------- race options ---------- */
+.br-scr-tracks .br-race-opts { position: absolute; left: 1330px; top: 250px; width: 540px; min-height: 400px; padding: 26px 30px 22px; }
+.br-ro-head { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+.br-ro-head .br-tag { font-size: 26px; }
+.br-ro-for { font-family: var(--f-cn-block); font-weight: 400; font-size: 30px; line-height: 1.1; }
+.br-ro { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; padding: 12px 18px 10px; background: rgba(11, 11, 15, 0.06); border-left: 8px solid rgba(11, 11, 15, 0.18); transition: background 0.12s, border-color 0.12s; }
+.br-ro.is-focus { background: var(--red); border-left-color: var(--ink); }
+.br-ro-label { font-family: var(--f-cn-heavy); font-weight: 900; font-size: 30px; }
+.br-ro.is-focus .br-ro-label { color: var(--white); }
+.br-ro-value { display: flex; align-items: center; gap: 10px; margin-left: auto; font-family: var(--f-cn-block); font-weight: 400; font-size: 32px; }
+.br-ro.is-focus .br-ro-value { color: var(--white); }
+.br-ro-hint { margin-top: 6px; font-family: var(--f-cn-heavy); font-size: 19px; color: #55555e; }
+
+/* ---------- the weather sticker ---------- */
+.br-wx { display: inline-flex; align-items: center; gap: 8px; }
+.br-wx-glyph { width: 34px; height: 34px; }
+.br-wx b { font-family: var(--f-cn-block); font-weight: 400; font-size: 28px; }
+.br-ro.is-focus .br-wx b { color: var(--white); }

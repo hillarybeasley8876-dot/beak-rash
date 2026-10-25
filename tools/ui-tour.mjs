@@ -97,6 +97,9 @@ async function fullTour(size) {
     await shot('track-select');
     await press(page, h, 'ArrowRight');
     await shot('track-select-2', 350);
+    await press(page, h, 'ArrowDown', 'ArrowRight');   // into the race options (weather)
+    await shot('track-select-opts', 350);
+    await press(page, h, 'Escape');                     // back to the cards
     await press(page, h, 'Escape', 'ArrowDown', 'Enter');
     await shot('garage', 1200);
     await press(page, h, 'ArrowDown', 'ArrowDown', 'ArrowDown');

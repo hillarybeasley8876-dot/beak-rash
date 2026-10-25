@@ -4,8 +4,23 @@
 // The Konami code lives on the ACTION stream instead (keyboard and pad alike), so it gets its own
 // matcher: createActionCode.
 import './eggs.css';
+import type { AppContext } from '../../core/contracts';
 import type { Action } from '../../core/input';
 import { h, jagged } from '../p5';
+
+/**
+ * Save a UI easter egg (SPEC §21) the first time it is found and announce it on the bus.
+ * The gameplay/secrets module does the same for the eggs in the world; these are the ones the menus own.
+ * Returns true when this call was the first find.
+ */
+export function findUiEgg(app: AppContext, id: string): boolean {
+  if (app.save.data.secrets.includes(id)) return false;
+  app.save.update((d) => {
+    if (!d.secrets.includes(id)) d.secrets.push(id);
+  });
+  app.bus.emit('secret:found', { id, riderId: 0, pos: null, first: true });
+  return true;
+}
 
 export interface Sequence {
   /** Feed a KeyboardEvent.code; true when the whole sequence has been typed, in order. */

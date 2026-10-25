@@ -96,8 +96,10 @@ async function quietChecks(page) {
   await page.waitForTimeout(120);
   const quiet = await page.evaluate(() => document.querySelector('.br-toast-lane')?.classList.contains('is-quiet'));
   await page.evaluate(() => window.__br.app.bus.emit('cine:ko', { phase: 'end', attacker: 'pelican', victim: 'goose', chain: 1 }));
-  await page.waitForTimeout(120);
-  const back = await page.evaluate(() => document.querySelector('.br-toast-lane')?.classList.contains('is-quiet'));
+  // The fx KO timeline can re-quiet the lane (its own 'peak' lands after our 'end'), so wait for it.
+  const back = await page.waitForFunction(
+    () => !document.querySelector('.br-toast-lane')?.classList.contains('is-quiet'), null, { timeout: 4000 },
+  ).then(() => false).catch(() => true);
   expect(quiet === true && back === false, `lane quiet during cine:ko, back after (${quiet} → ${back})`);
 }
 

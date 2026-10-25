@@ -8,7 +8,7 @@ import { MENU, MENU_QUIT } from '../copy';
 import { Nav } from '../nav';
 import { HINT_BACK, HINT_NAV, HINT_OK, artImage, artReady, backdrop, coinBadge, h, jagged, portrait, ransom, reducedMotion } from '../p5';
 import { frame, type ScreenCtx, type ScreenFactory } from '../screen';
-import { createActionCode, createSequence, eggBubble, type CodeStep } from './eggs';
+import { createActionCode, createSequence, eggBubble, findUiEgg, type CodeStep } from './eggs';
 import { recall, remember } from './memory';
 
 interface Entry { cn: string; en: string; blurb: string; padBlurb?: string; minor?: boolean; pick(): void }
@@ -132,6 +132,7 @@ export const menuScreen: ScreenFactory = (ctx) => {
     bubble = el;
     f.stage.append(el);
     app.audio.voice('pelican_taunt_0');
+    findUiEgg(app, 'pelican_word');   // 彩蛋 §21 #8: the egg is saved the first time only
     if (!reducedMotion()) {
       heroWrap.classList.remove('is-gulp');
       void heroWrap.offsetWidth;

@@ -70,6 +70,12 @@
 .br-pod.is-p2 .br-pod-say { left: 0; max-width: 250px; translate: none; }
 .br-pod.is-p3 .br-pod-say { left: auto; right: 0; max-width: 250px; translate: none; }
 
+/* ---------- the race report (nemesis / STYLE / police) ---------- */
+.br-res-report { position: absolute; left: 70px; top: 812px; width: 1000px; display: flex; flex-wrap: nowrap; gap: 12px; }
+.br-res-report > div { flex: 0 0 auto; padding: 4px 14px 2px; background: rgba(255, 255, 255, 0.1); color: var(--white); font-family: var(--f-cn-block); font-weight: 400; font-size: 24px; line-height: 1.25; white-space: nowrap; transform: skewX(var(--skew)); box-shadow: 5px 5px 0 var(--ink); animation: br-in-left 0.3s var(--ease-out) 0.5s both; }
+.br-res-report > div:nth-child(2) { animation-delay: 0.6s; }
+.br-res-report > div:nth-child(3) { animation-delay: 0.7s; }
+
 /* ---------- grade + coins ---------- */
 .br-res-reward { position: absolute; left: 1120px; top: 660px; width: 760px; display: grid; grid-template-columns: 220px 1fr; column-gap: 30px; align-items: start; }
 .br-grade { display: contents; }
