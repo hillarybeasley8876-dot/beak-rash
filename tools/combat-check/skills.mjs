@@ -61,7 +61,7 @@ export const skills = [
     cc.step(40);
     return { ok: boosted && ram?.victim === 1 && ram.damage === 8 && p.speed >= v0 - 0.2, info: { boosted, ram, v0, v: p.speed } };
   }],
-  ['SHOWTIME needs 100 SP, leaps to ~8 m and the shockwave hits 40 m ahead / 12 m behind', () => {
+  ['SHOWTIME needs 100 SP, leaps to ~8 m and the shockwave hits 40 m ahead / 20 m behind', () => {
     const cc = window.__cc; cc.reset(); const c = cc.C(); const p = cc.P();
     p.sp = 60; cc.press('ult'); cc.step(1);
     const denied = cc.of('skill:denied')[0];

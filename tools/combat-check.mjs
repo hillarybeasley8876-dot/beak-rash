@@ -3,6 +3,9 @@
 //   node tools/combat-check.mjs [--only <substring>] [--seed 7] [--full | --stub a,b] [--keep-going]
 // Default isolates fx/audio/ui/actors with core stubs (no slow-mo cinematics changing sim time, no breakage
 // from views being edited); --full runs every real unit; --stub picks the stubbed units explicitly.
+//   node tools/combat-check.mjs --soak [--tracks coast,city,mountain] [--seed 3] [--stub audio]
+// Soak mode (combat-check/soak.mjs): an aggressive scripted player over full races, one per track; asserts the
+// SP economy (≤ 2 SHOWTIMEs a race, the first not before 35 s, no place lost in the air).
 import { acc1 } from './combat-check/acc1.mjs';
 import { fixes } from './combat-check/fixes.mjs';
 import { fixes2 } from './combat-check/fixes2.mjs';
@@ -12,16 +15,19 @@ import { finish } from './combat-check/finish.mjs';
 import { installHelpers } from './combat-check/page.mjs';
 import { items } from './combat-check/items.mjs';
 import { melee } from './combat-check/melee.mjs';
+import { r3 } from './combat-check/r3.mjs';
 import { sigs } from './combat-check/sigs.mjs';
 import { skills } from './combat-check/skills.mjs';
+import { runSoak } from './combat-check/soak.mjs';
 import { parseArgs, withPage } from './lib.mjs';
 
 const a = parseArgs(process.argv.slice(2));
+if (a.soak) process.exit((await runSoak(a)) ? 0 : 1);
 const LINEUP = 'goose,cat,capybara,shiba,pigeon,penguin,seagull,sloth,corgi';
 const stubs = a.full ? '' : typeof a.stub === 'string' ? a.stub : 'fx,audio,ui,actors';
 const stub = stubs ? `&stub=${stubs}` : '';
 const url = `/?race=coast&seed=${a.seed ?? 7}&traffic=0&police=0&manual=1&rivals=${LINEUP}${stub}`;
-const all = [...melee, ...items, ...skills, ...sigs, ...fixes, ...fixes2, ...fixes3, ...fixes4, ...acc1, ...finish].filter(([name]) => !a.only || name.includes(String(a.only)));
+const all = [...melee, ...items, ...skills, ...sigs, ...fixes, ...fixes2, ...fixes3, ...fixes4, ...acc1, ...finish, ...r3].filter(([name]) => !a.only || name.includes(String(a.only)));
 
 // Every console error fails the run unless it is clearly another unit's (its [tag] or a stack in its files);
 // those are listed but don't fail (isolate them with --stub).

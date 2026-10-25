@@ -35,6 +35,12 @@ export class Trail implements Visual {
     this.stopped = true;
   }
 
+  /** Stop and drop every sample at once (gone on the next update). */
+  cut(): void {
+    this.stopped = true;
+    while (this.pts.length > 0) this.dropTail();
+  }
+
   update(dt: number): boolean {
     for (let i = 0; i < this.ages.length; i++) this.ages[i] = (this.ages[i] ?? 0) + dt;
     while (this.ages.length > 0 && (this.ages[this.ages.length - 1] ?? 0) > this.o.life) this.dropTail();

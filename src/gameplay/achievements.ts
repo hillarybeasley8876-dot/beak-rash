@@ -5,6 +5,7 @@
 import type { AppContext, Session } from '../core/contracts';
 import type { AchievementId } from '../data/achievements';
 import { makeRuleCtx, newFacts, type RaceFacts } from './achievements/facts';
+import { careerRules } from './achievements/rules-career';
 import { combatRules } from './achievements/rules-combat';
 import { raceRules } from './achievements/rules-race';
 import { rideRules } from './achievements/rules-ride';
@@ -58,7 +59,7 @@ export function createAchievements(app: AppContext): AchievementSystem {
     current = session;
     facts = newFacts();
     const ctx = makeRuleCtx(app, session, facts, (id) => unlock(session, id));
-    offs = [...raceRules(ctx), ...rideRules(ctx), ...combatRules(ctx)];
+    offs = [...raceRules(ctx), ...rideRules(ctx), ...combatRules(ctx), ...careerRules(ctx)];
     // Registered last, so it runs after the rules' own race:end handlers: once results are final the
     // race can no longer earn anything (teardown events such as the police leaving are not "real").
     offs.push(app.bus.on('race:end', () => {

@@ -57,7 +57,7 @@ export const sigs = [
     const v = cc.R(8);
     return { ok: cc.topMul(v) >= 1.599 && cc.has(v, 'boost') && v.speed > 18, info: { mul: cc.topMul(v), speed: v.speed } };
   }],
-  ['bell: angers rivals within 15 m, +5 SP, 3 s cooldown', () => {
+  ['bell: angers rivals within 15 m, +3 SP, 3 s cooldown', () => {
     const cc = window.__cc; cc.reset(); const c = cc.C(); const p = cc.P();
     c.pin(1, 6, 1); c.pin(2, 30, 0); cc.step(2);
     const sp0 = p.sp;
@@ -68,7 +68,7 @@ export const sigs = [
     cc.step(200);
     cc.press('bell'); cc.step(1); cc.step(2);
     const taunts2 = cc.of('taunt', (e) => e.riderId === 0).length;
-    return { ok: angry && p.sp - sp0 >= 5 && taunts1 === 1 && taunts2 === 2, info: { angry, sp: p.sp - sp0, taunts1, taunts2 } };
+    return { ok: angry && p.sp - sp0 >= 3 && taunts1 === 1 && taunts2 === 2, info: { angry, sp: p.sp - sp0, taunts1, taunts2 } };
   }],
   ['nothing runs away: projectiles, skills and visuals all wind down', () => {
     const cc = window.__cc; cc.reset(); cc.step(400);

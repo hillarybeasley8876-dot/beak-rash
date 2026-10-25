@@ -39,10 +39,18 @@ export const SHAKE = { light: 0.25, heavy: 0.45, crit: 0.5, skill: 0.35, ult: 0.
 /** Hits further than this from the player don't freeze time or shake the camera. */
 export const FEEDBACK_RANGE = 16;
 
-export const COMBO = { gap: 1.5, oneMore: 3, oneMoreSp: 10 } as const;
+export const COMBO = { gap: 1.5, oneMore: 3, oneMoreSp: 2 } as const;
 
+/**
+ * SP economy (retuned r3: an aggressive player fills the bar about once a minute, not every 15 s). A swing pays
+ * more than a skill hit (the skill already did the work); riding well pays as before. Fighting pays nothing with
+ * an SP-paid skill (SHOWTIME's own hits and KOs) and for `afterUlt` s after its cast (its stunned victims are easy
+ * pickings, the bar must not refill off them).
+ */
 export const SP = {
-  max: 100, hit: 6, hurt: 3, ko: 20, draftPerSec: 1, nearMiss: 4, perfect: 8, driftL3: 5, bell: 5,
+  max: 100, hit: 2.5, skillHit: 1, hurt: 1.5, ko: 10, draftPerSec: 1, nearMiss: 4, perfect: 8, driftL3: 5, bell: 3,
+  repeatWindow: 4, repeatHit: 0.5, // a swing pays `hit` once per window per victim, `repeatHit` in between
+  afterUlt: 12,
 } as const;
 
 export const KO = { creditWindow: 3, coins: 50, respawnHp: 0.7 } as const;
@@ -67,7 +75,7 @@ export const PICKUP = {
   respawn: 6,           // s until a row item comes back (drops never respawn)
   coinValue: 5,
   fishHp: 25,
-  canSp: 25,
+  canSp: 20,
   dropLife: 25,         // s a dropped weapon stays on the road
   viewRange: 220,       // m around the player that is animated / drawn
   autoRowEvery: 260,    // m between generated rows when the track defines none

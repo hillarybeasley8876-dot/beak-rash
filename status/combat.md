@@ -178,3 +178,31 @@ Issues owned by combat in reviews/game-r1-*.json (no "## Acceptance round 1" exi
   (shots/combat/acc1/shots-sheet.jpg); autopilot soak 40 s, all real units: 12 casts, 21 hits, 6 KOs, 2 ults hitting
   7 and 6 riders, 0 denials, 0 errors. Note: core added RiderMods.pushImmune but sim doesn't read it yet, so
   skills/wing.ts keeps its contact mirror (core request stays open for sim).
+
+## r3 polish (2026-10-25)
+Slice "economy" (combat rules + achievements). Probes and evidence: shots/r3-economy/ (gitignored).
+- [x] e2e#0 SHOWTIME loop → SP retuned (tuning.ts SP; sp.ts fightSp/hitSp): swing +2.5 once per 4 s per rival (+0.5 for
+  the swings between), skill hit +1, hurt +1.5, KO +10, ONE MORE +2, bell +3, can +20 (riding gains unchanged); SP-paid
+  skills (the ult) refund nothing and the caster's fighting pays nothing for SP.afterUlt 12 s after a cast
+  (RiderCombat.spSpentAt). Aggressive bot (autopilot + J/L mash in reach + U/I/O + P at 100): before coast/city/mountain
+  4/2/3 casts, first at 12.2/31.9/21.7 s, KOs 13/6/13; after (combat-check --soak, seeds 3-5) 1/1/1 casts at 53.9/88.2/
+  50.1 s, KOs 10 (5 SHOWTIME)/8/6. 18 bot races in all: ≤ 2 casts each, first 39-90 s (39 only with B spam on top).
+  Rival skills don't use SP: their cast counts are unchanged.
+- [x] e2e#4 places lost on a cast → ult-aim.ts planUlt only homes FORWARD of the natural landing (a pack behind is
+  caught by the wave, ULT.behind 12 → 20 m); homeStep never moves s back; the leap flies at ≥ the bike's top speed
+  (ULT.leapTop); riders behind at the cast, or mid-pass within 3 m, are kept 0.3 m behind it (stayAhead). 36 scripted
+  casts (cast-places.mjs, 12 layouts × coast/city/mountain): place never worse in the air or 2 s after the impact.
+- [x] aesthetic#1 / feel#1 red wall → wall and 'wave:wall' gone; the shockwave is visuals/ground-ring.ts: three bands
+  hugging the road (each vertex via track.toWorld, 5 cm up), vertex alpha fading out within 1–2.4 m of every rider but
+  the caster; dive trail cut at the impact. Victim pixels changed by combat (A vs combat-hidden, same frame): coast box
+  55 % / red +77 before → 8 % / +7 (interior ≤ 0.7 %); city ≤ 10 % of interior pixels, red ≤ +3.
+- [x] e2e#1 RiderState.ultTarget written every postStep for every rider (SkillRunner.updateUltTargets → the ult's own
+  ready() = planUlt on scratch arrays, no allocation; false for riders without an ult). Check 'r3 ultTarget …'.
+- [x] perf request (integrator) → combat programs after GO: MaterialPool.warmUp parks its hidden variants for the whole
+  session (the old "drop after the first rendered frame" lost them to loading-screen frames before core's warm-up).
+  Real-time autopilot races (progs-rt.mjs): mountain 4 → 0, city 0 (programs at GO 83 → 88).
+- tools: combat-check --soak (soak.mjs), r3.mjs (3 scenarios); old SP numbers updated in melee/items/fixes/fixes3/sigs;
+  acc1 "back on a rival 25 m behind" now expects 无目标 (never flies back); fixes4 skips the hidden warm-up meshes.
+- Checks: tsc 0 errors in combat/achievements files; combat-check 64/64 isolated and --full; --soak OK; combat-shots OK.
+- Requests: tips.ts (content owner) '三连击触发 ONE MORE! SP+10…' → no number (e.g. '…回一点 SP…'), '打铃 +5 SP…' → '+3 SP';
+  SPEC §7 (integrator) SP numbers / ONE MORE +2 / SHOWTIME 20 m behind; ui-hud reads ultTarget (planned).

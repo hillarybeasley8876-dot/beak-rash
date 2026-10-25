@@ -5,7 +5,7 @@ import { WEAPONS } from '../../data/weapons';
 import type { RiderState, Side, Vec3Like, WeaponId } from '../../core/types';
 import { finished, targetable, type CombatCtx } from './ctx';
 import { impact, nudge, type ImpactKind } from './feedback';
-import { gainSp, spRefund } from './sp';
+import { fightSp, gainSp, hitSp } from './sp';
 import { addStatus, statusStrength } from './statuses';
 import { COMBO, MELEE, SHIELD_IMMUNE, SHIELD_REFLECT, SP } from './tuning';
 
@@ -67,15 +67,14 @@ function land(ctx: CombatCtx, h: Hit, pos: Vec3Like): void {
   react(ctx, v, (dir === 1 ? -1 : 1) as Side, h.heavy || h.crit, Boolean(h.stun));
   v.combo = 0;
   v.comboTimer = 0;
-  const refund = spRefund(h.skillId);
-  gainSp(a, SP.hit * refund);
+  gainSp(a, hitSp(ctx, a, v, h.skillId));
   gainSp(v, SP.hurt);
   ctx.bus.emit('combat:hit', {
     attacker: a.id, victim: v.id, damage, side: h.side, weapon: h.weapon, heavy: h.heavy, crit: h.crit,
     blocked: false, pos, skillId: h.skillId,
   });
   if (h.skillId) ctx.bus.emit('skill:hit', { riderId: a.id, skillId: h.skillId, victim: v.id, pos });
-  if (h.countCombo !== false) countCombo(ctx, a, refund);
+  if (h.countCombo !== false) countCombo(ctx, a, h.skillId);
   impact(ctx, h.crit ? 'crit' : h.impact, a, v);
 }
 
@@ -104,13 +103,13 @@ function react(ctx: CombatCtx, v: RiderState, from: Side, big: boolean, stunned:
   if (stunned) view?.cue('stun');
 }
 
-function countCombo(ctx: CombatCtx, a: RiderState, refund: number): void {
+function countCombo(ctx: CombatCtx, a: RiderState, skillId: string | null): void {
   a.combo = a.comboTimer > 0 ? a.combo + 1 : 1;
   a.comboTimer = COMBO.gap;
   if (a.combo < 2) return;
   ctx.bus.emit('combat:combo', { riderId: a.id, count: a.combo });
   if (a.combo % COMBO.oneMore === 0) {
-    gainSp(a, COMBO.oneMoreSp * refund);
+    gainSp(a, COMBO.oneMoreSp * fightSp(ctx, a, skillId));
     ctx.rd(a).nextCrit = true;
   }
 }

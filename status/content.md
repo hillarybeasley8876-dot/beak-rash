@@ -138,3 +138,17 @@ repetition checks), `node tools/content-ach.mjs` 22/22 (gulp/police/riding scena
 real units (race 1: 9 unlocks incl. untouched, no slingshot; restart: real gulp → gulp + triple + hat_trick; autopilot none;
 0 page errors); npx tsc clean. 鹅 now in 36 of 654 flavour lines (19 outside the goose's own voice; was 45 of 687).
 Shots: shots/content/game-{taunts,results,loading}.png (new lines in game), shots/content/fix1/credits.png (balanced prompt).
+
+## r3 polish (2026-10-25)
+Slice "economy" (achievements). Evidence: shots/r3-economy/ (gitignored).
+- [x] e2e#5 too many early unlocks → ult_first retired (old saves keep the id harmlessly: ui lists catalogue ids only);
+  KO counts / chains / species / the goose need hand KOs (SHOWTIME's own KOs only feed 'showtime'); thief 3 steals,
+  one_more 5 calls, wing 3 riders in one dash, torpedo = a torpedo KO, near_miss 10, slingshot 5, triple 6 s window;
+  descs say 亲手 where it applies. Aggressive bot from a fresh profile (wins most races): race 1 → 9/7/9 unlocks (was 16),
+  three races 14–19 (was 23+); for a decent player the winning/brawling ones drop out.
+- [x] interaction#8 cups → cup1 新手村毕业 / cup2 卷王驾到 / cup3 鹈鹕封神 / career 大嘴吃四方 (achievements/rules-career.ts:
+  race:end with a top-3 on a cup's last career event, via ui/progress careerEvent/isCupFinal/cupCleared; a save that
+  cleared cups before collects them at its next race end). 45 achievements. cups-probe.mjs: tier 1/2/3 finals unlock
+  cup1, cup2, cup3 + career once each; results chips show them; records sheet 4/45 with the four cells earned.
+- Checks: content-ach 25/25 (new: hand KOs after SHOWTIME, cup/career clears, old save with retired/unknown ids);
+  content-lint 0 errors / 0 warnings; ui-results all passed; core-check OK.

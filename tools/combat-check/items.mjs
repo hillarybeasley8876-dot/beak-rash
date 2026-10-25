@@ -13,7 +13,7 @@ export const items = [
     cc.step(30);
     const again = cc.of('combat:ko').length;
     return { ok: kos.length === 1 && ko.attacker === 0 && ko.victim === 3 && ko.cause === 'ko' && p.kos === k0 + 1 && p.coins === coins0 + 50 &&
-      p.sp - sp0 >= 26 && v.wrecked === w0 + 1 && crashed === 'crashed' && back >= 0 && again === 1 && Math.abs(v.hp - Math.round(v.maxHp * 0.7)) <= 1,
+      p.sp - sp0 >= 2.5 + 10 - 1e-6 && p.sp - sp0 < 2.5 + 10 + 1 && v.wrecked === w0 + 1 && crashed === 'crashed' && back >= 0 && again === 1 && Math.abs(v.hp - Math.round(v.maxHp * 0.7)) <= 1,
       info: { kos: kos.length, ko, crashed, back, hp: v.hp, max: v.maxHp, again } };
   }],
   ['debug ko() and a wall crash after a hit are credited once', () => {
@@ -68,7 +68,7 @@ export const items = [
     c.give(0, 'none'); cc.mark();
     c.spawn('weapon', p.s + 10, p.x, 'umbrella');
     cc.until(() => cc.of('pickup:take').length >= 1, 120);
-    return { ok: takes.join() === 'coin,fish,can,crate' && res.coins === 5 && res.hp === 75 && res.sp >= 35 && res.weapon !== 'none' &&
+    return { ok: takes.join() === 'coin,fish,can,crate' && res.coins === 5 && res.hp === 75 && res.sp >= 30 && res.weapon !== 'none' &&
       picks[0]?.stolenFrom === null && p.weapon === 'umbrella', info: { takes, res, now: p.weapon } };
   }],
 ];

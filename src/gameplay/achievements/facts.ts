@@ -16,10 +16,11 @@ export interface RaceFacts {
   wasLast: boolean;              // player was in last place at some point after GO
   placeAtStretch: number | null; // player's place when entering the final stretch
   wrecks: number;
-  kos: number;
-  koTimes: number[];             // sim times of the player's recent KOs
+  kos: number;                   // KOs by the player's own hands (SHOWTIME's own KOs not included)
+  koTimes: number[];             // sim times of the player's recent hand KOs
   koSpecies: Set<CharacterId>;
-  torpedoHits: number;
+  oneMores: number;              // ONE MORE! calls for the player
+  steals: number;                // weapons the player took out of rivals' hands
   perfectLandings: number;
   nearMisses: number;
   slingshotAt: number;           // sim time of the player's last slingshot (draft) boost
@@ -34,7 +35,7 @@ export interface RaceFacts {
 export function newFacts(): RaceFacts {
   return {
     started: false, attacked: false, hurt: false, hp: Infinity, wasLast: false, placeAtStretch: null,
-    wrecks: 0, kos: 0, koTimes: [], koSpecies: new Set(), torpedoHits: 0, perfectLandings: 0, nearMisses: 0,
+    wrecks: 0, kos: 0, koTimes: [], koSpecies: new Set(), oneMores: 0, steals: 0, perfectLandings: 0, nearMisses: 0,
     slingshotAt: -Infinity, slingshotPasses: 0,
     wing: { active: false, hits: new Set() },
     ult: { at: -Infinity, victims: new Set(), kos: 0 },

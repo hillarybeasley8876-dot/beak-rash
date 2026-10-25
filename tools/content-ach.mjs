@@ -13,10 +13,13 @@ const ID = Object.fromEntries(FIELD.map((c, i) => [c, i]));
 const P = { x: 0, y: 0, z: 0 };
 
 /** Minimal AppContext + Session the rules need (bus, save, riders, places, time). */
-function makeWorld({ autopilot = false, bike = 'roadbike', stats = {} } = {}) {
+function makeWorld({ autopilot = false, bike = 'roadbike', stats = {}, config = {}, best = {}, achievements = [] } = {}) {
   const bus = new EventBus();
   const save = {
-    data: { achievements: [], stats: { races: 0, wins: 0, kos: 0, wrecked: 0, busted: 0, distance: 0, ...stats } },
+    data: {
+      achievements: [...achievements], stats: { races: 0, wins: 0, kos: 0, wrecked: 0, busted: 0, distance: 0, ...stats },
+      career: { unlocked: 1, best: { ...best } },
+    },
     update(fn) { fn(this.data); },
   };
   const riders = FIELD.map((c, i) => {
@@ -25,7 +28,7 @@ function makeWorld({ autopilot = false, bike = 'roadbike', stats = {} } = {}) {
     return r;
   });
   const session = {
-    config: { autopilot }, riders, player: riders[0], phase: 'racing', time: 0,
+    config: { autopilot, mode: 'quick', trackId: 'coast', level: 1, ...config }, riders, player: riders[0], phase: 'racing', time: 0,
     rider: (id) => riders[id],
   };
   const app = { bus, save };
@@ -221,11 +224,27 @@ scenario('weapon-kos', (expect) => {
 scenario('showtime-triple', (expect) => {
   const w = makeWorld();
   w.at(50).emit('ult:start', { riderId: 0, skillId: 'pelican.ult' });
-  w.at(51).emit('ult:impact', { riderId: 0, skillId: 'pelican.ult', pos: P, victims: [1, 2, 3] });
-  w.at(51.1).ko(1, { skillId: 'pelican.ult' }); w.ko(2, { skillId: 'pelican.ult' });
-  expect(w.has('ult_first') && !w.has('showtime'), 'two is not three');
-  w.at(53).ko(3);                            // knocked into traffic 2 s later: still the ult's
+  w.at(51).emit('ult:impact', { riderId: 0, skillId: 'pelican.ult', pos: P, victims: [1, 2, 3, 4] });
+  w.at(51.1).ko(ID.goose, { skillId: 'pelican.ult' }); w.ko(ID.capybara, { skillId: 'pelican.ult' });
+  expect(w.has('first_ko') && !w.has('showtime'), 'two is not three (an ult KO is still a first KO)');
+  expect(!w.has('ult_first'), 'the first SHOWTIME is no achievement any more');
+  w.ko(ID.shiba, { skillId: 'pelican.ult' });
   expect(w.has('showtime'), 'showtime');
+  w.at(53).ko(ID.cat);                       // finished off by hand 2 s later: the ult's, and a hand KO
+  const got = w.save.data.achievements;
+  expect(['double', 'triple', 'hat_trick', 'everyone', 'goose'].every((id) => !got.includes(id)),
+    `SHOWTIME's own KOs are no chain, no count, no species, no goose KO (${got})`);
+});
+
+scenario('hand-kos-after-showtime-count', (expect) => {
+  const w = makeWorld();
+  w.at(20).emit('ult:impact', { riderId: 0, skillId: 'pelican.ult', pos: P, victims: [ID.cat, ID.shiba] });
+  w.at(20.1).ko(ID.cat, { skillId: 'pelican.ult' });
+  w.at(21).ko(ID.shiba);                     // a stunned victim, finished by a swing
+  w.at(23).ko(ID.goose);
+  expect(w.has('double') && w.has('goose') && !w.has('hat_trick'), `two hand KOs: double + goose, no hat trick (${w.save.data.achievements})`);
+  w.at(26).ko(ID.pigeon);
+  expect(w.has('triple') && w.has('hat_trick'), '3 hand KOs within 6 s: triple + hat trick');
 });
 
 scenario('gulp-torpedo-wing', (expect) => {
@@ -243,13 +262,17 @@ scenario('gulp-torpedo-wing', (expect) => {
   w.emit('skill:hit', { riderId: 0, skillId: 'pelican.gulp', victim: ID.cat, pos: P });     // cat 0.85: spit
   w.emit('skill:end', { riderId: 0, skillId: 'pelican.gulp' });
   expect(w.has('gulp'), 'swallowing the cat (scale 0.85) and spitting it out is a gulp');
-  for (let i = 0; i < 3; i++) w.emit('skill:hit', { riderId: 0, skillId: 'pelican.torpedo', victim: ID.cat, pos: P });
-  w.emit('skill:hit', { riderId: 0, skillId: 'pelican.wing', victim: ID.cat, pos: P });   // wing not active
+  for (let i = 0; i < 5; i++) w.emit('skill:hit', { riderId: 0, skillId: 'pelican.torpedo', victim: ID.cat, pos: P });
+  expect(!w.has('torpedo'), 'torpedo hits are not a torpedo KO');
+  w.at(30).ko(ID.cat, { skillId: 'pelican.torpedo' });
+  const wing = (victim) => w.emit('skill:hit', { riderId: 0, skillId: 'pelican.wing', victim, pos: P });
+  wing(ID.cat);                                                                          // wing not active
   w.emit('skill:cast', { riderId: 0, skillId: 'pelican.wing', slot: 3 });
-  w.emit('skill:hit', { riderId: 0, skillId: 'pelican.wing', victim: ID.cat, pos: P });
-  w.emit('skill:hit', { riderId: 0, skillId: 'pelican.wing', victim: ID.cat, pos: P });
-  expect(!w.has('wing'), 'same rider twice is one');
-  w.emit('skill:hit', { riderId: 0, skillId: 'pelican.wing', victim: ID.shiba, pos: P });
+  wing(ID.cat); wing(ID.cat); wing(ID.shiba);
+  w.emit('skill:end', { riderId: 0, skillId: 'pelican.wing' });
+  expect(!w.has('wing'), 'same rider twice is one, two riders is not three');
+  w.emit('skill:cast', { riderId: 0, skillId: 'pelican.wing', slot: 3 });
+  wing(ID.cat); wing(ID.shiba); wing(ID.pigeon);
   expect(w.has('gulp') && w.has('torpedo') && w.has('wing'), 'gulp/torpedo/wing');
 });
 
@@ -258,7 +281,11 @@ scenario('thief-one-more-payback', (expect) => {
   w.emit('combat:weaponPick', { riderId: 0, weapon: 'pan', stolenFrom: null });
   w.emit('combat:combo', { riderId: 0, count: 2 });
   expect(!w.has('thief') && !w.has('one_more'), 'crate pick / combo 2');
-  w.emit('combat:weaponPick', { riderId: 0, weapon: 'pan', stolenFrom: ID.goose });
+  const steal = () => w.emit('combat:weaponPick', { riderId: 0, weapon: 'pan', stolenFrom: ID.goose });
+  steal(); steal();
+  for (const count of [2, 3, 4, 5, 6, 7, 8, 9, 3, 2]) w.emit('combat:combo', { riderId: 0, count });   // ONE MORE ×4
+  expect(!w.has('thief') && !w.has('one_more'), 'two steals / four ONE MOREs');
+  steal();
   w.emit('combat:combo', { riderId: 0, count: 3 });
   w.at(20).emit('skill:hit', { riderId: ID.seagull, skillId: 'seagull.steal', victim: 0, pos: P });
   w.at(32).ko(ID.seagull);
@@ -282,10 +309,12 @@ scenario('riding', (expect) => {
   for (let i = 0; i < 3; i++) w.emit('rider:land', { riderId: 0, airTime: 0.8, perfect: i !== 1 });
   expect(!w.has('perfect3'), 'two perfect landings');
   w.emit('rider:land', { riderId: 0, airTime: 0.8, perfect: true });
-  for (let i = 0; i < 5; i++) w.emit('rider:nearMiss', { riderId: 0, kind: 'traffic' });
+  for (let i = 0; i < 9; i++) w.emit('rider:nearMiss', { riderId: 0, kind: 'traffic' });
+  expect(!w.has('near_miss'), 'nine near misses');
+  w.emit('rider:nearMiss', { riderId: 0, kind: 'rider' });
   w.emit('rider:crash', { riderId: 0, cause: 'water', speed: 12, pos: P, attacker: null });
   for (const id of ['drift3', 'perfect3', 'near_miss', 'water']) expect(w.has(id), `missing ${id}`);
-  // 蹭饭达人: three slingshots that each turn into an overtake within 2 s (pulling out of the grid pack is not one).
+  // 蹭饭达人: five slingshots that each turn into an overtake within 2 s (pulling out of the grid pack is not one).
   const sling = (t, passAfter, from = 5, to = from - 1) => {
     w.at(t).emit('rider:boost', { riderId: 0, kind: 'draft', power: 0.15, time: 0.8 });
     if (passAfter !== null) w.at(t + passAfter).emit('race:placeChange', { riderId: 0, from, to });
@@ -299,8 +328,10 @@ scenario('riding', (expect) => {
   w.at(40.8).emit('race:placeChange', { riderId: 0, from: 4, to: 3 });  // same slingshot, 2nd rider: one credit
   sling(50, 1.5);
   expect(!w.has('slingshot'), 'two slingshot passes');
-  sling(60, 2);
-  expect(w.has('slingshot'), 'three slingshot passes');
+  sling(60, 2); sling(70, 0.2);
+  expect(!w.has('slingshot'), 'four slingshot passes');
+  sling(80, 1);
+  expect(w.has('slingshot'), 'five slingshot passes');
   const p = makeWorld();
   p.emit('rider:boost', { riderId: 0, kind: 'pad', power: 0.3, time: 1.1 });
   const l = makeWorld();
@@ -379,6 +410,48 @@ scenario('saved-once-across-races', (expect) => {
   const count = w.save.data.achievements.filter((id) => id === 'goose').length;
   expect(count === 1 && w.events.filter((id) => id === 'goose').length === 1, `goose saved ${count}x`);
   expect(w.sys.fresh().length === 0, 'fresh resets per race');
+});
+
+// ---------------------------------------------------------------- career (cups), old saves
+/** race:end with the player at `place` (null = DNF); the career rules only read the player's row. */
+const endRace = (w, place) => w.emit('race:end', { results: FIELD.map((c, i) => ({ riderId: i, character: c, name: c, isPlayer: i === 0,
+  place: i === 0 ? place ?? 8 : i + 1, time: i === 0 && place === null ? null : 150 + i, kos: 0, wrecked: 0, coins: 0 })) });
+
+scenario('cup-and-career-clears', (expect) => {
+  const career = (trackId, level) => ({ mode: 'career', trackId, level });
+  const mid = makeWorld({ config: career('city', 1) });          // a cup's middle event
+  endRace(mid, 1);
+  const quick = makeWorld({ config: { mode: 'quick', trackId: 'mountain', level: 1 } });
+  endRace(quick, 1);
+  const fourth = makeWorld({ config: career('mountain', 1) });   // the final, but 4th
+  endRace(fourth, 4);
+  const dnf = makeWorld({ config: career('mountain', 1) });
+  endRace(dnf, null);
+  expect([mid, quick, fourth, dnf].every((w) => !w.has('cup1')), 'no cup without a top-3 on its last event');
+  const cup1 = makeWorld({ config: career('mountain', 1) });
+  endRace(cup1, 3);
+  expect(cup1.has('cup1') && !cup1.has('cup2') && !cup1.has('career'), 'third on the 菜鸟杯 final clears it');
+  const last = makeWorld({ config: career('mountain', 3), best: { '1-mountain': 2, '2-mountain': 1 } });
+  endRace(last, 1);
+  expect(['cup1', 'cup2', 'cup3', 'career'].every((id) => last.has(id)), `the last cup with two cleared before: all four (${last.save.data.achievements})`);
+  const old = makeWorld({ config: { mode: 'quick', trackId: 'coast', level: 1 }, best: { '1-mountain': 1, '2-mountain': 3, '3-mountain': 2 } });
+  endRace(old, 6);
+  expect(['cup1', 'cup2', 'cup3', 'career'].every((id) => old.has(id)), 'a save that cleared the career before collects them at its next race end');
+  const twice = makeWorld({ config: career('mountain', 1), achievements: ['cup1'] });
+  endRace(twice, 1);
+  expect(twice.events.length === 0 && twice.save.data.achievements.filter((id) => id === 'cup1').length === 1, 'cleared again: no second unlock');
+});
+
+scenario('old-save-with-retired-and-unknown-ids', (expect) => {
+  const w = makeWorld({ achievements: ['ult_first', 'no_such_thing', 'goose'] });
+  w.emit('ult:start', { riderId: 0, skillId: 'pelican.ult' });
+  w.at(4).ko(ID.goose);
+  w.at(5).ko(ID.cat);
+  const ids = w.save.data.achievements;
+  expect(ids.includes('ult_first') && ids.includes('no_such_thing'), 'unknown ids stay in the save untouched');
+  expect(ids.filter((id) => id === 'goose').length === 1 && !w.events.includes('goose'), 'an id already saved is not unlocked again');
+  expect(w.events.includes('first_ko') && w.events.includes('double') && !w.events.includes('ult_first'), `new unlocks still work (${w.events})`);
+  expect(ACHIEVEMENTS.every((a) => a.id !== 'ult_first'), 'ult_first is retired from the catalogue');
 });
 
 scenario('nothing-after-race-end', (expect) => {

@@ -2,10 +2,10 @@
 import type { RuleCtx } from './facts';
 
 const PERFECT_LANDINGS = 3;
-const NEAR_MISSES = 5;
+const NEAR_MISSES = 10;
 /** 蹭饭达人: a slingshot only counts when it turns into an overtake this soon, and it takes a few of them. */
 const SLINGSHOT_PASS_WINDOW = 2;
-const SLINGSHOT_PASSES = 3;
+const SLINGSHOT_PASSES = 5;
 /** Launch boosts: a perfect start gives clearly more power than a plain one (race flow: 0.30 vs 0.18). */
 const PERFECT_LAUNCH_POWER = 0.25;
 

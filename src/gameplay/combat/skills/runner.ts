@@ -81,6 +81,18 @@ export class SkillRunner {
     return this.running.some((a) => a.caster === r && a.swallows?.() === true);
   }
 
+  /**
+   * RiderState.ultTarget for every rider (the HUD greys SHOWTIME with it): would the rider's ult find victims if
+   * cast now, i.e. its own ready() check (SHOWTIME: ult-aim.ts planUlt, no allocations). false without an ult.
+   */
+  updateUltTargets(): void {
+    for (const r of this.ctx.session.riders) {
+      const id = this.skillIn(r, ULT_SLOT);
+      const impl = id ? SKILL_IMPLS[id] : undefined;
+      r.ultTarget = impl !== undefined && (impl.ready?.(this.ctx, r) ?? true);
+    }
+  }
+
   find(r: RiderState, id: string): ActiveSkill | undefined {
     return this.running.find((a) => a.caster === r && a.id === id);
   }
@@ -128,6 +140,7 @@ export class SkillRunner {
     if (!def || !impl) return false;
     if (slot !== ULT_SLOT) r.cooldowns[slot - 1] = def.cooldown;
     r.sp = Math.max(0, r.sp - def.spCost);
+    if (def.spCost > 0) this.ctx.rd(r).spSpentAt = this.ctx.time; // fighting refills nothing for a while (sp.ts)
     r.invuln = 0; // casting gives up respawn protection
     if (r.action && r.action.kind !== 'skill' && r.action.kind !== 'ult') r.action = null;
     this.ctx.rd(r).buffered = null;

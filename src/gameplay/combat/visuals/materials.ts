@@ -1,7 +1,9 @@
 // Session material pool for combat visuals. Tinted materials are recycled instead of disposed, so their GL
 // programs stay linked between casts (no relink on every honk / torpedo / doge); vertex-coloured ribbons share
-// one material per blend mode. warmUp() draws one sub-pixel instance of every variant on the first rendered
-// frame, so the first cast of a race doesn't compile shaders mid-race either.
+// one material per blend mode. warmUp() parks one hidden sub-pixel instance of every variant under the combat
+// root for the whole session: core's race warm-up (core/warmup.ts) compiles hidden objects too, behind the
+// loading screen, so no combat program compiles after GO (removing them on the first rendered frame let the
+// loading screen's frames drop them before the warm-up ever saw them).
 import {
   AdditiveBlending, BufferAttribute, BufferGeometry, DoubleSide, FrontSide, Mesh, MeshBasicMaterial, NormalBlending,
   type ColorRepresentation, type Material, type Object3D, type Side,
@@ -27,7 +29,7 @@ export class MaterialPool {
   private free = new Map<string, Material[]>();
   private made: Material[] = [];
   private ribbons = new Map<boolean, MeshBasicMaterial>();
-  private warm: { objects: Object3D[]; geos: BufferGeometry[]; mats: Material[]; frame: number } | null = null;
+  private warm: { objects: Object3D[]; geos: BufferGeometry[] } | null = null;
 
   /** Per-visual tinted transparent material; hand it back with release() when the visual ends. */
   glow(color: ColorRepresentation, opacity: number, o: GlowOpts = {}): MeshBasicMaterial {
@@ -74,8 +76,8 @@ export class MaterialPool {
     return m;
   }
 
-  /** Add one invisible (sub-pixel, transparent) instance of each variant under `root` for the next render. */
-  warmUp(root: Object3D, frame: number): void {
+  /** Park one hidden sub-pixel instance of each variant under `root` (compiled by core's warm-up; see header). */
+  warmUp(root: Object3D): void {
     // glows, shield rim: tori / discs / spheres (normals) · ribbons: colours + alphas · props: vertex colours + normals
     const geos = [triangle(0, true), triangle(4, false), triangle(3, true)];
     const [solid, rgba, rgb] = geos as [BufferGeometry, BufferGeometry, BufferGeometry];
@@ -87,25 +89,19 @@ export class MaterialPool {
     ];
     for (const o of objects) {
       o.scale.setScalar(1e-4);
-      o.frustumCulled = false;
-      o.traverse((c) => { c.frustumCulled = false; });
+      o.visible = false;
       root.add(o);
     }
-    this.warm = { objects, geos, mats, frame };
-  }
-
-  /** Per step: once a frame has been rendered since warmUp(), drop the warm-up objects. */
-  tick(frame: number): void {
-    const w = this.warm;
-    if (!w || frame <= w.frame) return;
-    this.warm = null;
-    for (const o of w.objects) o.removeFromParent();
-    for (const m of w.mats) this.release(m);
-    for (const g of w.geos) g.dispose();
+    for (const m of mats) this.release(m); // the first casts reuse these compiled materials
+    this.warm = { objects, geos };
   }
 
   dispose(): void {
-    this.tick(Infinity);
+    if (this.warm) {
+      for (const o of this.warm.objects) o.removeFromParent();
+      for (const g of this.warm.geos) g.dispose();
+      this.warm = null;
+    }
     for (const m of this.made) m.dispose();
     this.made.length = 0;
     this.free.clear();

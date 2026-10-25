@@ -18,12 +18,7 @@ export class VisualSystem {
   private vTmp = new Vector3();
 
   constructor(readonly ctx: CombatCtx) {
-    this.materials.warmUp(ctx.root, this.renderedFrames);
-  }
-
-  /** Frames the renderer has drawn so far (drives the shader warm-up). */
-  private get renderedFrames(): number {
-    return this.ctx.session.app.renderer.info.render.frame;
+    this.materials.warmUp(ctx.root);
   }
 
   add<T extends Visual>(v: T): T {
@@ -32,7 +27,6 @@ export class VisualSystem {
   }
 
   update(dt: number): void {
-    this.materials.tick(this.renderedFrames);
     for (let i = this.list.length - 1; i >= 0; i--) {
       const v = this.list[i];
       if (v && !v.update(dt)) {

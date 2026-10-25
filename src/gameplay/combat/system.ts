@@ -83,6 +83,7 @@ export function createCombat(session: Session): CombatSystem {
       ctx.pickups.update(dt, ctx.racing);
       visualDt += dt;
       checkKos(ctx);
+      ctx.skills.updateUltTargets();
       flushImpacts(ctx);
     },
     /** Render-only work, once per rendered frame on final poses (update(0) re-faces ribbons in hit-stop). */

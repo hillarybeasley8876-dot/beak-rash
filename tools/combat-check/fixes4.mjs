@@ -29,7 +29,8 @@ export const fixes4 = [
     c.spawn('coin', p.s + 25, 2); c.cast(0, 3); cc.step(4);
     const root = cc.S().world.children.find((o) => o.name === 'combat');
     const ribbons = [], coins = root.children.find((o) => o.name === 'pickups:coin');
-    root.traverse((o) => { if (o.isMesh && o.geometry.getAttribute('color')?.itemSize === 4 && o.geometry.drawRange.count > 0) ribbons.push(o); });
+    // (hidden: the material pool's parked warm-up variants, not ribbons)
+    root.traverse((o) => { if (o.isMesh && o.visible && o.geometry.getAttribute('color')?.itemSize === 4 && o.geometry.drawRange.count > 0) ribbons.push(o); });
     const versions = () => [...ribbons.map((m) => m.geometry.getAttribute('position').version), coins.instanceMatrix.version];
     const delta = (a, b) => b.map((v, i) => v - a[i]);
     const v0 = versions(), t0 = cc.S().time; cc.step(1);

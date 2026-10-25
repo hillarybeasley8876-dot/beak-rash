@@ -1,9 +1,9 @@
 // KO pipeline (SPEC §7): hp ≤ 0 → physics.crash(victim,'ko') + combat:ko exactly once per wreck, credit
-// to lastHitBy within 3 s (+1 KO, +50 coins, +20 SP). A crash of any other cause within 3 s of being hit
+// to lastHitBy within 3 s (+1 KO, +50 coins, +10 SP). A crash of any other cause within 3 s of being hit
 // (knocked into a wall / traffic) is credited the same way. Respawned riders return at ≥ 70 % HP.
 import type { CrashCause, RiderState, Vec3Like, WeaponId } from '../../core/types';
 import { finished, type CombatCtx } from './ctx';
-import { gainSp, spRefund } from './sp';
+import { fightSp, gainSp } from './sp';
 import { KO, SP } from './tuning';
 
 /** Detect lastHitBy written by another unit (debug.ko, sim bumps) and treat it as a fresh hit. */
@@ -32,13 +32,13 @@ function koMethod(ctx: CombatCtx, victim: RiderState, attacker: RiderState | nul
   return { skillId: null, weapon: attacker?.weapon ?? 'none' };
 }
 
-/** +1 KO, coins and SP (none for KOs scored with an SP-paid skill, so the ult can't refill itself). */
-function award(victim: RiderState, attacker: RiderState | null, how: KoMethod): void {
+/** +1 KO, coins and SP (none for KOs scored with an SP-paid skill or right after casting one: sp.ts fightSp). */
+function award(ctx: CombatCtx, victim: RiderState, attacker: RiderState | null, how: KoMethod): void {
   victim.wrecked += 1;
   if (!attacker) return;
   attacker.kos += 1;
   attacker.coins += KO.coins;
-  gainSp(attacker, SP.ko * spRefund(how.skillId));
+  gainSp(attacker, SP.ko * fightSp(ctx, attacker, how.skillId));
 }
 
 function emitKo(ctx: CombatCtx, victim: RiderState, attacker: RiderState | null, cause: CrashCause, pos: Vec3Like, how: KoMethod): void {
@@ -56,7 +56,7 @@ export function checkKos(ctx: CombatCtx): void {
     const attacker = creditFor(ctx, r);
     const pos = ctx.pos(r, 0.9);
     const how = koMethod(ctx, r, attacker);
-    award(r, attacker, how);
+    award(ctx, r, attacker, how);
     ctx.view(r)?.cue('ko');
     emitKo(ctx, r, attacker, 'ko', pos, how); // SPEC §7 order: combat:ko, then the crash (rider:crash)
     ctx.session.physics.crash(r, 'ko', attacker?.id ?? null);
@@ -83,7 +83,7 @@ export function listenKo(ctx: CombatCtx, onCrash: (r: RiderState) => void): () =
     if (!attacker) return;
     d.koFired = true;
     const how = koMethod(ctx, r, attacker);
-    award(r, attacker, how);
+    award(ctx, r, attacker, how);
     emitKo(ctx, r, attacker, cause, { x: pos.x, y: pos.y, z: pos.z }, how);
   });
   const offRespawn = bus.on('rider:respawn', ({ riderId }) => {

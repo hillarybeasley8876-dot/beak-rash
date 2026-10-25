@@ -21,6 +21,8 @@ export interface RiderCombat {
   bellBuf: number | null;                         // age of a bell press held while a swing / stagger finishes
   bellCd: number;
   bellPaid: number[];                             // combat time the bell last paid SP for provoking rider [id]
+  spSpentAt: number;                              // combat time of the last SP-paid cast (fighting pays no SP for a while)
+  hitPaid: number[];                              // combat time a swing on rider [id] last paid full SP
   nextCrit: boolean;                              // ONE MORE! grants a guaranteed crit
   koFired: boolean;                               // combat:ko already emitted for this wreck
   hpAtCrash: number;                              // HP when the current wreck started
@@ -56,6 +58,7 @@ export class CombatCtx {
     session.world.add(this.root);
     this.data = session.riders.map(() => ({
       swing: { windup: 0, active: 0, recover: 0, total: 0 }, buffered: null, skillBuf: [], bellBuf: null, bellCd: 0, bellPaid: session.riders.map(() => -Infinity),
+      spSpentAt: -Infinity, hitPaid: session.riders.map(() => -Infinity),
       nextCrit: false, koFired: false, hpAtCrash: 0, lastAttack: -999, hitByMirror: null, koBy: null, pin: null,
     }));
   }

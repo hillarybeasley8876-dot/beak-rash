@@ -1,7 +1,7 @@
 // Fix round 2 regressions (run in the page; see page.mjs). Rider ids: 1 goose, 2 cat, 3 capybara, 4 shiba,
 // 5 pigeon, 6 penguin, 7 seagull, 8 sloth, 9 corgi.
 export const fixes3 = [
-  ['bell: three rings at the same angry rival pay 5 SP once; a rival 10 m behind pays nothing', () => {
+  ['bell: three rings at the same angry rival pay 3 SP once; a rival 10 m behind pays nothing', () => {
     const cc = window.__cc; cc.reset(); const c = cc.C(); const p = cc.P();
     const ring = () => { cc.press('bell'); cc.step(1); cc.step(200); return p.sp; };
     c.pin(1, 4, 3); cc.step(2);
@@ -12,7 +12,7 @@ export const fixes3 = [
     const close = ring();
     c.pin(3, -80, 0); c.pin(1, 4, 3); cc.step(300);
     const expired = !cc.has(cc.R(1), 'angry'), again = ring();
-    return { ok: sp.join() === '5,5,5' && behind === 5 && angered2.join() === '2' && close === 10 && expired && again === 15,
+    return { ok: sp.join() === '3,3,3' && behind === 3 && angered2.join() === '2' && close === 6 && expired && again === 9,
       info: { sp, behind, angered2, close, expired, again } };
   }],
   ['statuses: a strong short slow never inherits a weak long slow\'s timer (both orders)', () => {
@@ -47,7 +47,7 @@ export const fixes3 = [
     const gulp = cc.of('pickup:take').length, left = [fish, can, f2, c2].filter((id) => c.items().some((it) => it.id === id && it.alive)).length;
     p.hp = p.maxHp - 30; p.sp = 50; c.spawn('fish', p.s + 8, p.x); c.spawn('can', p.s + 12, p.x); cc.step(60);
     const taken = cc.of('pickup:take').map((e) => e.kind).join();
-    return { ok: ride === 0 && gulp === 0 && left === 4 && taken === 'fish,can' && p.hp === p.maxHp - 5 && p.sp === 75,
+    return { ok: ride === 0 && gulp === 0 && left === 4 && taken === 'fish,can' && p.hp === p.maxHp - 5 && p.sp === 70,
       info: { ride, gulp, left, taken, hp: p.hp, sp: p.sp } };
   }],
   ['torpedo: a car in the way stops it (no hit, projectile:end hit null); with the road clear it hits', () => {

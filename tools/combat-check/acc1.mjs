@@ -17,7 +17,7 @@ export const acc1 = [
     return { ok: none.denied === 'state' && none.line === '无目标！' && none.sp === 100 && none.starts === 0 && f > 0 &&
       !!imp?.victims.includes(1) && land.gap > 1.5 && land.gap < 4 && land.travel > 80, info };
   }],
-  ['SHOWTIME target assist: lands on the pack 70-90 m ahead (all three hit), or back on a rival 25 m behind', () => {
+  ['SHOWTIME target assist: lands on the pack 70-90 m ahead (all three hit); a rival 25 m behind is out of reach (never flies back)', () => {
     const cc = window.__cc; cc.reset(); const c = cc.C(); const p = cc.P();
     const ult = () => {
       cc.mark(); p.sp = 100; cc.press('ult'); cc.step(1);
@@ -31,10 +31,11 @@ export const acc1 = [
     const pack = ult();
     cc.reset();
     c.pin(1, -25, 1.6); cc.step(2); c.unpin(1);
-    const s0 = p.s, g = cc.R(1), g0 = g.s;
-    const back = ult();
-    const info = { pack, back, moved: (p.s - s0) - (g.s - g0) };
-    return { ok: [1, 2, 3].every((id) => pack.includes(id)) && back.includes(1), info };
+    const target = p.ultTarget;
+    cc.mark(); p.sp = 100; cc.press('ult'); cc.step(2);
+    const back = { target, denied: cc.of('skill:denied', (e) => e.riderId === 0 && e.slot === 4)[0]?.reason, starts: cc.of('ult:start').length, sp: p.sp };
+    const info = { pack, back };
+    return { ok: [1, 2, 3].every((id) => pack.includes(id)) && !back.target && back.denied === 'state' && back.starts === 0 && back.sp === 100, info };
   }],
   ['SHOWTIME near the line: a rival that will have finished by the impact is no target (denied)', () => {
     const cc = window.__cc, br = window.__br; cc.reset(); const c = cc.C(); const p = cc.P();

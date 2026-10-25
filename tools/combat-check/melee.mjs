@@ -62,14 +62,15 @@ export const melee = [
     const h = cc.of('combat:hit')[0], sw = cc.of('combat:swing')[0];
     return { ok: h?.victim === 3 && h.heavy && h.side === -1 && h.damage === 13 && sw?.heavy === true, info: { h, sw } };
   }],
-  ['combo of 3 → ONE MORE! (+10 SP) and the next hit crits', () => {
+  ['combo of 3 → ONE MORE! (+2 SP) and the next hit crits; one rival pays a full swing once per 4 s', () => {
     const cc = window.__cc; cc.reset(); const c = cc.C(); c.force({ block: false, loose: false });
     c.pin(3, 0.2, 1.2); cc.step(2);
     const sp0 = cc.P().sp;
     for (let i = 0; i < 4; i++) { cc.press('attackR'); cc.step(1); cc.step(30); }
     const hits = cc.of('combat:hit', (h) => h.attacker === 0), combos = cc.of('combat:combo');
     const gained = cc.P().sp - sp0;
-    return { ok: hits.length === 4 && combos.some((e) => e.count === 3) && hits[3].crit === true && gained >= 4 * 6 + 10,
+    const want = 2.5 + 3 * 0.5 + 2; // a full swing, three repeats on the same rival, ONE MORE (+ a little drafting)
+    return { ok: hits.length === 4 && combos.some((e) => e.count === 3) && hits[3].crit === true && gained >= want - 1e-6 && gained < want + 2.5,
       info: { hits: hits.map((h) => h.crit), combos: combos.map((e) => e.count), gained } };
   }],
 ];

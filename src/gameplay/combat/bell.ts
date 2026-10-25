@@ -4,7 +4,7 @@
 import type { RiderState } from '../../core/types';
 import { posing, type CombatCtx } from './ctx';
 import { nudge } from './feedback';
-import { gainSp } from './sp';
+import { fightSp, gainSp } from './sp';
 import { addStatus } from './statuses';
 import { BELL, PRESS_HOLD, SP } from './tuning';
 
@@ -54,7 +54,7 @@ function ring(ctx: CombatCtx, r: RiderState): void {
     d.bellPaid[o.id] = ctx.time;
     paid = true;
   }
-  if (paid) gainSp(r, SP.bell);
+  if (paid) gainSp(r, SP.bell * fightSp(ctx, r, null));
   ctx.bus.emit('combat:bell', { riderId: r.id, pos: ctx.pos(r, 1.2), angered });
   ctx.bus.emit('taunt', { riderId: r.id, text: '叮叮叮！', character: r.character });
   nudge(ctx, r, 0.06);
