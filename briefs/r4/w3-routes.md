@@ -31,13 +31,18 @@ segment; build.ts; reverse.ts = how the reversed layout is derived BEFORE the bu
 5. Keep the authored layouts bit-for-bit identical when `route` is 0.
 
 ## Files you own
-`src/world/layout/` (folder), `src/world/layouts/` (folder), `src/world/track.ts`, `src/world/ctx.ts`,
-`src/world/index.ts`, `src/world/dressing/` (folder), `sandbox/track.ts`, `sandbox/track.html`, `sandbox/track.*.mjs`
-(the existing track sandbox tools — list them in your plan).
+`src/world/layout/` (folder — put the generator and every per-track route hint here, a table keyed by track id),
+`src/world/layouts/coast.ts`, `city.ts`, `mountain.ts`, `index.ts`, `src/world/track.ts`, `src/world/ctx.ts`,
+`src/world/index.ts`, `src/world/dressing/coast/`, `city/`, `mountain/`, `src/world/dressing/dress.ts`,
+`src/world/dressing/index.ts`, `sandbox/track.*`.
+A polish job works on the water town and the gobi at the same time (their layouts, their dressing, road/, env/,
+terrain/): do not edit those. The generator must still handle all five tracks (their hints live in your route
+module); the lead checks watertown / gobi routes after both jobs land — if their dressing breaks on a route, say so
+under `## Requests` in your status file.
 
 ## Acceptance (the runner runs these; read `tools/r4/w3-routes.mjs` first)
-- `node tools/r4/tsc-own.mjs src/world/` → TSC-OWN OK
-- `node tools/r4/w3-routes.mjs` → w3-routes OK
+- `node tools/r4/tsc-own.mjs <your files>` → TSC-OWN OK (the exact command is in the acceptance list below)
+- `node tools/r4/w3-routes.mjs --tracks coast,city,mountain --race mountain` → w3-routes OK
 - `node tools/r4/w3-reverse.mjs` → w3-reverse OK (reverse still works)
 - `node tools/core-check.mjs` → core-check OK
 Look at your work: a chase shot at the start, the middle and the finish of route #4821 on every track, plus a plan
