@@ -5,8 +5,11 @@ const { app, BrowserWindow, protocol, net, Menu } = require('electron');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 
-// Smoke tests attach over CDP: BR_DEBUG_PORT=9333 open the app binary directly.
+// Smoke tests attach over CDP: BR_DEBUG_PORT=9471 open the app binary directly. BR_SMOKE=1 keeps the window
+// off-screen and unfocused (still rendering) so a test run doesn't interrupt whoever is using the machine.
 if (process.env.BR_DEBUG_PORT) app.commandLine.appendSwitch('remote-debugging-port', process.env.BR_DEBUG_PORT);
+const SMOKE = process.env.BR_SMOKE === '1';
+if (SMOKE) app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } },
@@ -17,10 +20,10 @@ const DIST = path.join(__dirname, 'dist');
 function createWindow() {
   const win = new BrowserWindow({
     width: 1600, height: 900, minWidth: 1024, minHeight: 600, backgroundColor: '#0b0b0f',
-    title: '暴力鹈鹕 BEAK RASH', autoHideMenuBar: true, show: false,
+    title: '暴力鹈鹕 BEAK RASH', autoHideMenuBar: true, show: false, ...(SMOKE ? { x: -4000, y: -4000 } : {}),
     webPreferences: { contextIsolation: true, sandbox: true, backgroundThrottling: false },
   });
-  win.once('ready-to-show', () => win.show());
+  win.once('ready-to-show', () => (SMOKE ? win.showInactive() : win.show()));
   win.loadURL('app://game/index.html');
   win.webContents.on('before-input-event', (event, input) => {
     if (input.type !== 'keyDown') return;

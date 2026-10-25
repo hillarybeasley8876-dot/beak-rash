@@ -9,3 +9,4 @@ desktop/build
 desktop/*.log
 desktop/*.ok
 dist-single
+desktop/electron-win
