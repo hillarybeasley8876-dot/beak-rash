@@ -50,13 +50,14 @@
 
 ## Files
 - src/fx/index.ts (entry) · system.ts (FxSystem core) · state.ts (PostState) · grade.ts · context.ts · debug.ts
-- post/{pipeline,bloom,composite,composite-glsl,composite-cast,mask,glsl-common,timer}.ts (timer = GPU timer for
-  `__br.fx.gpu`; mask = KO cast mask pass, composite-cast = victim / attacker / bystander look)
+- post/{pipeline,bloom,composite,composite-glsl,composite-cast,mask,lights,glsl-common,timer}.ts (timer = GPU timer for
+  `__br.fx.gpu`; mask = KO cast mask pass, composite-cast = victim / attacker / bystander look, lights = the scene's
+  lights for the mask draw + the lit-white level of the cast exposure)
 - particles/{atlas,atlas-shapes,atlas-shapes2,atlas-shapes3,shaders,pool,system}.ts
 - presets/{kit,impacts,ground,bodies,rewards,speed,skills,index}.ts
 - react/{tracker,bus,bus-combat,bus-ride,emitters,skills,species}.ts
-- ko/{director,cine,cast,look,camera,framing,subject,rise,tester}.ts (cast = who is who for the mask + occluders) (framing = shot templates incl. SHOWTIME + picker +
-  bounds confine, subject = head/body/bike sphere + SHOWTIME hero pick)
+- ko/{director,cine,cine-aim,cast,look,camera,framing,subject,rise,tester}.ts (cast = who is who for the mask + occluders) (framing = shot templates incl. SHOWTIME + picker +
+  bounds confine, subject = head/body/bike sphere + SHOWTIME hero pick, cine-aim = SHOWTIME hold aim: hero + pair truck)
 - sandbox/fx.{html,ts,stage.ts,replay.ts,check.mjs,cine.mjs,cine-sum.py,flow.mjs,sheet.py,grid.py,play.mjs,isolate.mjs,
   accept.mjs,warm.mjs} (accept = the critics' cinematic probe with sizes/events + contact sheet; warm = shader link check)
 - particle modes: 0 billboard · 1 screen-stretched · 2 flat on the road · 3 flutter · 4 orbit anchor · 5 world line
@@ -284,3 +285,51 @@ Requests (acceptance round 1):
 - actors: stun stars are small in the SHOWTIME hold (critic: 'scale up the stun stars so the chain reads'); and the
   near-camera fade of a crashed rider uses min(body, bike) distance, so a bike 1.9 m from a cinematic camera fades the
   whole body (fx now keeps 2.15 m from head/body/bike, but a dedicated cinematic exemption would be safer).
+
+## r3 polish (2026-10-25) — reviews game-r2-aesthetic #0 #3, game-r2-e2e #3, game-r2-feel #2 #3, game-r2-perf #0, reduced motion
+Probes + frames in shots/r3-fx/ (ult.mjs, tone.mjs, occl.mjs, sparks.mjs, reduced.mjs, warmcost.mjs, bench.mjs).
+- [x] perf/feel: first KO compiled 4-9 programs mid-race. The mask warm-up never ran (core's warm-up frames skip rendering, the
+      director's one-frame cast was gone by core's draw-everything frame) and the mask draw (camera.layers = 30) dropped the
+      lights, so the next shadow pass compiled zero-light depth variants. Now pipeline.warm(cast) draws the whole race cast (every
+      view + traffic + police) into the mask in core's draw-everything frame (no core edit needed), and SubjectMask.render puts the
+      scene lights (post/lights.ts SceneLights) on layer 30 with shadowMap auto-update off for the draw. actors-programs.mjs high,
+      after GO: coast/city/mountain 11 -> 0 fx / depth programs (KO, WRECKED); fx.warm.mjs (+ a real SHOWTIME, exits 1 on any
+      late program): late 0 on 3 tracks high + coast low/medium. Cost: hidden warm-up frame +~70 ms (coast 668 -> 738 ms).
+      The latest actors-programs run shows 4 late programs, all combat skill visuals (see Requests).
+- [x] e2e: SHOWTIME subject = a rider the impact knocked out (combat zeroes their HP before ult:impact), nearest the impact;
+      nearest hit rider only if nobody was KO'd (KoCine re-targets with a cut if a KO arrives for a hit-only hero). cine:ko start
+      names each KO'd rider, peak / end the shot's KO'd subject. fx.cine.mjs ult / ultko (new subjectKod, namesKod): 1 / true on
+      coast, city, mountain. Tester ult zeroes HP before ult:impact like combat.
+- [x] e2e: near-neutral victims keep their own lightness: 4 clean tones (ink, dark grey, light grey, paper) instead of the paper-
+      biased 3-tone map, and the exposure lift comes from the light level (grade.litWhite: strongest directional + hemisphere
+      from the live scene lights, so tunnels count) instead of the victim's own mean luma (that lifted a grey pigeon to white).
+      tone.mjs coast pigeon median luma 238 -> 116 (paper share 0.59 -> 0.04), goose / seagull keep paper (p90 245-247);
+      city night goose still white (p90 236), pigeon grey (p50 84). The 25-tap victim loop in the vertex stage is gone.
+- [x] aesthetic #0: SHOWTIME hold. Framings lower (ult34 1.3-1.5 m, ult34High 2.2-2.4 m), bias 0.22 -> 0.08-0.1 (hero just above the
+      middle, clear of the KO splash band below NDC -0.2), heightFollow 0.5-0.6 (the eye climbs with a flung hero), hero fit drops
+      its bike from 0.4 m; the centroid pan is replaced by a truck toward the victim nearest the hero (<= 8 m, hero kept within 0.3
+      NDC of the centre; ko/cine-aim.ts) and the picker penalises framings that would leave that victim out (pairMiss); other
+      victims count as occluders of the hero. Critics' city scenario: hero 0.23-0.26 at NDC y 0.19-0.23 (others 0.45-0.84) ->
+      0.28-0.36 at y 0.05 (others 0.23-0.5); KO'd pigeon probe 0.15 at y 0.47-0.66 -> 0.26-0.31 at y 0.09-0.19; fx.cine ult heroFrac
+      0.33-0.35 on 3 tracks. Not done literally: "pair on the lower third" (the KO splash band covers the lower 40 % after the peak).
+- [x] aesthetic #3: fillOccluders also skips traffic / police in front of a victim (instanced per type: the race:traffic group steps
+      aside for the frame; long vehicles by their near end). occl.mjs (car parked on the sight line, city): victim px 0 / 0 / 1759
+      -> 44835 / 40069 / 33582. KO framings follow the flung body (followY 11, heightFollow 0.5) and the KO fit drops the bike from
+      2 m (was 3.5): fx.cine ko coast/city/mountain + city edge/chain/wrecked body/bike in frame 1, headClear 1, headTop <= 0.59.
+- [x] feel #2: drift sparks per level (presets/speed.ts FAN): L1 small blue, L2 bigger orange, L3 large pink + glow pool on the road +
+      flame jet; longer, not fatter streaks; driftPop adds a camera-facing burst ring (grows per level), new driftRelease ring on
+      the drift boost; rivals' fans at 0.6. sparks.mjs 1080p coloured px L1 715 -> 1679, L2 2949 -> 8492, L3 1369 -> 6726, release
+      6258 -> 20421. Particles: player L3 add 43 -> 80 alive; all 8 riders drifting L3: 140 solid / 469 add (caps 2000 / 1000);
+      scene-pass GPU with vs without particles within noise.
+- [x] reduced motion (state.ts REDUCED): no impact frames (as before), flashes x0.35, chroma punches x0.35 and fringes x0.5, hurt
+      pulse x0.6, whoosh x0.5, cam:kick 7 -> 2.5 deg, zoom blur x0.35 and no start / peak pulses, speed lines re-randomise at 4 Hz
+      (18), static grain, KO / WRECKED / SHOWTIME look eases in / out over 0.16 s. reduced.mjs (KO + real SHOWTIME, 640x360):
+      largest frame-to-frame luma jump KO 155.6 -> 50.1 (the camera cut into the shot), SHOWTIME 146.6 -> 29.9; 0 inverted frames.
+      Bug found on the way: the look's fades started at tl.releaseAt while the release still waited for the apex (bars / grain
+      dipped, then snapped back); they now start at the actual release.
+- Checks: tsc clean for src/fx + sandbox/fx.*; fx.check bursts / ride / replay ko|ult|chain|wrecked|lite / real swing|ult /
+  closeups / gallery 0 errors; fx.flow all pass; fx.accept coast ko|wrecked|chain|ult + city ko (cat) | ult 0 errors; fx.play city /
+  mountain 60 fps 0 errors; core-check OK; post at 1080p 0.08-0.2 ms riding, 0.43-0.54 ms in a KO hold (old mask 0.97 in the same
+  probe). Sandbox scripts take FX_OUT=<dir> for their frames.
+- Requests: combat — 4 programs still link after GO at the first pigeon / shiba / penguin skill (combat MeshBasicMaterial +
+  ShaderMaterial meshes under the 'combat' group; tools/actors-programs.mjs lists them): please pre-warm them at race build.

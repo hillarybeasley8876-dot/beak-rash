@@ -24,8 +24,6 @@ export interface ShotFraming {
   /** Vertical / horizontal focus follow rates (1/s, defaults 6 / 9); fast for a diving subject. */
   followY?: number;
   followXZ?: number;
-  /** SHOWTIME: share of the victims' centroid offset the aim pans toward (default 0.35; 0 = hero centred). */
-  pan?: number;
 }
 
 export interface ShotSpec extends ShotFraming {

@@ -1,9 +1,11 @@
 // Subject mask for the KO look: the cast (victims, attacker, bystanders) is drawn again with a role id
 // and its view depth into a small RG target, so the composite can keep the victim in its own colours with
 // a sticker rim and push everyone else into the backdrop. Objects join layer 30 only for this one call.
+// The scene's lights join it too: three keys the NEXT frame's shadow pass on the light setup of the last
+// render of the scene, so a light-less mask draw made every shadow caster compile zero-light depth variants.
 import {
   HalfFloatType, NearestFilter, RGFormat, ShaderMaterial, WebGLRenderTarget, Color, DoubleSide,
-  type Camera, type Material, type Mesh, type Object3D, type Scene, type Texture, type WebGLRenderer,
+  type Camera, type Light, type Material, type Mesh, type Object3D, type Scene, type Texture, type WebGLRenderer,
 } from 'three';
 
 export type CastRole = 'victim' | 'attacker' | 'ghost';
@@ -53,6 +55,8 @@ export class SubjectMask {
   private readonly tagged: Object3D[] = [];
   /** frustumCulled of each tagged object (culling is off for the mask draw so warm-up compiles off-screen riders too). */
   private readonly culled: boolean[] = [];
+  /** Scene lights put on the mask layer for the current draw. */
+  private readonly lit: Light[] = [];
   private readonly clear = new Color();
 
   constructor() {
@@ -79,18 +83,26 @@ export class SubjectMask {
     this.rt.setSize(Math.max(1, Math.round(width * k)), Math.max(1, Math.round(height * k)));
   }
 
-  /** Draw the cast into the mask (R = view depth, G = role id); scene, camera and renderer state are restored. */
-  render(r: WebGLRenderer, scene: Scene, camera: Camera, cast: ReadonlyMap<Object3D, CastRole>): void {
+  /** Draw the cast into the mask (R = view depth, G = role id); scene, camera and renderer state are restored.
+   *  The scene's `lights` stay in the draw (same light setup as the scene pass); the shadow maps are not redrawn. */
+  render(r: WebGLRenderer, scene: Scene, camera: Camera, cast: ReadonlyMap<Object3D, CastRole>, lights: readonly Light[]): void {
     for (const [root, role] of cast) this.tag(root, ROLE_ID[role]);
+    for (const light of lights) {
+      if (light.layers.isEnabled(MASK_LAYER)) continue;
+      light.layers.enable(MASK_LAYER);
+      this.lit.push(light);
+    }
     const prev = {
       target: r.getRenderTarget(), alpha: r.getClearAlpha(), override: scene.overrideMaterial, background: scene.background,
-      auto: scene.matrixWorldAutoUpdate, layers: camera.layers.mask,
+      auto: scene.matrixWorldAutoUpdate, layers: camera.layers.mask, shadowAuto: r.shadowMap.autoUpdate, shadowNeeds: r.shadowMap.needsUpdate,
     };
     r.getClearColor(this.clear);
     try {
       scene.overrideMaterial = this.material;
       scene.background = null;
       scene.matrixWorldAutoUpdate = false;
+      r.shadowMap.autoUpdate = false;
+      r.shadowMap.needsUpdate = false;
       camera.layers.set(MASK_LAYER);
       r.setRenderTarget(this.rt);
       r.setClearColor(0x000000, 0);
@@ -100,6 +112,8 @@ export class SubjectMask {
       scene.overrideMaterial = prev.override;
       scene.background = prev.background;
       scene.matrixWorldAutoUpdate = prev.auto;
+      r.shadowMap.autoUpdate = prev.shadowAuto;
+      r.shadowMap.needsUpdate = prev.shadowNeeds;
       camera.layers.mask = prev.layers;
       r.setClearColor(this.clear, prev.alpha);
       r.setRenderTarget(prev.target);
@@ -124,8 +138,10 @@ export class SubjectMask {
       o.layers.disable(MASK_LAYER);
       o.frustumCulled = this.culled[i] ?? true;
     });
+    for (const light of this.lit) light.layers.disable(MASK_LAYER);
     this.tagged.length = 0;
     this.culled.length = 0;
+    this.lit.length = 0;
     this.roles.clear();
   }
 

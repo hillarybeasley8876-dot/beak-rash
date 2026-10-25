@@ -11,7 +11,7 @@ import { BASE, parseArgs, withPage } from '../tools/lib.mjs';
 const a = parseArgs(process.argv.slice(2));
 const mode = a._[0] ?? 'bursts';
 const q = typeof a.q === 'string' ? a.q : '';
-const OUT = 'shots/fx';
+const OUT = process.env.FX_OUT ?? 'shots/fx'; // FX_OUT=shots/<slice> keeps a fix round's frames apart
 
 async function race(h, extra = '') {
   await h.goto(`/?race=coast&seed=3&traffic=0&police=0${q}${extra}`);

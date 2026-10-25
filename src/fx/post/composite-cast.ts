@@ -1,6 +1,6 @@
 // KO cast look (composite fragment stage): the subject mask (post/mask.ts) tells the victim, the
-// attacker and bystanders apart. The victim keeps its own toon colours (lifted when dark) inside a paper
-// sticker border with an ink line; the attacker is muted; bystanders become dark ink ghosts on the backdrop.
+// attacker and bystanders apart. The victim keeps its own toon colours (lifted when the light is dim) inside a
+// paper sticker border with an ink line; the attacker is muted; bystanders become dark ink ghosts on the backdrop.
 export const CAST_GLSL = /* glsl */ `
 uniform sampler2D tMask;
 uniform float uMask;
@@ -47,17 +47,18 @@ vec2 fxSticker(vec2 uv) {
   return vec2(inner, outer * (1.0 - inner));
 }
 
-// Victim colours: white-balanced and lifted when dark. Near-neutral parts (white plumage, grey fur) go to
-// clean paper / ink manga shading, so a sunset or neon key light never tints them pink or blue; saturated
-// parts (fur, beaks, helmets, bikes) keep their own colour.
+// Victim colours: white-balanced and lifted when dark. Near-neutral parts (plumage, grey fur) keep their own
+// lightness on four clean tones (ink, dark grey, light grey, paper; no screen-tone dots on small faces), so a
+// grey pigeon stays grey and a penguin's back black next to a white goose, and a sunset or neon key light never
+// tints them pink or blue; saturated parts (fur, beaks, helmets, bikes) keep their own colour.
 vec3 fxVictimTone(vec3 col) {
   vec3 c = clamp(col * uVicWB * vVicGain, 0.0, 1.0);
   float mx = max(c.r, max(c.g, c.b));
   float sat = (mx - min(c.r, min(c.g, c.b))) / max(mx, 0.001);
   float l = fxLuma(c);
-  float g = clamp((l - 0.5) * 1.6 + 0.55, 0.0, 1.0);
-  // Three clean tones (ink, cool grey, paper): no screen-tone dots on small faces.
-  vec3 manga = mix(mix(FX_INK, vec3(0.74, 0.74, 0.79), smoothstep(0.16, 0.3, g)), FX_PAPER, smoothstep(0.42, 0.58, g));
+  vec3 manga = mix(FX_INK, vec3(0.34, 0.35, 0.39), smoothstep(0.17, 0.24, l));
+  manga = mix(manga, vec3(0.66, 0.67, 0.71), smoothstep(0.39, 0.46, l));
+  manga = mix(manga, FX_PAPER, smoothstep(0.72, 0.79, l));
   return mix(manga, clamp(mix(vec3(l), c, 1.1), 0.0, 1.0), smoothstep(0.3, 0.46, sat));
 }
 
@@ -92,24 +93,17 @@ vec3 fxCastLook(vec3 koc, vec3 graded, vec2 uv, float role, vec3 burst) {
 }
 `;
 
-/** Vertex stage: mean graded luma of the visible victim around the focus -> exposure lift (night victims). */
+/** Vertex stage: exposure lift of the victim from the light level, not from the victim itself, so every species
+ *  keeps its own lightness: a white surface in the toon lit band under the scene's lights right now (uLitWhite,
+ *  linear) is graded like the frame and lifted toward paper when the light is dim (night city, tunnels). A lift
+ *  measured on the victim (the old way) pushed a grey pigeon up to the white of a white goose. */
 export const CAST_VERT_GLSL = /* glsl */ `
 uniform sampler2D tMask;
 uniform float uMask;
+uniform float uLitWhite;
 varying float vVicGain;
 
-float fxVictimGain(vec2 focus) {
-  float sum = 0.0;
-  float n = 0.0;
-  for (int j = 0; j < 5; j++) {
-    for (int i = 0; i < 5; i++) {
-      vec2 p = clamp(focus + vec2((float(i) - 2.0) * 0.04, (float(j) - 2.0) * 0.06), 0.001, 0.999);
-      vec2 m = texture2D(tMask, p).rg;
-      float w = step(0.83, m.g) * step(m.r - 0.3, fxViewDepth(p));
-      sum += fxLuma(fxGrade(texture2D(tScene, p).rgb)) * w;
-      n += w;
-    }
-  }
-  return n > 0.5 ? clamp(0.5 / max(sum / n, 0.05), 1.0, 1.8) : 1.0;
+float fxVictimGain() {
+  return clamp(0.92 / max(fxLuma(fxGrade(vec3(uLitWhite))), 0.05), 1.0, 2.4);
 }
 `;

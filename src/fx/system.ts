@@ -1,6 +1,7 @@
 // FxSystem: render pipeline (post), particles, bus reactions, continuous emitters and the KO director.
-import { Vector3 } from 'three';
+import { Vector3, type Object3D } from 'three';
 import { updateGrade, SpeedFeel } from './grade';
+import { fillCast } from './ko/cast';
 import { Particles } from './particles/system';
 import { PostPipeline } from './post/pipeline';
 import { PRESETS } from './presets';
@@ -11,6 +12,7 @@ import type { AppContext, FxSystem, Session } from '../core/contracts';
 import { reducedMotion } from '../core/motion';
 import type { Vec3Like } from '../core/types';
 import type { FxContext } from './context';
+import type { CastRole } from './post/mask';
 
 /** A module plugged into the fx frame loop (reactions, emitters, directors). */
 export interface FxPart {
@@ -65,9 +67,14 @@ export function createFxCore(app: AppContext): { fx: FxSystem; ctx: FxInternals 
       post.reset();
       snapGrade = true;
       if (s) {
-        pipeline.warm();
+        // The whole cast (every view as a bystander), so every mask program variant compiles in the warm-up frame.
+        const cast = new Map<Object3D, CastRole>();
+        pipeline.warm(() => {
+          fillCast(cast, s, [], []);
+          return cast;
+        });
         particles.warm();
-      }
+      } else pipeline.warm(null);
       for (const part of ctx.parts) part.attach?.(s);
     },
     update(dtSim, dtReal) {
@@ -77,6 +84,7 @@ export function createFxCore(app: AppContext): { fx: FxSystem; ctx: FxInternals 
       if (session) tracker.update(session, dtSim, camPos);
       for (const part of ctx.parts) part.update?.(dtSim, dtReal);
       updateGrade(post, session?.track.look ?? null, app.renderer, dtReal, snapGrade);
+      post.grade.litWhite = pipeline.lights.litWhite(app.scene);
       snapGrade = false;
       speed.update(post, session?.player ?? null, dtReal);
       particles.update(dtSim, dtReal);

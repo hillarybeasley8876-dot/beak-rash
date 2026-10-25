@@ -22,44 +22,50 @@ export interface FramingDef {
   bias?: number;
   /** Score bonus (subtracted) for a preferred, geometry-built framing. */
   bonus?: number;
-  /** SHOWTIME pan share toward the other victims (ShotFraming.pan). */
-  pan?: number;
+  /** 0..1: how much the eye climbs with a subject rising past 1.3 m (ShotFraming.heightFollow). */
+  heightFollow?: number;
+  /** Vertical focus follow rate (1/s, ShotFraming.followY). */
+  followY?: number;
 }
+
+/** KO framings: vertical focus follow rate (default 6/s lagged behind a flung victim) and eye climb. */
+const KO_FOLLOW = { followY: 11, heightFollow: 0.5 } as const;
 
 export const FRAMINGS: Record<Kind, FramingDef[]> = {
   // KO: low front three-quarter drifting out to the side · worm's-eye dolly · high 3/4 spin · side track
-  // · rear three-quarter (the fallback when riders would ride into a front camera).
+  // · rear three-quarter (the fallback when riders would ride into a front camera). All follow the flung body
+  // quickly and climb with it, so the tumble stays clear of the top bar until the whoosh.
   ko: [
-    { id: 'front34', azimuth: 30, orbit: 22, dist: [3.3, 2.6], height: [0.75, 1.0], fov: [52, 46], lookUp: 0, bias: 0.08 },
-    { id: 'worm', azimuth: 22, orbit: 12, dist: [3.1, 2.5], height: [0.35, 0.45], fov: [60, 54], lookUp: 0, bias: 0.02 },
-    { id: 'high', azimuth: 48, orbit: 34, dist: [3.3, 3.0], height: [3.0, 2.7], fov: [52, 47], lookUp: 0, bias: 0.1 },
-    { id: 'side', azimuth: 86, orbit: 8, dist: [3.7, 3.1], height: [1.05, 1.15], fov: [50, 44], lookUp: 0, bias: 0.08 },
-    { id: 'rear34', azimuth: 145, orbit: -10, dist: [3.5, 3.0], height: [1.5, 1.7], fov: [54, 48], lookUp: 0, bias: 0.06 },
+    { id: 'front34', azimuth: 30, orbit: 22, dist: [3.3, 2.6], height: [0.75, 1.0], fov: [52, 46], lookUp: 0, bias: 0.08, ...KO_FOLLOW },
+    { id: 'worm', azimuth: 22, orbit: 12, dist: [3.1, 2.5], height: [0.35, 0.45], fov: [60, 54], lookUp: 0, bias: 0.02, ...KO_FOLLOW },
+    { id: 'high', azimuth: 48, orbit: 34, dist: [3.3, 3.0], height: [3.0, 2.7], fov: [52, 47], lookUp: 0, bias: 0.1, ...KO_FOLLOW },
+    { id: 'side', azimuth: 86, orbit: 8, dist: [3.7, 3.1], height: [1.05, 1.15], fov: [50, 44], lookUp: 0, bias: 0.08, ...KO_FOLLOW },
+    { id: 'rear34', azimuth: 145, orbit: -10, dist: [3.5, 3.0], height: [1.5, 1.7], fov: [54, 48], lookUp: 0, bias: 0.06, ...KO_FOLLOW },
   ],
   // Player wrecked: from the side with a dutch tilt; the high variant looks over a rider in the way.
   wrecked: [
     { id: 'side', azimuth: 92, orbit: -14, dist: [3.3, 2.8], height: [1.15, 1.35], fov: [56, 50], roll: 7, lookUp: 0, bias: 0.06 },
     { id: 'sideHigh', azimuth: 72, orbit: -10, dist: [3.3, 2.9], height: [2.5, 2.7], fov: [54, 48], roll: 5, lookUp: 0, bias: 0.08 },
   ],
-  // SHOWTIME impact: a raised three-quarter view from behind and beside the hero victim (nearest the impact),
-  // so the cluster spreads across the frame instead of stacking along the lens axis; the hero rides the
-  // upper part (clear of the peak splash band) while the shot pushes in.
+  // SHOWTIME impact: a three-quarter view from behind and beside the hero victim (the impact's KO), low enough
+  // that the burst fills the frame behind the victims instead of empty road; the hero sits just above the
+  // middle (clear of the peak splash band below NDC -0.2) and the eye climbs with a hero flung upward.
   ult: [
-    { id: 'ult34', azimuth: 125, orbit: 7, dist: [6.6, 4.6], height: [1.8, 2.1], fov: [48, 46], lookUp: 0, bias: 0.22 },
-    { id: 'ult34High', azimuth: 135, orbit: 6, dist: [7.0, 4.9], height: [2.8, 3.0], fov: [48, 46], lookUp: 0, bias: 0.22 },
+    { id: 'ult34', azimuth: 125, orbit: 7, dist: [6.0, 4.4], height: [1.3, 1.5], fov: [48, 46], lookUp: 0, bias: 0.08, heightFollow: 0.6 },
+    { id: 'ult34High', azimuth: 135, orbit: 6, dist: [6.4, 4.7], height: [2.2, 2.4], fov: [48, 46], lookUp: 0, bias: 0.1, heightFollow: 0.5 },
   ],
 };
 
 /** SHOWTIME impact with nobody hit: a wide low shot of the impact point. */
 export const ULT_WIDE: FramingDef = { id: 'wide', azimuth: 35, orbit: 16, dist: [7.0, 6.0], height: [1.6, 2.3], fov: [60, 54], lookUp: 0.6 };
 
-const OTS = { back: 2.4, side: 1.3, bias: 0.15, fov: [18, 50] as const };
+const OTS = { back: 2.4, side: 1.3, bias: 0.08, heightFollow: 0.6, fov: [18, 50] as const };
 
 /**
  * SHOWTIME impact, low over the pelican's shoulder: the eye sits OTS.back behind the impact point (away
- * from the hero victim) and OTS.side to its left, ~1.1 m up, so the victims stand against the rays and
- * the pelican is a foreground edge. The FOV makes the hero's subject sphere fill FIT_NDC - bias of the
- * half-height from there (the shot's fit then keeps it). Built for the left side; the picker mirrors it.
+ * from the hero victim) and OTS.side to its left, ~1.1 m up (climbing with a hero flung upward), so the
+ * victims stand against the rays and the pelican is a foreground edge. The FOV makes the hero's subject
+ * sphere fill FIT_NDC - bias of the half-height from there (the shot's fit then keeps it). Built for the left side; the picker mirrors it.
  * Null when the hero is too close to the impact for a shoulder (the raised 3/4 framings cover that).
  */
 export function ultOverShoulder(impact: Vector3, hero: Vector3, heading: Vector3, radius: number): FramingDef | null {
@@ -75,7 +81,7 @@ export function ultOverShoulder(impact: Vector3, hero: Vector3, heading: Vector3
   const fov = clamp((2 * Math.atan(radius / ((FIT_NDC - OTS.bias) * dist))) / DEG, OTS.fov[0], OTS.fov[1]);
   return {
     id: 'ultOts', azimuth: az / DEG, orbit: 3, dist: [dist, dist], height: [1.15, 1.05], fov: [fov, fov * 0.93],
-    lookUp: 0, bias: OTS.bias, bonus: 1.2, pan: 0,
+    lookUp: 0, bias: OTS.bias, bonus: 1.2, heightFollow: OTS.heightFollow,
   };
 }
 
@@ -84,7 +90,7 @@ export function framingOf(def: FramingDef, side: 1 | -1, heading: Vector3, durat
   return {
     heading, duration, azimuth: side * def.azimuth * DEG, orbit: side * def.orbit * DEG,
     dist: def.dist, height: def.height, fov: def.fov, roll: def.roll === undefined ? undefined : side * def.roll * DEG, lookUp: def.lookUp,
-    bias: def.bias, pan: def.pan,
+    bias: def.bias, heightFollow: def.heightFollow, followY: def.followY,
   };
 }
 
@@ -145,8 +151,25 @@ export interface PickInput {
   defs?: FramingDef[];
   /** Radius of the subject sphere the shot will fit (the eye backs off to at least that distance). */
   fitRadius?: number;
+  /** SHOWTIME: the victim that should share the frame with the hero (world body). */
+  pair?: Vector3;
   /** Filled with every candidate's score (debug). */
   trace?: string[];
+}
+
+const ASPECT = 16 / 9;
+/** Share of the half-width the paired victim may sit out (the shot trucks the hero up to 0.3 of it the other way). */
+const PAIR_FRAME = 1.05;
+
+/** How far (in half-widths) past PAIR_FRAME the paired victim lands from this framing's first eye (behind it: 2). */
+function pairMiss(framing: ShotFraming, o: PickInput, fov: number, minDist: number, eye: Vector3, ab: Vector3, ap: Vector3): number {
+  if (!o.pair) return 0;
+  eyeAt(framing, o.focus, o.ground, 0, eye, minDist);
+  ab.subVectors(o.focus, eye).setY(0);
+  ap.subVectors(o.pair, eye).setY(0);
+  if (ab.dot(ap) <= 0) return 2;
+  const ang = Math.abs(Math.atan2(ab.x * ap.z - ab.z * ap.x, ab.dot(ap)));
+  return Math.min(2, Math.max(0, Math.tan(ang) / (Math.tan((fov * DEG) / 2) * ASPECT) - PAIR_FRAME));
 }
 
 /** Score every framing × side and return the best (lowest penalty) with its id. */
@@ -176,8 +199,9 @@ export function pickFraming(o: PickInput): { framing: ShotFraming; id: string } 
           occ += hit * (t === 0 ? 3 : 1.5);
         }
       }
-      score += room + occ + o.rand() * 0.8;
-      o.trace?.push(`${def.id}${side > 0 ? 'L' : 'R'}:${score.toFixed(1)}(b${room.toFixed(1)},o${occ.toFixed(1)})`);
+      const pair = o.pair ? 2 * pairMiss(framing, o, def.fov[0], minDist, eye, ab, ap) : 0;
+      score += room + occ + pair + o.rand() * 0.8;
+      o.trace?.push(`${def.id}${side > 0 ? 'L' : 'R'}:${score.toFixed(1)}(b${room.toFixed(1)},o${occ.toFixed(1)},p${pair.toFixed(1)})`);
       if (!best || score < best.score) best = { framing, id: def.id, score };
     }
   }

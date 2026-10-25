@@ -71,7 +71,7 @@ void main() {
   vUv = uv;
   vKoMid = 0.45;
   vKoRed = 1.0;
-  vVicGain = uKo > 0.001 && uMask > 0.5 ? fxVictimGain(uFocus) : 1.0;
+  vVicGain = uKo > 0.001 && uMask > 0.5 ? fxVictimGain() : 1.0;
   if (uKo > 0.001) {
     float sum = 0.0;
     float red = 0.0;
@@ -106,7 +106,7 @@ uniform float uBloom;
 uniform float uEdgeBlur, uChroma, uZoom;
 uniform vec2 uBlurCenter;
 uniform float uKo, uHalftone, uRed, uGrain, uVignette, uLetterbox;
-uniform float uLines, uKoLines;
+uniform float uLines, uKoLines, uLineRate, uGrainSeed;
 uniform vec2 uFocus;
 uniform float uDamage, uFlash, uImpact;
 uniform vec3 uFlashColor, uImpactColor, uLinesColor;
@@ -142,7 +142,8 @@ vec3 fxSampleScene(vec2 uv) {
 `;
 
 const SHAPES = /* glsl */ `
-// Anime speed lines: wedge-shaped rays around c that re-randomise at 18 fps. 'edge' 1 = gameplay lines:
+// Anime speed lines: wedge-shaped rays around c that re-randomise uLineRate times a second (18; 4 with reduced
+// motion). 'edge' 1 = gameplay lines:
 // even a small amount (plain top speed) shows a few thin lines in the outer 12-15 % of the frame.
 float fxSpeedLines(vec2 uv, vec2 c, float amount, float seed, float edge) {
   if (amount < 0.001) return 0.0;
@@ -152,7 +153,7 @@ float fxSpeedLines(vec2 uv, vec2 c, float amount, float seed, float edge) {
   float slots = 150.0;
   float a = ang * slots;
   float id = floor(a);
-  float frame = floor(uTime * 18.0) + seed;
+  float frame = floor(uTime * uLineRate) + seed;
   float h = fxHash12(vec2(id, frame));
   float h2 = fxHash12(vec2(id * 1.37 + 7.0, frame * 0.61 + 3.0));
   float present = step(1.0 - amount * 0.7, h);
@@ -302,7 +303,7 @@ void main() {
   col = mix(col, FX_INK, fxSpeedLines(uv, uFocus, uKoLines, 17.0, 0.0) * 0.92);
   if (uDamage > 0.001) col = fxDamage(col, uv, vr, asp);
   col *= 1.0 - smoothstep(0.36, 0.86, vr) * (0.24 + uVignette);
-  if (uGrain > 0.001) col += (fxHash12(gl_FragCoord.xy + fract(uTime * 7.31) * 311.0) - 0.5) * uGrain * 0.14;
+  if (uGrain > 0.001) col += (fxHash12(gl_FragCoord.xy + uGrainSeed * 311.0) - 0.5) * uGrain * 0.14;
   if (uImpact > 0.5) col = mix(uImpactColor, FX_INK, step(0.45, fxLuma(col)));
   col = mix(col, uFlashColor, uFlash);
   if (uLetterbox > 0.001) col = fxLetterbox(col, uv);

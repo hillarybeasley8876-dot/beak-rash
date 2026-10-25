@@ -1,17 +1,18 @@
 // One KO-style cinematic window: hit-stop → slow-mo + orbit camera + comic post → peak → whoosh back.
 // Chains extend it once; `lite` (settings.slowmo = 'off') keeps only the events and a flash.
 import { Vector3, type Object3D, type PerspectiveCamera } from 'three';
-import { clamp, smoothstep } from '../../core/math';
+import { clamp } from '../../core/math';
+import { REDUCED, type PostState } from '../state';
 import { applyLook, WINDOW_MAX, type CineKind, type Timeline } from './look';
 import { createShot, HANDBACK, type Shot, type ShotFraming } from './camera';
-import { heroIndex, subjectSphere, type Anchors } from './subject';
+import { UltAim } from './cine-aim';
+import { subjectSphere, type Anchors } from './subject';
 import type { Clock } from '../../core/clock';
 import type { CameraRig } from '../../core/contracts';
 import type { EventBus } from '../../core/events';
 import type { GameEvents } from '../../core/events-map';
 import type { RiderId, Vec3Like } from '../../core/types';
 import type { CastRole } from '../post/mask';
-import type { PostState } from '../state';
 
 /** What a cinematic window drives (narrow, so the fx sandbox can replay the real thing without a race). */
 export interface CineHost {
@@ -32,12 +33,12 @@ type Confine = (eye: Vector3, focus: Vector3) => void;
 
 /** Closest the eye may come to the subject's head / body / bike (actors fade a crashed rider within 1.9 m). */
 const CLEARANCE = 2.15;
-
-/** SHOWTIME: share (default, ShotFraming.pan) and cap (m) of the cluster centroid's sideways offset the aim pans toward. */
-const PAN = 0.35;
-const PAN_MAX = 2;
-/** SHOWTIME hero: its bike leaves the fitted sphere from this far (m), so the hero stays big while it tumbles. */
-const HERO_BIKE_NEAR = 1;
+/** Release time handed to the look before the window has released (far ahead: no fade starts early). */
+const NOT_YET = 1e6;
+/** KO victim: its bike leaves the fitted sphere from this far (m), gone KO_BIKE_FADE m further, so the shot keeps the
+ *  flung body (not the midpoint between it and a bike on the road) big and inside the bars through the release. */
+const KO_BIKE_NEAR = 2;
+const KO_BIKE_FADE = 2;
 
 export interface CineStart {
   kind: CineKind;
@@ -50,8 +51,10 @@ export interface CineStart {
   shot: ShotFraming | null;
   /** Fixed focus (ult impact point); otherwise the victim's body is followed. */
   point?: Vec3Like;
-  /** Riders framed with `point` (ult victims): the one nearest the impact is the hero of the shot. */
+  /** Riders framed with `point` (ult victims); `victim` is the hero of the shot when it is one of them. */
   cluster?: RiderId[];
+  /** Riders already known to be knocked out by this window (SHOWTIME: the impact's KOs, the rise's held KOs). */
+  kod?: RiderId[];
   /** Keeps the eye inside the track bounds while the shot runs. */
   confine?: Confine;
   /** KOs already announced by a window this one takes over (no second `start`). */
@@ -67,8 +70,10 @@ export class KoCine {
   t = 0;
   private tl!: Timeline;
   private victim: RiderId = 0;
-  /** Everyone this window knocked out (all of them keep their colours in the comic look). */
+  /** Everyone this window hit or knocked out (all of them keep their colours in the comic look). */
   private victims: RiderId[] = [];
+  /** Riders this window knocked out: the events name one of them, never a rider the impact only hit. */
+  private koed: RiderId[] = [];
   private attacker: RiderId | null = null;
   private koStarted = false;
   private peaked = false;
@@ -84,15 +89,11 @@ export class KoCine {
   private release = 0;
   private releaseFrame = false;
   private shot: Shot | null = null;
-  private readonly point = new Vector3();
+  /** SHOWTIME impact window: aimed by `ult` (hero, pair, impact point). */
   private hasPoint = false;
-  private cluster: RiderId[] = [];
-  private hero: RiderId | null = null;
-  private pan = PAN;
-  private readonly bodies: Vector3[] = [];
+  private readonly ult: UltAim;
   private readonly ndc = new Vector3();
   private readonly aim = new Vector3();
-  private readonly centroid = new Vector3();
   /** Radius of the subject sphere the shot keeps in frame (head, body, bike). */
   private fitRadius = 0;
   /** Victim body height last frame and whether it is coming down (the release waits for the apex). */
@@ -101,11 +102,22 @@ export class KoCine {
   /** Particle real-time mark taken just before the window (the final blow's burst included). */
   private debrisFrom = 0;
 
-  constructor(private readonly host: CineHost, private readonly onEnd: (kind: CineKind) => void) {}
+  constructor(private readonly host: CineHost, private readonly onEnd: (kind: CineKind) => void) {
+    this.ult = new UltAim((id) => host.subject(id), host.camera);
+  }
 
   /** Rider the shot currently follows (changes when a chain KO re-targets the window). */
   get victimId(): RiderId {
     return this.victim;
+  }
+
+  /** SHOWTIME window: the impact point and the riders it hit (null / empty for a KO window). */
+  get impact(): Vector3 | null {
+    return this.active && this.hasPoint ? this.ult.point : null;
+  }
+
+  get framed(): readonly RiderId[] {
+    return this.hasPoint ? this.ult.cluster : [];
   }
 
   start(o: CineStart): void {
@@ -125,12 +137,11 @@ export class KoCine {
     this.release = o.tl.releaseAt;
     this.hasPoint = !!o.point;
     this.continued = !!o.cutNow;
-    if (o.point) this.point.set(o.point.x, o.point.y, o.point.z);
-    this.cluster = o.cluster ?? [];
-    this.victims = this.cluster.length > 0 ? [...this.cluster] : [o.victim];
-    this.hero = this.pickHero();
+    const cluster = o.cluster ?? [];
+    if (o.point) this.ult.start(o.point, cluster, o.victim);
+    this.victims = cluster.length > 0 ? [...cluster] : [o.victim];
+    this.koed = o.kod ? [...o.kod] : o.ko ? [o.victim] : [];
     this.fitRadius = 0;
-    this.pan = o.shot?.pan ?? PAN;
     this.debrisFrom = (this.host.debris?.mark() ?? 0) - 0.06;
     this.shot = o.shot && !o.lite ? this.makeShot(o.shot, o.confine) : null;
     if (o.cutNow && this.shot) rig.override(this.shot.override, HANDBACK);
@@ -150,24 +161,32 @@ export class KoCine {
   }
 
   /**
-   * Another KO inside the window: every KO the cinematic handles is announced with its own `start`
-   * (chain = running count) so listeners skip their no-cinematic fallbacks; after the peak it re-peaks.
-   * Extends the window once. False when the window is already closing.
+   * Another KO inside the window: every KO the cinematic handles is announced with its own `start` naming
+   * that rider (chain = running count) so listeners skip their no-cinematic fallbacks; after the peak it
+   * re-peaks. A SHOWTIME shot whose hero was only hit hands the shot to the KO'd rider. Extends the window
+   * once. False when the window is already closing.
    */
   addKo(victim: RiderId, attacker: RiderId | null): boolean {
     if (!this.active || this.released) return false;
     this.chain++;
     if (!this.victims.includes(victim)) this.victims.push(victim);
-    if (!this.hasPoint && victim !== this.victim && (!this.koStarted || this.near(victim))) {
+    if (!this.koed.includes(victim)) this.koed.push(victim);
+    if (this.hasPoint) {
+      const hero = this.ult.hero;
+      if (hero !== null && !this.koed.includes(hero) && this.ult.cluster.includes(victim)) {
+        this.ult.retarget(victim);
+        this.victim = victim;
+      }
+    } else if (victim !== this.victim && (!this.koStarted || this.near(victim))) {
       this.victim = victim;
       this.prevY = Number.NaN;
       this.falling = false;
     }
     this.attacker = attacker ?? this.attacker;
-    this.emitKo('start');
+    this.emitKo('start', victim);
     if (this.peaked) {
       this.lastPeak = this.t;
-      this.emitKo('peak');
+      this.emitKo('peak', victim);
     }
     if (!this.extended) {
       // Chains play at the hold scale and never stretch the window past WINDOW_MAX.
@@ -216,10 +235,14 @@ export class KoCine {
     const handedBack = this.released && !this.releaseFrame;
     if (handedBack && this.whooshPending) this.whoosh();
     if (!this.lite) {
-      applyLook(post.cine, this.kind, tl, t, this.lastPeak, this.release, handedBack, this.continued);
+      // The fades start at the actual release (it may wait past tl.releaseAt for the victim's apex).
+      const release = this.released ? this.release : NOT_YET;
+      applyLook(post.cine, this.kind, tl, t, this.lastPeak, release, handedBack, this.continued, post.reducedFlashes);
       this.updateFocus();
       if (post.cine.ko > 0) this.host.cast?.(post.cine.cast, this.victims, this.attacker === null ? [] : [this.attacker]);
       else post.cine.cast.clear();
+      // A look still easing out (reduced motion) over the chase view hides nobody.
+      if (this.released) post.cine.hide.clear();
     }
     if (this.released && t >= this.release + tl.fadeOut) {
       this.active = false;
@@ -265,9 +288,10 @@ export class KoCine {
   private whoosh(): void {
     this.whooshPending = false;
     this.host.debris?.cull(this.debrisFrom);
-    this.host.post.whoosh(1);
-    this.host.post.punch(0.01);
-    this.host.bus.emit('cam:kick', { fov: 7, duration: 0.45 });
+    const { post } = this.host;
+    post.whoosh(1);
+    post.punch(0.01);
+    this.host.bus.emit('cam:kick', { fov: post.reducedFlashes ? REDUCED.kick : 7, duration: 0.45 });
   }
 
   /** Release once the victim's arc has turned over (its fall starts on camera), or after tl.apexWait. */
@@ -292,7 +316,7 @@ export class KoCine {
     if (this.hasPoint) {
       // Every SHOWTIME victim gets the subject palette: the dark band starts past the farthest one.
       let far = c.subjectDepth;
-      for (const b of this.bodies) far = Math.max(far, this.depth(b));
+      for (const b of this.ult.bodies) far = Math.max(far, this.depth(b));
       c.behindAt = far - c.subjectDepth + 2;
       c.bgMargin = c.behindAt + 1;
     }
@@ -321,7 +345,7 @@ export class KoCine {
 
   /** Move the eye straight out from any subject point closer than CLEARANCE. */
   private keepClear(eye: Vector3): void {
-    const id = this.hasPoint ? this.hero : this.victim;
+    const id = this.hasPoint ? this.ult.hero : this.victim;
     const a = id === null ? undefined : this.host.subject(id);
     if (!a) return;
     for (const p of [a.head, a.body, a.bike]) {
@@ -333,61 +357,28 @@ export class KoCine {
 
   /** Centre of the victim's head + body + bike sphere (fitRadius = its radius), or the SHOWTIME aim. */
   private subject(): Vector3 | null {
-    if (this.hasPoint) return this.clusterPoint();
+    if (this.hasPoint) {
+      const p = this.ult.aimAt(this.t);
+      this.fitRadius = this.ult.radius;
+      return p;
+    }
     const v = this.host.subject(this.victim);
     if (!v) return null;
-    this.fitRadius = subjectSphere(v, this.aim);
+    this.fitRadius = subjectSphere(v, this.aim, KO_BIKE_NEAR, KO_BIKE_FADE);
     return this.aim;
-  }
-
-  private clusterPoint(): Vector3 {
-    this.bodies.length = 0;
-    for (const id of this.cluster) {
-      const b = this.host.subject(id)?.body;
-      if (b) this.bodies.push(b);
-    }
-    const hero = this.hero === null ? undefined : this.host.subject(this.hero);
-    if (!hero) {
-      this.fitRadius = 0;
-      return this.point;
-    }
-    this.fitRadius = subjectSphere(hero, this.aim, HERO_BIKE_NEAR);
-    // Pan (never dolly) toward the rest of the cluster: the centroid offset across the line of sight.
-    if (this.bodies.length > 1 && this.pan > 0) {
-      const c = this.centroid.set(0, 0, 0);
-      for (const b of this.bodies) c.add(b);
-      c.divideScalar(this.bodies.length).sub(this.aim).setY(0);
-      const v = this.ndc.subVectors(this.aim, this.host.camera.position).setY(0).normalize();
-      c.addScaledVector(v, -c.dot(v)).multiplyScalar(this.pan * smoothstep(0, 0.3, this.t)).clampLength(0, PAN_MAX);
-      this.aim.add(c);
-    }
-    return this.aim;
-  }
-
-  /** The SHOWTIME victim nearest the impact point frames the hold. */
-  private pickHero(): RiderId | null {
-    if (!this.hasPoint) return null;
-    const ids: RiderId[] = [];
-    const bodies: Vector3[] = [];
-    for (const id of this.cluster) {
-      const b = this.host.subject(id)?.body;
-      if (b) {
-        ids.push(id);
-        bodies.push(b);
-      }
-    }
-    return ids[heroIndex(this.point, bodies)] ?? null;
   }
 
   private ground(): number {
-    const id = this.hasPoint ? this.hero : this.victim;
+    const id = this.hasPoint ? this.ult.hero : this.victim;
     const g = id === null ? undefined : this.host.subject(id)?.ground;
-    return g ?? (this.hasPoint ? this.point.y - 1 : 0);
+    return g ?? (this.hasPoint ? this.ult.point.y - 1 : 0);
   }
 
-  private emitKo(phase: 'start' | 'peak' | 'end'): void {
+  /** `who` = the rider this event is about (default: the shot's victim if it was knocked out, else the latest KO). */
+  private emitKo(phase: 'start' | 'peak' | 'end', who?: RiderId): void {
     if (phase === 'start') this.koStarted = true;
     if (!this.koStarted) return;
-    this.host.bus.emit('cine:ko', { phase, attacker: this.attacker, victim: this.victim, chain: Math.max(1, this.chain) });
+    const victim = who ?? (this.koed.includes(this.victim) ? this.victim : this.koed[this.koed.length - 1] ?? this.victim);
+    this.host.bus.emit('cine:ko', { phase, attacker: this.attacker, victim, chain: Math.max(1, this.chain) });
   }
 }

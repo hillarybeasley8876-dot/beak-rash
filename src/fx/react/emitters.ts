@@ -8,6 +8,8 @@ import type { Tracked } from './tracker';
 
 const KICKUP: Partial<Record<RiderState['surface'], string>> = { grass: 'grass', sand: 'sand', dirt: 'dirt', water: 'splash', curb: 'dust' };
 const NEAR = 90;
+/** Size / count share of a rival's drift spark fan. */
+const RIVAL_SPARKS = 0.6;
 
 const contact = new Vector3();
 const kick = new Vector3();
@@ -65,7 +67,9 @@ export class RiderEmitters implements FxPart {
     const level = driftLevel(r.driftCharge);
     kick.addScaledVector(t.right, r.yaw > 0 ? -0.7 : 0.7);
     fx.spark += (level ? 34 : 14) * dt;
-    for (; fx.spark >= 1; fx.spark--) this.ctx.burst('driftSpark', contact, { level, vel: t.vel, dir: kick });
+    // The player's fan is the release timing cue; rivals' fans are thinner (several riders drift at once).
+    const scale = r.isPlayer ? 1 : RIVAL_SPARKS;
+    for (; fx.spark >= 1; fx.spark--) this.ctx.burst('driftSpark', contact, { level, vel: t.vel, dir: kick, scale });
     fx.smoke += 12 * dt;
     for (; fx.smoke >= 1; fx.smoke--) this.ctx.burst('driftSmoke', contact, { count: 1, vel: t.vel, dir: kick });
   }

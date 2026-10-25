@@ -43,6 +43,7 @@ export const PRESETS: Readonly<Record<string, Preset>> = {
   crate: rewards.crate,
   driftSpark: speed.driftSpark,
   driftPop: speed.driftPop,
+  driftRelease: speed.driftRelease,
   streaks: speed.streaks,
   boost: speed.boost,
   shockwave: speed.shockwave,

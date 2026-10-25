@@ -1,6 +1,6 @@
 // KO / ult cinematic timelines (real seconds) and the post look they drive.
 import { clamp01, easeInCubic, easeOutCubic, smoothstep } from '../../core/math';
-import type { CineState } from '../state';
+import { REDUCED, type CineState } from '../state';
 
 export type CineKind = 'ko' | 'wrecked' | 'ult';
 
@@ -65,18 +65,22 @@ export function shortVariant(t: Timeline): Timeline {
  * `release` may move later than tl.releaseAt when a chain extends the window. The comic look snaps in
  * on the camera cut (slowAt) and is gone on the first handed-back frame (the whoosh carries the
  * transition); only bars, grain and vignette ease out over tl.fadeOut. `continued` = the window takes
- * over a running cinematic (SHOWTIME dive): bars and look are on from the first frame.
+ * over a running cinematic (SHOWTIME dive): bars and look are on from the first frame. `calm` (reduced
+ * motion): the look eases in and out over REDUCED.lookFade instead of snapping, and the zoom / halftone
+ * pulses at the start and the peak are left out.
  * KO / ult: black-and-white subject with a paper rim on red rays. WRECKED: the same committed
  * look on an inverted backdrop (ink rays on deep red), red only at the edges, a crisp subject.
  */
 export function applyLook(
-  c: CineState, kind: CineKind, tl: Timeline, t: number, lastPeak: number, release: number, handedBack: boolean, continued = false,
+  c: CineState, kind: CineKind, tl: Timeline, t: number, lastPeak: number, release: number, handedBack: boolean, continued = false, calm = false,
 ): void {
   const inK = continued || t >= tl.slowAt ? 1 : 0;
   const w = inK * (1 - smoothstep(release, release + tl.fadeOut, t));
-  const wc = handedBack ? 0 : inK;
-  const start = Math.exp(-Math.max(0, t - tl.slowAt) * 7);
-  const peak = t >= lastPeak ? Math.exp(-(t - lastPeak) * 6) : 0;
+  const from = continued ? 0 : tl.slowAt;
+  const fade = smoothstep(from, from + REDUCED.lookFade, t) * (1 - smoothstep(release, release + REDUCED.lookFade, t));
+  const wc = calm ? inK * fade : handedBack ? 0 : inK;
+  const start = calm ? 0 : Math.exp(-Math.max(0, t - tl.slowAt) * 7);
+  const peak = !calm && t >= lastPeak ? Math.exp(-(t - lastPeak) * 6) : 0;
   const wrecked = kind === 'wrecked';
   c.ko = wc;
   c.bgBurst = wc;

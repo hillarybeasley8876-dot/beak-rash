@@ -7,7 +7,8 @@ import {
 import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 import { Bloom } from './bloom';
 import { Composite } from './composite';
-import { SubjectMask } from './mask';
+import { SceneLights } from './lights';
+import { SubjectMask, type CastRole } from './mask';
 import type { GpuTimer } from './timer';
 import type { Quality } from '../../core/types';
 import type { PostState } from '../state';
@@ -27,6 +28,8 @@ export class PostPipeline {
   readonly toggles: PostToggles = { enabled: true, bloom: true, blur: true, castView: false };
   /** Set by the debug bench to time scene / bloom / composite on the GPU. */
   timer: GpuTimer | null = null;
+  /** The scene's lights (subject mask draw, KO cast exposure). */
+  readonly lights = new SceneLights();
   /** Draw stats of the scene pass alone (the post passes add ~10 tiny draws). */
   readonly sceneStats = { calls: 0, triangles: 0 };
   private readonly preset: Preset;
@@ -34,8 +37,9 @@ export class PostPipeline {
   private readonly bloom: Bloom | null;
   private readonly composite: Composite;
   private readonly mask = new SubjectMask();
-  /** Draw the cast mask on the next frame even without a KO look (compiles its programs during the intro). */
-  private warmMask = false;
+  /** The race's whole cast (every rider view, traffic and police), drawn into the mask once on the next rendered
+   *  frame — core's warm-up frame, which draws everything — so the mask programs compile behind the loading screen. */
+  private warmCast: (() => ReadonlyMap<Object3D, CastRole>) | null = null;
   private readonly quad: FullScreenQuad;
   private readonly size = new Vector2(1, 1);
 
@@ -62,9 +66,10 @@ export class PostPipeline {
     this.bloom?.setSize(w, h);
   }
 
-  /** Compile the subject-mask programs on the next frame that has a cast (call when a race is attached). */
-  warm(): void {
-    this.warmMask = true;
+  /** A race was attached (cast = its whole cast) or detached (null): warm the subject mask on the next frame. */
+  warm(cast: (() => ReadonlyMap<Object3D, CastRole>) | null): void {
+    this.warmCast = cast;
+    this.lights.forget();
   }
 
   render(scene: Scene, camera: Camera, state: PostState, timeReal: number): void {
@@ -110,15 +115,16 @@ export class PostPipeline {
       tonemap: r.toneMapping === NoToneMapping ? 0 : 1,
     });
     const lens = camera instanceof PerspectiveCamera ? camera : null;
-    const cast = state.cine.cast;
-    const useMask = lens !== null && cast.size > 0 && (state.cine.ko > 0.001 || this.warmMask);
+    const ko = state.cine.ko > 0.001;
+    const cast = ko ? state.cine.cast : this.warmCast?.() ?? null;
+    const useMask = lens !== null && cast !== null && cast.size > 0;
     if (useMask) {
       t?.begin('mask');
-      this.mask.render(r, scene, camera, cast);
+      this.mask.render(r, scene, camera, cast, this.lights.of(scene));
       t?.end();
-      this.warmMask = false;
+      if (!ko) this.warmCast = null;
     }
-    const maskTex = useMask && state.cine.ko > 0.001 ? this.mask.texture : null;
+    const maskTex = useMask && ko ? this.mask.texture : null;
     this.composite.castView = this.toggles.castView;
     this.composite.sync(state, this.sceneRT.texture, bloomTex, this.sceneRT.depthTexture, maskTex, lens, this.size, timeReal);
     r.setRenderTarget(null);

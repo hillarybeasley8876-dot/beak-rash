@@ -84,7 +84,8 @@ export class KoTester implements FxPart {
     return v.id;
   }
 
-  /** SHOWTIME: ult:start now, the dive impact 1.1 s later knocking out rivals in range. */
+  /** SHOWTIME: ult:start now, the dive impact 1.1 s later knocking out (up to 3) rivals in range. Like combat, the
+   *  riders it knocks out are at 0 HP when ult:impact goes out. */
   ult(direct = false): void {
     const s = this.ctx.session();
     if (!s) return;
@@ -92,9 +93,14 @@ export class KoTester implements FxPart {
     this.ctx.app.bus.emit('ult:start', { riderId: p.id, skillId: 'pelican.ult' });
     this.later(1.1, () => {
       const victims = s.riders.filter((r) => !r.isPlayer && r.mode === 'racing' && r.s > p.s - 12 && r.s < p.s + 40).map((r) => r.id);
+      const kos = victims.slice(0, 3);
+      for (const id of kos) {
+        const v = s.rider(id);
+        if (v) v.hp = 0;
+      }
       const pos = s.track.toWorld(p.s + 2, p.x, 0.2, new Vector3());
       this.ctx.app.bus.emit('ult:impact', { riderId: p.id, skillId: 'pelican.ult', pos, victims });
-      for (const id of victims.slice(0, 3)) this.ko({ victim: id, attacker: p.id, direct, stage: false });
+      for (const id of kos) this.ko({ victim: id, attacker: p.id, direct, stage: false });
     });
   }
 }

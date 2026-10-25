@@ -2,7 +2,7 @@
 import { Color, ShaderMaterial, Vector2, Vector3, type PerspectiveCamera, type Texture } from 'three';
 import { clamp01, DEG, lerp } from '../../core/math';
 import { COMPOSITE_FRAG, COMPOSITE_VERT } from './composite-glsl';
-import type { PostState } from '../state';
+import { REDUCED, type PostState } from '../state';
 
 export interface CompositeFeatures {
   blur: boolean;     // radial speed/zoom blur + chromatic fringe taps
@@ -31,13 +31,13 @@ export class Composite {
       fragmentShader: COMPOSITE_FRAG,
       defines: this.defines(),
       uniforms: {
-        tScene: u<Texture | null>(null), tBloom: u<Texture | null>(null), tDepth: u<Texture | null>(null), tMask: u<Texture | null>(null), uMask: u(0), uMaskRes: u(new Vector2(1, 1)), uVicWB: u(new Color(1, 1, 1)), uCastView: u(0),
+        tScene: u<Texture | null>(null), tBloom: u<Texture | null>(null), tDepth: u<Texture | null>(null), tMask: u<Texture | null>(null), uMask: u(0), uMaskRes: u(new Vector2(1, 1)), uVicWB: u(new Color(1, 1, 1)), uLitWhite: u(1), uCastView: u(0),
         uNear: u(0.1), uFar: u(1000), uTanHalf: u(new Vector2(1, 1)), uViewUp: u(new Vector3(0, 1, 0)), uSubjectDepth: u(4), uBgBurst: u(0), uBgMargin: u(3), uBehindAt: u(2), uBurstInk: u(0), uRim: u(0),
         uRes: u(new Vector2(1, 1)), uTime: u(0),
         uExposure: u(1), uSat: u(1), uContrast: u(1), uBloom: u(0), uTintN: u(new Color(1, 1, 1)),
         uEdgeBlur: u(0), uChroma: u(0), uZoom: u(0), uBlurCenter: u(new Vector2(0.5, 0.56)),
         uKo: u(0), uHalftone: u(0), uRed: u(0), uGrain: u(0), uVignette: u(0), uLetterbox: u(0),
-        uLines: u(0), uKoLines: u(0), uFocus: u(new Vector2(0.5, 0.5)),
+        uLines: u(0), uKoLines: u(0), uFocus: u(new Vector2(0.5, 0.5)), uLineRate: u(18), uGrainSeed: u(0),
         uDamage: u(0), uFlash: u(0), uImpact: u(0),
         uFlashColor: u(new Color(1, 1, 1)), uImpactColor: u(new Color(1, 1, 1)), uLinesColor: u(new Color(1, 1, 1)),
       },
@@ -96,10 +96,15 @@ export class Composite {
     u.uBloom!.value = grade.bloom * BLOOM_NORMALISE;
     (u.uTintN!.value as Color).copy(this.normalisedTint(grade.tint));
     (u.uVicWB!.value as Color).copy(grade.wb);
+    u.uLitWhite!.value = grade.litWhite;
     // The release whoosh (rush) is never masked by the fading KO look, so it is on screen at the cut.
+    const calm = state.reducedFlashes;
     u.uEdgeBlur!.value = speed.edgeBlur * (1 - cine.ko) + 0.04 * speed.rush;
-    u.uChroma!.value = speed.chroma * (1 - cine.ko) + pulse.chroma;
-    u.uZoom!.value = cine.zoom;
+    u.uChroma!.value = (speed.chroma * (1 - cine.ko) + pulse.chroma) * (calm ? REDUCED.chroma : 1);
+    u.uZoom!.value = cine.zoom * (calm ? REDUCED.zoom : 1);
+    // Reduced motion: speed lines re-randomise slowly (no 18 Hz flicker) and the grain stands still.
+    u.uLineRate!.value = calm ? REDUCED.lineRate : 18;
+    u.uGrainSeed!.value = calm ? 0 : (time * 7.31) % 1;
     const focusW = clamp01(Math.max(cine.ko, cine.zoom * 8, cine.heroLines * 4));
     (u.uBlurCenter!.value as Vector2).set(lerp(this.center.x, cine.focus.x, focusW), lerp(this.center.y, cine.focus.y, focusW));
     u.uKo!.value = cine.ko;

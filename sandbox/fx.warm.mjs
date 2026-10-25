@@ -1,6 +1,7 @@
-// Shader warm-up check: which programs link after GO (launch boost) and at the first KO / SHOWTIME?
+// Shader warm-up check: which programs link after GO (launch boost), at the first KO, WRECKED and SHOWTIME?
 //   node sandbox/fx.warm.mjs [track] [quality]   -> per phase: new programs (+ the objects using them)
-// fx expects: fx.particles.* and the subject mask (fx.subjectMask) linked during the intro, none at GO / KO.
+// Expected: everything (fx.particles.*, the subject mask fx.subjectMask, shadow-depth variants) links behind the
+// loading screen; any program linked after GO is reported as `late` and the script exits with code 1.
 import { withPage } from '../tools/lib.mjs';
 
 const [track = 'coast', quality = 'high'] = process.argv.slice(2);
@@ -47,9 +48,25 @@ await withPage(async (page, h) => {
   await page.evaluate(() => { window.__warm.tag = 'ko'; window.__br.fx.testKo(); });
   await h.step(120);
   await page.evaluate(() => { window.__warm.tag = 'wrecked'; window.__br.fx.testWrecked(); });
-  await h.step(120);
+  await h.step(400);
+  // A real SHOWTIME on three pinned low-HP rivals (rise look, impact window, chain KOs).
+  await page.evaluate(() => {
+    const br = window.__br;
+    const c = br.combat;
+    window.__warm.tag = 'ult';
+    if (!c) return;
+    const rivals = br.session().riders.filter((r) => !r.isPlayer && r.mode === 'racing').slice(0, 3);
+    rivals.forEach((r, i) => { c.pin(r.id, 8 + i * 6, (i - 1) * 2.2, true); c.set(r.id, { hp: 20 }); });
+    c.set(0, { sp: 100 });
+    c.cast(0, 4);
+  });
+  await h.step(10);
+  await page.evaluate(() => window.__br.combat?.unpin());
+  await h.step(230);
   const log = await page.evaluate(report);
   for (const e of log) console.log(`${e.tag.padEnd(8)} ${e.phase.padEnd(9)} ${String(e.ms).padStart(6)}ms ${e.progs.join(', ').slice(0, 300)}`);
-  const late = log.filter((e) => e.tag !== 'intro' && e.progs.some((p) => /fx\.|\?ShaderMaterial/.test(p)));
-  console.log(JSON.stringify({ track, quality, fxLate: late.length, errors: await h.errors() }));
+  const late = log.filter((e) => e.tag !== 'intro');
+  const fxLate = late.filter((e) => e.progs.some((p) => /fx\.|\?ShaderMaterial/.test(p)));
+  console.log(JSON.stringify({ track, quality, late: late.reduce((n, e) => n + e.progs.length, 0), fxLate: fxLate.length, errors: await h.errors() }));
+  if (late.length) process.exitCode = 1;
 }, { size: '1280x720' });

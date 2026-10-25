@@ -9,7 +9,7 @@ import { KoCine } from './cine';
 import { FRAMINGS, makeConfine, pickFraming, ULT_WIDE, ultOverShoulder } from './framing';
 import { FULL, LITE, shortVariant, ULT_IMPACT, WRECKED, type CineKind, type Timeline } from './look';
 import { UltRise, type SlowmoMode } from './rise';
-import { heroIndex, subjectSphere, type Anchors } from './subject';
+import { heroIndex, PAIR_MAX, subjectSphere, type Anchors } from './subject';
 import type { ShotFraming } from './camera';
 import type { Session } from '../../core/contracts';
 import type { RiderId, Vec3Like } from '../../core/types';
@@ -29,6 +29,7 @@ interface CineRequest {
   point?: Vec3Like;
   chain?: number;
   cluster?: RiderId[];
+  kod?: RiderId[];
 }
 
 interface Pick {
@@ -51,8 +52,6 @@ export class KoDirector implements FxPart {
   /** race:end seen: no new cinematic until the next attach (late impacts / KOs behind the results). */
   private ended = false;
   private pending: Pending | null = null;
-  /** Subject-mask warm-up: every rider in the cast for one frame after attach (its programs compile in the intro). */
-  private warm: 'fill' | 'clear' | null = null;
   private readonly live = new Map<RiderId, { head: Vector3; body: Vector3; bike: Vector3; ground: number }>();
   private readonly scores: string[] = [];
   private readonly rng = new Rng(0x6b0);
@@ -161,24 +160,37 @@ export class KoDirector implements FxPart {
     this.cine.start(pick ? { ...base, shot: pick.framing, confine: pick.confine } : base);
   }
 
-  /** A chain KO moved the window onto another victim: cut to a fresh framing instead of swinging. */
+  /** A chain KO moved the window onto another victim (or the SHOWTIME shot onto a KO'd rider): cut to a fresh
+   *  framing instead of swinging. */
   private reshoot(attacker: RiderId | null): void {
     if (this.slowmo === 'off') return;
-    const pick = this.pick(this.cine.kind, this.cine.victimId, attacker, RESHOOT_DURATION);
+    const { kind, victimId, impact, framed } = this.cine;
+    const pick = this.pick(kind, victimId, attacker, RESHOOT_DURATION, impact ?? undefined, [...framed]);
     if (pick) this.cine.reshoot(pick.framing, pick.confine);
   }
 
-  /** Framing for a subject (victim, or SHOWTIME hero + cluster) scored by room, occluders and variety. */
+  /**
+   * SHOWTIME hero: the rider the impact knocked out nearest to it (combat zeroes their HP before ult:impact; their
+   * combat:ko follow in the same step), else the nearest rider it hit; undefined when nobody is near the impact.
+   */
+  private ultHero(point: Vector3, victims: readonly RiderId[], kod: readonly RiderId[]): RiderId | undefined {
+    const nearest = (ids: readonly RiderId[]): RiderId | undefined => {
+      const known = ids.filter((id) => !!this.anchors(id));
+      return known[heroIndex(point, known.map((id) => this.anchors(id)?.body ?? point))];
+    };
+    return nearest(kod) ?? nearest(victims);
+  }
+
+  /** Framing for a subject (victim, or SHOWTIME hero among the riders the impact hit) scored by room, occluders and
+   *  variety. The other SHOWTIME victims count as occluders, so the hero is never shot through a rider it only hit. */
   private pick(kind: CineKind, victim: RiderId, attacker: RiderId | null, duration: number, at?: Vec3Like, cluster: RiderId[] = []): Pick | null {
     const s = this.session();
     const { tracker } = this.ctx;
     const point = at ? new Vector3(at.x, at.y, at.z) : null;
-    const ids = cluster.filter((id) => !!tracker.get(id));
-    const bodies = ids.map((id) => tracker.get(id)?.body ?? new Vector3());
-    const heroId = point ? ids[heroIndex(point, bodies)] : victim;
-    const r = s?.rider(heroId ?? victim);
+    const r = s?.rider(victim);
     if (!s || !r) return null;
-    const hero = heroId === undefined ? undefined : tracker.get(heroId);
+    // A SHOWTIME dive that hit nobody frames the impact point instead of a hero.
+    const hero = !point || cluster.includes(victim) ? tracker.get(victim) : undefined;
     const focus = new Vector3();
     let fitRadius = 0;
     if (hero) fitRadius = subjectSphere(hero, focus);
@@ -190,18 +202,20 @@ export class KoDirector implements FxPart {
     // Camera on the side away from the attacker, so it is seen behind the victim (or toward the road centre).
     const other = attacker !== null && attacker !== r.id ? s.rider(attacker) : undefined;
     const prefer = (other ? other.x > r.x : r.x > 0) ? 1 : -1;
-    const skip = new Set<RiderId>([victim, r.id, ...ids]);
     const others = s.riders
-      .filter((o) => !skip.has(o.id) && Math.abs(o.s - r.s) < 30)
+      .filter((o) => o.id !== r.id && Math.abs(o.s - r.s) < 30)
       .map((o) => tracker.get(o.id))
       .filter((e) => !!e)
       .map((e) => ({ pos: e.body, vel: e.vel }));
     others.push(...this.vehicles(s, r.s));
     const focusVel = (hero?.vel.clone() ?? new Vector3()).multiplyScalar(point ? 0 : 0.7);
+    // SHOWTIME: the victim nearest the hero (within PAIR_MAX) should share the frame (KoCine trucks toward it).
+    const mates = cluster.filter((id) => id !== victim).map((id) => tracker.get(id)?.body).filter((b) => !!b);
+    const pair = point && hero ? mates[heroIndex(hero.body, mates, PAIR_MAX)] : undefined;
     const ots = point && hero ? ultOverShoulder(point, focus, heading, fitRadius) : null;
     const defs = kind === 'ult' ? (hero ? [...(ots ? [ots] : []), ...FRAMINGS.ult] : [ULT_WIDE]) : undefined;
     const { framing, id } = pickFraming({
-      kind, track: s.track, focus, ground, s: r.s, heading, duration, others, focusVel, prefer, defs, fitRadius,
+      kind, track: s.track, focus, ground, s: r.s, heading, duration, others, focusVel, prefer, defs, fitRadius, pair,
       avoid: this.lastFraming, rand: () => this.rng.next(), trace: (this.scores.length = 0, this.scores),
     });
     this.lastFraming = id;
@@ -242,13 +256,19 @@ export class KoDirector implements FxPart {
     if (rider !== s.player.id || !this.rise.open) return;
     this.ctx.app.bus.emit('cine:ult', { phase: 'impact', riderId: rider });
     this.rise.handoff();
-    const held = this.pending?.count ?? 0;
+    const held = this.pending;
     this.pending = null;
     this.cine.releaseNow();
     this.lastStart = this.ctx.app.clock.realTime;
     const tl = this.slowmo === 'off' ? LITE : this.slowmo === 'short' ? shortVariant(ULT_IMPACT) : ULT_IMPACT;
-    const point = { x: pos.x, y: (t?.ground ?? pos.y) + 1, z: pos.z };
-    this.startCine({ kind: 'ult', tl, victim: victims[0] ?? rider, attacker: rider, ko: false, point, chain: held, cluster: victims });
+    const point = new Vector3(pos.x, (t?.ground ?? pos.y) + 1, pos.z);
+    const kod = victims.filter((id) => (s.rider(id)?.hp ?? 1) <= 0);
+    // Nobody near the impact: the pelican (not one of the victims) stands in and the shot frames the impact point.
+    const hero = this.ultHero(point, victims, kod) ?? rider;
+    this.startCine({
+      kind: 'ult', tl, victim: hero, attacker: rider, ko: false, point, chain: held?.count ?? 0, cluster: victims,
+      kod: held ? [...kod, held.victim] : kod,
+    });
   }
 
   private onRaceEnd(): void {
@@ -271,29 +291,19 @@ export class KoDirector implements FxPart {
     this.ended = false;
     this.lastStart = -1e9;
     this.lastFraming = null;
-    this.warm = 'fill';
   }
 
   update(_dtSim: number, dtReal: number): void {
-    this.warmCast();
     if (this.ctx.app.clock.getScale('pause') === 0) return;
     this.rise.update(dtReal);
     if (this.pending && !this.rise.open) this.flushPending();
     this.cine.update(dtReal);
   }
 
-  private warmCast(): void {
-    const s = this.session();
-    if (!this.warm || !s || this.cine.active) return;
-    if (this.warm === 'fill') fillCast(this.ctx.post.cine.cast, s, [], []);
-    else this.ctx.post.cine.cast.clear();
-    this.warm = this.warm === 'fill' ? 'clear' : null;
-  }
-
   /** Debug summary for __br.fx.stats(). */
   info(): Record<string, unknown> {
     const ko = this.cine.active
-      ? { kind: this.cine.kind, t: +this.cine.t.toFixed(3), chain: this.cine.chain, framing: this.lastFraming, scores: this.scores.join(' ') }
+      ? { kind: this.cine.kind, t: +this.cine.t.toFixed(3), chain: this.cine.chain, subject: this.cine.victimId, framing: this.lastFraming, scores: this.scores.join(' ') }
       : null;
     return { ko, rise: this.rise.active, pending: this.pending?.count ?? 0, ended: this.ended };
   }

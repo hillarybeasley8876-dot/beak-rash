@@ -22,7 +22,7 @@ await withPage(async (page, h) => {
   });
   for (let f = 0; f < frames; f += every) {
     await h.step(every);
-    await h.shot(`shots/fx/play-${track}-${String(f + every).padStart(4, '0')}.png`);
+    await h.shot(`${process.env.FX_OUT ?? 'shots/fx'}/play-${track}-${String(f + every).padStart(4, '0')}.png`);
   }
   const out = await page.evaluate(() => ({ counts: window.__fxCounts, stats: window.__br.fx.stats(), snap: window.__br.snapshot() }));
   console.log(JSON.stringify({ counts: out.counts, scene: out.stats.scene, particles: out.stats.particles, fps: out.snap.fps, phase: out.snap.phase }));

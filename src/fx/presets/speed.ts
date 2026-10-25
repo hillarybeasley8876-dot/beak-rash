@@ -2,6 +2,7 @@
 import { Vector3 } from 'three';
 import { FRAME } from '../particles/atlas';
 import { groundRing } from './ground';
+import { ring } from './impacts';
 import { inherit, launch, type BurstOpts, type Kit, type Preset } from './kit';
 import type { Vec3Like } from '../../core/types';
 
@@ -19,13 +20,16 @@ function driftColors(level: number | undefined): readonly [string, string] {
   return DRIFT_COLORS[Math.max(0, Math.min(3, level ?? 0))] ?? ['#ffffff', '#ffffff'];
 }
 
-/** Hot additive streak sparks thrown along `o.dir` (drift spray, boost flare). */
-function hotSparks(k: Kit, pos: Vec3Like, o: BurstOpts, count: number, size: number, a: string, b: string): void {
+/** Hot additive streak sparks thrown along `o.dir` (drift spray, boost flare): `size` = streak width, `speed` =
+ *  launch speed range, `stretch` = streak length per m/s of screen speed. */
+function hotSparks(
+  k: Kit, pos: Vec3Like, o: BurstOpts, count: number, size: number, a: string, b: string, speed: readonly [number, number] = [4, 8], stretch = 0.045,
+): void {
   for (let i = 0; i < count; i++) {
     const s = k.at(pos, 0.04);
     k.p.colors(s, a, b);
-    s.frame = FRAME.spark; s.additive = true; s.mode = 1; s.k = 0.045;
-    launch(s, k.dir(d, o.dir, 0.6), k.range(4, 8));
+    s.frame = FRAME.spark; s.additive = true; s.mode = 1; s.k = stretch;
+    launch(s, k.dir(d, o.dir, 0.6), k.range(speed[0], speed[1]));
     s.vy = Math.abs(s.vy) + 1.8;
     s.life = k.range(0.18, 0.32); s.size0 = size; s.size1 = size * 0.3;
     s.drag = 2.5; s.gravity = 11;
@@ -54,37 +58,77 @@ function groundStar(k: Kit, pos: Vec3Like, o: BurstOpts, color: string, size: nu
   k.p.emit(s);
 }
 
-const INK_SIZE = [0, 0.22, 0.3, 0.38];
+/** L3: a soft pink pool of light on the road under the wheel (overlapping short-lived flat glows ride with it). */
+function glowPool(k: Kit, pos: Vec3Like, o: BurstOpts, size: number): void {
+  const g = k.at({ x: pos.x, y: pos.y - 0.04, z: pos.z });
+  k.p.colors(g, '#b8389f', '#4a0c40');
+  g.frame = FRAME.glow; g.additive = true; g.mode = 2; g.life = 0.18; g.size0 = size * k.range(0.85, 1.1); g.size1 = size * 1.2;
+  inherit(g, o, 1);
+  k.p.emit(g);
+}
 
-/** One frame of drift sparks at the rear wheel (called continuously by the rider emitters). Every level
- *  is bigger than the last: more and fatter hot streaks, more inked sparks, and zaps at L3. */
+/** L3: a short hot flame tongue licking out behind the wheel along the spray (white core fading to the level colour). */
+function flameJet(k: Kit, pos: Vec3Like, o: BurstOpts, color: string): void {
+  const s = k.at({ x: pos.x, y: pos.y + 0.12, z: pos.z }, 0.03);
+  k.p.colors(s, '#ffffff', color);
+  s.frame = FRAME.spark; s.additive = true; s.mode = 1; s.k = 0.075;
+  launch(s, k.dir(d, o.dir, 0.18), k.range(5, 7));
+  s.life = k.range(0.08, 0.12); s.size0 = 0.34; s.size1 = 0.12; s.drag = 6;
+  inherit(s, o, 0.95);
+  k.p.emit(s);
+}
+
+/** Drift spark fan per level (charging, L1 small blue, L2 bigger orange, L3 large pink): hot streaks per tick, their
+ *  width, launch speed and stretch (longer, not fatter: fat streaks read as petals), inked sparks, the ground star,
+ *  and at L3 a pink glow pool on the road + a flame jet. */
+const FAN = [
+  { streaks: 1, size: 0.05, speed: [4, 8], stretch: 0.045, ink: 0, inkSize: 0, star: 0, glow: 0, jet: 0 },
+  { streaks: 4, size: 0.12, speed: [4.5, 8.5], stretch: 0.055, ink: 1, inkSize: 0.34, star: 0.7, glow: 0, jet: 0 },
+  { streaks: 6, size: 0.15, speed: [5, 10], stretch: 0.065, ink: 2, inkSize: 0.5, star: 1.0, glow: 0, jet: 0 },
+  { streaks: 8, size: 0.19, speed: [5.5, 11.5], stretch: 0.075, ink: 3, inkSize: 0.64, star: 1.35, glow: 2.0, jet: 2 },
+] as const;
+
+/** One frame of drift sparks at the rear wheel (called continuously by the rider emitters). Every level is a
+ *  clearly bigger fan than the last (the main timing cue for the release); o.scale < 1 thins a rival's fan. */
 export const driftSpark: Preset = (k, pos, o) => {
   const [a, b] = driftColors(o.level);
   const lv = Math.max(0, Math.min(3, o.level ?? 0));
-  if (!lv) {
-    hotSparks(k, pos, o, k.n(1, o), 0.05, a, b);
-    return;
-  }
-  hotSparks(k, pos, o, k.n(2 + lv, o), lv === 3 ? 0.16 : 0.1, a, b);
-  const inked = lv === 1 ? (k.rng.chance(0.5) ? 1 : 0) : lv;
-  for (let i = 0; i < inked; i++) inkSpark(k, pos, o, b, a, INK_SIZE[lv] ?? 0.22);
-  if (k.rng.chance(0.35)) groundStar(k, pos, o, b, 0.45 + 0.15 * lv, 0.06);
+  const fan = FAN[lv] ?? FAN[0];
+  const sc = o.scale ?? 1;
+  hotSparks(k, pos, o, k.n(fan.streaks, o), fan.size * sc, a, b, fan.speed, fan.stretch);
+  if (!lv) return;
+  const inked = lv === 1 ? (k.rng.chance(0.6) ? 1 : 0) : Math.max(1, Math.round(fan.ink * sc));
+  for (let i = 0; i < inked; i++) inkSpark(k, pos, o, b, a, fan.inkSize * sc);
+  if (k.rng.chance(0.35)) groundStar(k, pos, o, b, fan.star * sc, 0.06);
+  if (fan.glow > 0 && k.rng.chance(0.5)) glowPool(k, pos, o, fan.glow * sc);
+  for (let i = 0; i < fan.jet && sc >= 1; i++) flameJet(k, pos, o, b);
   if (lv === 3 && k.rng.chance(0.2)) {
     const z = k.at(pos, 0.15);
     k.p.colors(z, '#ffffff', b);
-    z.frame = FRAME.zap; z.life = 0.08; z.size0 = 0.45; z.size1 = 0.55; z.rot = k.range(0, 6.28); z.realtime = true;
+    z.frame = FRAME.zap; z.life = 0.08; z.size0 = 0.55 * sc; z.size1 = 0.7 * sc; z.rot = k.range(0, 6.28); z.realtime = true;
     inherit(z, o, 1);
     k.p.emit(z);
   }
 };
 
-/** Mini-turbo level reached: a flat shock ring and a star on the road, a spray in the level colour. */
+/** Mini-turbo level reached: a camera-facing burst ring around the wheel and a flat shock ring on the road (both
+ *  growing with the level), a spray in the level colour and a ground star. */
 export const driftPop: Preset = (k, pos, o) => {
   const [a, b] = driftColors(o.level);
-  groundRing(k, pos, { ...o, ground: pos.y }, 0.2, 1.6, 0.22, b, 1);
-  hotSparks(k, pos, o, k.n(12, o), 0.12, a, b);
-  for (let i = 0; i < 3; i++) inkSpark(k, pos, o, b, a, 0.3);
-  groundStar(k, pos, o, b, 1, 0.14);
+  const lv = Math.max(1, Math.min(3, o.level ?? 1));
+  ring(k, { x: pos.x, y: pos.y + 0.3, z: pos.z }, o, 0.3, 0.9 + 0.45 * lv, 0.2 + 0.03 * lv, b);
+  groundRing(k, pos, { ...o, ground: pos.y }, 0.2 + 0.3 * lv, 1.6 + 0.6 * lv, 0.22, b, 1);
+  hotSparks(k, pos, o, k.n(8 + 6 * lv, o), 0.12 + 0.05 * lv, a, b, [5, 10]);
+  for (let i = 0; i < 2 + lv; i++) inkSpark(k, pos, o, b, a, 0.3 + 0.08 * lv);
+  groundStar(k, pos, o, b, 0.9 + 0.3 * lv, 0.14);
+};
+
+/** Drift release (the mini-turbo fires): one burst ring at the rear wheel in the level colour, sized by level. */
+export const driftRelease: Preset = (k, pos, o) => {
+  const [a, b] = driftColors(o.level);
+  const lv = Math.max(1, Math.min(3, o.level ?? 1));
+  ring(k, { x: pos.x, y: pos.y + 0.35, z: pos.z }, o, 0.4, 1.3 + 0.55 * lv, 0.24, b);
+  hotSparks(k, pos, o, k.n(6 + 4 * lv, o), 0.16 + 0.05 * lv, a, b, [5, 10]);
 };
 
 /** Wind lines the rider rushes through: thin world-space lines along the travel direction (mode 5, ~2.5 px

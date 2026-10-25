@@ -7,7 +7,7 @@
 // Prints a JSON summary (timeline, sim seconds to the release, victim displacement, eye bounds margin,
 // victim NDC) with checks: headClear (KO head top below NDC y 0.70 in every hold frame), heroFrac (ult:
 // nearest victim >= 25 % of the frame height), barsMin (ult: letterbox >= 0.95 impact -> release),
-// protocol (ultko). Key frames: shots/fx/cine-<track>-<variant>-<ms>.png (sheet: sandbox/fx.grid.py).
+// protocol (ultko), subjectKod / namesKod (ult: the shot's subject and every cine:ko victim are riders combat KO'd). Key frames: shots/fx/cine-<track>-<variant>-<ms>.png (FX_OUT=<dir> moves them; sheet: sandbox/fx.grid.py).
 import { parseArgs, withPage } from '../tools/lib.mjs';
 
 const a = parseArgs(process.argv.slice(2));
@@ -18,6 +18,7 @@ const ULT = variant === 'ult' || variant === 'ultko';
 const SHOTS = String(a.shots ?? (ULT ? '1000,1300,1600,1800,1950,2250,2700,3100' : '40,150,300,500,800,1100,1350,1600'))
   .split(',').map(Number);
 const FRAMES = Number(a.frames ?? (ULT ? 240 : 120));
+const OUT = process.env.FX_OUT ?? 'shots/fx';
 
 function stage(v) {
   const br = window.__br;
@@ -119,7 +120,7 @@ await withPage(async (page, h) => {
     await h.step(1);
     const row = await page.evaluate(telemetry, [victim, variant]);
     tel.push(row);
-    if (shots.length && row.kt !== null && row.kt * 1000 >= shots[0]) await h.shot(`shots/fx/cine-${track}-${variant}-${String(shots.shift()).padStart(4, '0')}.png`);
+    if (shots.length && row.kt !== null && row.kt * 1000 >= shots[0]) await h.shot(`${OUT}/cine-${track}-${variant}-${String(shots.shift()).padStart(4, '0')}.png`);
   }
   const log = await page.evaluate(() => window.__cineLog);
   if (a.trace === 'size') for (const r of tel) if (r.kt !== null && r.cam === 'cinematic') console.log(r.kt, r.scale, JSON.stringify(r.sizes), JSON.stringify(r.all), JSON.stringify(r.headTop), r.bars);
@@ -141,6 +142,7 @@ function summary(tel, log) {
   const cut = hold[0];
   const last = hold[hold.length - 1];
   const ultPhases = log.filter((e) => e.ev === 'cine:ult').map((e) => e.phase).join(',');
+  const kos = log.filter((e) => e.ev === 'combat:ko').map((e) => e.victim);
   const impactTo = tel.filter((r) => start !== null && release !== null && r.t >= start && r.t < release);
   return {
     track, variant, events: log, start, release,
@@ -157,6 +159,8 @@ function summary(tel, log) {
     barsMin: ULT && impactTo.length ? Math.min(...impactTo.map((r) => r.bars)) : undefined,
     protocol: ULT ? ultPhases : undefined,
     protocolOk: ULT ? ultPhases === 'start,impact,end' : undefined,
+    subjectKod: ULT && hold.length && kos.length ? frac((r) => kos.includes(r.ko?.subject)) : undefined,
+    namesKod: ULT ? log.filter((e) => e.ev === 'cine:ko').every((e) => kos.includes(e.victim)) : undefined,
     scales: [0.1, 0.3, 0.5, 0.8, 1.1, 1.3, 1.5].map((t) => [t, start === null ? null : at(start + t).scale]),
   };
 }

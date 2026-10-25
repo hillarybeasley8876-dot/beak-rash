@@ -1,7 +1,7 @@
 // Acceptance-round replay of the critics' cinematic probe (shots/accept/r1-aesthetic/cine.mjs) with fx
 // telemetry: real game, all rivals around (bystanders), manual frames at 1920x1080, UI on by default.
 //   node sandbox/fx.accept.mjs <track> <ko|wrecked|ult|chain> [extraQuery] [tag]   (VICTIM=cat picks the victim)
-// -> shots/fx/acc1/<track>-<variant><tag>/NN-<ms>.png, sheet.jpg (contact sheet), log.txt
+// -> shots/fx/acc1/<track>-<variant><tag>/NN-<ms>.png, sheet.jpg (contact sheet), log.txt (FX_OUT=<dir> replaces shots/fx/acc1)
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,7 +10,7 @@ import { withPage } from '../tools/lib.mjs';
 
 const [track = 'coast', variant = 'ko', extra = '', tag = ''] = process.argv.slice(2);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const OUT = path.join(ROOT, 'shots/fx/acc1', `${track}-${variant}${tag}`);
+const OUT = path.join(ROOT, process.env.FX_OUT ?? 'shots/fx/acc1', `${track}-${variant}${tag}`);
 fs.mkdirSync(OUT, { recursive: true });
 const TIMES = (process.env.TIMES ?? '').split(',').filter(Boolean).map(Number);
 const DEFAULT = {

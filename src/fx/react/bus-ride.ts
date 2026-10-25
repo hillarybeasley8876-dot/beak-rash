@@ -52,8 +52,10 @@ export function subscribeRide(ctx: FxContext): Array<() => void> {
     bus.on('rider:boost', (e) => {
       const t = ctx.tracker.get(e.riderId);
       if (!t) return;
-      const color = e.kind === 'drift' ? DRIFT_COLORS[clamp(driftLevel.get(e.riderId) ?? 1, 1, 3)]?.[1] : BOOST_COLOR[e.kind];
+      const level = clamp(driftLevel.get(e.riderId) ?? 1, 1, 3);
+      const color = e.kind === 'drift' ? DRIFT_COLORS[level]?.[1] : BOOST_COLOR[e.kind];
       ctx.burst('boost', t.body, { vel: t.vel, dir: t.fwd, color, ground: t.ground });
+      if (e.kind === 'drift') ctx.burst('driftRelease', t.wheelR, { vel: t.vel, dir: t.fwd.clone().negate(), level });
       if (isPlayer(e.riderId)) ctx.post.punch(0.008);
     }),
     bus.on('rider:bump', (e) => {
