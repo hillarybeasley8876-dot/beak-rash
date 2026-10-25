@@ -11,15 +11,26 @@ import '@fontsource/noto-sans-sc/900.css';
 import { ACHIEVEMENTS } from '../../data/achievements';
 import { POLICE_LINES, ROSTER } from '../../data/roster';
 import { SKILLS } from '../../data/skills';
+import { R4_HUD } from '../../data/strings';
 import { WEAPONS } from '../../data/weapons';
 import { HINT_CN } from './hints';
 
-const LATIN = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?/:.%+-×▲▼';
+const LATIN = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?/:.%+-×▲▼°−·';
 const FIXED_CN = '名次时间击倒双杀三连完美落地漂移擦肩而过尾流最后冲刺被抓了罚款小鱼干翻车终点第一二三四五六七八名冷却中不足冲鹈鹕天降复活中警察出没前方注意' +
   '罚停靠边秒起步加速成就解锁咕嘟叮弹射超车被超了段四杀五杀超神你无目标还有个赛后看';
 
+/** Every string under `obj` (nested objects included). */
+function collectStrings(obj: unknown, out: string[] = []): string[] {
+  if (typeof obj === 'string') out.push(obj);
+  else if (Array.isArray(obj)) for (const v of obj) collectStrings(v, out);
+  else if (obj && typeof obj === 'object') for (const v of Object.values(obj)) collectStrings(v, out);
+  return out;
+}
+
 function hudCnText(): string {
   const parts = [FIXED_CN, HINT_CN, '跳过'];
+  // The r4 HUD copy (SPEC §14–§19): police, tricks, STYLE, weapons, rivals, track events.
+  parts.push(...collectStrings(R4_HUD));
   // Bubbles show every roster line race / combat may shout: idle taunts, KO / hurt lines, skill shouts, and
   // the police corgi's chase lines (npc:say).
   for (const def of Object.values(ROSTER)) {

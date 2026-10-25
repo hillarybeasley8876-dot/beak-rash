@@ -18,7 +18,8 @@ const CRASH_CN: Record<CrashCause, string> = {
 };
 
 let seed = 1;
-const nextSeed = (): number => (seed = (seed * 16807) % 2147483647);
+/** The shared ransom-lettering seed: every splash picks the next one so no two look alike. */
+export const nextSeed = (): number => (seed = (seed * 16807) % 2147483647);
 
 /** Over a KO cinematic (`cine`) the band sits flat in the lower 40 % of the frame (the HUD is hidden and the
  *  tumbling victim owns the centre); without one it crosses the middle, clear of the corner modules. */

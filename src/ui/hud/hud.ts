@@ -16,6 +16,7 @@ import { Counters, PlaceBlock } from './place';
 import { hudSfx } from './sfx';
 import { ProgressStrip } from './progress';
 import { Quip } from './quip';
+import { R4Hud } from './r4';
 import { Speedo } from './speedo';
 import { WorldOverlay } from './world/overlay';
 import type { BubbleObstacles } from './world/bubbles';
@@ -46,6 +47,13 @@ export function createHud(app: AppContext, layer: HTMLElement): Hud {
   const cutins = new CutinLayer(root, hudLayer, sfx);
   let cluster: Cluster | null = null;
   let session: Session | null = null;
+  // r4 (§14–§19): the wanted stars, the police warnings, the STYLE meter, the trick / parry pops and
+  // the rival and track-event banners. Its corner pieces sit in a tl corner next to the place badge.
+  const r4Corner = corner('tl brh-r4-corners');
+  // The r4 world-anchored pops sit above the world overlays but below the cut-in stage.
+  const r4Host = el('div', 'brh-layer brh-r4-host');
+  root.insertBefore(r4Host, hudLayer);
+  const r4 = new R4Hud(app.bus, { session: () => session, world, cutins, cluster: () => cluster }, r4Corner, r4Host, cutins.stage);
   let visible = false;
   let k = -1;
   /** Sim time of the player's last BUSTED (ticket-stop countdown), null = none this race. */
@@ -86,6 +94,7 @@ export function createHud(app: AppContext, layer: HTMLElement): Hud {
       alpha = 0;
       world.attach(s);
       cutins.attach(s);
+      r4.attach();
     },
     setVisible(v) {
       visible = v;
@@ -117,10 +126,12 @@ export function createHud(app: AppContext, layer: HTMLElement): Hud {
       world.update(dtReal, k, dyn);
       cluster?.occlude(world.gaugesCovered, dtReal);
       cutins.update(dtReal, k, proj);
+      r4.update(dtReal, k, proj);
       hints.update(session, dtReal, quiet || alpha < 0.99 || cutins.screenBusy || world.bottomBusy);
     },
     dispose() {
       unwire();
+      r4.dispose();
       world.dispose();
       root.remove();
       session = null;

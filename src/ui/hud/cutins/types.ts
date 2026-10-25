@@ -19,6 +19,8 @@ export const PRIORITY = {
   ko: 8,
   showtime: 9,
   finish: 10,
+  police: 6,   // r4: 柯基下班了！ (SPEC §14)
+  nemesis: 6,  // r4: the 宿敌 card (SPEC §18)
 } as const;
 
 export type SplashKind = keyof typeof PRIORITY;

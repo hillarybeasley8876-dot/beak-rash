@@ -1,10 +1,12 @@
-// Weapon slot: icon, name and remaining uses (pips, or ∞ for bare wings). The count is combat's own
-// RiderState.weaponUses (stolen and picked-up weapons keep their wear); '?' if combat never set it.
+// Weapon slot: icon, name, the weapon's trait (SPEC §15) and the remaining uses (pips, or ∞ for bare
+// wings). The count is combat's own RiderState.weaponUses (stolen and picked-up weapons keep their wear);
+// '?' if combat never set it.
 import { WEAPONS } from '../../data/weapons';
 import type { RiderState, WeaponId } from '../../core/types';
 import { slam } from './anim';
 import { el, w, type W } from './dom';
 import { weaponIcon } from './icons';
+import './css/r4.css';
 
 const MAX_PIPS = 10;
 
@@ -19,11 +21,15 @@ export class WeaponSlot {
   private rootW: W;
   private ico: HTMLDivElement;
   private name: W;
+  private trait: W;
   private usesHost: HTMLDivElement;
   private flashW: W;
   private pips: W[] = [];
   private count: W | null = null;
-  private weapon: WeaponId | null = null;
+  /** The weapon on display (the rider's, or the one combat:weaponPick just reported). */
+  private shown: WeaponId | null = null;
+  /** The weapon combat:weaponPick reported — the HUD may hear of it before the rider state shows it. */
+  private picked: WeaponId | null = null;
   private uses: number | null = -1;
   private flashT = 9;
 
@@ -33,14 +39,18 @@ export class WeaponSlot {
     el('span', 'wp-k', this.root, 'WEAPON');
     const body = el('div', 'wp-body', this.root);
     this.ico = el('div', 'wp-ico', body);
-    this.name = w(el('span', 'wp-n', body));
+    const txt = el('div', 'wp-txt', body);
+    this.name = w(el('span', 'wp-n', txt));
+    this.trait = w(el('span', 'wp-trait', txt));
     this.usesHost = el('div', 'wp-u', body);
     this.flashW = w(el('div', 'wp-flash', this.root));
   }
 
   update(r: RiderState, dt: number): void {
-    if (r.weapon !== this.weapon) this.set(r.weapon);
-    const uses = usesLeft(r);
+    const id = r.weapon !== 'none' ? r.weapon : (this.picked ?? 'none');
+    if (id !== this.shown) this.set(id);
+    // The wear of a weapon the HUD only heard about is unknown: the slot says '?'.
+    const uses = this.shown === r.weapon ? usesLeft(r) : null;
     if (uses !== this.uses) {
       this.uses = uses;
       this.renderUses();
@@ -51,14 +61,25 @@ export class WeaponSlot {
     this.flashW.op(t < 0.3 ? 1 - t / 0.3 : 0);
   }
 
+  /** combat:weaponPick: the HUD heard of the weapon (the rider state may catch up a frame later). */
+  setPicked(weapon: WeaponId): void {
+    this.picked = weapon;
+  }
+
+  /** The weapon is gone (dropped or broken): the slot falls back to the rider's own weapon. */
+  clearPicked(): void {
+    this.picked = null;
+  }
+
   /** Rebuild the slot for a new weapon: pips sized by the weapon's full uses, or a ×N / ∞ counter. */
   private set(weapon: WeaponId): void {
     const def = WEAPONS[weapon];
-    const changed = this.weapon !== null && weapon !== this.weapon;
-    this.weapon = weapon;
+    const changed = this.shown !== null && weapon !== this.shown;
+    this.shown = weapon;
     this.uses = -1;
     this.ico.innerHTML = weaponIcon(weapon);
     this.name.text(def.name);
+    this.trait.text(def.traitName ?? '');
     this.usesHost.textContent = '';
     this.pips = [];
     this.count = null;

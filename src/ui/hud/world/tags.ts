@@ -35,12 +35,22 @@ const LEAD_MIN = 10;
 const JUMP = 8;
 const CHIP_KINDS = ['cast', 'angry', 'stun', 'shield', 'weapon'] as const;
 
+/** The alliance's chain link (SPEC §18): two links, drawn as SVG so no emoji font is needed. */
+const CHAIN_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true">'
+  + '<g fill="none" stroke="#0B0B0F" stroke-width="3.2">'
+  + '<rect x="1.5" y="9" width="11" height="6" rx="3"/><rect x="11.5" y="9" width="11" height="6" rx="3"/></g></svg>';
+
+/** The mark on a rider's plate: the nemesis' red 宿敌 badge, an ally's chain link, or none. */
+export type TagMark = 'nemesis' | 'ally' | '';
+
 type ChipKind = (typeof CHIP_KINDS)[number] | '';
 
 interface Tag {
   r: RiderState;
   root: W; inner: W; pip: W; pipPl: W; lead: W; end: W; tip: W;
-  hp: W; pl: W; chip: W;
+  hp: W; pl: W; chip: W; mark: W;
+  /** The plate's mark (SPEC §18): 'nemesis', 'ally' or none. */
+  markKind: TagMark;
   vis: number; x: number; y: number; scale: number; depth: number;
   /** Full plate (true) or compact pip, and seconds since the form last changed. */
   full: boolean; modeT: number;
@@ -87,10 +97,11 @@ function build(r: RiderState, host: HTMLElement): Tag {
   const hpBox = el('div', 'nt-hp', inner);
   const hp = el('div', 'nt-hp-f', hpBox);
   const chip = el('span', 'nt-chip', inner);
+  const mark = el('span', 'nt-mark', inner);
   const tip = el('div', 'nt-tip', inner);
   return {
     r, root: w(root), inner: w(inner), pip: w(pip), pipPl: w(pipPl), lead: w(lead), end: w(end), tip: w(tip),
-    hp: w(hp), pl: w(pl), chip: w(chip),
+    hp: w(hp), pl: w(pl), chip: w(chip), mark: w(mark), markKind: '',
     vis: 0, x: 0, y: 0, scale: 1, depth: 0, full: false, modeT: MODE_HOLD, ox: 0, oy: 0, slamT: 9, lx: 0, ly: 0,
     fw: 0, fh: 0, pw: 0, ph: 0,
     item: { x: 0, y: 0, depth: 0, w: 0, h: 0, full: false, side: 0, tx: 0, ty: 0 },
@@ -148,6 +159,18 @@ export class NameTags {
     if (!t) return;
     t.cast = CAST_TIME;
     t.castGlyph = glyph;
+  }
+
+  /** SPEC §18: mark a rival's plate (the nemesis' 宿敌 badge, an ally's chain link) or clear it. */
+  setMark(rider: RiderId, kind: TagMark): void {
+    const t = this.tags.find((x) => x.r.id === rider);
+    if (!t || t.markKind === kind) return;
+    t.markKind = kind;
+    // The mark's content is written directly: it alternates between text and an inline SVG.
+    const node = t.mark.node as HTMLElement;
+    if (kind === 'nemesis') node.textContent = '宿敌';
+    else if (kind === 'ally') node.innerHTML = CHAIN_SVG;
+    else node.textContent = '';
   }
 
   /** `callouts` = the callout stack's rect while it shows (plates keep clear of it). */
@@ -299,5 +322,8 @@ export class NameTags {
     t.chip.cls('on', chip.kind !== '');
     for (const kind of CHIP_KINDS) t.chip.cls(kind, chip.kind === kind);
     if (chip.text) t.chip.text(chip.text);
+    t.mark.cls('on', t.markKind !== '');
+    t.mark.cls('nemesis', t.markKind === 'nemesis');
+    t.mark.cls('ally', t.markKind === 'ally');
   }
 }

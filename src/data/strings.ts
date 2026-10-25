@@ -177,6 +177,35 @@ export const PLACE_CALLOUTS: Callout[] = [
   { cn: '第八名', en: '8TH', alt: ['倒数第一，也是第一。'] },
 ];
 
+// ---------------------------------------------------------------- r4 race HUD (SPEC §14–§19)
+/** Copy for the r4 in-race HUD: police, tricks, STYLE, weapons, rivals and track events. */
+export const R4_HUD = {
+  wanted: { en: 'WANTED', cn: '通缉' },
+  roadblock: { en: 'ROADBLOCK', cn: '前方设卡！' },
+  policeDown: { en: 'OFF DUTY', cn: '柯基下班了！' },
+  bribeOk: 'BRIBE',
+  bribeNo: { en: 'NO DEAL', cn: '这次不行！' },
+  throw: { en: 'THROW', cn: '投掷', hold: '按住' },
+  parry: { en: 'PARRY!', cn: '当！' },
+  nemesis: { en: 'NEMESIS', cn: '宿敌' },
+  alliance: { en: 'SQUAD', cn: '围剿！' },
+  betrayal: { en: 'BROKEN', cn: '塑料友谊！' },
+  style: 'STYLE',
+  trickFail: { en: 'FAIL', cn: '失败' },
+  trick: {
+    spin: { en: '360°', cn: '360°' },
+    backflip: { en: 'BACKFLIP', cn: '后空翻' },
+    frontflip: { en: 'FRONTFLIP', cn: '前空翻' },
+    superman: { en: 'SUPERMAN', cn: '超人' },
+  },
+  event: {
+    fishSpill: { en: 'FISH SPILL', cn: '前方鱼车侧翻！小心路滑' },
+    geese: { en: 'GEESE', cn: '前方鹅群过马路！' },
+    roadworks: { en: 'ROADWORKS', cn: '前方施工！' },
+    stalls: { en: '', cn: '' },   // the market stalls warn nobody (SPEC §19)
+  },
+} as const;
+
 /** WRECKED splash sub-lines by crash cause. */
 export const WRECK_LINES: Record<CrashCause, string[]> = {
   ko: ['眼前全是小鱼干……', '天上怎么全是星星……', '这一下，记住了……'],

@@ -10,6 +10,7 @@ import type { CharacterId } from '../../../core/types';
 import { enter, exit, fadeOut } from '../anim';
 import { badge } from '../badge';
 import { el } from '../dom';
+import { keyGlyphs, type HudKey } from '../glyphs';
 import type { Rect } from '../world/avoid';
 
 const LIFE = 1.7;
@@ -63,6 +64,32 @@ export class SkillChips {
     el('span', 'chip-en', txt, def.nameEn);
     el('span', 'chip-cn', txt, def.name);
     el('span', 'chip-who', txt, ROSTER[character].name);
+    this.add(root, key, LIFE, 0, false);
+  }
+
+  /** A short note chip (a bribe, a race notice): a card with a kicker and a line, no portrait. */
+  note(key: string, en: string, cn: string, accent = '#E5191C'): void {
+    if (this.refresh(key)) return;
+    const root = el('div', 'chip chip-note', this.host);
+    root.style.setProperty('--c3', accent);
+    const cardEl = el('div', 'chip-card', root);
+    const txt = el('div', 'chip-t', cardEl);
+    el('span', 'chip-en', txt, en);
+    el('span', 'chip-cn', txt, cn);
+    this.add(root, key, LIFE, 0, false);
+  }
+
+  /** A control hint (the first weapon's throw prompt): the key badge follows the device in use. */
+  hint(key: string, en: string, pre: string, kb: HudKey, post: string): void {
+    if (this.refresh(key)) return;
+    const root = el('div', 'chip chip-hint', this.host);
+    const cardEl = el('div', 'chip-card', root);
+    const txt = el('div', 'chip-t', cardEl);
+    el('span', 'chip-en', txt, en);
+    const line = el('span', 'chip-cn chip-hint-l', txt);
+    el('i', '', line, pre);
+    keyGlyphs(el('kbd', 'chip-key', line), kb);
+    el('i', '', line, post);
     this.add(root, key, LIFE, 0, false);
   }
 

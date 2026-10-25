@@ -4,6 +4,7 @@ import '../css/world.css';
 import { SKILLS } from '../../../data/skills';
 import type { Session } from '../../../core/contracts';
 import type { GameEvents } from '../../../core/events-map';
+import type { RiderId } from '../../../core/types';
 import { el } from '../dom';
 import { Bubbles, type BubbleObstacles } from './bubbles';
 import { DamageNumbers } from './damage';
@@ -11,7 +12,7 @@ import { EdgeWarnings } from './edges';
 import { IncomingWarning } from './incoming';
 import type { Projector } from './project';
 import { GaugeOcclusion } from './occlusion';
-import { NameTags } from './tags';
+import { NameTags, type TagMark } from './tags';
 import { HudZones } from './zones';
 
 const WARN_RANGE = 30;
@@ -86,6 +87,18 @@ export class WorldOverlay {
     const glyph = SKILLS[e.skillId]?.glyph ?? '!';
     this.edges.skillWarn(r.id, glyph);
     this.tags.castFlash(r.id, glyph);
+  }
+
+  /** police:hurt (SPEC §14): the player hit the corgi — a damage number over it. */
+  onPoliceHurt(e: GameEvents['police:hurt']): void {
+    this.damage.spawn({
+      pos: e.pos, damage: e.damage, crit: false, heavy: false, blocked: false, hurt: false, minor: false,
+    });
+  }
+
+  /** SPEC §18: mark a rival's name tag (宿敌 / the alliance's chain link). */
+  setTagMark(rider: RiderId, kind: TagMark): void {
+    this.tags.setMark(rider, kind);
   }
 
   dispose(): void {

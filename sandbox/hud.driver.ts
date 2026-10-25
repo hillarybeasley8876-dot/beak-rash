@@ -2,7 +2,7 @@
 // drive every cut-in, so sandbox/hud.shots.mjs can screenshot each state deterministically.
 import { Vector3 } from 'three';
 import type { Game } from '../src/core/game';
-import type { Obstacle, RiderState, WeaponId } from '../src/core/types';
+import type { Obstacle, RiderState, TrickKind, WeaponId } from '../src/core/types';
 import { SKILLS } from '../src/data/skills';
 import { POLICE_LINES, ROSTER } from '../src/data/roster';
 
@@ -167,6 +167,58 @@ export function installDriver(game: Game, hooks: HudHooks): void {
       Object.assign(p, { weapon, weaponUses: Number(o.uses ?? 3) });
       bus.emit('combat:weaponPick', { riderId: p.id, weapon, stolenFrom: null });
     },
+    // ---- r4 (§14–§19) ----
+    /** The wanted stars (SPEC §14). */
+    wanted: (o) => bus.emit('police:wanted', { riderId: sess().player.id, level: Number(o.level ?? 2), prev: 0 }),
+    /** The corgi winds up its baton: put the officer on the road first, then warn. */
+    windup: (o) => {
+      const s = sess();
+      let ob = s.obstacles.find((x) => x.id === NPC_ID);
+      if (!ob) {
+        const fresh: Obstacle = { id: NPC_ID, kind: 'police', s: 0, x: 0, speed: 0, halfWidth: 0.45, halfLength: 0.9, height: 1.6, solid: false, active: true };
+        s.obstacles.push(fresh);
+        ob = fresh;
+      }
+      Object.assign(ob, { s: s.player.s + Number(o.ds ?? 6), x: Number(o.x ?? 1.6), speed: s.player.speed, active: true });
+      bus.emit('police:windup', { riderId: s.player.id, obstacleId: NPC_ID, side: 1, pos: posOf(s.player), time: 0.45 });
+    },
+    roadblock: (o) => bus.emit('police:roadblock', { riderId: sess().player.id, s: sess().player.s + 220, gapX: 2, gapWidth: 3.2, pos: posOf(sess().player) }),
+    policeDown: () => bus.emit('police:down', { obstacleId: NPC_ID, attacker: sess().player.id, pos: posOf(sess().player) }),
+    bribe: (o) => bus.emit('police:bribe', { riderId: sess().player.id, obstacleId: NPC_ID, amount: 50, accepted: o.accepted !== false }),
+    /** An air trick landed (SPEC §16). */
+    trick: (o) => bus.emit('rider:trick', {
+      riderId: sess().player.id, phase: String(o.phase ?? 'land') as 'start' | 'land' | 'fail',
+      kind: String(o.kind ?? 'backflip') as TrickKind, count: Number(o.count ?? 1), points: Number(o.points ?? 120),
+    }),
+    /** A STYLE chain grew (SPEC §17). */
+    styleChain: (o) => bus.emit('style:chain', {
+      riderId: sess().player.id, action: 'nearMiss', label: '擦肩', points: 60,
+      total: Number(o.total ?? 1240), mult: Number(o.mult ?? 2.25), count: 5,
+    }),
+    /** The chain paid out (SPEC §17). */
+    styleBank: (o) => bus.emit('style:bank', {
+      riderId: sess().player.id, total: 1240, count: 5, sp: Number(o.sp ?? 12), coins: 4, broken: Boolean(o.broken),
+    }),
+    /** The first weapon of a profile (SPEC §15): the throw hint shows again. */
+    throwPick: () => {
+      localStorage.removeItem('beak-rash.hint.throw');
+      const p = sess().player;
+      Object.assign(p, { weapon: 'saltfish' as WeaponId, weaponUses: 5 });
+      bus.emit('combat:weaponPick', { riderId: p.id, weapon: 'saltfish', stolenFrom: null });
+    },
+    parry: () => bus.emit('combat:parry', { riderId: sess().player.id, attacker: null, obstacleId: null, weapon: 'pan', pos: posOf(sess().player) }),
+    /** The nemesis card (SPEC §18). */
+    nemesis: (o) => bus.emit('race:nemesis', { riderId: Number(o.id ?? 1), character: 'goose', grudge: Number(o.grudge ?? 80) }),
+    /** The alliance forms or breaks (SPEC §18). */
+    alliance: (o) => bus.emit('race:alliance', {
+      phase: String(o.phase ?? 'form') as 'form' | 'break', members: [1, 2], target: 0,
+      reason: String(o.reason ?? 'leader') as 'leader' | 'rampage' | 'betrayal' | 'timeout' | 'ko',
+    }),
+    /** A track event warns (SPEC §19). */
+    event: (o) => bus.emit('race:event', {
+      kind: String(o.kind ?? 'fishSpill') as 'fishSpill' | 'geese' | 'roadworks' | 'stalls',
+      phase: String(o.phase ?? 'warn') as 'warn' | 'start' | 'end', s: 1200, pos: posOf(sess().player),
+    }),
   };
 
   window.__hud = {

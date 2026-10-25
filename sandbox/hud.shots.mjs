@@ -61,6 +61,27 @@ const LOD = `(() => {
   const inZone = full.filter((r) => r.right > W * 0.38 && r.left < W * 0.62 && r.bottom > H * 0.25 && r.top < H * 0.5).length;
   return 'tags=' + tags.length + ' full=' + full.length + (full.length <= 3 ? ' full<=3' : '') + ' inZone=' + inZone;
 })()`;
+/* ---- r4 (§14–§19) ---- */
+/** The wanted badge on screen and its star count. */
+const WANTED = `(() => { const n = $h('.brh-wanted').find((x) => getComputedStyle(x).visibility !== 'hidden'); return 'level=' + (n ? n.dataset.level : '-'); })()`;
+/** The baton wind-up warning over the corgi. */
+const BATON = `'baton=' + $h('.brh-baton-warn').filter((n) => getComputedStyle(n).visibility !== 'hidden').length`;
+/** The r4 diagonal warning banner (roadblock / alliance / track event). */
+const BANNER = `$h('.rb').map((n) => n.textContent).join('|')`;
+/** The r4 cut-ins (the corgi going off duty, the 宿敌 card). */
+const CUT = `$h('.ci-police .sx-cn, .ci-nemesis .sx-cn').map((n) => n.textContent).join('|')`;
+/** The note chips (the bribe). */
+const NOTES = `$h('.chip-note').map((n) => n.textContent).join('|')`;
+/** The trick card. */
+const TRICK = `$h('.brh-trick').map((n) => n.textContent).join('|')`;
+/** The STYLE meter and its bank pop. */
+const STYLE = `$h('.brh-style').map((n) => n.textContent).join('|') + ' bank=' + $h('.sty-bank').map((n) => n.textContent).join('|')`;
+/** The throw hint on the chip column and the weapon's trait name. */
+const THROW = `$h('.chip-hint').map((n) => n.textContent).join('|') + ' trait=' + $h('.wp-trait').map((n) => n.textContent).join('|')`;
+/** The parry pop. */
+const PARRY = `$h('.brh-parry').map((n) => n.textContent).join('|')`;
+/** The name-tag marks (宿敌 / the alliance's chain link). */
+const MARKS = `$h('.nt-mark.on').map((n) => n.textContent || 'chain').join('|')`;
 const SCENES = {
   hud: [P('cruise'), P('rich'), S(20)],
   busy: [P('cruise'), P('rich'), P('drift2'), P('cooldowns'), P('weapon'), P('draft'), S(20)],
@@ -186,6 +207,24 @@ const SCENES = {
     E('__hudSfx.length = 0; Object.assign(__br.session().player, { mode: "busted", modeTime: 0 })'), F('busted'), S(30),
     X('__hudSfx.join()', 'ui.stamp'), S(160), X(`'counts=' + __hudSfx.filter((id) => id === 'ui.count').length`, 'counts=3'),
   ],
+  // ---- r4 (§14–§19): the police, the tricks, the STYLE meter, the weapons, the rivals, the events ----
+  r4Wanted: [F('wanted', { level: 2 }), S(20), X(WANTED, 'level=2')],
+  r4Baton: [F('windup', { ds: 6, x: 1.6 }), S(6), X(BATON, 'baton=1')],
+  r4Roadblock: [F('roadblock'), S(20), X(BANNER, '前方设卡')],
+  r4PoliceDown: [F('policeDown'), S(20), X(CUT, '柯基下班了')],
+  r4Bribe: [F('bribe'), S(20), X(NOTES, 'V我50')],
+  r4Trick: [F('trick', { kind: 'backflip', points: 290 }), S(10), X(TRICK, '+290')],
+  r4Style: [F('styleChain'), S(10), X(STYLE, '×2.25', '1,240')],
+  r4StyleBank: [F('styleChain'), S(6), F('styleBank'), S(8), X(STYLE, '+12 SP')],
+  r4Throw: [F('throwPick'), S(20), X(THROW, '投掷', '回旋镖')],
+  r4Parry: [F('parry'), S(8), X(PARRY, '当')],
+  r4Nemesis: [E('__hud.place(1, 8, 1.5)'), F('nemesis'), S(16), X(CUT, '宿敌'), X(MARKS, '宿敌')],
+  r4Alliance: [
+    E('__hud.place(1, 8, -1.5); __hud.place(2, 12, 1.5)'), F('alliance'), S(16),
+    X(BANNER, '围剿'), X(MARKS, 'chain'),
+  ],
+  r4Betrayal: [F('alliance'), S(6), F('alliance', { phase: 'break', reason: 'betrayal' }), S(12), X(BANNER, '塑料友谊')],
+  r4Event: [F('event', { kind: 'fishSpill' }), S(16), X(BANNER, '鱼车')],
 };
 const STUB_ONLY = new Set(['sfx', 'ticket']);
 const AFTER = {

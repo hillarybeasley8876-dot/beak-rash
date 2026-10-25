@@ -5,9 +5,9 @@ import { ACHIEVEMENTS } from '../../../data/achievements';
 import { SKILLS } from '../../../data/skills';
 import type { Session } from '../../../core/contracts';
 import type { GameEvents } from '../../../core/events-map';
-import type { RiderId } from '../../../core/types';
+import type { CharacterId, RiderId } from '../../../core/types';
 import { TICKET_HOLD } from '../events';
-import { SLOT_KEYS } from '../glyphs';
+import { SLOT_KEYS, type HudKey } from '../glyphs';
 import { ordinal } from '../place';
 import { DRIFT_COLORS } from '../speedo';
 import type { Sfx } from '../sfx';
@@ -19,6 +19,7 @@ import { SkillChips } from './chips';
 import { countdownCut, skillBand, type BandCut } from './countdown';
 import { Director } from './director';
 import { IntroCards } from './intro';
+import { nemesisCut, policeDownCut } from './r4cuts';
 import { bustedSplash, finishSplash, koSplash, showtimeCut, wreckedSplash } from './splashes';
 
 const CHIP_RANGE = 30;
@@ -101,6 +102,11 @@ export class CutinLayer {
   get screenBusy(): boolean {
     const kind = this.director.splashKind;
     return this.cinematic || this.director.bandUp || (kind !== null && kind !== 'countdown');
+  }
+
+  /** The cut-in stage (1920×1080, scaled by --k): the r4 warning banners live here. */
+  get stage(): HTMLElement {
+    return this.director.stage;
   }
 
   attach(session: Session | null): void {
@@ -224,6 +230,26 @@ export class CutinLayer {
     if (!this.isMe(e.riderId)) return;
     this.director.splashIn('busted', () => bustedSplash(e.fine, TICKET_HOLD));
     this.cues.push({ at: this.clock + STAMP_AT, id: 'ui.stamp', volume: 0.9 });
+  }
+
+  /** A short note chip in the top-right column (a bribe, a race notice). */
+  note(key: string, en: string, cn: string, accent = '#E5191C'): void {
+    this.chips.note(key, en, cn, accent);
+  }
+
+  /** A control-hint chip (the first weapon's throw prompt). */
+  hint(key: string, en: string, pre: string, kb: HudKey, post: string): void {
+    this.chips.hint(key, en, pre, kb, post);
+  }
+
+  /** r4 (§14): the corgi went down and is going home. */
+  policeDown(): void {
+    this.director.splashIn('police', () => policeDownCut());
+  }
+
+  /** r4 (§18): the rival holding the biggest grudge — the 宿敌 card. */
+  nemesis(character: CharacterId, grudge: number): void {
+    this.director.splashIn('nemesis', () => nemesisCut(character, grudge));
   }
 
   finish(e: GameEvents['race:finishLine']): void {
