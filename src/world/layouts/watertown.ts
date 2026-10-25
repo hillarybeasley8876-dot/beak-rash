@@ -65,7 +65,7 @@ export const WATERTOWN: LayoutDef = {
     },
     {
       len: 64, name: 'lanes', radius: -48, ease: 30, left: laneL, right: laneR,
-      features: [{ kind: 'pickupRow', at: 26, len: 15, x0: -3.2, x1: 3.2, data: { kind: 'coin' } }],
+      features: [{ kind: 'pickupRow', at: 26, len: 15, x0: -2.4, x1: 2.4, data: { kind: 'coin' } }],
       marks: [
         { kind: 'house', at: 0, x: -1, data: { len: 64 } },
         { kind: 'house', at: 0, x: 1, data: { len: 64 } },
@@ -75,7 +75,7 @@ export const WATERTOWN: LayoutDef = {
     },
     {
       len: 66, name: 'lanes',
-      features: [{ kind: 'pickupRow', at: 16, len: 12, x0: 3, x1: 3, data: { kind: 'can' } }],
+      features: [{ kind: 'pickupRow', at: 16, len: 12, x0: 2.25, x1: 2.25, data: { kind: 'can' } }],
       marks: [
         { kind: 'house', at: 0, x: -1, data: { len: 46 } },
         { kind: 'house', at: 0, x: 1, data: { len: 46 } },
@@ -87,8 +87,8 @@ export const WATERTOWN: LayoutDef = {
     {
       len: 280, name: 'canal', radius: 520, ease: 60, left: quayL, right: laneR,
       features: [
-        { kind: 'pickupRow', at: 120, len: 15, x0: 3.2, x1: -1.5, data: { kind: 'coin' } },
-        { kind: 'puddle', at: 196, len: 7, x0: 1, x1: 3.3 },
+        { kind: 'pickupRow', at: 120, len: 15, x0: 2.4, x1: -1.12, data: { kind: 'coin' } },
+        { kind: 'puddle', at: 196, len: 7, x0: 0.75, x1: 2.47 },
       ],
       marks: [
         { kind: 'willow', at: 0, x: -1, data: { len: 280 } },
@@ -124,10 +124,10 @@ export const WATERTOWN: LayoutDef = {
     {
       len: 310, name: 'market', left: quayL, right: stallR,
       features: [
-        { kind: 'pickupRow', at: 70, len: 12, x0: -3.2, x1: -3.2, data: { kind: 'fish' } },
-        { kind: 'puddle', at: 140, len: 6, x0: -3.3, x1: -1.5 },
+        { kind: 'pickupRow', at: 70, len: 12, x0: -2.4, x1: -2.4, data: { kind: 'fish' } },
+        { kind: 'puddle', at: 140, len: 6, x0: -2.47, x1: -1.12 },
         { kind: 'boostPad', at: 190, len: 6, x0: 1.2, x1: 3.3, data: { power: 0.3, time: 1 } },
-        { kind: 'pickupRow', at: 214, len: 12, x0: 3, x1: 3, data: { kind: 'crate' } },
+        { kind: 'pickupRow', at: 214, len: 12, x0: 2.25, x1: 2.25, data: { kind: 'crate' } },
       ],
       marks: [
         { kind: 'stalls', at: 10, x: 1, data: { len: 210 } },
@@ -139,7 +139,7 @@ export const WATERTOWN: LayoutDef = {
     // ---- 1156 – 1376: the tea house quarter, one tight R 34 bend and a short straight.
     {
       len: 50, name: 'tea', radius: 34, ease: 22, left: laneL, right: laneR,
-      features: [{ kind: 'pickupRow', at: 24, len: 12, x0: 3, x1: 3, data: { kind: 'coin' } }],
+      features: [{ kind: 'pickupRow', at: 24, len: 12, x0: 2.25, x1: 2.25, data: { kind: 'coin' } }],
       marks: [
         { kind: 'teahouse', at: 20, x: 1 },
         { kind: 'chevrons', at: 4, x: -1, data: { len: 44 } },
@@ -159,8 +159,8 @@ export const WATERTOWN: LayoutDef = {
     {
       len: 440, name: 'sweeper', radius: 240, bank: 3, ease: 80, left: quayL, right: laneR,
       features: [
-        { kind: 'pickupRow', at: 110, len: 15, x0: 3.2, x1: -1.5, data: { kind: 'coin' } },
-        { kind: 'puddle', at: 200, len: 8, x0: -4.5, x1: -1 },
+        { kind: 'pickupRow', at: 110, len: 15, x0: 2.4, x1: -1.12, data: { kind: 'coin' } },
+        { kind: 'puddle', at: 200, len: 8, x0: -3.38, x1: -0.75 },
         { kind: 'boostPad', at: 280, len: 6, x0: -3.3, x1: -1.4, data: { power: 0.3, time: 1 } },
       ],
       marks: [
@@ -194,7 +194,7 @@ export const WATERTOWN: LayoutDef = {
     // ---- 1912 – 2142: the memorial archway (牌坊) over the lane, the town's landmark.
     {
       len: 120, name: 'archway', left: laneL, right: laneR,
-      features: [{ kind: 'pickupRow', at: 60, len: 15, x0: -3, x1: 3, data: { kind: 'coin' } }],
+      features: [{ kind: 'pickupRow', at: 60, len: 15, x0: -2.25, x1: 2.25, data: { kind: 'coin' } }],
       marks: [
         { kind: 'archway', at: 66, x: 0 },
         { kind: 'house', at: 0, x: -1, data: { len: 120 } },
@@ -224,7 +224,7 @@ export const WATERTOWN: LayoutDef = {
       len: 100, name: 'bridge', left: bridgeL, right: bridgeR,
       features: [
         { kind: 'bridge', at: 12, len: 76, x0: -4.2, x1: 4.2 },
-        { kind: 'pickupRow', at: 58, len: 12, x0: 3, x1: 3, data: { kind: 'can' } },
+        { kind: 'pickupRow', at: 58, len: 12, x0: 2.25, x1: 2.25, data: { kind: 'can' } },
       ],
       marks: [
         { kind: 'boat', at: 30, x: -1, data: { len: 60 } },
@@ -242,7 +242,7 @@ export const WATERTOWN: LayoutDef = {
     },
     {
       len: 30, name: 'corners',
-      features: [{ kind: 'pickupRow', at: 10, len: 12, x0: -3.2, x1: -3.2, data: { kind: 'fish' } }],
+      features: [{ kind: 'pickupRow', at: 10, len: 12, x0: -2.4, x1: -2.4, data: { kind: 'fish' } }],
       marks: [{ kind: 'house', at: 0, x: 1, data: { len: 30 } }],
     },
     {
@@ -270,8 +270,8 @@ export const WATERTOWN: LayoutDef = {
     {
       len: 320, name: 'promenade', radius: -180, ease: 60, left: stallL, right: quayR,
       features: [
-        { kind: 'pickupRow', at: 90, len: 15, x0: 3.2, x1: -1.5, data: { kind: 'coin' } },
-        { kind: 'puddle', at: 150, len: 7, x0: 1, x1: 3.3 },
+        { kind: 'pickupRow', at: 90, len: 15, x0: 2.4, x1: -1.12, data: { kind: 'coin' } },
+        { kind: 'puddle', at: 150, len: 7, x0: 0.75, x1: 2.47 },
         { kind: 'boostPad', at: 200, len: 6, x0: 1.2, x1: 3.3, data: { power: 0.3, time: 1 } },
       ],
       marks: [
