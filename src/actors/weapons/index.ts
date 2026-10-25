@@ -8,10 +8,10 @@ import { CharacterBuilder } from '../kit/builder';
 import { hullFor } from '../kit/outline';
 import { aimQuat } from '../rig/ik';
 import { baguette, leek, pan, saltfish } from './models-a';
-import { keyboard, selfie, slipper, umbrella } from './models-b';
+import { baton, keyboard, selfie, slipper, umbrella } from './models-b';
 
 type Armed = Exclude<WeaponId, 'none'>;
-const BUILD: Record<Armed, (b: CharacterBuilder) => void> = { saltfish, baguette, pan, leek, umbrella, selfie, slipper, keyboard };
+const BUILD: Record<Armed, (b: CharacterBuilder) => void> = { saltfish, baguette, pan, leek, umbrella, selfie, slipper, keyboard, baton };
 const cache = new Map<Armed, BufferGeometry>();
 const Y = new Vector3(0, 1, 0), Z = new Vector3(0, 0, 1);
 const dir = new Vector3(), hit = new Vector3(), up = new Vector3(), tv = new Vector3(), inv = new Quaternion();

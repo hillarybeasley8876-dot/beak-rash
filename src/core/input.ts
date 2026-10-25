@@ -152,13 +152,14 @@ export class Input {
   /** Current player controls; edges stay latched until consumeEdges(). */
   peek(out: Controls): Controls {
     if (this.scripted) {
-      Object.assign(out, { steer: 0, throttle: 0, brake: 0, drift: false, lookBack: false }, this.scripted);
+      Object.assign(out, { steer: 0, throttle: 0, brake: 0, drift: false, lookBack: false, heavyHeld: false }, this.scripted);
     } else {
       out.steer = this.steer;
       out.throttle = this.throttle;
       out.brake = this.brake;
       out.drift = this.isDown('drift');
       out.lookBack = this.isDown('lookBack');
+      out.heavyHeld = this.isDown('heavy');
     }
     for (const a of EDGE_ACTIONS) out[a] = this.edges.has(a) || (this.scripted?.[a] ?? false);
     return out;

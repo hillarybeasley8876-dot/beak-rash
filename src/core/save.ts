@@ -2,7 +2,7 @@
 // (core/save-sanitize.ts): unknown bike ids, quality names and bad numbers never reach the game.
 import { BIKES } from '../data/bikes';
 import { sanitizeSave } from './save-sanitize';
-import type { BikeId, Quality } from './types';
+import type { BikeId, CharacterId, Quality } from './types';
 
 export interface Settings {
   master: number;
@@ -13,6 +13,7 @@ export interface Settings {
   shake: number;        // 0..1 camera shake strength
   autoPedal: boolean;
   slowmo: 'full' | 'short' | 'off';
+  duckRider: boolean;   // the rubber duck rides on the handlebar (unlocked by finding every duck, SPEC §21)
 }
 
 export interface SaveData {
@@ -22,8 +23,16 @@ export interface SaveData {
   bike: BikeId;
   career: { unlocked: number; best: Record<string, number> };
   settings: Settings;
-  stats: { races: number; wins: number; kos: number; wrecked: number; busted: number; distance: number };
+  stats: {
+    races: number; wins: number; kos: number; wrecked: number; busted: number; distance: number;
+    bestStyle: number; tricks: number; bribes: number;
+  };
   achievements: string[];
+  /** r4 (SPEC §18): grudge 0..100 per rival species, updated by the race unit at race end. */
+  rivalry: Partial<Record<CharacterId, number>>;
+  /** r4 (SPEC §21): ids of found easter eggs (gameplay/secrets) and unlocked extras ('llm' bike, …). */
+  secrets: string[];
+  unlocks: string[];
 }
 
 const KEY = 'beak-rash.save.v1';
@@ -34,9 +43,12 @@ export const defaultSave = (): SaveData => ({
   ownedBikes: ['roadbike'],
   bike: 'roadbike',
   career: { unlocked: 1, best: {} },
-  settings: { master: 0.9, music: 0.7, sfx: 0.9, voice: 0.9, quality: 'high', shake: 1, autoPedal: false, slowmo: 'full' },
-  stats: { races: 0, wins: 0, kos: 0, wrecked: 0, busted: 0, distance: 0 },
+  settings: { master: 0.9, music: 0.7, sfx: 0.9, voice: 0.9, quality: 'high', shake: 1, autoPedal: false, slowmo: 'full', duckRider: false },
+  stats: { races: 0, wins: 0, kos: 0, wrecked: 0, busted: 0, distance: 0, bestStyle: 0, tricks: 0, bribes: 0 },
   achievements: [],
+  rivalry: {},
+  secrets: [],
+  unlocks: [],
 });
 
 export class SaveStore {

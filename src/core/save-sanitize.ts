@@ -2,11 +2,13 @@
 // back to the defaults, so a stale bike id or quality name can never block a race or disable a unit.
 // Pure (type-only imports): tools/test-core-save.mjs runs it under plain Node.
 import type { SaveData, Settings } from './save';
-import type { BikeId, Quality } from './types';
+import type { BikeId, CharacterId, Quality } from './types';
 
 export const QUALITIES: readonly Quality[] = ['low', 'medium', 'high'];
 const SLOWMO: readonly Settings['slowmo'][] = ['full', 'short', 'off'];
 const MAX_COINS = 1e9;
+/** Species that can hold a grudge (SaveData.rivalry keys): every rival, not the player's pelican or the police. */
+const RIVALS: readonly CharacterId[] = ['goose', 'capybara', 'cat', 'shiba', 'pigeon', 'penguin', 'seagull', 'sloth'];
 
 type Loose = Record<string, unknown>;
 
@@ -74,6 +76,7 @@ function settingsOf(f: Fields, base: Settings): Settings {
     shake: unit('shake'),
     autoPedal: f.bool('autoPedal', base.autoPedal),
     slowmo: f.pick('slowmo', SLOWMO, base.slowmo),
+    duckRider: f.bool('duckRider', base.duckRider),
   };
 }
 
@@ -91,6 +94,15 @@ function statsOf(f: Fields, base: SaveData['stats']): SaveData['stats'] {
   const out = { ...base };
   for (const key of Object.keys(base) as Array<keyof SaveData['stats']>) {
     out[key] = f.num(key, base[key], 0, Number.MAX_SAFE_INTEGER);
+  }
+  return out;
+}
+
+function rivalryOf(f: Fields): SaveData['rivalry'] {
+  const out: SaveData['rivalry'] = {};
+  for (const [key, v] of Object.entries(f.raw)) {
+    if (isOneOf(key, RIVALS) && typeof v === 'number' && Number.isFinite(v)) out[key] = Math.min(100, Math.max(0, v));
+    else f.fixed.push(`${f.path}${key}`);
   }
   return out;
 }
@@ -114,5 +126,8 @@ export function sanitizeSave(raw: unknown, base: SaveData, bikes: readonly BikeI
     settings: settingsOf(Fields.of(f.raw.settings, 'settings.', fixed), base.settings),
     stats: statsOf(Fields.of(f.raw.stats, 'stats.', fixed), base.stats),
     achievements: f.strings('achievements'),
+    rivalry: rivalryOf(Fields.of(f.raw.rivalry, 'rivalry.', fixed)),
+    secrets: f.strings('secrets'),
+    unlocks: f.strings('unlocks'),
   };
 }

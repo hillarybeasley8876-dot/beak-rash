@@ -24,6 +24,7 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
   umbrella: { id: 'umbrella', name: '雨伞', blurb: '撑开还能挡一下。', damage: 11, heavyDamage: 17, reach: 2.4, swing: 0.36, knock: 3.8, uses: 7, weight: 3, block: 0.2 },
   selfie: { id: 'selfie', name: '自拍杆', blurb: '最远的距离，是你够不着我。', damage: 8, heavyDamage: 12, reach: 3.0, swing: 0.36, knock: 2.6, uses: 9, weight: 3, block: 0 },
   slipper: { id: 'slipper', name: '妈妈的拖鞋', blurb: '传说级武器。中者必倒。', damage: 22, heavyDamage: 34, reach: 2.0, swing: 0.42, knock: 5.5, uses: 3, weight: 1, block: 0 },
+  baton: { id: 'baton', name: '警棍', blurb: '柯基警官的执法工具。只拍坏鹈鹕。', damage: 10, heavyDamage: 14, reach: 1.8, swing: 0.45, knock: 4.2, uses: Infinity, weight: 0, block: 0 },
   keyboard: { id: 'keyboard', name: '机械键盘', blurb: '键盘侠的本命武器，青轴。', damage: 13, heavyDamage: 20, reach: 2.3, swing: 0.36, knock: 4.0, uses: 5, weight: 2, block: 0 },
 };
 

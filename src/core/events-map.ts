@@ -1,5 +1,5 @@
 // Every cross-unit event. Emitters own the payload shape; listeners must tolerate extra fields.
-import type { CharacterId, CrashCause, RiderId, Side, TrackId, Vec3Like, WeaponId } from './types';
+import type { CharacterId, CrashCause, RiderId, Side, TrackId, TrickKind, Vec3Like, WeaponId } from './types';
 import type { RaceConfig, RaceResult, ScreenId } from './contracts';
 
 export interface GameEvents {
@@ -20,6 +20,11 @@ export interface GameEvents {
   'race:end': { results: RaceResult[] };          // all results final; game.ts shows results screen
   'race:finalStretch': { riderId: RiderId };       // player passes 85 % progress
   'race:introFocus': { riderId: RiderId | null };  // intro flyover's current subject (null = scenery shot)
+  // ---- r4 rivals & track events (SPEC §18–§19) ----
+  'race:nemesis': { riderId: RiderId; character: CharacterId; grudge: number };
+  'race:nemesisDown': { riderId: RiderId; attacker: RiderId; bonus: number };
+  'race:alliance': { phase: 'form' | 'break'; members: RiderId[]; target: RiderId; reason: 'leader' | 'rampage' | 'betrayal' | 'timeout' | 'ko' };
+  'race:event': { kind: 'fishSpill' | 'geese' | 'roadworks' | 'stalls'; phase: 'warn' | 'start' | 'end'; s: number; pos: Vec3Like };
 
   // ---- riding (sim/) ----
   'rider:bump': { a: RiderId; b: RiderId; strength: number; pos: Vec3Like };
@@ -32,6 +37,9 @@ export interface GameEvents {
   'rider:nearMiss': { riderId: RiderId; kind: 'traffic' | 'rider' };
   'rider:offroad': { riderId: RiderId; surface: string };
   'rider:obstacleHit': { riderId: RiderId; obstacleId: number; kind: string; speed: number; pos: Vec3Like };
+  /** Air tricks (sim, SPEC §16): 'start' per trick, 'land' once per clean landing (count = tricks in that air,
+   *  points = base STYLE points), 'fail' when a trick or superman is unfinished at touchdown (the rider crashes). */
+  'rider:trick': { riderId: RiderId; phase: 'start' | 'land' | 'fail'; kind: TrickKind; count: number; points: number };
 
   // ---- combat (gameplay/combat) ----
   'combat:swing': { riderId: RiderId; side: Side; heavy: boolean; weapon: WeaponId };
@@ -54,6 +62,21 @@ export interface GameEvents {
   'ult:start': { riderId: RiderId; skillId: string };      // UI cut-in + KO-style cinematic
   'ult:impact': { riderId: RiderId; skillId: string; pos: Vec3Like; victims: RiderId[] };
   'pickup:take': { riderId: RiderId; kind: string; pos: Vec3Like };
+  // ---- r4 combat (SPEC §15) ----
+  'combat:throw': { riderId: RiderId; weapon: WeaponId; dir: 1 | -1; pos: Vec3Like; projectileId: number };
+  'combat:parry': { riderId: RiderId; attacker: RiderId | null; obstacleId: number | null; weapon: WeaponId; pos: Vec3Like };
+  /** A swing or a thrown weapon reached an obstacle (traffic, a police corgi, event props, secret props). */
+  'combat:obstacleHit': { obstacleId: number; attacker: RiderId; weapon: WeaponId; damage: number; thrown: boolean; pos: Vec3Like };
+  /** Request: combat puts a pickup on the road (track events, secrets). */
+  'pickup:spawn': { kind: 'coin' | 'fish' | 'can' | 'crate' | 'weapon'; s: number; x: number; weapon?: WeaponId };
+  /** Request: a non-rider attacker (police baton, event hazard) strikes `victim`; `side` = the attacker's side of the
+   *  victim. combat resolves it like a melee hit (block, pan parry, shield, intangible, invuln, damage, knock, KO with
+   *  `cause`, attacker null) and always answers with 'npc:hit'. */
+  'npc:strike': { victim: RiderId; obstacleId: number; damage: number; knock: number; side: Side; heavy: boolean; weapon: WeaponId; pos: Vec3Like; cause: CrashCause };
+  'npc:hit': { victim: RiderId; obstacleId: number; damage: number; blocked: boolean; parried: boolean; side: Side; weapon: WeaponId; pos: Vec3Like };
+  // ---- r4 STYLE chains (gameplay/style, SPEC §17) ----
+  'style:chain': { riderId: RiderId; action: string; label: string; points: number; total: number; mult: number; count: number };
+  'style:bank': { riderId: RiderId; total: number; count: number; sp: number; coins: number; broken: boolean };
   'taunt': { riderId: RiderId; text: string; character: CharacterId };
 
   // ---- police / traffic (gameplay/race) ----
@@ -62,6 +85,14 @@ export interface GameEvents {
   'police:whistle': { riderId: RiderId; pos: Vec3Like };               // the corgi whistles at riderId
   'police:knock': { riderId: RiderId; weapon: WeaponId; pos: Vec3Like }; // riderId's swing knocked the corgi back
   'police:horn': { riderId: RiderId; pos: Vec3Like };                  // the corgi toots as it lets riderId go
+  // ---- r4 police 2.0 (SPEC §14); obstacleId 900 = first corgi, 901 = backup ----
+  'police:wanted': { riderId: RiderId; level: number; prev: number };  // wanted stars 0..3
+  'police:windup': { riderId: RiderId; obstacleId: number; side: Side; pos: Vec3Like; time: number }; // time = s until the strike
+  'police:swing': { riderId: RiderId; obstacleId: number; side: Side; pos: Vec3Like; hit: boolean };
+  'police:roadblock': { riderId: RiderId; s: number; gapX: number; gapWidth: number; pos: Vec3Like };
+  'police:hurt': { obstacleId: number; attacker: RiderId; damage: number; hp: number; pos: Vec3Like };
+  'police:down': { obstacleId: number; attacker: RiderId; pos: Vec3Like };
+  'police:bribe': { riderId: RiderId; obstacleId: number; amount: number; accepted: boolean };
   /** A line from a speaker that is not a session rider but rides an Obstacle (the police corgi): listeners follow
    *  `session.obstacles` by id for the anchor and drop the line once that obstacle is gone. */
   'npc:say': { obstacleId: number; character: CharacterId; text: string };
@@ -69,6 +100,8 @@ export interface GameEvents {
 
   // ---- meta (gameplay/achievements) ----
   'achievement:unlock': { id: string };
+  /** An easter egg found (gameplay/secrets, SPEC §21); first = never found before on this profile. */
+  'secret:found': { id: string; riderId: RiderId | null; pos: Vec3Like | null; first: boolean };
 
   // ---- cinematics (fx/ko director) ----
   'cine:ko': { phase: 'start' | 'peak' | 'end'; attacker: RiderId | null; victim: RiderId; chain: number };

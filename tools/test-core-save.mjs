@@ -8,9 +8,12 @@ const BIKES = ['roadbike', 'erba', 'shared', 'fixie', 'mtb', 'tandem', 'kidbike'
 const base = () => ({
   version: 1, coins: 300, ownedBikes: ['roadbike'], bike: 'roadbike',
   career: { unlocked: 1, best: {} },
-  settings: { master: 0.9, music: 0.7, sfx: 0.9, voice: 0.9, quality: 'high', shake: 1, autoPedal: false, slowmo: 'full' },
-  stats: { races: 0, wins: 0, kos: 0, wrecked: 0, busted: 0, distance: 0 },
+  settings: { master: 0.9, music: 0.7, sfx: 0.9, voice: 0.9, quality: 'high', shake: 1, autoPedal: false, slowmo: 'full', duckRider: false },
+  stats: { races: 0, wins: 0, kos: 0, wrecked: 0, busted: 0, distance: 0, bestStyle: 0, tricks: 0, bribes: 0 },
   achievements: [],
+  rivalry: {},
+  secrets: [],
+  unlocks: [],
 });
 const clean = (raw) => { const fixed = []; return { data: sanitizeSave(raw, base(), BIKES, fixed), fixed }; };
 
@@ -56,6 +59,16 @@ r = clean({ coins: 80, settings: { quality: 'low' } });
 assert.equal(r.data.settings.quality, 'low');
 assert.equal(r.data.settings.master, 0.9);
 assert.deepEqual(r.fixed, [], 'missing fields are defaults, not repairs');
+
+// r4 fields: rivalry keys must be rival species with finite grudges (clamped 0..100); secrets / unlocks unique strings.
+r = clean({ rivalry: { goose: 140, cat: -3, pelican: 50, corgi: 10, shiba: 'lots', pigeon: 42 }, secrets: ['duck_coast', 'duck_coast', 7], unlocks: 'llm' });
+assert.deepEqual(r.data.rivalry, { goose: 100, cat: 0, pigeon: 42 }, 'rivalry keeps rival species, clamps the grudge');
+assert.deepEqual(r.data.secrets, ['duck_coast'], 'secrets: unique strings');
+assert.deepEqual(r.data.unlocks, [], 'unlocks: a non-array falls back to none');
+assert.ok(r.fixed.includes('rivalry.pelican') && r.fixed.includes('rivalry.shiba') && r.fixed.includes('unlocks'), 'r4 repairs are reported');
+r = clean({ coins: 5, stats: { races: 2 } });
+assert.deepEqual([r.data.rivalry, r.data.secrets, r.data.unlocks, r.data.settings.duckRider, r.data.stats.bestStyle], [{}, [], [], false, 0], 'a pre-r4 save gets r4 defaults');
+assert.deepEqual(r.fixed, [], 'pre-r4 saves are not reported as repaired');
 
 assert.ok(isQuality('medium') && !isQuality('ultra') && !isQuality(undefined), 'isQuality');
 console.log('test-core-save OK');

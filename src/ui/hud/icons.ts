@@ -28,6 +28,9 @@ const ICONS: Record<WeaponId, string> = {
   slipper:
     `<path d="M10 40 C2 36 4 20 12 12 C18 6 28 6 34 12 L44 30 C46 36 42 42 36 42 Z" fill="#FF7FB0"/>` +
     `<path d="M12 22 C18 16 28 16 34 22" fill="none" stroke-width="6"/><path d="M12 22 C18 16 28 16 34 22" fill="none" stroke="#2EC4B6" stroke-width="3"/>`,
+  baton:
+    `<path d="M10 40 L38 12" stroke-width="7"/><path d="M10 40 L38 12" stroke="#18181D" stroke-width="4"/>` +
+    `<path d="M32 18 L36 14" stroke="#F2F4F7" stroke-width="4"/>`,
   keyboard:
     `<rect x="3" y="14" width="42" height="22" rx="3" fill="#2B2B33"/>` +
     `<path d="M8 20 h4 M15 20 h4 M22 20 h4 M29 20 h4 M36 20 h4 M10 26 h4 M17 26 h4 M24 26 h4 M31 26 h4 M14 31 h20" stroke="#5BE37D" stroke-width="3"/>`,

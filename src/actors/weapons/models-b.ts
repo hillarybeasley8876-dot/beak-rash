@@ -1,4 +1,4 @@
-// Weapon models, part 2: umbrella, selfie stick, mom's slipper, mechanical keyboard (grip space as
+// Weapon models, part 2: umbrella, selfie stick, mom's slipper, mechanical keyboard, police baton (grip space as
 // in models-a: grip at the origin, length along +Y).
 import { BoxGeometry, CapsuleGeometry, ConeGeometry, CylinderGeometry, LatheGeometry, Shape, TorusGeometry, Vector2 } from 'three';
 import type { CharacterBuilder } from '../kit/builder';
@@ -53,4 +53,12 @@ export function keyboard(b: CharacterBuilder): void {
   }
   key.dispose();
   put(b, new BoxGeometry(0.026, 0.2, 0.014), [0.051, 0.22, 0.022], [0, 0, 0], 1, 0xe9e9ef, 0.25);
+}
+
+/** The corgi officer's baton (police only): black rubber stick, ridged grip, a white reflective band near the tip. */
+export function baton(b: CharacterBuilder): void {
+  put(b, new CylinderGeometry(0.019, 0.017, 0.62, 10), [0, 0.31, 0], [0, 0, 0], 1, 0x18181d, 0.8);
+  for (let i = 0; i < 4; i++) put(b, new TorusGeometry(0.02, 0.004, 4, 10), [0, 0.03 + i * 0.035, 0], [Math.PI / 2, 0, 0], 1, 0x3a3a44, 0);
+  put(b, new CylinderGeometry(0.0195, 0.0195, 0.05, 10), [0, 0.5, 0], [0, 0, 0], 1, 0xf2f4f7, 0);
+  put(b, new CylinderGeometry(0.024, 0.024, 0.02, 10), [0, -0.01, 0], [0, 0, 0], 1, 0x2a2a31, 0.6);
 }

@@ -96,5 +96,9 @@ export function weaponGeometry(id: Exclude<WeaponId, 'none'>): BufferGeometry {
     case 'selfie': return selfie();
     case 'slipper': return slipper();
     case 'keyboard': return keyboard();
+    case 'baton': return new PartBuilder()
+      .add(new CylinderGeometry(0.035, 0.032, 0.72, 10), '#18181d', [0, 0, 0], [HALF_PI, 0, 0])
+      .add(new CylinderGeometry(0.036, 0.036, 0.07, 10), '#f2f4f7', [0, 0, -0.22], [HALF_PI, 0, 0])
+      .build();
   }
 }

@@ -14,7 +14,7 @@ const CHAIN_CN = ['击倒！', '击倒！', '双杀！', '三杀！', '四杀！
 const PLACE_CN = ['', '第一名！', '第二名！', '第三名！', '第四名', '第五名', '第六名', '第七名', '第八名'];
 const CRASH_CN: Record<CrashCause, string> = {
   ko: '被打下车了……', traffic: '撞车了……', wall: '亲吻护栏……', water: '下海喂鱼了……',
-  obstacle: '人仰车翻……', skill: '中招翻车……', police: '被柯基警官拦下……',
+  obstacle: '人仰车翻……', skill: '中招翻车……', police: '被柯基警官拦下……', trick: '特技失败……',
 };
 
 let seed = 1;

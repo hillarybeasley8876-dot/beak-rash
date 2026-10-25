@@ -7,10 +7,7 @@ import type { Input } from './input';
 import type { Rng } from './rng';
 import type { SaveStore } from './save';
 import type { Modules } from './modules';
-import type {
-  BikeId, CharacterId, Controls, CrashCause, EnvLook, Obstacle, Quality, RiderId, RiderState,
-  Side, Surface, TrackFeature, TrackFrame, TrackId, Vec3Like, WeaponId,
-} from './types';
+import type { BikeId, CharacterId, Controls, CrashCause, EnvLook, Obstacle, Quality, RiderId, RiderState, Side, Surface, TrackFeature, TrackFrame, TrackId, Vec3Like, WeaponId, Weather } from './types';
 
 // ---------------------------------------------------------------- app
 export interface AppContext {
@@ -50,6 +47,18 @@ export interface RaceConfig {
   traffic: boolean;
   police: boolean;
   autopilot: boolean;          // player bike driven by AI (soak tests / attract mode)
+  // ---- r4 (SPEC §18, §20); absent = clear weather, authored direction and layout, no nemesis ----
+  weather?: Weather;
+  reverse?: boolean;
+  route?: number;              // 0 / absent = the authored layout, else the seed of a generated route
+  nemesis?: CharacterId | null; // the rival holding the biggest grudge (core fills it from SaveData.rivalry)
+}
+
+/** How a track is built (SPEC §20). */
+export interface TrackOptions {
+  weather?: Weather;
+  reverse?: boolean;
+  route?: number;
 }
 
 export interface RaceResult {
@@ -62,6 +71,7 @@ export interface RaceResult {
   kos: number;
   wrecked: number;
   coins: number;
+  styleBest?: number;          // best banked STYLE chain this race (player only, gameplay/style)
 }
 
 export interface Session {
@@ -92,6 +102,12 @@ export interface Track {
   readonly look: EnvLook;
   readonly group: Group;       // road, terrain, scenery, sky — added to the session world
   readonly features: TrackFeature[];
+  /** r4 (SPEC §20): how this track was built; absent on builds that predate the option = clear / authored. */
+  readonly weather?: Weather;
+  readonly reverse?: boolean;
+  readonly route?: number;
+  /** Weather road-grip multiplier (rain 0.85, snow 0.75, else 1); sim multiplies the lateral grip with it. */
+  readonly grip?: number;
   /** Interpolated frame at s (clamped to [0, length + runoff]). `out` is reused when given. */
   frameAt(s: number, out?: TrackFrame): TrackFrame;
   /** World position of track-space point (s, x, y). */

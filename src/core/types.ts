@@ -9,11 +9,16 @@ export type CharacterId =
 export type BikeId = 'roadbike' | 'erba' | 'shared' | 'fixie' | 'mtb' | 'tandem' | 'kidbike';
 export type TrackId = 'coast' | 'city' | 'mountain';
 export type WeaponId =
-  | 'none' | 'saltfish' | 'baguette' | 'pan' | 'leek' | 'umbrella' | 'selfie' | 'slipper' | 'keyboard';
+  | 'none' | 'saltfish' | 'baguette' | 'pan' | 'leek' | 'umbrella' | 'selfie' | 'slipper' | 'keyboard'
+  | 'baton'; // police only (SPEC §14): never in crates or rival loadouts
 export type Surface = 'road' | 'curb' | 'grass' | 'sand' | 'dirt' | 'water' | 'wall';
 export type Side = -1 | 1; // -1 = left, +1 = right (rider's own left/right)
 export type RiderId = number;
 export type Quality = 'low' | 'medium' | 'high';
+/** Race weather (SPEC §20): looks, road grip, particles and ambience follow it. */
+export type Weather = 'clear' | 'rain' | 'snow' | 'fog' | 'dusk';
+/** Air tricks (SPEC §16). */
+export type TrickKind = 'spin' | 'backflip' | 'frontflip' | 'superman';
 
 export interface Vec3Like { x: number; y: number; z: number }
 
@@ -34,12 +39,14 @@ export interface Controls {
   skill3: boolean;
   ult: boolean;
   bell: boolean;
+  /** Held state of the heavy key/button (a heavy press still held when its windup ends = throw aim, SPEC §15). */
+  heavyHeld: boolean;
 }
 
 export const emptyControls = (): Controls => ({
   steer: 0, throttle: 0, brake: 0, drift: false, lookBack: false,
   hop: false, attackL: false, attackR: false, heavy: false,
-  skill1: false, skill2: false, skill3: false, ult: false, bell: false,
+  skill1: false, skill2: false, skill3: false, ult: false, bell: false, heavyHeld: false,
 });
 
 export type StatusId =
@@ -72,7 +79,7 @@ export const defaultMods = (): RiderMods => ({
 });
 
 export type RiderMode = 'grid' | 'racing' | 'crashed' | 'respawning' | 'finished' | 'busted';
-export type CrashCause = 'ko' | 'traffic' | 'wall' | 'water' | 'obstacle' | 'skill' | 'police';
+export type CrashCause = 'ko' | 'traffic' | 'wall' | 'water' | 'obstacle' | 'skill' | 'police' | 'trick';
 
 export interface CrashInfo {
   cause: CrashCause;
@@ -86,7 +93,7 @@ export interface CrashInfo {
 
 /** Current animated action, for views and hit timing. */
 export interface RiderAction {
-  kind: 'attack' | 'heavy' | 'skill' | 'ult' | 'bell' | 'hit';
+  kind: 'attack' | 'heavy' | 'skill' | 'ult' | 'bell' | 'hit' | 'throw'; // 'throw' = aiming (cocked) until release
   side: Side;
   t: number;           // seconds since start
   dur: number;         // total duration
@@ -118,6 +125,8 @@ export interface RiderState {
   boostPower: number;  // extra top-speed fraction while boosting (0.25 = +25%)
   surface: Surface;
   draft: number;       // 0..1 slipstream amount
+  trick: TrickState | null; // air trick in progress (SPEC §16); views rotate the rider + bike by it
+  trickChain: number;  // tricks completed in the current air (0 on the ground)
   // --- race (owned by gameplay/race) ---
   mode: RiderMode;
   modeTime: number;    // seconds in current mode
@@ -148,6 +157,14 @@ export interface RiderState {
   crash: CrashInfo | null;
 }
 
+/** An air trick in progress (sim-owned). progress = t / dur; superman has dur = Infinity while held. */
+export interface TrickState {
+  kind: TrickKind;
+  t: number;           // seconds since the trick started
+  dur: number;         // seconds for the full rotation
+  dir: Side;           // spin direction (+1 = clockwise seen from above); flips use −1 back / +1 front
+}
+
 export interface TrackFrame {
   s: number;
   pos: Vec3Like;       // centre-line road surface point (world)
@@ -162,7 +179,7 @@ export interface TrackFrame {
 
 export type FeatureKind =
   | 'ramp' | 'tunnel' | 'bridge' | 'oil' | 'puddle' | 'cones' | 'barrier'
-  | 'boostPad' | 'pickupRow' | 'checkpoint' | 'jumpCrest';
+  | 'boostPad' | 'pickupRow' | 'checkpoint' | 'jumpCrest' | 'secret'; // secret: data.id (gameplay/secrets, SPEC §21)
 
 export interface TrackFeature {
   kind: FeatureKind;
@@ -184,7 +201,8 @@ export interface EnvLook {
 }
 
 export type ObstacleKind =
-  | 'car' | 'van' | 'truck' | 'bus' | 'police' | 'cone' | 'crate' | 'barrel' | 'oil' | 'puddle' | 'ramp';
+  | 'car' | 'van' | 'truck' | 'bus' | 'police' | 'cone' | 'crate' | 'barrel' | 'oil' | 'puddle' | 'ramp'
+  | 'barrier' | 'goose' | 'stall' | 'prop'; // r4: roadblocks/roadworks, crossing geese, market stalls, hittable props
 
 /** Anything on the road physics must collide with (traffic, props). Track space, like riders. */
 export interface Obstacle {
