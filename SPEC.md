@@ -2,7 +2,9 @@
 
 > **DESIGN DECISION (integrator, 10-19): the player always rides the pelican 阿鹕. There is no character select; the other seven species are rivals.** SPEC §10 lists no character-select screen, and the menu/HUD/results are built around the pelican. Critics: don't report the missing character select as a defect. Fixers: skip such issues.
 >
-> **IMAGE BUDGET (applies to everyone).** Six critics died today with "Request timed out" after they had Read 30–45 full-size screenshots, because the request grows with every image. Before you Read a screenshot, convert it (`sips -Z 1280 -s format jpeg -s formatOptions 70 in.png --out in.jpg`) or combine several into one contact sheet. Read at most ~15 images in total for your whole task.
+> **IMAGE BUDGET (applies to everyone).** Six critics died today with "Request timed out" after they had Read 30–45 full-size screenshots, because the request grows with every image. Before you Read a screenshot, convert it (`python tools/thumb.py in.png` → in.jpg, 1280 px; several files → `-o sheet.jpg` contact sheet; on macOS `sips -Z 1280` also works). Read at most ~15 images in total for your whole task.
+>
+> **WINDOWS (since 2026-10-25).** The working copy is `H:/dev/beak-rash` on Windows 11 (Git Bash). `python` not `python3`; no `sips`/`open`; Chromium renders through ANGLE D3D11 on an RTX 3090 (tools/lib.mjs picks the backend per OS); never write to the C: drive (scratch → `shots/` or `F:/dev/beak-rash-out/`).
 
 A 3D arcade combat racer in the spirit of Road Rash (暴力摩托): a pelican on a bicycle races seven
 other animals down open roads, fighting with wings, salted fish and signature skills. Knocking a
@@ -24,7 +26,7 @@ The title riffs on the LLM benchmark "Generate an SVG of a pelican riding a bicy
    nothing mean-spirited or crude.
 
 ## 1. Run, tools, testing
-- Stack: Vite 8 + TypeScript (strict, no `any`) + three 0.186. Project root `~/m/beak-rash`.
+- Stack: Vite 8 + TypeScript (strict, no `any`) + three 0.186. Project root `H:/dev/beak-rash` (was `~/m/beak-rash` on the Mac).
 - Dev server (shared, port 5300, **HMR off**: pages see changes on reload): `tools/devserver.sh` (idempotent).
   Never start your own Vite on another port; never kill the shared server unless it is wedged.
 - Typecheck: `npx tsc --noEmit -p tsconfig.json` — fix errors in YOUR files; ignore other units' errors.
@@ -167,8 +169,10 @@ jagged clip-path polygons, star bursts, halftone dot fields, torn edges, thick o
   scaled by power stat; 10 % crit ×1.6; hitting a rival mid-windup = counter crit.
 - Reaction: victim lateral impulse = knock (heavy ×1.5), speed −5…10 %, 'hit' action cancels their swing,
   'wobble' 0.4 s. Hit-stop .045 / .08 heavy / .1 crit (`clock.hitStop`). Combo ≥3 within 1.5 s gaps →
-  "ONE MORE!" (+10 SP, next hit crits).
-- SP gain: hit +6, hurt +3, KO +20, drafting +1/s, near miss +4, perfect landing +8, drift L3 +5, bell +5.
+  "ONE MORE!" (+2 SP, next hit crits).
+- SP gain (r3): swing hit +2.5 (once per 4 s per rival, +0.5 for the swings in between), skill hit +1, hurt +1.5, KO +10,
+  ONE MORE +2, drafting +1/s, near miss +4, perfect landing +8, drift L3 +5, bell +3, energy can +20. SHOWTIME's own
+  hits/KOs pay nothing, and the caster's fighting pays no SP for 12 s after a cast (target: 1–2 SHOWTIMEs per race).
 - Weapons: rivals start armed by level; heavy hits knock weapons loose (30 % light / 60 % heavy):
   unarmed attacker steals it, else it drops as a road pickup. Weapons break after `uses`.
 - Pickups (track 'pickupRow' features + drops): 小鱼干 coins, fish (+25 HP), weapon crate, 能量鱼罐头 (+25 SP).
@@ -182,7 +186,7 @@ jagged clip-path polygons, star bursts, halftone dot fields, torn edges, thick o
   get bitten (12 dmg + weapon stolen).
   pelican.wing — wings out 2.2 s: +40 % top speed, ramming knocks riders aside (8 dmg) without slowing you.
   pelican.ult SHOWTIME (SP 100) — cut-in, leap to 8 m in slow-mo, dive-bomb; shockwave hits riders 40 m
-  ahead / 12 m behind: 45 dmg + knock + 1 s stun (usually a chain KO).
+  ahead / 20 m behind: 45 dmg + knock + 1 s stun (usually a chain KO); the leap only homes forward, never costing places.
   goose.honk (cone 14 m ±30°: stun .8 s, −15 % speed) · capybara.chill (aura 10 m, 4 s: others ×0.85 speed,
   can't attack) · cat.spin (.8 s spin, 2.6 m radius, 10 dmg + knock) · shiba.doge (3 s shield reflects melee,
   +15 % speed) · pigeon.ghost (1.5 s invisible+intangible, reappear 25 m ahead) · penguin.slide (2.5 s
@@ -284,3 +288,185 @@ background (flood fill from edges → alpha, keep outlines). Outputs: per charac
 pose), `<id>_smug`, `<id>_hurt`, `<id>_eyes` (wide eyes close-up strip); title key art; menu/loading
 backgrounds; 6–10 billboard posters per track (text-free; track unit overlays Chinese text). Write
 `src/data/assets.ts` (manifest of files that exist). Keep originals' prompts in `public/assets/PROMPTS.md`.
+
+---
+
+# r4 — DEEPER GAME (2026-10-25, owner's requests)
+The owner asked for: police that fight, more easter eggs, more complex mechanics (air tricks + STYLE
+chains, throwable weapons + weapon traits, persistent rivals + alliances, random track events) and more
+varied maps (2 new tracks, weather/time variants, reverse direction, seeded routes). §14–§21 are the design;
+§22 lists every contract the integrator added in core. Numbers live in each unit's tuning table; the values
+below are the starting point. Everything stays kind and cartoonish (pillar 5): nobody bleeds, cops are corgis.
+
+## 14. Police 2.0 — wanted stars (race unit, `gameplay/race/police*`)
+- Wanted level W 0..3 on the player (race-owned, emitted as `police:wanted`). Hysteresis on heat:
+  W1 heat ≥ 0.50 (spawn, today's behaviour) · W2 heat ≥ 0.75, or the player knocked the corgi twice this chase,
+  or KO'd a rival within 30 m of it · W3 heat ≥ 0.95, or a corgi went down (§14 fight back), or a bribe was refused
+  twice. Escape ('lost'), let-go and bust reset W to 0 (heat as today). Extra heat: a thrown weapon hits a corgi
+  +0.10, a rival KO within 30 m of a corgi +0.15, hitting traffic within 40 m of a corgi +0.05.
+- W1: whistle + ticket exactly as today.
+- W2 baton (警棍, WeaponId `baton`, police only): when |ds| ≤ 1.5 m and the lateral gap is 0.5–1.8 m and the corgi is
+  not tired/knocked, it winds up for 0.45 s (W3 0.35 s): emit `police:windup` (HUD red "!" over the corgi + baton
+  icon, audio rising whistle). At the end, if the player is still within |ds| ≤ 1.6 m, lateral ≤ 1.9 m, not airborne
+  (y < 0.5 m), not intangible/invuln/crashed → emit `npc:strike` (damage W2 10 / W3 14, knock 4.2 m/s, heavy at W3).
+  Always emit `police:swing {hit}` at the strike moment (pose/whoosh). Cooldown 2.2 s (W3 1.6 s); two corgis never wind
+  up within 0.6 s of each other. Dodge = brake/swerve out of reach or hop over it; block/parry = combat rules (§15).
+- combat resolves `npc:strike` like a melee hit from nobody: block chance of the held weapon, pan PARRY, shield,
+  intangible, invuln; damage, knock (physics.applyImpulse), 0.4 s wobble, hit-stop .06, view cue 'hit'; emits `npc:hit`.
+  A police strike that empties HP crashes the player with cause 'police' (attacker null) → race busts the player at
+  once when it respawns (fine 100, 4 s ticket stop, BUSTED splash).
+- W3 backup + roadblock: a second corgi (obstacle id 901) sprints in from behind ~4 s later (same chase AI, both can
+  strike, both can be bribed/knocked). Once per W3 chase a roadblock appears 220–300 m ahead of the player (never in a
+  tunnel, on a bridge or within 150 m of the finish): red/white sawhorse barriers (ObstacleKind `barrier`, solid)
+  across the whole drivable width except one 3.2 m gap at a seeded lane, cones in front, a "柯基执勤 POLICE" sign.
+  Hitting a barrier faster than 8 m/s = crash cause 'police' → bust; slower = bounce like a wall. Removed 20 s after the
+  player passes it or when the chase ends. Threading the gap = STYLE action `roadblock` (§17). Emit `police:roadblock`.
+- Fight back: each corgi has 60 HP. Player swings that reach it (today's knock check) deal the weapon damage (heavy
+  ×1.5); thrown weapons (`combat:obstacleHit` on id 900/901) deal their thrown damage. Every hit knocks it back and
+  emits `police:hurt {hp}` (HUD damage number). At 0 HP the corgi goes down: race poses a tumble (corgi state mode
+  'crashed' + crash info → the actors view tumbles), emits `police:down`, sets W3; if no backup is out, one arrives in
+  6 s. The downed corgi sits up, shakes its head ("柯基下班了！") and leaves after 3 s. Achievement `police_down`.
+- Bribe 「V我50」: the player rings the bell (`combat:bell`) with a corgi within 6 m and ≥ 50 race coins
+  (rider.coins) at W1–W2 → `police:bribe {accepted:true}`, coins −50, the corgi says "……下不为例。" and lets go (no
+  'lost' credit), heat → 0.15, no new chase for 30 s. Refused at W3, with < 50 coins or after 2 bribes this race
+  (line "事不过三！" / "小鱼干不够还想贿赂？") → `police:bribe {accepted:false}`, heat +0.1. Achievement `bribe`.
+- Tunnels: while the player is inside a 'tunnel' feature and every corgi is > 15 m behind, heat decays 2× faster.
+- Corgi lines (npc:say, content): wind-up "站住！", strike "警棍警告！", backup "呼叫增援！", roadblock "前方设卡，看你往哪跑！",
+  down "柯基下班了！", bribe yes/no as above. The corgi holds the baton (actors weapon mesh `baton`); its swing is the
+  actors attack pose driven by the corgi's RiderState.action like any rider.
+
+## 15. Weapons 2.0 — throwing, traits, parry (combat unit; poses = actors; trails = fx)
+- Throw: `Controls.heavyHeld` mirrors the heavy key/button. Pressing heavy starts the heavy swing (windup .16 s) as
+  today. If heavyHeld is still true when that windup ends and the rider holds a weapon (not 'none'), the swing becomes
+  a throw aim (RiderAction kind 'throw', the weapon cocked back) for as long as it is held (max 1.5 s, then auto
+  release); releasing throws. A tap (released before the windup ends) stays a normal heavy swing — no added latency.
+  lookBack held at release = throw backwards. AI throws by holding heavyHeld for 0.3–0.6 s.
+- Projectile (`projectile:spawn` kind `weapon:<id>`): forward = rider speed + 16 m/s (backward = rider speed − 14 m/s),
+  launch vy 3 m/s, gravity 12 m/s², lifetime ≤ 1.6 s or until it touches the road; soft homing to the nearest valid
+  target in a ±18° cone within 35 m (backward 25 m), turn rate 1.2 rad/s. Hits a rider within 1.0 m: damage =
+  heavyDamage × 1.2 (10 % crit ×1.6), knock, 0.4 s wobble, SP +6 for the thrower, counts as the thrower's hit (KO
+  credit). Hits an obstacle (traffic, corgi, event props) → `combat:obstacleHit`. The weapon leaves the hand (weapon
+  'none'); where the projectile ends it drops as a road pickup with uses − 1 (breaks at 0). Emit `combat:throw`.
+- Traits (data/weapons.ts `trait`; combat implements; sim implements the glide):
+  saltfish 咸鱼 — 回旋镖: a thrown saltfish that hits nothing curves back to its thrower within 1.6 s (caught if it
+  passes within 2 m, else drops). baguette 法棍 — 硬核: heavy hits knock the victim's weapon loose 100 % (not 60 %).
+  pan 平底锅 — 完美格挡: any swing pressed ≤ 0.15 s before an incoming melee/baton hit lands = PARRY: no damage, the
+  attacker is stunned 0.6 s and loses its swing, "当！" (`combat:parry`); passive block 0.35 stays. leek 大葱 — 甩葱三连:
+  every 3rd consecutive hit within 1.2 s deals ×1.5 and +50 % knock. umbrella 雨伞 — 滑翔: airborne + drift held =
+  glide (gravity ×0.45, air steering 60 %) until landing; no tricks while gliding; block 0.2 stays. selfie 自拍杆 — 闪光灯:
+  hits blind the victim 0.6 s. slipper 妈妈的拖鞋 — 必中: thrown slippers home hard (6 rad/s, ±60°, 45 m). keyboard
+  机械键盘 — 青轴: 25 % crit chance, keycap debris. none/wings: no trait, can't be thrown. baton: police only.
+- HUD: the weapon slot shows the trait name (e.g. "回旋镖"); the first weapon pickup of a profile shows "按住 K 投掷" /
+  pad "按住 Y 投掷".
+
+## 16. Air tricks (sim unit; poses = actors; trails/landing burst = fx)
+- A trick starts on a FRESH drift press while airborne (not a drift held from the ground), ≥ 0.25 s after take-off,
+  not stunned and not gliding: drift + steer |s| > 0.6 → `spin` (360° yaw, dir = sign, 0.55 s); drift + up/throttle
+  → `backflip` (−360° pitch, 0.65 s); drift + down/brake → `frontflip` (+360° pitch, 0.65 s); drift alone held 0.2 s →
+  `superman` (rider stretches off the bars; held while drift is held; counts after 0.3 s; must be released ≥ 0.15 s
+  before landing). After a trick finishes another may start (RiderState.trickChain + 1).
+- Visual only: the trick rotates the rider + bike view around its centre (actors reads RiderState.trick); physics yaw
+  and the landing alignment are unaffected. Landing with a trick < 85 % done, or still in superman, = crash cause
+  'trick'; ≥ 85 % snaps to done. Landing with ≥ 1 trick done: `rider:trick {phase:'land'}` → boost +20 % for
+  0.6 s × (1 + 0.2 · (count − 1)), SP +8 per trick (combat), STYLE points (§17). Fails emit `rider:trick {phase:'fail'}`.
+- AI show-offs (cat, shiba, seagull, pigeon) spin on airs ≥ 0.6 s 40 % of the time (race AI sets the controls).
+- Inputs: keyboard Shift + A/D/W/S (or arrows); pad RB + stick/d-pad (up/down = stick or RT/LT).
+
+## 17. STYLE chains (new module `gameplay/style`, player only)
+- Actions (base points): drift boost L1/L2/L3 50/100/180 · slingshot 80 · near miss 60 · PERFECT landing 80 ·
+  trick landed 120 per trick (+50 per extra trick in the same air) · hit 40 · heavy hit 60 · throw hit 90 ·
+  parry 150 · KO 200 · weapon steal 80 · baton dodged (a police windup that ends in a miss) 100 · roadblock gap
+  threaded 150 · event bonus (fruit stall smashed 100, goose flock threaded 120).
+- Each action within 3.0 s of the previous extends the chain; multiplier = 1 + 0.25 × (distinct action kinds in the
+  chain − 1), max ×4; the same kind twice in a row scores half. Breaks on: a hit taken (not blocked/parried), a crash,
+  3 s without an action. On break/timeout the chain banks: total = Σ points × multiplier → SP + min(25, ⌊total/100⌋)
+  and coins + ⌊total/250⌋ (combat applies both on `style:bank`). Best chain per race goes to RaceResult.styleBest.
+- Events `style:chain` (every extension) and `style:bank`. HUD: a meter under the place badge "STYLE ×2.25 · 1,240"
+  with P5 action labels flying in; bank pop "+12 SP +4 小鱼干".
+
+## 18. Rivals — nemesis & alliances (race unit; career/results UI = ui-screens)
+- SaveData.rivalry[character] 0..100 (rivals only), updated at race end by the race unit's rivalry tracker:
+  the player KOs X +25 · steals X's weapon +10 · lands a thrown hit on X +5 · finishes ahead of X by < 1 s +5 ·
+  X KOs the player −20 · per race −3 for riders in the race, −8 for those not in it (floor 0).
+- Nemesis: core puts the rival with the highest rivalry ≥ 50 among this race's rivals into RaceConfig.nemesis.
+  It gets aggression +50 %, payback catch-up always armed against the player (2× window), skills aimed at the player
+  first, +3 % top speed while behind the player and within 80 m ("复仇之心"), nemesis taunts. Intro flyover: red
+  "宿敌 NEMESIS" card + a grudge line. KO'ing the nemesis → `race:nemesisDown`, +150 小鱼干 in results, rivalry → 20,
+  achievement `nemesis`. The nemesis KOs the player → line "这只是开始。".
+- Alliance 围剿: when the player leads by > 5 s, or has KO'd ≥ 3 riders this race (at most once per 60 s), the 2–3
+  rivals nearest behind the player within 120 m ally for 20 s: they never attack each other, all hunt the player,
+  draft each other. Breaks on friendly fire (an ally hits an ally → "塑料友谊!", those two fight for 5 s), when the
+  player KOs a member, or after 20 s. `race:alliance {phase, members, reason}`. HUD banner "围剿！" with linked
+  portraits; allies' name tags get a chain icon; the nemesis tag is red "宿敌".
+- Results: a nemesis line under the podium (content: per species, outcome won/lost/KO'd). Career ladder: the current
+  nemesis portrait + grudge bar.
+
+## 19. Track events (race unit, new folder `gameplay/race/events/`)
+- 1–2 events per race, seeded at 25–80 % of the track, armed when the player is 180–260 m before the spot; never two
+  within 600 m, never in tunnels/on bridges, never within 150 m of the finish. `race:event {kind, phase, s, pos}`
+  with phase 'warn' (HUD banner + audio stinger), 'start', 'end'.
+- 鱼车侧翻 `fishSpill`: a traffic truck in the player's or an adjacent lane brakes and tips onto its side (0.6 s roll),
+  blocking that lane (solid). Behind it, 60 m across two lanes: 18–26 小鱼干 + 3 fish (`pickup:spawn`) and 3 slick
+  patches (grip ×0.4, 0.8 s, like oil). Warn "前方鱼车侧翻！".
+- 大鹅过马路 `geese`: a column of 7 geese (ObstacleKind `goose`, not solid) waddles across at 1.2 m/s (~6 s). Touching
+  one: wobble 0.5 s, speed −20 %, honk, it flaps away. Threading the whole flock untouched = STYLE `event`. Warn
+  "前方鹅群过马路！".
+- 施工改道 `roadworks`: a 140 m zone: barriers close all but one lane, switching sides halfway (a chicane), cones,
+  a "前方施工 请绕行" sign, two capybara workers in hard hats waving (static props). Barriers as §14. Warn "前方施工！".
+- 水果摊 `stalls` (coast, city, watertown): 3–4 market stalls (ObstacleKind `stall`) on the road edge; riding into one
+  above 6 m/s smashes it (speed −15 %, no crash, fruit debris, 2–4 coins, 25 % a weapon crate) and the stall owner (a
+  sloth) shouts "我的西瓜！". No warning.
+
+## 20. Maps (track unit + env units)
+- RaceConfig `weather` ('clear' | 'rain' | 'snow' | 'fog' | 'dusk'), `reverse`, `route` (0 = authored layout, else a
+  seed). createTrack(app, id, rng, opts) builds accordingly; Track exposes `weather`, `reverse`, `route`, `grip`
+  (weather grip multiplier, sim multiplies the road grip with it).
+- Weather: per (track, weather) EnvLook overrides (world table). rain: grip 0.85, puddle features ×3, wet road sheen,
+  rain streaks (fx), rain ambience (audio). snow: grip 0.75, snowy shoulders/props, falling snow, colder grade. fog:
+  fog near/far × 0.35, headlights on traffic. dusk: low warm sun. Allowed: coast {clear, rain, dusk, fog},
+  city {clear(night), rain, fog}, mountain {clear(sunset), snow, fog, rain}, watertown {rain(default), fog, clear},
+  gobi {clear, dusk, fog(sandstorm look)}. Quick race: a weather picker (随机 + the allowed list).
+- Reverse: the LayoutDef is mirrored before the build (segment order reversed, radius and rise negated, bank
+  negated, left/right side profiles swapped, features and marks re-anchored and x mirrored, directional features
+  (ramps, jump crests) re-oriented so they still launch). Start/finish set pieces are rebuilt at the new ends.
+- Seeded routes: per track a segment pool (curves of several radii, S-chicanes, hairpins (mountain), straights with
+  features); the generator keeps the authored opening and closing set pieces and draws the middle from the pool:
+  total length within ±10 % of the authored track, R ≥ 25 m, no self-intersection (non-adjacent centre-line points
+  ≥ 40 m apart), terrain fit; dressing runs on any layout (landmark marks re-placed by rules).
+- New tracks: `watertown` 江南水乡 (古镇: canals, arched stone bridges as jump ramps, white walls + black tiles, willows,
+  red lanterns, boats, tea houses; narrow lanes and tight corners → drift-heavy; default drizzle) and `gobi` 戈壁公路
+  (desert highway: long straights, dune jumps, wind turbines, oil pumps, camels, a sandstorm finale; fast, wide).
+  Each: layout + dressing + env look + billboards + a race song + track card still + career slot.
+- Career: 3 cups × 5 tracks; cup 2 uses weather variants, cup 3 reverse or seeded routes (ui-screens' progress table).
+
+## 21. Easter eggs 彩蛋 (new module `gameplay/secrets`; SaveData.secrets; records sheet "彩蛋 n/9")
+1. 小黄鸭 (×5, one per track, `duck_<track>`): a rubber duck on a reachable shoulder spot off the racing line (track
+   feature `secret` with data.id). Ride within 1.2 m → quack, toast "找到小黄鸭！(n/5)". All five → achievement
+   `ducks` "这是鸭子不是鹈鹕" + a garage toggle for a rubber duck riding on the player's handlebar.
+2. Konami code on title/menu (keyboard ↑↑↓↓←→←→ B A, pad ✚↑↑↓↓←→←→ B A) → bike `llm` 大模型限定款: chain to the rider's
+   neck, a floating extra pedal, the saddle on the handlebar, 7 spokes pointing anywhere ("LLM drew this bike");
+   roadbike stats, +4 % top speed (幻觉加速), −10 % handling; free. Toast "大模型限定款已解锁：链条接在脖子上，这很合理。"
+3. 「V我50」 bribe (§14).
+4. SVG 画架 (`svg_<track>`): an easel at a scenic spot showing a deliberately wrong flat SVG pelican-on-a-bicycle with
+   the caption "Generate an SVG of a pelican riding a bicycle". Hitting it with a THROWN weapon → it spins,
+   "致敬原作！" +50 小鱼干. Achievement `svg`.
+5. 鹅鹅鹅: ring the bell 3× within 5 s with the goose within 8 m → the goose goes berserk 8 s (angry, +15 % speed, honk
+   ready) and recites "鹅鹅鹅，曲项向天歌——". Achievement `goose_poem`.
+6. 比树懒还慢: no pedalling for 8 s after GO → the sloth (if racing) stops too: "你也不急？", then floors it with 闪电.
+   Achievement `sloth`.
+7. 鹈鹕神显灵: seeded 1 race in 15 (coast or mountain), a giant cloud pelican crosses the sky for 12 s; ringing the
+   bell while it is on screen → "心诚则灵" +50 小鱼干, achievement `pelican_god`.
+8. Title: typing P-E-L-I-C-A-N on the title screen → the title pelican's pouch inflates + "嘴大吃四方！".
+9. Credits: idle 30 s → a hidden line "特别鸣谢：每一只被画歪的鹈鹕。".
+
+## 22. r4 contracts (core, applied by the integrator — units never edit core)
+- types.ts: TrackId + 'watertown' | 'gobi' · BikeId + 'llm' · WeaponId + 'baton' · CrashCause + 'trick' ·
+  ObstacleKind + 'barrier' | 'goose' | 'stall' · FeatureKind + 'secret' · Weather · TrickKind / TrickState ·
+  Controls.heavyHeld · RiderState.trick, RiderState.trickChain (sim-owned).
+- contracts.ts: RaceConfig.weather / reverse / route / nemesis · Track.weather / reverse / route / grip ·
+  TrackOptions · RaceResult.styleBest · Modules.createTrack(app, id, rng, opts?).
+- events-map.ts: police:wanted / windup / swing / roadblock / hurt / down / bribe · npc:strike · npc:hit ·
+  combat:throw · combat:parry · combat:obstacleHit · pickup:spawn · rider:trick · style:chain · style:bank ·
+  race:nemesis · race:nemesisDown · race:alliance · race:event · secret:found.
+- save.ts: SaveData.rivalry, secrets, unlocks, settings.duckRider, stats.bestStyle / tricks / bribes (sanitized).
+- New per-session modules (loaded like achievements, stub fallback): `gameplay/style`, `gameplay/secrets`.

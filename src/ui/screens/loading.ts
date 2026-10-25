@@ -7,7 +7,7 @@ import './loading.css';
 import type { TrackId } from '../../core/types';
 import { LOADING_ART } from '../../data/assets';
 import { calendarFor } from '../../data/strings';
-import { TIPS } from '../../data/tips';
+import { PAD_TIPS, TIPS } from '../../data/tips';
 import { TRACKS, TRACK_ORDER } from '../../data/tracks';
 import { artImage, artReady, backdrop, h, jagged, ransom, riderIconSvg, svg, torn, wait } from '../p5';
 import { frame, type ScreenFactory } from '../screen';
@@ -26,7 +26,8 @@ const WEATHER_ICON: Record<TrackId, string> = {
 const luckRow = (kind: 'good' | 'bad', mark: string, text: string): HTMLDivElement =>
   h('div', { class: `is-${kind}${[...text].length > 4 ? ' is-long' : ''}` }, h('i', { text: mark }), h('span', { text }));
 
-/** Tips that name keyboard keys (按 P, 刹车键在 S, J 往左扇…): a gamepad player gets one of the others. */
+/** Tips that name keyboard keys (按 P, 刹车键在 S, J 往左扇…): a gamepad player gets their PAD_TIPS wording,
+ *  and a key tip without one is left out. */
 const KEYBOARD_TIP = /(按住?|键在)\s?(Shift|[A-Z])(?![A-Za-z])|^[A-Z] 往/;
 
 /** From mount (under the cover wipe): long enough to read the tip after it lands. */
@@ -68,7 +69,9 @@ export const loadingScreen: ScreenFactory = (ctx) => {
     h('div', { class: 'br-load-en', text: info.nameEn }),
     h('div', { class: 'br-load-blurb', text: info.blurb }));
 
-  const tips = ctx.app.input.lastDevice === 'gamepad' ? TIPS.filter((t) => !KEYBOARD_TIP.test(t)) : TIPS;
+  const tips = ctx.app.input.lastDevice === 'gamepad'
+    ? TIPS.flatMap((t) => PAD_TIPS[t] ?? (KEYBOARD_TIP.test(t) ? [] : [t]))
+    : TIPS;
   const tip = tips[Math.floor(Math.random() * tips.length)] ?? '';
   const tipBox = h('div', { class: 'br-load-tip br-anim-rise', vars: { '--clip': jagged('tip', { jx: 1.5, jy: 7, notches: 2 }), '--delay': '0ms' } },
     h('span', { class: 'br-tag is-red br-load-tip-tag', text: 'TIPS 小贴士' }),

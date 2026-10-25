@@ -22,11 +22,11 @@ export const TIP_GROUPS: Record<TipGroup, string[]> = {
   ],
   fight: [
     '按 B 打铃可以嘲讽对手。大鹅最吃这一套：它会直接冲过来。',
-    '打铃 +5 SP，三秒一次。叮叮叮，比挨打划算。',
+    '打铃 +3 SP，三秒一次。叮叮叮，比挨打划算。',
     'J 往左扇，L 往右扇，K 重击会自动挑边。',
     '重击更容易打掉对手的武器。你空着手的话，直接归你。',
     '在对手挥武器的前摇打中它，算反击暴击。',
-    '三连击触发 ONE MORE! SP+10，下一击必定暴击。',
+    '三连击触发 ONE MORE! 回一点 SP，下一击必定暴击。',
     '被打也会涨 SP。挨打不可怕，可怕的是白挨。',
     'SP 满了按 P：SHOWTIME！前方 40 米的对手请自求多福。',
     '咸鱼鱼雷会自动追踪前方的对手，命中还附赠眩晕。',
@@ -87,3 +87,13 @@ export const TIP_GROUPS: Record<TipGroup, string[]> = {
 
 /** Every tip, flat (the loading screen picks one at random). */
 export const TIPS: string[] = [...TIP_GROUPS.ride, ...TIP_GROUPS.fight, ...TIP_GROUPS.rivals, ...TIP_GROUPS.trivia];
+
+/** Gamepad wording of the tips that name keyboard keys (core/input.ts PADMAP, labels as on the pause sheet). */
+export const PAD_TIPS: Readonly<Record<string, string>> = {
+  '按住 Shift 转向就能漂移：火花由蓝变橙再变粉，越粉越快。': '按住 RB 转向就能漂移：火花由蓝变橙再变粉，越粉越快。',
+  '撞墙会掉速，撞太狠直接翻车。刹车键在 S，别客气。': '撞墙会掉速，撞太狠直接翻车。刹车在 LT，别客气。',
+  '按 C 回头看。先看清是谁在追你，再决定跑还是打。': '按下左摇杆（L3）回头看。先看清是谁在追你，再决定跑还是打。',
+  '按 B 打铃可以嘲讽对手。大鹅最吃这一套：它会直接冲过来。': '按 BACK 打铃可以嘲讽对手。大鹅最吃这一套：它会直接冲过来。',
+  'J 往左扇，L 往右扇，K 重击会自动挑边。': 'X 往左扇，B 往右扇，Y 重击会自动挑边。',
+  'SP 满了按 P：SHOWTIME！前方 40 米的对手请自求多福。': 'SP 满了按下右摇杆（R3）：SHOWTIME！前方 40 米的对手请自求多福。',
+};
