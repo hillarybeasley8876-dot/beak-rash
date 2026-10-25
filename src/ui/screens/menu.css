@@ -98,3 +98,13 @@
 }
 .br-menu-coins { position: absolute; right: 70px; top: 46px; }
 .br-scr-menu .br-hints { bottom: 20px; }
+
+/* The frame and the key art share one box, so the 彩蛋 gulp can squash the whole pelican. */
+.br-menu-portrait { position: absolute; inset: 0; transform-origin: 50% 76%; }
+.br-menu-portrait.is-gulp { animation: br-egg-gulp 0.5s var(--ease-slam) both; }
+@keyframes br-egg-gulp {
+  0% { transform: scale(1, 1); }
+  30% { transform: scale(1.1, 0.84) translateY(18px); }
+  60% { transform: scale(0.94, 1.12) translateY(-12px); }
+  100% { transform: scale(1, 1); }
+}

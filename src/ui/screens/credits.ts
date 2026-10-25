@@ -18,6 +18,7 @@ const VIEW_H = 760;     // .br-cr-view height
 const HOLD_S = 3;       // a manual scroll pauses the auto-scroll this long
 const NUDGE = 160;      // px per ↑↓ press
 const LINE_PX = 40;     // wheel deltaMode 1 (lines) → px
+const IDLE_S = 30;      // 彩蛋 §21 #9: idle this long and the hidden thank-you line shows up
 const LATIN = /^[\x20-\x7e\u00a0]+$/;
 const CAST = Object.values(ROSTER);
 
@@ -88,23 +89,57 @@ export const creditsScreen: ScreenFactory = (ctx) => {
     hold = HOLD_S;
     wrap();
   };
+  // 彩蛋 §21 #9: 30 s without any input and a hidden thank-you line slides in at the bottom. It is
+  // fixed on the stage (not part of the scrolling roll) and stays until the screen closes.
+  const thanks = h('div', { class: 'br-egg-thanks', vars: { '--clip': jagged('egg-thanks', { jx: 1.5, jy: 6, notches: 1 }) },
+    text: '特别鸣谢：每一只被画歪的鹈鹕。' });
+  let thanksShown = false;
+  let idleTimer = 0;
+  let lastInputAt = performance.now();
+  const showThanks = (): void => {
+    if (thanksShown) return;
+    thanksShown = true;
+    f.stage.append(thanks);
+  };
+  /** Any input (key, pad button, click, wheel) restarts the idle countdown. */
+  const armIdle = (): void => {
+    lastInputAt = performance.now();
+    window.clearTimeout(idleTimer);
+    idleTimer = window.setTimeout(showThanks, IDLE_S * 1000);
+  };
+  const onKey = (): void => armIdle();
+  const onPointer = (): void => armIdle();
+  window.addEventListener('keydown', onKey);
+  window.addEventListener('pointerdown', onPointer);
+  armIdle();
+
   const view = f.stage.querySelector<HTMLElement>('.br-cr-view');
   // On window: the overlay passes pointer events through its non-interactive parts to the game canvas.
   const onWheel = (e: WheelEvent): void => {
+    armIdle();
     const scale = (view?.getBoundingClientRect().height ?? VIEW_H) / VIEW_H || 1;
     scrollBy((e.deltaMode === 1 ? e.deltaY * LINE_PX : e.deltaY) / scale);
   };
   window.addEventListener('wheel', onWheel, { passive: true });
+
   if (finale) ctx.sfx('ui.unlock');
   return {
     root: f.root,
-    dispose: () => window.removeEventListener('wheel', onWheel),
+    dispose: () => {
+      window.removeEventListener('wheel', onWheel);
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('pointerdown', onPointer);
+      window.clearTimeout(idleTimer);
+    },
     update: (dt) => {
       hold = Math.max(0, hold - dt);
       if (auto && hold === 0) y += SPEED * dt;
       wrap();
+      // Backstop for a throttled timer (a hidden tab): the countdown runs on real time.
+      if (!thanksShown && performance.now() - lastInputAt >= IDLE_S * 1000) showThanks();
     },
     onAction: (a) => {
+      armIdle();
       if (a === 'back' || a === 'confirm') {
         ctx.sfx('ui.back');
         ctx.go(finale ? 'career' : 'menu');

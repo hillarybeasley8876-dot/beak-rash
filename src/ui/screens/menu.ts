@@ -6,11 +6,17 @@ import { ART } from '../../data/assets';
 import { ROSTER } from '../../data/roster';
 import { MENU, MENU_QUIT } from '../copy';
 import { Nav } from '../nav';
-import { HINT_BACK, HINT_NAV, HINT_OK, artImage, artReady, backdrop, coinBadge, h, jagged, portrait, ransom } from '../p5';
+import { HINT_BACK, HINT_NAV, HINT_OK, artImage, artReady, backdrop, coinBadge, h, jagged, portrait, ransom, reducedMotion } from '../p5';
 import { frame, type ScreenCtx, type ScreenFactory } from '../screen';
+import { createSequence, eggBubble } from './eggs';
 import { recall, remember } from './memory';
 
 interface Entry { cn: string; en: string; blurb: string; padBlurb?: string; minor?: boolean; pick(): void }
+
+/** 彩蛋 §21 #8: typing P-E-L-I-C-A-N on the menu makes the pelican talk back. */
+const PELICAN_CODES = ['KeyP', 'KeyE', 'KeyL', 'KeyI', 'KeyC', 'KeyA', 'KeyN'];
+const EGG_SHOW_MS = 2500;   // bubble on screen
+const EGG_FADE_MS = 350;    // bubble fade-out after that
 
 async function askQuit(ctx: ScreenCtx, quit: () => void): Promise<void> {
   if (await ctx.confirm(MENU_QUIT.ask, MENU_QUIT.askText, MENU_QUIT.yes, MENU_QUIT.no)) quit();
@@ -51,14 +57,16 @@ export const menuScreen: ScreenFactory = (ctx) => {
   const heroArt = artImage(ART.menu, 'br-menu-art', () => stand.replaceWith(framed()), stand);
   heroFrame.append(heroArt ? stand : framed());
   if (heroArt) heroFrame.classList.add('is-backing');
+  // The frame and the art share one box so the whole hero can gulp as one.
+  const heroWrap = h('div', { class: 'br-menu-portrait' }, heroFrame);
+  if (heroArt) heroWrap.append(heroArt);
   const coins = coinBadge(app.save.data.coins);
   coins.el.classList.add('br-menu-coins');
   f.stage.append(
     h('div', { class: 'br-menu-logo' }, ransom('暴力鹈鹕', { seed: 'menu-logo', fonts: 'block', styles: ['wb', 'bw', 'wr'] })),
     list,
     h('div', { class: 'br-menu-hero' },
-      heroFrame,
-      heroArt,
+      heroWrap,
       h('div', { class: 'br-menu-name' }, h('b', { text: pel.name }), h('span', { text: pel.codename })),
       h('div', { class: 'br-menu-epithet', text: pel.title })),
     blurb,
@@ -93,6 +101,38 @@ export const menuScreen: ScreenFactory = (ctx) => {
   });
   if (ctx.props.message) ctx.toast(ctx.props.message, 'warn');
   const offSave = app.save.onChange((d) => coins.set(d.coins));
+
+  // 彩蛋: P-E-L-I-C-A-N on the menu → the pelican gulps and talks back. The menu's own onAction
+  // (P = ult, L = attackR, I = skill2, C = lookBack, A = left) keeps working exactly as before.
+  const sequence = createSequence(PELICAN_CODES);
+  const timers: number[] = [];
+  const later = (fn: () => void, ms: number): void => { timers.push(window.setTimeout(fn, ms)); };
+  let bubble: HTMLElement | null = null;
+  const showEgg = (): void => {
+    const el = eggBubble('嘴大吃四方！', 'egg-pelican');
+    bubble?.remove();
+    bubble = el;
+    f.stage.append(el);
+    app.audio.voice('pelican_taunt_0');
+    if (!reducedMotion()) {
+      heroWrap.classList.remove('is-gulp');
+      void heroWrap.offsetWidth;
+      heroWrap.classList.add('is-gulp');
+    }
+    later(() => {
+      el.classList.add('is-out');
+      later(() => {
+        el.remove();
+        if (bubble === el) bubble = null;
+      }, EGG_FADE_MS);
+    }, EGG_SHOW_MS);
+  };
+  const onKey = (e: KeyboardEvent): void => {
+    if (e.repeat) return;
+    if (sequence.push(e.code)) showEgg();
+  };
+  window.addEventListener('keydown', onKey);
+
   return {
     root: f.root,
     ready: artReady(heroArt),
@@ -106,6 +146,11 @@ export const menuScreen: ScreenFactory = (ctx) => {
       if (a === 'pause' && app.input.lastDevice === 'gamepad') return nav.handle('confirm');
       return nav.handle(a);
     },
-    dispose: offSave,
+    dispose: () => {
+      offSave();
+      window.removeEventListener('keydown', onKey);
+      for (const t of timers) window.clearTimeout(t);
+      timers.length = 0;
+    },
   };
 };

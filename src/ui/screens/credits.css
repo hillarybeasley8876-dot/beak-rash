@@ -43,3 +43,21 @@
 .br-cr-trophy-line { margin: 16px 0 0; max-width: 560px; font-family: var(--f-cn-play); font-weight: 400; font-size: 32px; line-height: 1.35; color: var(--white); }
 .br-cr-cups { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 18px; }
 .br-cr-cups span { padding: 4px 14px 2px; background: var(--white); color: var(--red); font-family: var(--f-cn-block); font-weight: 400; font-size: 26px; rotate: -3deg; box-shadow: 5px 5px 0 var(--red); }
+/* 彩蛋: the hidden thank-you line that slides in after 30 s of silence (SPEC §21 #9). */
+.br-egg-thanks {
+  position: absolute;
+  left: 50%;
+  bottom: 46px;
+  isolation: isolate;
+  padding: 14px 46px 12px 38px;
+  color: var(--ink);
+  font-family: var(--f-cn-play);
+  font-weight: 400;
+  font-size: 36px;
+  line-height: 1.2;
+  white-space: nowrap;
+  transform: translateX(-50%) skewX(var(--skew));
+  animation: br-rise 0.4s var(--ease-out) both;
+}
+.br-egg-thanks::before { content: ''; position: absolute; inset: 0; z-index: -1; background: var(--white); clip-path: var(--clip); }
+.br-egg-thanks::after { content: ''; position: absolute; inset: 0; z-index: -2; background: var(--red); clip-path: var(--clip); transform: translate(12px, 12px); }

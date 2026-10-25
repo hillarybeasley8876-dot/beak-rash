@@ -1,0 +1,46 @@
+/* 彩蛋: the P5 speech bubble (menu PELICAN egg). A jagged white plate with a tail, popped in and
+   faded out again; the caller positions it next to the character that talks. */
+.br-egg-bubble {
+  position: absolute;
+  left: 900px;
+  top: 56px;
+  width: max-content;
+  max-width: 520px;
+  animation: br-egg-pop 0.32s var(--ease-slam) both;
+}
+.br-egg-bubble-plate {
+  position: relative;
+  padding: 22px 34px 18px 30px;
+  background: var(--white);
+  color: var(--ink);
+  clip-path: var(--clip);
+  font-family: var(--f-cn-block);
+  font-weight: 400;
+  font-size: 56px;
+  line-height: 1.14;
+  transform: skewX(var(--skew)) rotate(-3deg);
+  filter: drop-shadow(6px 6px 0 var(--ink));
+}
+.br-egg-bubble-tail {
+  position: absolute;
+  right: -44px;
+  top: 26px;
+  width: 0;
+  height: 0;
+  border-top: 38px solid transparent;
+  border-bottom: 38px solid transparent;
+  border-left: 46px solid var(--white);
+  filter: drop-shadow(5px 4px 0 var(--ink));
+}
+/* Fade-out replaces the pop-in (both animate opacity, so one animation must own the property). */
+.br-egg-bubble.is-out { animation: br-egg-out 0.35s var(--ease-out) both; }
+
+@keyframes br-egg-pop {
+  0% { transform: scale(0.55) rotate(-6deg); opacity: 0; }
+  70% { transform: scale(1.06) rotate(1deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0deg); opacity: 1; }
+}
+@keyframes br-egg-out {
+  0% { transform: scale(1) rotate(0deg); opacity: 1; }
+  100% { transform: scale(0.92) rotate(-2deg) translateY(-14px); opacity: 0; }
+}
