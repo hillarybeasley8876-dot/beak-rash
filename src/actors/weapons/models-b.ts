@@ -19,6 +19,20 @@ export function umbrella(b: CharacterBuilder): void {
   put(b, new TorusGeometry(0.045, 0.013, 6, 12, Math.PI), [0, -0.01, 0.045], [0, Math.PI / 2, Math.PI], 1, 0x6b4226);
 }
 
+/** The open canopy (umbrella glide): a shallow striped dome 0.9 m wide, the furled umbrella's colours. */
+export function umbrellaOpen(b: CharacterBuilder): void {
+  put(b, new CylinderGeometry(0.008, 0.008, 0.5, 6), [0, 0.25, 0], [0, 0, 0], 1, 0x2b2b30, 0.6);
+  // The canopy: a shallow dome, eight red / white panels like the furled one (rim first, so it faces up).
+  const pts = [0.45, 0.43, 0.36, 0.26, 0.13, 0].map((r, i) => new Vector2(r, [0, 0.05, 0.105, 0.155, 0.19, 0.2][i] as number));
+  put(b, new LatheGeometry(pts, 16), [0, 0.46, 0], [0, 0, 0], 1, (x, _y, z) => {
+    const a = Math.atan2(z, x) + Math.PI;
+    return Math.floor(a / (Math.PI / 4)) % 2 === 0 ? 0xe5191c : 0xfff4ea;
+  });
+  put(b, new ConeGeometry(0.012, 0.07, 6), [0, 0.72, 0], [0, 0, 0], 1, 0xc9cdd4, 0.6);
+  // J-hook handle below the grip.
+  put(b, new TorusGeometry(0.045, 0.013, 6, 12, Math.PI), [0, -0.01, 0.045], [0, Math.PI / 2, Math.PI], 1, 0x6b4226);
+}
+
 export function selfie(b: CharacterBuilder): void {
   put(b, new CapsuleGeometry(0.017, 0.12, 4, 8), [0, 0.06, 0], [0, 0, 0], 1, 0x1f1f24);
   put(b, new CylinderGeometry(0.009, 0.01, 0.45, 6), [0, 0.36, 0], [0, 0, 0], 1, 0xc9cdd4, 0.6);

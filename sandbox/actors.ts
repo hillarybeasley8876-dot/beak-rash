@@ -2,7 +2,7 @@
 import { type Bone, Euler, Quaternion, Vector3 } from 'three';
 import type { ViewCue } from '../src/core/contracts';
 import { damp } from '../src/core/math';
-import type { CharacterId, CrashCause, Side, StatusId, WeaponId } from '../src/core/types';
+import type { CharacterId, CrashCause, RiderAction, Side, StatusId, TrickState, WeaponId } from '../src/core/types';
 import { GRIP_BACK } from '../src/actors/rig/ride';
 import { B } from '../src/actors/rig/skeleton';
 import { speciesAsset, speciesDef } from '../src/actors/species';
@@ -76,6 +76,16 @@ const api = {
   },
   action(kind: 'attack' | 'heavy' | 'skill' | 'ult' | 'bell' | 'hit', side: Side, dur: number, skillId: string | null = null): void {
     for (const r of riders) r.state.action = { kind, side, t: 0, dur, weapon: r.state.weapon, skillId, resolved: false };
+  },
+  /** Force the riders' trick / glide / throw state (SPEC §15, §16) for the pose sheets. */
+  pose(o: { trick?: TrickState | null; gliding?: boolean; action?: RiderAction | null; weapon?: WeaponId }): void {
+    for (const r of riders) {
+      const st = r.state;
+      if (o.trick !== undefined) st.trick = o.trick;
+      if (o.gliding !== undefined) st.gliding = o.gliding;
+      if (o.action !== undefined) st.action = o.action;
+      if (o.weapon !== undefined) { st.weapon = o.weapon; r.view.setWeapon(o.weapon); }
+    }
   },
   /** Cast a skill like combat does (cue + ≤ 0.35 s cast action for non-lockout skills + the caster's statuses). */
   skill(id: string): void {

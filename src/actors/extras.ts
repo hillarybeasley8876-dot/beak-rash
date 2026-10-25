@@ -55,7 +55,7 @@ export class RiderExtras {
 
   /** Hold or hand across the weapon; leaves the pivot's body-space pose in pA/qA (for the smear). An off-side swing
    *  tosses it across in 0.1 s; while riding it moves over (0.4 s) to the side a rival rides on (`prefer`). */
-  private updateWeapon(cues: CueSystem, ps: PoseState, meshMatrix: Matrix4, prefer: Side | null, dt: number): void {
+  private updateWeapon(cues: CueSystem, ps: PoseState, meshMatrix: Matrix4, prefer: Side | null, dt: number, holdUp: boolean): void {
     const st = cues.strikeState, w = this.weapon;
     this.strike += (st.weight - this.strike) * (1 - Math.exp(-(st.weight > this.strike ? 22 : 9) * dt));
     mTmp.copy(meshMatrix).decompose(pB, meshQ, sc);
@@ -70,7 +70,10 @@ export class RiderExtras {
       if (pass) w.attach(pass.to);
       this.pass = null;
       this.handPose(w.hand, ps, meshMatrix, pA, qA);
-      w.aim(ps.mq[w.hand === -1 ? B.handL : B.handR] as Quaternion, dir, this.strike);
+      const handQ = ps.mq[w.hand === -1 ? B.handL : B.handR] as Quaternion;
+      // Gliding: the umbrella is held straight up over the head, not shouldered.
+      if (holdUp) w.holdUp(handQ);
+      else w.aim(handQ, dir, this.strike);
       return;
     }
     // Toss: the grip slides across over the bars while the weapon dips forward-down through Q_PASS (never the face).
@@ -86,8 +89,10 @@ export class RiderExtras {
   /** `fx` = this frame's glint/steam beats from the cue layer. */
   update(state: RiderState, cues: CueSystem, ps: PoseState, meshMatrix: Matrix4, stunned: boolean, fx: { glint: number; steam: number },
     dt: number, prefer: Side | null = null): void {
-    if (state.weapon !== this.weapon.current) this.weapon.set(state.weapon);
-    this.updateWeapon(cues, ps, meshMatrix, prefer, dt);
+    // The umbrella opens its canopy while the rider glides (SPEC §15).
+    const glide = state.gliding && state.weapon === 'umbrella';
+    if (state.weapon !== this.weapon.current || glide !== this.weapon.isOpen) this.weapon.set(state.weapon, glide);
+    this.updateWeapon(cues, ps, meshMatrix, prefer, dt, glide);
     tip.set(0, this.weapon.length, 0).applyQuaternion(qA).add(pA);
     base.copy(pA).lerp(tip, 0.35);
     this.smear.update(base, tip, cues.strikeState.active, dt);

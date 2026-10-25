@@ -1,6 +1,7 @@
 // Weapon meshes (cached geometry per id, shared toon material) and the holder that keeps the current
 // weapon in the attacking hand: shouldered (out-up-back, visible from the chase cam) while riding, swung
-// along the hand into the rival lane (outward-forward, kept low) while striking.
+// along the hand into the rival lane (outward-forward, kept low) while striking. The umbrella has a second
+// model — the open canopy it shows while the rider glides (SPEC §15).
 import { Mesh, Object3D, Quaternion, Vector3, type BufferGeometry, type Bone } from 'three';
 import { riderMaterial } from '../kit/material';
 import type { Side, WeaponId } from '../../core/types';
@@ -8,29 +9,32 @@ import { CharacterBuilder } from '../kit/builder';
 import { hullFor } from '../kit/outline';
 import { aimQuat } from '../rig/ik';
 import { baguette, leek, pan, saltfish } from './models-a';
-import { baton, keyboard, selfie, slipper, umbrella } from './models-b';
+import { baton, keyboard, selfie, slipper, umbrella, umbrellaOpen } from './models-b';
 
 type Armed = Exclude<WeaponId, 'none'>;
 const BUILD: Record<Armed, (b: CharacterBuilder) => void> = { saltfish, baguette, pan, leek, umbrella, selfie, slipper, keyboard, baton };
-const cache = new Map<Armed, BufferGeometry>();
+/** Weapons with a second model (the umbrella's open canopy, shown while gliding). */
+const OPEN: Partial<Record<Armed, (b: CharacterBuilder) => void>> = { umbrella: umbrellaOpen };
+const cache = new Map<string, BufferGeometry>();
 const Y = new Vector3(0, 1, 0), Z = new Vector3(0, 0, 1);
 const dir = new Vector3(), hit = new Vector3(), up = new Vector3(), tv = new Vector3(), inv = new Quaternion();
 
-export function weaponGeometry(id: Armed): BufferGeometry {
-  let g = cache.get(id);
+export function weaponGeometry(id: Armed, open = false): BufferGeometry {
+  const key = open ? `${id}|open` : id;
+  let g = cache.get(key);
   if (!g) {
     const b = new CharacterBuilder();
-    BUILD[id](b);
+    (open ? OPEN[id] ?? BUILD[id] : BUILD[id])(b);
     g = b.build();
-    cache.set(id, g);
+    cache.set(key, g);
   }
   return g;
 }
 
 /** A standalone weapon mesh with outline (grip at origin, length +Y). */
-export function createWeaponMesh(id: Armed): Mesh {
-  const mesh = new Mesh(weaponGeometry(id), riderMaterial());
-  mesh.name = `weapon:${id}`;
+export function createWeaponMesh(id: Armed, open = false): Mesh {
+  const mesh = new Mesh(weaponGeometry(id, open), riderMaterial());
+  mesh.name = `weapon:${id}${open ? ':open' : ''}`;
   mesh.add(hullFor(mesh, 0.018));
   return mesh;
 }
@@ -39,6 +43,7 @@ export class WeaponHolder {
   readonly pivot = new Object3D();
   private mesh: Mesh | null = null;
   private id: WeaponId = 'none';
+  private open = false;
   private side: Side = 1;
   private readonly q = new Quaternion();
 
@@ -52,12 +57,18 @@ export class WeaponHolder {
     return this.id;
   }
 
-  set(id: WeaponId): void {
-    if (id === this.id) return;
+  /** Is the open model showing (the umbrella's canopy while gliding)? */
+  get isOpen(): boolean {
+    return this.open;
+  }
+
+  set(id: WeaponId, open = false): void {
+    if (id === this.id && open === this.open) return;
     if (this.mesh) this.pivot.remove(this.mesh);
-    this.mesh = id === 'none' ? null : createWeaponMesh(id);
+    this.mesh = id === 'none' ? null : createWeaponMesh(id as Armed, open);
     if (this.mesh) this.pivot.add(this.mesh);
     this.id = id;
+    this.open = id !== 'none' && open;
   }
 
   /** Move the weapon to the hand of `side` (the swing side). */
@@ -103,6 +114,12 @@ export class WeaponHolder {
   /** Orient the weapon held in its current hand (see orient). */
   aim(handQ: Quaternion, handDir: Vector3, strike: number): void {
     this.pivot.quaternion.copy(this.orient(this.side, handQ, handDir, strike, this.q));
+  }
+
+  /** Hold the weapon straight up in the character frame (the umbrella glide): the shaft points at the sky.
+   *  `handQ` = the hand bone's model rotation; the pivot's own rotation cancels it. */
+  holdUp(handQ: Quaternion): void {
+    this.pivot.quaternion.copy(handQ).invert();
   }
 
   get hand(): Side {

@@ -1,9 +1,19 @@
 // Small timing helpers for cue clips: envelopes and eased keyframe tracks over normalised time u = 0..1.
-import { easeInOutCubic, lerp, smoothstep } from '../../core/math';
+import { clamp01, easeInOutCubic, lerp, smoothstep } from '../../core/math';
 
 /** Rise over [a, b], hold, fall over [c, d] (normalised time). */
 export function env(t: number, a: number, b: number, c: number, d: number): number {
   return smoothstep(a, b, t) * (1 - smoothstep(c, d, t));
+}
+
+/**
+ * A snap easing over `window` seconds: the value reaches most of its target within a couple of frames and
+ * eases into the rest. The trick poses use it so a pose that starts (or ends) reads at once instead of
+ * drifting in over a tenth of a second.
+ */
+export function snap(t: number, window: number, power = 8): number {
+  const u = clamp01(t / window);
+  return 1 - Math.pow(1 - u, power);
 }
 
 /** Piecewise-linear keyframes with eased segments: keys = [[t, value], ...]. */

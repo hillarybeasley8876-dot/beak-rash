@@ -42,6 +42,8 @@ export class RidePose {
   tuck = 0;
   legScale = 1;
   armScale = 1;
+  /** Extra reach for the arms (1 = the normal 15 % stretch): the umbrella glide needs a longer arm. */
+  armStretch = 1;
   private t = 0;
   /** 1 / mesh squash scale: grip/pedal targets are solved in squashed mesh space so they land after the scale. */
   private readonly unsquash = new Vector3(1, 1, 1);
@@ -104,7 +106,7 @@ export class RidePose {
     const rock = Math.sin(crank) * (0.025 + 0.1 * stand) * pedalling;
     rot(ps.lq[B.pelvis] as Quaternion, -stand * 0.22 - cue.lie * 0.5, cue.spin, rock);
     ps.ls[B.thighL] = ps.ls[B.thighR] = this.legScale;
-    this.keepReach(inp);
+    this.keepReach(inp, cue);
     ps.ls[B.footL] = ps.ls[B.footR] = 1 / this.legScale;
     ps.ls[B.armL] = ps.ls[B.armR] = this.armScale;
     ps.ls[B.handL] = ps.ls[B.handR] = 1 / this.armScale;
@@ -220,7 +222,7 @@ export class RidePose {
     ps.ls[c.root] = this.armScale;
     ps.fk(c.root);
     const [a1, a2] = chainLengths(ps, c);
-    const k = clamp(tgt.distanceTo(ps.mp[c.root] as Vector3) / ((a1 + a2) * (ps.msc[c.root] ?? 1) * 0.985), 1, 1.15);
+    const k = clamp(tgt.distanceTo(ps.mp[c.root] as Vector3) / ((a1 + a2) * (ps.msc[c.root] ?? 1) * 0.985), 1, 1.15 * this.armStretch);
     ps.ls[c.root] = this.armScale * k;
     ps.ls[c.end] = 1 / (this.armScale * k);
   }
@@ -232,9 +234,10 @@ export class RidePose {
   }
 
   /** Pull the pelvis back toward the pedals when standing/bobbing would overstretch a leg. */
-  private keepReach(inp: RideInput): void {
+  private keepReach(inp: RideInput, cue: CueOut): void {
     const ps = this.ps;
     if (this.def.meta.shortLegs) return;
+    if (cue.legTuck > 0.05) return; // the feet are off the pedals: the hips may leave the saddle
     const pel = ps.lp[B.pelvis] as Vector3;
     for (let iter = 0; iter < 2; iter++) {
       ps.fk(B.pelvis);

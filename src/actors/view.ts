@@ -16,12 +16,16 @@ import { gripPoint } from './rig/bar-fit';
 import { clearCue, makeCue } from './rig/cue-types';
 import { CueSystem } from './rig/cues';
 import { FaceRig } from './rig/face';
+import { GlidePose } from './rig/glide-pose';
 import { IdleMotion } from './rig/idle';
 import { PoseState } from './rig/pose-state';
 import { RidePose, type RideInput } from './rig/ride';
 import { B } from './rig/skeleton';
 import { StateCues } from './rig/state-cues';
+import { ThrowPose } from './rig/throw-pose';
+import { TrickPose } from './rig/trick-pose';
 import { instantiate, type CharacterInstance } from './species';
+import { applyTrickPivot } from './trick-pivot';
 import { ShaderWarmup } from './warmup';
 import { RiderLod } from './lod';
 
@@ -33,9 +37,9 @@ const GHOST = new Color('#7fe8ff'), FLASH = new Color('#ffffff');
 /** A point far down the road at eye height (character space). */
 const AHEAD = new Vector3(0, 0.85, -12);
 
-function safeBike(id: BikeId, quality: Quality, tint: string | undefined): BikeModel {
+function safeBike(id: BikeId, quality: Quality, tint: string | undefined, player: boolean): BikeModel {
   try {
-    return createBike(id, { quality, tint });
+    return createBike(id, { quality, tint, player });
   } catch (err) {
     console.error(`[actors] createBike(${id}) failed, using the fallback bike`, err);
     return createFallbackBike(id, tint);
@@ -54,6 +58,10 @@ export class RiderViewImpl implements RiderView {
   readonly cueOut = makeCue();
   readonly cues: CueSystem;
   readonly stateCues: StateCues;
+  /** The state-driven poses: the superman, the throw aim and the umbrella glide (SPEC §15, §16). */
+  readonly trickPose: TrickPose;
+  readonly throwPose: ThrowPose;
+  readonly glidePose: GlidePose;
   readonly extras: RiderExtras;
   readonly crash: CrashController;
   readonly fade: RiderFade;
@@ -91,7 +99,7 @@ export class RiderViewImpl implements RiderView {
   constructor(private readonly app: AppContext, readonly character: CharacterId, private readonly bikeId: BikeId, readonly opts: ViewOpts) {
     this.root.name = `rider:${character}`;
     const tint = opts.isPlayer ? undefined : ROSTER[character].colors.accent;
-    this.bike = safeBike(bikeId, opts.quality, tint);
+    this.bike = safeBike(bikeId, opts.quality, tint, opts.isPlayer);
     this.bike.root.updateMatrixWorld(true);
     const saddle = this.bike.markers.saddle.getWorldPosition(new Vector3());
     this.bike.root.position.set(-saddle.x, 0, -saddle.z);
@@ -101,6 +109,9 @@ export class RiderViewImpl implements RiderView {
     this.root.add(this.bike.root, this.body);
     this.ps = new PoseState(this.inst.rig);
     this.ride = new RidePose(this.ps, this.inst.def);
+    this.trickPose = new TrickPose(this.ps);
+    this.throwPose = new ThrowPose(this.ps);
+    this.glidePose = new GlidePose(this.ps, this.ride);
     this.cues = new CueSystem(this.inst.def);
     this.stateCues = new StateCues(app, this.cues, (): RiderId => this.id, (): Side => this.rivalSide());
     this.extras = new RiderExtras(this.inst, this.body);
@@ -157,7 +168,11 @@ export class RiderViewImpl implements RiderView {
     this.stateCues.update(state, dtSim);
     const crashed = state.mode === 'crashed' && state.crash !== null;
     if (crashed) this.updateCrash(state, pos, quat, dtSim);
-    else this.updateRide(state, quat, dtSim);
+    else {
+      // The trick turns the whole rig around the bike's centre (SPEC §16); the physics pose is untouched.
+      applyTrickPivot(this.root, state.trick, quat, pos);
+      this.updateRide(state, quat, dtSim);
+    }
     if (this.app.camera) this.lod.update(this.root, this.app.camera.position, crashed);
     this.warm?.update();
   }
@@ -187,6 +202,9 @@ export class RiderViewImpl implements RiderView {
     inp.carry = damp(inp.carry, this.carrySide, 2.5, dtSim);
     clearCue(this.cueOut);
     this.cues.update(state, this.cueOut, dtSim);
+    this.trickPose.update(state, this.cueOut, dtSim);
+    this.throwPose.update(state, this.cueOut, dtSim);
+    this.glidePose.update(state, this.cueOut, dtSim);
     const sq = clamp(this.cueOut.squash, -0.35, 0.45);
     this.ride.squashTo(1 + sq * 0.5, 1 - sq);
     this.ride.update(inp, this.cueOut, dtSim);
@@ -197,7 +215,9 @@ export class RiderViewImpl implements RiderView {
     this.ps.apply();
     this.inst.mesh.scale.set(1 + sq * 0.5, 1 - sq, 1 + sq * 0.5);
     this.inst.mesh.updateMatrix();
-    this.extras.update(state, this.cues, this.ps, this.inst.mesh.matrix, stunned, this.cueOut, dtSim);
+    // A throw carries the weapon to the throwing hand.
+    const prefer = state.action?.kind === 'throw' ? state.action.side : null;
+    this.extras.update(state, this.cues, this.ps, this.inst.mesh.matrix, stunned, this.cueOut, dtSim, prefer);
     if (this.extenders) {
       const m = this.inst.mesh.matrix, lift = this.inst.def.meta.ankleLift[1];
       tmp.copy(this.ps.mp[B.footL] as Vector3).applyMatrix4(m).setY(tmp.y - lift);
