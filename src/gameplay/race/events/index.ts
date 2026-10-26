@@ -13,6 +13,7 @@ import { createRoadworks } from './roadworks';
 import { createStalls } from './stalls';
 import { EVENT_TUNING as T } from './tuning';
 import type { EventProps, EventSlot } from './types';
+import { buildEventWarmKit, warmReflectLayer } from './warm';
 
 export interface EventDirector {
   preStep(dt: number): void;
@@ -36,6 +37,14 @@ export function createEventDirector(ctx: RaceCtx, traffic: Traffic | null): Even
   const slots: EventSlot[] = [];
   // The events bring their own props; the traffic manager has nothing to add here.
   void traffic;
+  // The stand-ins of the props go up with the race, so core's warm-up compiles their programs behind the
+  // loading screen: an event that appears in the middle of the race never has to compile one.
+  const warm = buildEventWarmKit();
+  session.world.add(warm.group);
+  // The wet road's mirror draws the track's reflection layer with a camera that sees no lights: those
+  // programs are warmed here too, or the mirror compiles them the first time the player rides past a
+  // retaining wall.
+  warmReflectLayer(session);
 
   for (const p of planEvents(rng, track, session.config.level)) {
     slots.push({ kind: p.kind, s: p.s, phase: 'planned', props: null });
@@ -105,6 +114,7 @@ export function createEventDirector(ctx: RaceCtx, traffic: Traffic | null): Even
         slot.props = null;
       }
       slots.length = 0;
+      warm.dispose();
       if (br && br.events === api) delete br.events;
     },
   };

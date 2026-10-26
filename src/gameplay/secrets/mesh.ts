@@ -2,7 +2,7 @@
 // the cloud pelican god. Toon materials + ink outlines, chunky toy shapes (SPEC §5).
 import {
   BoxGeometry, CanvasTexture, ConeGeometry, CylinderGeometry, Group, Mesh, MeshBasicMaterial,
-  SphereGeometry, SRGBColorSpace, TorusGeometry,
+  SphereGeometry, SRGBColorSpace, TorusGeometry, type Material,
 } from 'three';
 import { outline, toon } from '../../render/toon';
 import { SECRET_LINES } from '../../data/secret-lines';
@@ -162,8 +162,9 @@ export function buildEasel(): { group: Group; texture: CanvasTexture | null; pic
 }
 
 /** The pelican god: soft cloud blobs shaped like a pelican, drawn in the sky without fog. */
-export function buildGod(): Group {
+export function buildGod(): { group: Group; materials: Material[] } {
   const g = new Group();
+  const materials: Material[] = [];
   const cloud = toon('#f2f4f8').clone();
   cloud.fog = false;
   cloud.transparent = true;
@@ -172,6 +173,7 @@ export function buildGod(): Group {
   shade.fog = false;
   shade.transparent = true;
   shade.opacity = 0.9;
+  materials.push(cloud, shade);
 
   const blobs: Array<[number, number, number, number, 'c' | 's']> = [
     [0, 0, 0, 4.6, 'c'], [-3.4, -0.6, 0.4, 3.2, 'c'], [3.2, -0.4, -0.6, 3.6, 'c'],
@@ -191,6 +193,7 @@ export function buildGod(): Group {
   beakMat.fog = false;
   beakMat.transparent = true;
   beakMat.opacity = 0.92;
+  materials.push(beakMat);
   const beak = new Mesh(new ConeGeometry(1.5, 5.4, 12), beakMat);
   beak.rotation.z = -Math.PI / 2;
   beak.rotation.y = 0.12;
@@ -207,5 +210,5 @@ export function buildGod(): Group {
   halo.position.set(0, 1.4, 0);
   g.add(halo);
 
-  return g;
+  return { group: g, materials };
 }

@@ -1,6 +1,6 @@
 // The props the easter eggs put into the race world (SPEC §21): the rubber duck, the SVG easel and the cloud
 // pelican god. This file owns their placement, their look and their removal; the rules live in runner.ts.
-import { Group, Vector3, type CanvasTexture, type MeshBasicMaterial } from 'three';
+import { Group, Vector3, type CanvasTexture, type Material, type MeshBasicMaterial } from 'three';
 import type { Session } from '../../core/contracts';
 import type { Obstacle } from '../../core/types';
 import { buildDuck, buildEasel, buildGod } from './mesh';
@@ -37,13 +37,16 @@ export class SecretProps {
   duck: DuckProp | null = null;
   easel: EaselProp | null = null;
   god: Group | null = null;
+  /** The toon clones the god owns (the shared ones stay alive). */
+  private godMaterials: Material[] = [];
 
   constructor(private readonly session: Session) {}
 
-  /** Put the duck and the easel into the race world. */
+  /** Put the duck, the easel and the (hidden) god into the race world. */
   place(): void {
     this.placeDuck();
     this.placeEasel();
+    this.placeGod();
   }
 
   /** Take everything out of the world again (the race ended or restarted). */
@@ -105,30 +108,41 @@ export class SecretProps {
     this.easel = null;
   }
 
-  /** The cloud pelican (SPEC §21 #7): it lives in the sky, high above the road. */
+  /** The cloud pelican (SPEC §21 #7): it lives in the sky, high above the road. It is built with the race
+   *  and stays hidden until its moment, so core's warm-up compiles its programs behind the loading
+   *  screen instead of the god compiling them when it drifts over the road. */
+  private placeGod(): void {
+    if (this.god) return;
+    const { group, materials } = buildGod();
+    group.name = 'pelican-god';
+    group.scale.setScalar(2.6);
+    group.visible = false;
+    this.session.world.add(group);
+    this.god = group;
+    this.godMaterials = materials;
+  }
+
+  /** The god drifts across the sky. */
   showGod(): Group {
-    if (!this.god) {
-      const group = buildGod();
-      group.name = 'pelican-god';
-      group.scale.setScalar(2.6);
-      this.god = group;
-    }
-    if (!this.god.parent) this.session.world.add(this.god);
-    this.god.visible = true;
-    return this.god;
+    this.placeGod();   // it is normally placed with the race; this is the safety net
+    const group = this.god;
+    if (!group) throw new Error('[secrets] the pelican god is not in the race');
+    group.visible = true;
+    return group;
   }
 
   /** The god has crossed the sky (or the race ended). */
   hideGod(): void {
     if (!this.god) return;
     this.god.visible = false;
-    this.god.parent?.remove(this.god);
   }
 
   removeGod(): void {
     if (!this.god) return;
     this.god.parent?.remove(this.god);
     disposeGroup(this.god);
+    for (const m of this.godMaterials) m.dispose();
+    this.godMaterials = [];
     this.god = null;
   }
 }

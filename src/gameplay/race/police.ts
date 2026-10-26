@@ -27,6 +27,7 @@ import { listenFight, stepOfficer, tryKnock, type FightCtx } from './police/figh
 import { inTunnel } from './police/roadblock';
 import { CHASE, LET_GO_LINES, T } from './police/tuning';
 import { createWanted } from './police/wanted';
+import { buildPoliceWarmKit } from './police/warm';
 
 type Mode = 'off' | 'chase' | 'ticket' | 'leaving';
 type Reason = 'spawn' | 'lost' | 'busted';
@@ -50,6 +51,10 @@ export function createPolice(ctx: RaceCtx): Police {
   // Both officers are built (hidden) with the race, so core's warm-up compiles them behind the loading
   // screen; a spawn only places and shows one.
   const primary = createCorgiUnit(app, session.world, 900, 99);
+  // The roadblock goes up in the middle of a chase: its stand-ins go up with the race, so the block never
+  // compiles a shader program in front of the player.
+  const warm = buildPoliceWarmKit();
+  session.world.add(warm.group);
   const field: Field = createField({
     app, session, player, wanted, rng,
     officers: () => corgis,
@@ -392,6 +397,7 @@ export function createPolice(ctx: RaceCtx): Police {
       }
       disposeCorgiUnit(primary);
       field.dispose();
+      warm.dispose();
     },
   };
 }
