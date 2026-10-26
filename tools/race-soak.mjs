@@ -3,13 +3,14 @@
 // nobody gets stuck, positions stay sane, traffic never spawns inside riders, the police can bust,
 // and no console errors. Prints a per-seed summary.
 //   node tools/race-soak.mjs [--seeds 1,2,3] [--track coast] [--stub fx,ui] [--shots] [--max 9000] [--lenient]
+//                            [--extra weather=rain&reverse=1&route=77]   (more race URL params)
 // Any console error fails; --lenient only fails on errors mentioning race/traffic/police (isolation runs).
 import { parseArgs, withPage } from './lib.mjs';
 
 const a = parseArgs(process.argv.slice(2));
 const seeds = String(a.seeds ?? '1,2,3').split(',').map(Number);
 const track = a.track ?? 'coast';
-const stub = a.stub ? `&stub=${a.stub}` : '';
+const stub = (a.stub ? `&stub=${a.stub}` : '') + (a.extra ? `&${String(a.extra).replace(/^&/, '')}` : '');
 const MAX_FRAMES = Number(a.max ?? 9000);   // at dt 1/30 → 300 s of race time
 const CHUNK = 15;                            // frames between samples (0.5 s)
 const DT = 1 / 30;
