@@ -203,3 +203,18 @@ parallel on the shared tree.
 Residual: `features/bridge.ts` red arch is removed at runtime by the water town (make the arch style per track);
 SHOWTIME now fires about twice a race (more fighting + the STYLE / trick bonus, budget 40 SP per race) — the soak
 accepts it; the records sheet lists 71 achievements in dense one-line cells.
+
+## r5 (2026-10-26) — air, teaching, hitches, water-town paving, records, web
+Same workflow as r4 (lead tests in `tools/r5/`, briefs in `briefs/r5/`, checkpoints in `status/r5/`).
+- air: a shared kicker / jump-hill catalogue (`world/layouts/jumps.ts`), 6+ jumps per track, 2+ big ones (≥ 1.3 s);
+  mega: one landmark mega jump per track (≥ 1.9 s, three chained spins land clean) with its own set dressing.
+- teach: HOW TO 「新玩法」 tab, 18 r4 loading tips, first-time race hints (trick / baton / bribe, twice per profile).
+- hitch: the r4 set pieces (events, roadblock, cloud pelican) and the city's reflection layer compile behind the
+  loading screen — 0 shader programs after GO on every track (was 2–5).
+- wt-look: the flagstone texture covered only part of the lane (courses laid from x 0 instead of −halfWidth); granite
+  setts on the shoulders; a softer drizzle per track.
+- records: a keyboard / pad focus over all 71 achievements with a detail strip; the pause sheet names the r4 actions.
+- lead: Shift-then-direction and take-off trick presses are buffered (sim/tricks.ts); r4 banners wait behind cut-ins;
+  events are never planned under a jump; web meta (Open Graph card, icons) and a touch-device note on the title.
+Residual: the events module warms the city's reflection layer (`gameplay/race/events/warm.ts`) — it belongs in the
+world unit; the water town still removes the shared red bridge arch at runtime; SHOWTIME ~2 per race.
