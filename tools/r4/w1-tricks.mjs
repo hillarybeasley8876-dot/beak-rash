@@ -81,6 +81,12 @@ await withPage(async (page, h) => {
   ev = mine(await events(page, 'rider:trick'));
   expect(ev.some((x) => x.e.phase === 'start' && x.e.kind === 'backflip'), `Shift then brake 50 ms later: a backflip (${JSON.stringify(ev.map((x) => [x.e.phase, x.e.kind]))})`);
 
+  // 3c. Shift + steer pressed right at take-off (50 ms into the air, before minAir): kept, the spin starts at minAir
+  await clearEvents(page);
+  await fly(page, 9, [[{}, 3], [{ drift: true, steer: 1 }, 24], [{ drift: false, steer: 0 }, 4]]);
+  ev = mine(await events(page, 'rider:trick'));
+  expect(ev.some((x) => x.e.phase === 'start' && x.e.kind === 'spin') && ev.some((x) => x.e.phase === 'land'), `Shift + steer at take-off: the spin waits for minAir and lands (${JSON.stringify(ev.map((x) => [x.e.phase, x.e.kind]))})`);
+
   // 4. superman: drift alone, released before landing
   await clearEvents(page);
   await fly(page, 8, [[{}, 20], [{ drift: true }, 24], [{ drift: false }, 4]]);

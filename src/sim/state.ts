@@ -74,6 +74,7 @@ export interface SimRider {
   driftPrev: boolean;                // the previous step's drift input (false → true = a fresh press)
   driftPressed: boolean;             // a fresh drift press this step (in the air it can start a trick)
   supermanHold: number;              // s the drift has been held for the current superman (−1 = none)
+  trickQueued: boolean;              // a fresh drift press came before tricks.minAir: it starts the trick at minAir
   lastTrick: TrickKind | null;       // the last trick of the current air (the land event's kind)
   finishing: TrickState | null;      // a trick judged done at touchdown, still turning its last degrees on the ground
   // crash
@@ -95,7 +96,7 @@ export function createSimRider(r: RiderState): SimRider {
     draftLeader: -1,
     nearMiss: new Map(), nearMissCooldown: 0, touching: new Set(), wallCooldown: 0, wallHitCooldown: 0,
     wallSide: 0, wallFree: 0, swipeCooldown: 0, swipeLatch: -1, swipeFree: 0, airCalm: 0, hopPressAt: -1,
-    driftPrev: false, driftPressed: false, supermanHold: -1, lastTrick: null, finishing: null,
+    driftPrev: false, driftPressed: false, supermanHold: -1, trickQueued: false, lastTrick: null, finishing: null,
     crashBack: 0, pushOff: 0, prevS: r.s, accel: 0,
   };
 }

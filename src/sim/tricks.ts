@@ -1,7 +1,7 @@
 // Air tricks (SPEC §16) and the umbrella glide (SPEC §15).
 // A trick starts on a FRESH drift press while airborne: the drift must be pressed after the take-off (a
 // drift held from the ground never tricks), the rider must be racing, un-stunned and not gliding, and the
-// air must be older than tricks.minAir. The same step's controls pick the trick: |steer| → spin,
+// air must be older than tricks.minAir (an earlier press waits for it while the drift is held). The same step's controls pick the trick: |steer| → spin,
 // brake → backflip, hop → frontflip, drift alone → superman (it starts after tricks.supermanHold of
 // holding and lasts while the drift is held). The trick is visual only: the yaw, the position and the
 // landing alignment never see it — the actors rotate the view from rider.trick.
@@ -53,12 +53,19 @@ export function updateAirTricks(ctx: SimCtx, sr: SimRider, c: Controls, dt: numb
   if (!r.airborne) {
     r.gliding = false;
     sr.supermanHold = -1;
+    sr.trickQueued = false;
     return;
   }
   // The glide ends with the drift release, without the umbrella, or when a trick takes over.
   if (r.gliding && (!c.drift || r.weapon !== 'umbrella' || r.trick)) r.gliding = false;
 
-  if (sr.driftPressed) {
+  // A press in the first moment of the air (as the rider leaves the lip) is kept until minAir, as long as the
+  // drift stays held — pressing the trick on take-off is natural and must not be swallowed.
+  if (sr.driftPressed && r.airTime < K.minAir && r.weapon !== 'umbrella') sr.trickQueued = true;
+  if (!c.drift) sr.trickQueued = false;
+  const queued = sr.trickQueued && r.airTime >= K.minAir;
+  if (queued) sr.trickQueued = false;
+  if (sr.driftPressed || queued) {
     if (r.weapon === 'umbrella' && !r.trick && r.mode === 'racing' && r.mods.steerMul > 0) {
       r.gliding = true; // the umbrella glide is not a trick: no points, no events
     } else if (canTrick(r) && r.airTime >= K.minAir) {
@@ -132,5 +139,6 @@ export function resetTrick(sr: SimRider): void {
   r.trickChain = 0;
   r.gliding = false;
   sr.supermanHold = -1;
+  sr.trickQueued = false;
   sr.lastTrick = null;
 }
