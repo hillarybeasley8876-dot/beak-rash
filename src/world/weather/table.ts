@@ -23,6 +23,9 @@ export const TUNE = {
     satMul: 0.68, nightSatMul: 0.86, contrastMul: 0.92, darken: 0.26, grey: 0.65,
     sunMul: 0.55, ambientMul: 0.9, tint: '#c9d6e4', wetDark: 0.6, sheen: 0.85, spec: 0.45,
   },
+  /** The water town's drizzle (SPEC §20): a soft rain — the stone only darkens a little, so the
+   *  joints of the flagstones stay readable and the lane keeps its light stone colour. */
+  softRain: { dark: 0.86, sheen: 0.5, spec: 0.28 },
   /** Rain puddles: how many a rainy track gets, and where they may sit. */
   puddle: { min: 3, extra: 1, keepClear: 120, lenMin: 5, lenMax: 9, wideMin: 1.4, wideMax: 3.2, margin: 1.2, block: 14 },
   /** Snow: the cover on up-facing surfaces and the colours around it. */

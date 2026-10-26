@@ -87,7 +87,13 @@ function rainLook(base: EnvLook): EnvLook {
       horizon: mix(shade(base.sky.horizon, 1 - darken * 0.45), horizon, grey),
       bottom: mix(shade(base.sky.bottom, 1 - darken * 0.7), horizon, grey * 0.8),
     },
-    fog: { ...base.fog, color: mix(base.fog.color, overcast, grey * 0.85) },
+    fog: {
+      ...base.fog,
+      color: mix(base.fog.color, overcast, grey * 0.85),
+      // The town's drizzle hangs in the air: the haze comes a little closer.
+      near: base.fog.near * (soft ? 0.9 : 1),
+      far: base.fog.far * (soft ? 0.85 : 1),
+    },
     sun: {
       ...base.sun,
       color: mix(base.sun.color, '#9fb0c4', night ? 0.5 : 0.75),
@@ -96,7 +102,8 @@ function rainLook(base: EnvLook): EnvLook {
     ambient: {
       sky: mix(base.ambient.sky, night ? '#4a5464' : '#8d99a6', soft ? 0.3 : 0.5),
       ground: mix(base.ambient.ground, night ? '#3a3f4a' : '#6a6a66', soft ? 0.3 : 0.5),
-      intensity: base.ambient.intensity * (soft ? 1.08 : r.ambientMul),
+      // The town's drizzle is a soft, bright haze: the ambient carries it, not a dark sun.
+      intensity: base.ambient.intensity * (soft ? 1.15 : r.ambientMul),
     },
     grade: {
       saturation: base.grade.saturation * (night ? r.nightSatMul : soft ? 0.86 : r.satMul),

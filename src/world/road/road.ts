@@ -12,13 +12,15 @@ import { roadLookFor } from '../looks';
 import { roadDetail } from './detail';
 import { flagstoneTexture, FLAGSTONE_PERIOD } from './flagstone';
 import { racingLine } from './line';
+import { settTexture } from './sett';
 import { ROAD_PERIOD, asphaltTexture, grainTexture } from './textures';
 
 const SHOULDER_COLORS: Record<string, string> = {
   road: '#73767d', curb: '#73767d', grass: '#7dbb52', sand: '#f1dfab', dirt: '#b98d5a', water: '#4fb6c9', wall: '#8a8a8a',
 };
-/** Per-track shoulder colour: the water town's lane ends in a stone apron, not asphalt. */
-const SHOULDER_OVERRIDE: Record<string, string> = { watertown: '#8f8b80' };
+/** Per-track shoulder colour: the water town's lane ends in a stone apron, not asphalt. Its setts
+ *  carry their own colour, so the vertex colour leaves them alone. */
+const SHOULDER_OVERRIDE: Record<string, string> = { watertown: '#ffffff' };
 const CURB_H = 0.03;
 
 /** Visual s range of the road (run-up before the start, run-off after the finish). */
@@ -64,8 +66,11 @@ export function buildRoad(ctx: WorldCtx): Float32Array {
   road.receiveShadow = true;
   ctx.group.add(road);
   // ---- shoulders (both sides in one mesh)
-  const grain = ctx.shared('tex:grain', () => grainTexture(app.renderer));
-  const shoulderMat = ctx.own(new MeshToonMaterial({ map: grain, vertexColors: true, gradientMap: toonRamp() }));
+  // The water town's shoulders are paved with granite setts; the other tracks get a plain grain.
+  const map = stone
+    ? ctx.shared('tex:sett', () => settTexture(app.renderer))
+    : ctx.shared('tex:grain', () => grainTexture(app.renderer));
+  const shoulderMat = ctx.own(new MeshToonMaterial({ map, vertexColors: true, gradientMap: toonRamp() }));
   for (const side of [-1, 1] as const) {
     const sd = side < 0 ? L.sides.left : L.sides.right;
     const g = new GridGeo(rows, 2);
