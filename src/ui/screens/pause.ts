@@ -10,11 +10,13 @@ import { frame, type ScreenCtx, type ScreenFactory } from '../screen';
 import { remember } from './memory';
 import { fmtTime } from './results-parts';
 
-/** [keyboard, gamepad, action]: the sheet shows the glyphs of the device in use (.is-pad on the root). */
+/** [keyboard, gamepad, action]: the sheet shows the glyphs of the device in use (.is-pad on the root).
+ *  The r4 actions are named too: the held throw, the air tricks and the bell bribe. */
 const CONTROLS: Array<[string, string, string]> = [
-  ['W / ↑', 'RT', '踩踏'], ['S / ↓', 'LT', '刹车'], ['A D / ← →', '左摇杆 / ✚←→', '转向'], ['SHIFT', 'RB', '漂移'],
-  ['SPACE', 'A', '跳跃'], ['J / L', 'X / B', '左挥 / 右挥'], ['K', 'Y', '重击'], ['U I O', 'LB ✚↑ ✚↓', '技能'],
-  ['P', 'R3', 'SHOWTIME'], ['B', 'BACK', '打铃嘲讽'], ['C', 'L3', '回头看'], ['ESC', 'START', '暂停'],
+  ['W / ↑', 'RT', '踩踏'], ['S / ↓', 'LT', '刹车'], ['A D / ← →', '左摇杆 / ✚←→', '转向'],
+  ['SHIFT', 'RB', '漂移 / 特技'], ['SPACE', 'A', '跳跃'], ['J / L', 'X / B', '左挥 / 右挥'],
+  ['K', 'Y', '重击 / 投掷'], ['U I O', 'LB ✚↑ ✚↓', '技能'], ['P', 'R3', 'SHOWTIME'],
+  ['B', 'BACK', '打铃 / V我50'], ['C', 'L3', '回头看'], ['ESC', 'START', '暂停'],
 ];
 
 function standings(session: Session | null): HTMLDivElement {

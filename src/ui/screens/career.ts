@@ -106,7 +106,7 @@ export const careerScreen: ScreenFactory = (ctx) => {
   })), { layout: 'grid', columns: TRACK_ORDER.length, start: recall('career', Math.max(0, highestOpen(save) - 1)), sfx: ctx.sfx }));
   go.addEventListener('click', () => nav.pointerActivate());
 
-  const records = recordsSheet(save, () => setRecords(false));
+  const records = recordsSheet(save, { onClose: () => setRecords(false), sfx: ctx.sfx });
   const recChip = h('div', { class: 'br-car-rec', attrs: { role: 'button' } }, ...keyGlyph('TAB', 'LB'), h('span', { text: '成就' }), h('b', { text: records.count }));
   f.stage.append(recChip, records.el);
   const setRecords = (open: boolean): void => {
@@ -126,13 +126,14 @@ export const careerScreen: ScreenFactory = (ctx) => {
   window.addEventListener('keydown', onKey);
   return {
     root: f.root,
-    dispose: () => window.removeEventListener('keydown', onKey),
+    dispose: () => { window.removeEventListener('keydown', onKey); records.dispose(); },
     onAction: (a) => {
       const tab = (a === 'skill1' || a === 'drift') && ctx.app.input.lastDevice === 'gamepad';
       if (records.open) {
         // Pad B / pad A / Space fire attackR / hop before back / confirm: let those twins fall through.
         if (a === 'back' || a === 'confirm' || a === 'pause' || tab) setRecords(false);
         else if (!isDirection(a)) return false;
+        else return records.handle(a); // the arrows walk the achievement grid, not the ladder
         return true;
       }
       if (tab) {
