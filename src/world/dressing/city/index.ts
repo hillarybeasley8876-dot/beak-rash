@@ -10,6 +10,7 @@ import { loadBillboardArt } from '../coast/signage';
 import { buildRain } from '../../env/city-rain';
 import { buildWetRoad } from '../../env/city-wet';
 import { finishDressYielding, makeDress } from '../dress';
+import { megaOf, megaSetPiece } from '../mega';
 import { SlicedAtlas } from './atlas';
 import { skyline, streetWalls } from './blocks';
 import { REFLECT_LAYER } from './batch';
@@ -137,6 +138,8 @@ export async function dressCity(ctx: WorldCtx, field: TerrainField): Promise<voi
   pools.build();
   const fontsReady = await fonts;
   st.restart();
+  // The mega jump's set piece: the flyover's gap, its piers and the cones along the deck.
+  megaSetPiece(megaOf(c.d));
   await paintAtlases(c, faces, fontsReady);
   await st.done('pools + atlases', 0.62);
   const cityMeshes = await finishCity(c, (f) => ctx.progress(0.62 + 0.2 * f));

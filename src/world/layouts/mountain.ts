@@ -6,7 +6,7 @@
 // lakeside straight into the sunset → finish gantry with paper lanterns.
 import { MountainTerrain } from '../env/mountain-relief';
 import type { GroundDef, LayoutDef, SideDef } from '../layout/types';
-import { fixCrestPeaks, hill, kicker } from './jumps';
+import { fixCrestPeaks, hill, kicker, megaHill } from './jumps';
 
 const G = (g: Partial<GroundDef>): GroundDef => ({
   step: 0, stepW: 2, flat: 3, slope: 0.35, target: 40, rough: 3, abs: false, detached: false, mat: 'grass', ...g,
@@ -87,7 +87,8 @@ export const MOUNTAIN: LayoutDef = {
     ...hill('village', 6.5),
     {
       len: 200, name: 'pines', radius: -300, rise: 14, bank: -3, ease: 60, left: forestDown, right: forestUp,
-      features: [{ kind: 'pickupRow', at: 110, len: 12, x0: 3, x1: 3, data: { kind: 'crate' } }],
+      // The weapon crate stands clear of the village jump's landing zone.
+      features: [{ kind: 'pickupRow', at: 180, len: 12, x0: 3, x1: 3, data: { kind: 'crate' } }],
       marks: [{ kind: 'balloon', at: 120, x: -1 }, { kind: 'teaTerraces', at: 20, x: 1, data: { len: 170 } }],
     },
     {
@@ -175,15 +176,15 @@ export const MOUNTAIN: LayoutDef = {
         { kind: 'prayerFlags', at: 20, x: 1, data: { len: 140 } },
       ],
     },
-    { len: 60, name: 'crest', rise: 6, vEase: 24 },
-    {
-      len: 60, name: 'crest', rise: -8, vEase: 5,
-      features: [{ kind: 'jumpCrest', at: -8, len: 16, x0: -7.5, x1: 7.5 }],
-      marks: [{ kind: 'pagoda', at: -4, x: 1 }],
-    },
+    // The summit's mega jump: the cliff-edge kicker over the gully. The ridge road tops out on the
+    // crest and drops away, so the rider flies the whole descent — ≈ 2.2 s of air, the longest on
+    // the mountain and the one that fits a three-trick chain (SPEC §16).
+    ...megaHill('mega', 6.5, { upLen: 18, upRise: 8, downLen: 52, downRise: 10 }, [
+      { kind: 'pagoda', at: 14, x: 1 },
+    ]),
     // ---- fast descent: sweeper → S-chicane → ramp → down to the lake
     {
-      len: 260, name: 'descent', radius: 400, rise: -40, bank: 4, ease: 60, vEase: 20, left: ridgeUp, right: ridgeDown, sideEase: 30,
+      len: 310, name: 'descent', radius: 400, rise: -40, bank: 4, ease: 60, vEase: 20, left: ridgeUp, right: ridgeDown, sideEase: 30,
       features: [
         { kind: 'pickupRow', at: 120, len: 12, x0: -3, x1: -3, data: { kind: 'crate' } },
         { kind: 'oil', at: 200, len: 8, x0: -4.6, x1: -1.4 },
@@ -212,7 +213,11 @@ export const MOUNTAIN: LayoutDef = {
     },
     {
       len: 180, name: 'lake', radius: 500, rise: -20, ease: 60, left: meadowL, right: shoreR, sideEase: 60,
-      features: [{ kind: 'pickupRow', at: 90, len: 15, x0: 2, x1: -3, data: { kind: 'coin' } }],
+      features: [
+        { kind: 'pickupRow', at: 90, len: 15, x0: 2, x1: -3, data: { kind: 'coin' } },
+        // The weapon crate stands clear of the lakeside jump's landing zone.
+        { kind: 'pickupRow', at: 140, len: 15, x0: -3, x1: -3, data: { kind: 'crate' } },
+      ],
       marks: [{ kind: 'balloon', at: 12, x: 1 }, { kind: 'cows', at: 20, x: -1, data: { len: 150 } }],
     },
     {
@@ -220,7 +225,7 @@ export const MOUNTAIN: LayoutDef = {
       features: [
         { kind: 'puddle', at: 60, len: 6, x0: 1.5, x1: 4.5 },
         { kind: 'boostPad', at: 140, len: 6, x0: -1.7, x1: 1.7, data: { power: 0.3, time: 1 } },
-        { kind: 'pickupRow', at: 190, len: 15, x0: -3, x1: -3, data: { kind: 'crate' } },
+
         kicker('low', 80, 0.4, 5.4),
       ],
       marks: [

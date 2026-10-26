@@ -5,7 +5,7 @@
 //            the rider (the road falls away under the flight, so the air is long).
 // The air times below are what the sim gives at 22 m/s (measured with the offline model, ~8 % less
 // in the browser because the rider loses a little speed on the way up).
-import type { FeatureDef, SegmentDef } from '../layout/types';
+import type { FeatureDef, MarkDef, SegmentDef, SideDef } from '../layout/types';
 
 /** The kicker presets: the wedge's length and lip height (m), and the air they give. */
 export const KICK = {
@@ -52,6 +52,56 @@ export function fixCrestPeaks(segs: SegmentDef[]): void {
     }
     s += g.len;
   }
+}
+
+/**
+ * The mega jump (r5): the landmark launch — a tall kicker hill with a long downhill landing.
+ * The road climbs `upRise` over `upLen` metres, crests, and drops away over `downLen` metres, so
+ * the rider flies the whole descent: ≈ 2.2 s of air at 22 m/s, enough for a three-trick chain
+ * (SPEC §16: 0.25 s before the first trick + 0.55 s per spin + 85 % of the last one ≈ 1.95 s).
+ * The shape is the same on every track, so the feel is tuned from one table.
+ */
+export const MEGA = {
+  upLen: 18, upRise: 8, downLen: 44, downRise: 8, vEaseUp: 10, vEaseDown: 12,
+} as const;
+
+/** A mega-jump shape: the climb, the crest and the long landing (metres). */
+export interface MegaShape {
+  upLen: number; upRise: number; downLen: number; downRise: number;
+  vEaseUp?: number; vEaseDown?: number;
+}
+
+/** The ground the mega jump stands on: the sides of the road and how fast they change. */
+export interface MegaSides {
+  left?: SideDef;
+  right?: SideDef;
+  sideEase?: number;
+}
+
+/**
+ * The two segments of the mega jump, in the order they are laid down. The crest's feature sits on
+ * the second one, so it straddles the top; its peak is filled in by `fixCrestPeaks`. `marks` are
+ * placed on the climb, `at` metres from its start. `sides` gives the ground the jump stands on
+ * (a bridge over a canal, a viaduct over the street) and how fast the sides change.
+ */
+export function megaHill(name: string, halfWidth: number, shape: MegaShape = MEGA, marks?: MarkDef[], sides?: MegaSides): [SegmentDef, SegmentDef] {
+  const vUp = shape.vEaseUp ?? 10;
+  const vDown = shape.vEaseDown ?? 12;
+  const up: SegmentDef = { len: shape.upLen, name, rise: shape.upRise, vEase: vUp, ease: vUp };
+  const down: SegmentDef = {
+    len: shape.downLen, name, rise: -shape.downRise, vEase: vDown, ease: vDown,
+    features: [{ kind: 'jumpCrest', at: -8, len: 16, x0: -halfWidth - 1, x1: halfWidth + 1, data: { big: 1, mega: 1 } }],
+  };
+  if (marks?.length) up.marks = marks;
+  if (sides) {
+    if (sides.left) up.left = sides.left;
+    if (sides.right) up.right = sides.right;
+    if (sides.sideEase !== undefined) up.sideEase = sides.sideEase;
+    down.left = up.left;
+    down.right = up.right;
+    down.sideEase = up.sideEase;
+  }
+  return [up, down];
 }
 
 /**

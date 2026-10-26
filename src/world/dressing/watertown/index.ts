@@ -14,6 +14,7 @@ import type { TerrainField } from '../../terrain/field';
 import { finishArchAt, flags, gantryAt, stands } from '../coast/event';
 import { banners, chevrons, roadSign, warning } from '../coast/signage';
 import { finishDressYielding, makeDress, repaintWhenFontsLoad } from '../dress';
+import { megaOf, megaSetPiece } from '../mega';
 import { humpbackArch, stoneBridge, waterSheet } from './bridges';
 import * as P from './places';
 import { quaySteps } from './quay';
@@ -74,7 +75,10 @@ function water(d: ReturnType<typeof makeDress>): void {
   }
   for (const f of d.ctx.L.features) {
     if (f.kind === 'jumpCrest') {
-      waterSheet(d, f.s0 - 2, f.s1 + 2, (ss) => {
+      // The mega jump's canal is the widest: the water runs under the whole flight.
+      const mega = f.data?.mega === 1 || f.data?.mega === true;
+      const pad = mega ? 26 : 2;
+      waterSheet(d, f.s0 - pad, f.s1 + pad, (ss) => {
         const b = d.field.bound(ss, 1);
         return [-b - 8, b + 8];
       });
@@ -151,6 +155,8 @@ export async function dressWatertown(ctx: WorldCtx, field: TerrainField): Promis
   }
   await breathe();
   ctx.progress(0.68);
+  // The mega jump's set piece: the tall humpback bridge with its lanterns.
+  megaSetPiece(megaOf(d));
   const fontsReady = await fonts;
   d.atlas.flush();
   if (!fontsReady) repaintWhenFontsLoad(d);

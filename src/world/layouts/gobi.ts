@@ -8,7 +8,7 @@
 import { smoothstep } from '../../core/math';
 import type { TrackFrame } from '../../core/types';
 import type { GroundDef, LayoutDef, SideDef } from '../layout/types';
-import { fixCrestPeaks, hill, hillIn, kicker } from './jumps';
+import { fixCrestPeaks, hill, hillIn, kicker, megaHill } from './jumps';
 
 /** Scratch frame for the terrain modifier (it is called once per far-grid vertex). */
 const scratch = {} as TrackFrame;
@@ -159,13 +159,13 @@ export const GOBI: LayoutDef = {
       ],
     }, 80, 8),
     // ---- 2340 – 2720: the salt lake. The road crests a rise, then the white pan opens up below it.
-    { len: 70, name: 'lake', rise: 8, vEase: 24, left: lakeL, right: lakeR },
+    // The giant dune ramp: the road climbs the salt ridge and drops away over the pan, so the rider
+    // flies the whole crossing — the mega jump: ≈ 2.2 s of air, enough for a three-trick chain.
+    ...megaHill('mega', 8, { upLen: 18, upRise: 8, downLen: 46, downRise: 9 }, [
+      { kind: 'dunes', at: 6, x: 1, data: { len: 60 } },
+    ], { left: lakeL, right: lakeR, sideEase: 12 }),
     {
-      len: 70, name: 'lake', rise: -9, vEase: 5,
-      features: [{ kind: 'jumpCrest', at: -8, len: 16, x0: -8, x1: 8, data: { peak: 2410 } }],
-    },
-    {
-      len: 240, name: 'lake',
+      len: 308, name: 'lake',
       features: [
         { kind: 'pickupRow', at: 60, len: 18, x0: -4.5, x1: 4.5, data: { kind: 'coin' } },
         { kind: 'oil', at: 150, len: 9, x0: 0.8, x1: 4.2 },

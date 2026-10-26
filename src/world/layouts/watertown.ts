@@ -5,7 +5,7 @@
 // Water sits at y = 0; the town's lanes run at y = 1.6. Every canal crossing is a segment whose
 // ground profile drops away (detached), so the road is a bridge there.
 import type { GroundDef, LayoutDef, SideDef } from '../layout/types';
-import { fixCrestPeaks, kicker } from './jumps';
+import { fixCrestPeaks, kicker, megaHill } from './jumps';
 
 const G = (g: Partial<GroundDef>): GroundDef => ({
   step: 0, stepW: 2, flat: 4, slope: 0.3, target: 30, rough: 3, abs: false, detached: false, mat: 'grass', ...g,
@@ -128,10 +128,10 @@ export const WATERTOWN: LayoutDef = {
         { kind: 'pickupRow', at: 70, len: 12, x0: -2.4, x1: -2.4, data: { kind: 'fish' } },
         { kind: 'puddle', at: 140, len: 6, x0: -2.47, x1: -1.12 },
         { kind: 'boostPad', at: 190, len: 6, x0: 1.2, x1: 3.3, data: { power: 0.3, time: 1 } },
-        { kind: 'pickupRow', at: 214, len: 12, x0: 2.25, x1: 2.25, data: { kind: 'crate' } },
+        { kind: 'pickupRow', at: 214, len: 12, x0: 2.25, x1: 2.25, data: { kind: 'coin' } },
         // Two stone humps on the market quay: the lane jumps over the canal's edge.
         kicker('low', 94, 0.3, 3.0),
-        kicker('low', 274, 0.3, 3.0),
+        kicker('low', 240, 0.3, 3.0),
       ],
       marks: [
         { kind: 'stalls', at: 10, x: 1, data: { len: 210 } },
@@ -164,6 +164,8 @@ export const WATERTOWN: LayoutDef = {
       len: 440, name: 'sweeper', radius: 240, bank: 3, ease: 80, left: quayL, right: laneR,
       features: [
         { kind: 'pickupRow', at: 110, len: 15, x0: 2.4, x1: -1.12, data: { kind: 'coin' } },
+        // The weapon crate stands clear of the humpback bridge's landing zone.
+        { kind: 'pickupRow', at: 60, len: 15, x0: 2.4, x1: 2.4, data: { kind: 'crate' } },
         { kind: 'puddle', at: 200, len: 8, x0: -3.38, x1: -0.75 },
         { kind: 'boostPad', at: 280, len: 6, x0: -3.3, x1: -1.4, data: { power: 0.3, time: 1 } },
       ],
@@ -175,21 +177,21 @@ export const WATERTOWN: LayoutDef = {
         { kind: 'pagoda', at: 60, x: 190 },
       ],
     },
-    // ---- 1756 – 1912: the second humpback stone bridge, on the rise out of the sweeper.
+    // ---- 1756 – 1912: the town's tallest humpback bridge, over the widest canal. The lane climbs
+    // to the tall stone arch, the road drops away and the rider flies the whole crossing — the mega
+    // jump: ≈ 2.2 s of air, enough for a three-trick chain (SPEC §16).
     {
-      len: 70, name: 'hump', rise: 2,
+      len: 44, name: 'hump', rise: 3,
       marks: [
         { kind: 'warnCrest', at: 26, x: -1 },
         { kind: 'house', at: 0, x: 1, data: { len: 70 } },
       ],
     },
-    { len: 8, name: 'hump', rise: 2.6, vEase: 8, ease: 8, sideEase: 6, left: humpL, right: humpR },
+    ...megaHill('mega', 3.6, { upLen: 18, upRise: 8, downLen: 40, downRise: 8 }, undefined, {
+      left: humpL, right: humpR, sideEase: 8,
+    }),
     {
-      len: 8, name: 'hump', rise: -2.6, vEase: 8, ease: 8, sideEase: 6, left: humpL, right: humpR,
-      features: [{ kind: 'jumpCrest', at: -8, len: 16, x0: -3.6, x1: 3.6, data: { big: 1 } }],
-    },
-    {
-      len: 70, name: 'hump', rise: -2, left: laneL, right: laneR, sideEase: 8,
+      len: 54, name: 'hump', rise: -3, left: laneL, right: laneR, sideEase: 8,
       marks: [
         { kind: 'house', at: 0, x: -1, data: { len: 70 } },
         { kind: 'lantern', at: 30, x: 0 },
@@ -310,7 +312,8 @@ export const WATERTOWN: LayoutDef = {
     },
     {
       len: 200, name: 'finish', left: apronL, right: apronR,
-      features: [kicker('low', 88, 0.3, 3.0)],
+      // The stone hump on the town square: on the straight, so the riders ride over it.
+      features: [kicker('low', 60, 0.3, 3.0)],
       marks: [
         { kind: 'stands', at: 30, x: -1, data: { len: 150 } },
         { kind: 'stands', at: 30, x: 1, data: { len: 150 } },

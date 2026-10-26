@@ -9,7 +9,7 @@
 // avenue → hairpin R28 round a roundabout → sprint between billboards → finish under the big screen.
 import { CityTerrain } from '../env/city-terrain';
 import type { GroundDef, LayoutDef, SegmentDef, SideDef } from '../layout/types';
-import { fixCrestPeaks, hill, kicker } from './jumps';
+import { fixCrestPeaks, hill, kicker, megaHill } from './jumps';
 
 /** Street level (m above the harbour water). */
 export const STREET = 9;
@@ -95,20 +95,15 @@ const TO_CREST: SegmentDef[] = [
     ],
     marks: [{ kind: 'warnCrest', at: 150, x: 1 }],
   },
-  { len: 50, name: 'crest', rise: 5, vEase: 20 },
+  // The flyover gap: the viaduct ends in a tall launch and dives the last metres to the street, so
+  // the rider flies the gap over the expressway's end — ≈ 2.2 s of air, the longest in the city.
+  ...megaHill('mega', 7, { upLen: 18, upRise: 6, downLen: 52, downRise: 15 }),
 ];
-
-/** s of the crest top (start of the 'drop' segment). */
-const CREST = TO_CREST.reduce((s, g) => s + g.len, 0);
 
 /** Crest jump drop → riverside → bridge → underpass + tunnel → avenue → hairpin → sprint → finish. */
 const FROM_CREST: SegmentDef[] = [
   {
-    len: 70, name: 'drop', rise: -14, vEase: 5,
-    features: [{ kind: 'jumpCrest', at: -8, len: 16, x0: -7, x1: 7, data: { peak: CREST } }],
-  },
-  {
-    len: 300, name: 'riverside', radius: 520, ease: 60, left: quay, right: walk,
+    len: 350, name: 'riverside', radius: 520, ease: 60, left: quay, right: walk,
     features: [
       { kind: 'pickupRow', at: 100, len: 15, x0: -3.5, x1: -3.5, data: { kind: 'fish' } },
       { kind: 'puddle', at: 210, len: 7, x0: -5.0, x1: -2.0 },

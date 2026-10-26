@@ -19,11 +19,11 @@ const LAMPS = {
 type LampKind = keyof typeof LAMPS;
 
 /** Zones with street lamps (the arcade has lanterns, the underpass / tunnel their own lights). */
-const LAMP_ZONES = ['start', 'boulevard', 'corner', 'street', 'scramble', 'chicane', 'ramp', 'expressway', 'crest', 'drop', 'riverside', 'bridge', 'avenue', 'hairpin', 'sprint', 'finish'];
+const LAMP_ZONES = ['start', 'boulevard', 'corner', 'street', 'scramble', 'chicane', 'ramp', 'expressway', 'crest', 'drop', 'mega', 'riverside', 'bridge', 'avenue', 'hairpin', 'sprint', 'finish'];
 
 function lampKind(zone: string, rng: Rng): LampKind {
   if (zone === 'scramble' || zone === 'sprint') return rng.chance(0.35) ? 'pink' : 'led';
-  if (['ramp', 'expressway', 'crest', 'drop', 'bridge'].includes(zone)) return 'sodium';
+  if (['ramp', 'expressway', 'crest', 'drop', 'mega', 'bridge'].includes(zone)) return 'sodium';
   return rng.chance(0.75) ? 'sodium' : 'led';
 }
 

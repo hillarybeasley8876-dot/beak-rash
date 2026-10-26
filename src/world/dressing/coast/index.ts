@@ -7,6 +7,7 @@ import { ensureFonts } from '../../fonts';
 import { SignAtlas } from '../../scenery/signs/atlas';
 import type { TerrainField } from '../../terrain/field';
 import { finishDressYielding, makeDress, repaintWhenFontsLoad, type Dress } from '../dress';
+import { megaOf, megaSetPiece } from '../mega';
 import { atSea, finishArchAt, flags, gantryAt, gulls, lighthouseAt, pierAt, STAND_BANNERS, stands } from './event';
 import { farForest, hedges, hillsides, islands, midGround, palms, rocks } from './nature';
 import { groundCover, oliveTerraces } from './cover';
@@ -143,6 +144,8 @@ export async function dressCoast(ctx: WorldCtx, field: TerrainField): Promise<vo
   if (!low) groundCover(d, L.sMin, L.sMin + L.n - 1);
   await breathe();
   ctx.progress(0.66);
+  // The mega jump's set piece: the boardwalk launch with the crowd on its deck.
+  megaSetPiece(megaOf(d));
   const fontsReady = await fonts;
   d.atlas.flush();
   if (!fontsReady) repaintWhenFontsLoad(d);

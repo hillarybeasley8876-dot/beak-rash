@@ -228,3 +228,50 @@ export function jumpSignTexture(renderer: WebGLRenderer, text: string): CanvasTe
   }
   return t;
 }
+
+/**
+ * The MEGA sign: the landmark jump's own board — a black field with a red border, three red
+ * chevrons and the word, much bigger than the ordinary JUMP sign. It stands 120 m before the jump,
+ * so the rider has a whole straight to see it coming.
+ */
+export function megaSignTexture(renderer: WebGLRenderer, text: string): CanvasTexture {
+  const font = /[^\x00-\x7f]/.test(text) ? FONT.cn : FONT.en;
+  const spec = `700 150px ${font}`;
+  const paint = (g: CanvasRenderingContext2D): void => {
+    g.clearRect(0, 0, 512, 256);
+    g.fillStyle = '#0b0b0f';
+    g.fillRect(0, 0, 512, 256);
+    g.strokeStyle = '#e5191c';
+    g.lineWidth = 20;
+    g.strokeRect(10, 10, 492, 236);
+    // Three red chevrons on the left, the word on the right.
+    g.fillStyle = '#e5191c';
+    for (let i = 0; i < 3; i++) {
+      const x = 26 + i * 46;
+      g.beginPath();
+      g.moveTo(x, 40);
+      g.lineTo(x + 34, 128);
+      g.lineTo(x, 216);
+      g.lineTo(x - 22, 216);
+      g.lineTo(x + 12, 128);
+      g.lineTo(x - 22, 40);
+      g.closePath();
+      g.fill();
+    }
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.font = spec;
+    g.fillStyle = '#ffe600';
+    g.fillText(text, 340, 132);
+  };
+  const t = make(512, 256, paint, renderer);
+  if (typeof document !== 'undefined' && document.fonts && !document.fonts.check(spec, text)) {
+    document.fonts.load(spec, text).then(() => {
+      const g = (t.image as HTMLCanvasElement).getContext('2d');
+      if (!g) return;
+      paint(g);
+      t.needsUpdate = true;
+    }, (err: unknown) => console.warn('[track] mega sign font failed', text, err));
+  }
+  return t;
+}

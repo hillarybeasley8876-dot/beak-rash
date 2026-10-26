@@ -18,7 +18,7 @@ import { ahead, hdr, mount, signInset, towardRiders, zoneAt, zoneRuns } from './
 const m = new Matrix4();
 
 /** Zones without street boards: narrow, walled, elevated, or already full of signs. */
-const NO_BOARDS = ['arcade', 'underpass', 'tunnel', 'ramp', 'expressway', 'crest', 'drop', 'bridge', 'sprint', 'start', 'finish'];
+const NO_BOARDS = ['arcade', 'underpass', 'tunnel', 'ramp', 'expressway', 'crest', 'drop', 'mega', 'bridge', 'sprint', 'start', 'finish'];
 const BOARD = { w: 6.2, turn: 0.9, lift: 2.2 };
 const BANNERS = ['暴力鹈鹕', '霓虹夜城'];
 const PYLON = { w: 5, h: 15, base: 4.5 };

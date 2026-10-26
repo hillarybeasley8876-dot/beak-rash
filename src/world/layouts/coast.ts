@@ -4,7 +4,7 @@
 // descent with ramp → headland tunnel → bridge over a cove → hillside → fish-market quay → final
 // sprint. Heights: sea level 0, road 1–37 m. Marks place landmarks, signs, hill villages and gulls.
 import type { GroundDef, LayoutDef, SideDef } from '../layout/types';
-import { fixCrestPeaks, hill, kicker } from './jumps';
+import { fixCrestPeaks, hill, kicker, megaHill } from './jumps';
 
 const G = (g: Partial<GroundDef>): GroundDef => ({
   step: 0, stepW: 2, flat: 4, slope: 0.3, target: 30, rough: 3, abs: false, detached: false, mat: 'grass', ...g,
@@ -76,17 +76,18 @@ export const COAST: LayoutDef = {
         { kind: 'sign', at: 25, x: 1, data: { sign: 'limit' } }, { kind: 'village', at: 180, x: 1 }, { kind: 'gulls', at: 150, x: -40 },
       ],
     },
-    // A jump hill on the promenade: the boardwalk's kicker — the road climbs and drops away, so the
-    // rider flies over the crest with a long, clear landing on the beach road.
-    ...hill('promenade', 7),
+    // The boardwalk's mega jump: the promenade's timber deck climbs to a tall launch and drops
+    // away to the beach road, so the rider flies the whole descent — ≈ 2.2 s of air, the longest
+    // on the coast and the one that fits a three-trick chain (SPEC §16).
+    ...megaHill('mega', 7),
     {
-      len: 300, name: 'beach', radius: -380, rise: -0.1, bank: -2, ease: 60, left: beachL,
+      len: 262, name: 'beach', radius: -380, rise: -0.1, bank: -2, ease: 60, left: beachL,
       features: [
         { kind: 'pickupRow', at: 30, len: 12, x0: 3.5, x1: 3.5, data: { kind: 'crate' } },
         { kind: 'pickupRow', at: 150, len: 21, x0: -6, x1: -1, data: { kind: 'coin' } },
       ],
       marks: [
-        { kind: 'villas', at: 20, x: 1, data: { len: 260 } }, { kind: 'towels', at: 30, x: -1, data: { len: 240 } },
+        { kind: 'villas', at: 20, x: 1, data: { len: 222 } }, { kind: 'towels', at: 30, x: -1, data: { len: 202 } },
         { kind: 'sign', at: 10, x: 1, data: { sign: 'pelican' } },
       ],
     },

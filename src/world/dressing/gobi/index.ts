@@ -8,6 +8,7 @@ import { ensureFonts } from '../../fonts';
 import { installFogCull } from '../../lod';
 import { loadBillboardArt } from '../../scenery/signs/art';
 import type { TerrainField } from '../../terrain/field';
+import { megaOfGobi, megaSetPiece } from '../mega';
 import { makeGobiCtx, type GobiCtx } from './gctx';
 import { buildTurbineRotors, pumpjack, turbine, type TurbineSite } from './industry';
 import { dunes, distantMesas, mesas, saltLake, scatter, shoulderTufts } from './land';
@@ -149,6 +150,8 @@ export async function dressGobi(ctx: WorldCtx, field: TerrainField): Promise<voi
     for (const n of g.nod) n.obj.rotation.z = Math.sin(t * n.speed + n.phase) * n.amp;
   });
 
+  // The mega jump's set piece: the giant dune ramp with its flag poles and the watching caravan.
+  megaSetPiece(megaOfGobi(g));
   const fontsReady = await fonts;
   g.faceTex.needsUpdate = true;
   if (!fontsReady) repaintWhenFontsLoad(g);

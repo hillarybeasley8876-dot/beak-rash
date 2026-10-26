@@ -16,6 +16,7 @@ import type { TerrainField } from '../../terrain/field';
 import { flags } from '../coast/event';
 import { banners, distanceMarkers, loadBillboardArt } from '../coast/signage';
 import { finishDressYielding, makeDress } from '../dress';
+import { megaOf, megaSetPiece } from '../mega';
 import { rockBatch, rockWalls } from './crags';
 import { boulders, farForest, roadsideTrees } from './forest';
 import { rockLedges } from './ledges';
@@ -85,7 +86,7 @@ export async function dressMountain(ctx: WorldCtx, field: TerrainField): Promise
   switchbackLegs(d, rocks);
   distanceMarkers(d);
   billboards(d, art, BANNER_PICKS);
-  for (const name of ['cliff', 'cutting', 'bridgeExit', 'summit', 'crest']) {
+  for (const name of ['cliff', 'cutting', 'bridgeExit', 'summit', 'crest', 'mega']) {
     for (const z of zones(ctx, name)) boulders(d, z.s0, z.s1);
   }
   await st.done('legs, signs, boulders', 0.42);
@@ -94,6 +95,8 @@ export async function dressMountain(ctx: WorldCtx, field: TerrainField): Promise
   verges(d, 0, ctx.L.length);
   farForest(d, L.sMin, L.sMin + L.n - 1);
   await st.done('verges + far forest', 0.62);
+  // The mega jump's set piece: the cliff-edge kicker with its prayer flags.
+  megaSetPiece(megaOf(d));
   const meshes = await finishDressYielding(d, (f) => ctx.progress(0.62 + 0.34 * f));
   await rocks.finishYielding();
   installMountainLod(ctx, meshes);

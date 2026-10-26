@@ -82,7 +82,7 @@ export async function farBank(c: City, tick: () => Promise<void>): Promise<numbe
   const mirror = ctx.mirror;   // the river swaps sides when the road is mirrored (SPEC §20)
   const streaks = new MeshBuf();
   let n = 0;
-  for (const [s0, s1] of zoneRuns(ctx, ['drop', 'riverside', 'bridge'])) {
+  for (const [s0, s1] of zoneRuns(ctx, ['mega', 'riverside', 'bridge'])) {
     embankment(c, s0 - 40, s1 + 60);
     for (let s = s0 - 40; s < s1 + 60; s += rng.range(20, 30)) {
       const fr = ctx.q.frameVis(s);
