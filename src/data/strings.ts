@@ -52,6 +52,85 @@ export const HOWTO_BASICS: string[] = [
 
 export const HOWTO_SP = '打人、挨打、击倒、蹭尾流、擦肩而过、完美落地、三段漂移、打铃，都能攒 SP。';
 
+// ---------------------------------------------------------------- how to play: the r4 mechanics (SPEC §14–§21)
+/** One card of the 「新玩法 NEW」 tab: the mechanic, its keys (keyboard and gamepad) and its rules. */
+export interface HowtoNewCard {
+  id: string;
+  cn: string;
+  en: string;
+  /** Key chips: [keyboard, gamepad, what the key does]. */
+  keys: Array<[kb: string, pad: string, text: string]>;
+  lines: string[];
+  /** A card that spans two columns of the grid. */
+  wide?: boolean;
+}
+
+/** The r4 mechanics, one card each: the tricks, the throw, the weapon traits, the parry, the corgi, the
+ *  bribe, STYLE, the rivals, the track events and the race options (SPEC §14–§21). */
+export const HOWTO_NEW: HowtoNewCard[] = [
+  { id: 'trick', cn: '空中特技', en: 'AIR TRICKS', keys: [
+    ['SHIFT', 'RB', '+ 转向 = 转体 360°'],
+    ['SHIFT + S', 'RB + LT', '= 后空翻'],
+    ['SHIFT + SPACE', 'RB + A', '= 前空翻'],
+    ['SHIFT', 'RB', '单独按 = 超人'],
+  ], lines: ['一次腾空能连做，连做加分', '超人要在落地前松开', '没转完就落地 = 翻车'] },
+  { id: 'throw', cn: '投掷', en: 'THROW', keys: [
+    ['K', 'Y', '按住 = 投掷'],
+    ['K + C', 'Y + L3', '松手时回头 = 往后扔'],
+  ], lines: ['轻点 = 重击，按住 = 扔出去', '扔中对手 = 90 STYLE'] },
+  { id: 'traits', cn: '武器特性', en: 'WEAPON TRAITS', wide: true, keys: [], lines: [
+    '咸鱼：回旋镖，会飞回来',
+    '法棍：硬核，必掉对手武器',
+    '大葱：甩葱三连，第三下更疼',
+    '雨伞：滑翔，空中飘着走',
+    '自拍杆：闪光灯，打瞎 0.6 秒',
+    '拖鞋：必中，追着你飞',
+    '机械键盘：青轴，25% 暴击',
+    '平底锅：完美格挡，见弹反',
+  ] },
+  { id: 'parry', cn: '平底锅弹反', en: 'PAN PARRY', keys: [
+    ['J / L', 'X / B', '挨打前 0.15 秒内出手'],
+  ], lines: ['当！——不掉血，攻击者晕 0.6 秒', '拿着锅本来就能挡掉 35%'] },
+  { id: 'corgi', cn: '柯基警官', en: 'CORGI', keys: [], lines: [
+    '★1 吹哨 · ★2 警棍 · ★3 增援',
+    '头顶冒红「!」= 要抡警棍（0.45 秒）',
+    '刹车 / 闪开 / 跳过去都能躲',
+    '也能拿平底锅弹反',
+    '把它打趴 = 柯基下班了',
+  ] },
+  { id: 'roadblock', cn: '★3 路障', en: 'ROADBLOCK', keys: [], lines: [
+    '★3 会再叫来一只柯基',
+    '前方设卡：只留 3.2 米缺口',
+    '撞上去 = 罚款，钻缺口 = STYLE',
+  ] },
+  { id: 'bribe', cn: '「V我50」', en: 'BRIBE', keys: [
+    ['B', 'BACK', '在柯基旁边打铃'],
+  ], lines: ['★1–★2 才谈得拢，★3 没得谈', '要 50 小鱼干，当场少 50', '它说「……下不为例」'] },
+  { id: 'style', cn: 'STYLE 连段', en: 'STYLE CHAIN', keys: [], lines: [
+    '3 秒内连做动作就不断链',
+    '动作越杂倍率越高，最高 ×4',
+    '挨打 / 翻车 / 断 3 秒就断链',
+    '结算给 SP 和小鱼干',
+  ] },
+  { id: 'nemesis', cn: '宿敌 · 围剿', en: 'NEMESIS', keys: [], lines: [
+    '宿敌：仇记得越深，咬得越狠',
+    '领先太多，他们临时结盟围剿',
+    '盟友误伤 = 塑料友谊',
+  ] },
+  { id: 'events', cn: '赛道突发', en: 'TRACK EVENTS', keys: [], lines: [
+    '鱼车侧翻：绕开，还能捡鱼干',
+    '鹅群过马路：一只都别碰，穿过去有 STYLE',
+    '施工改道：跟着锥桶走',
+    '水果摊：撞摊子掉速，但有鱼干',
+  ] },
+  { id: 'modes', cn: '天气 · 反向 · 路线', en: 'RACE MODES', keys: [], lines: [
+    '雨雪天气抓地力下降',
+    '雾里看不清，跟着车灯',
+    '反向：同一条路倒着骑',
+    '随机路线：同种子同一条路',
+  ] },
+];
+
 // ---------------------------------------------------------------- credits
 export const CREDITS: Array<[role: string, name: string]> = [
   ['总导演', '一只想吃鱼的鹈鹕'],

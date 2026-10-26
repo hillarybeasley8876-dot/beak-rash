@@ -137,6 +137,10 @@ export class R4Hud {
     if (!THROWABLE.has(e.weapon) || hintSeen()) return;
     rememberHint();
     this.deps.cutins.hint('throw', S.throw.en, S.throw.hold, 'heavy', S.throw.cn);
+    // The chip lives in the cut-in layer (not this unit's file), so it is tagged here: every prompt card
+    // of the HUD carries a data-hint, the throw chip included.
+    const chip = document.querySelector<HTMLElement>('.chip-hint');
+    if (chip) chip.dataset.hint = 'throw';
   }
 
   /** The nemesis: a red 宿敌 card and a 宿敌 badge on that rider's name tag. */

@@ -1,5 +1,5 @@
-// Loading-screen tips (≤ 40 字). Light, kind, meme-flavoured; gameplay facts match SPEC §6–7.
-export type TipGroup = 'ride' | 'fight' | 'rivals' | 'trivia';
+// Loading-screen tips (≤ 40 字). Light, kind, meme-flavoured; gameplay facts match SPEC §6–7 (r4: §14–§21).
+export type TipGroup = 'ride' | 'fight' | 'rivals' | 'trivia' | 'r4';
 
 export const TIP_GROUPS: Record<TipGroup, string[]> = {
   ride: [
@@ -83,10 +83,30 @@ export const TIP_GROUPS: Record<TipGroup, string[]> = {
     '卡皮巴拉的胜率不高，但心情一直很好。',
     '玩到第三局：质疑鹈鹕，理解鹈鹕，成为鹈鹕。',
   ],
+  r4: [
+    '空中按住 Shift 加方向就是转体，转完落地还白赚一段加速。',
+    'Shift+S 后空翻，Shift+空格前空翻，Shift 单独按是超人。',
+    '空翻没转完就落地会翻车，鹈鹕的尊严碎了一地。',
+    '按住 K 就能把手里的家伙投掷出去，扔中对手算 STYLE。',
+    '平底锅挡得完美，就是「当！」的一声，攻击者直接愣住。',
+    '咸鱼投掷出去会自己飞回来，接住它算你厉害。',
+    '★2 起柯基会抡警棍，头顶冒出红色「!」就是要抡了。',
+    '柯基举起警棍时按 S 刹车、闪开，或者拿平底锅弹反。',
+    '★3 会有第二只柯基，还会在前面设路障，只留一个缺口。',
+    '★1–★2 时在柯基身边按 B 打铃：V我50，它就放过你。',
+    '连着做动作攒 STYLE，三秒一断，倍率最高四倍。',
+    '领先太多，别的车会临时结盟围剿你。',
+    '盟友打错人，塑料友谊当场碎一地，围剿就是这么脆。',
+    '前方鹅群过马路，慢慢过去比撞上去划算。',
+    '鱼车侧翻后面有鱼干，也有油渍。贪一点，滑一点。',
+    '雨雪天气抓地力会掉，打滑的时候少转一点。',
+    '随机路线：同一个种子就是同一条路，迷路了就把种子记下来。',
+    '每条赛道的路边都藏着一只小黄鸭，五只凑齐有惊喜。',
+  ],
 };
 
 /** Every tip, flat (the loading screen picks one at random). */
-export const TIPS: string[] = [...TIP_GROUPS.ride, ...TIP_GROUPS.fight, ...TIP_GROUPS.rivals, ...TIP_GROUPS.trivia];
+export const TIPS: string[] = [...TIP_GROUPS.ride, ...TIP_GROUPS.fight, ...TIP_GROUPS.rivals, ...TIP_GROUPS.trivia, ...TIP_GROUPS.r4];
 
 /** Gamepad wording of the tips that name keyboard keys (core/input.ts PADMAP, labels as on the pause sheet). */
 export const PAD_TIPS: Readonly<Record<string, string>> = {
@@ -96,4 +116,10 @@ export const PAD_TIPS: Readonly<Record<string, string>> = {
   '按 B 打铃可以嘲讽对手。大鹅最吃这一套：它会直接冲过来。': '按 BACK 打铃可以嘲讽对手。大鹅最吃这一套：它会直接冲过来。',
   'J 往左扇，L 往右扇，K 重击会自动挑边。': 'X 往左扇，B 往右扇，Y 重击会自动挑边。',
   'SP 满了按 P：SHOWTIME！前方 40 米的对手请自求多福。': 'SP 满了按下右摇杆（R3）：SHOWTIME！前方 40 米的对手请自求多福。',
+  // r4 (SPEC §14–§21)
+  '空中按住 Shift 加方向就是转体，转完落地还白赚一段加速。': '空中按住 RB 加方向就是转体，转完落地还白赚一段加速。',
+  'Shift+S 后空翻，Shift+空格前空翻，Shift 单独按是超人。': 'RB+LT 后空翻，RB+A 前空翻，RB 单独按是超人。',
+  '按住 K 就能把手里的家伙投掷出去，扔中对手算 STYLE。': '按住 Y 就能把手里的家伙投掷出去，扔中对手算 STYLE。',
+  '柯基举起警棍时按 S 刹车、闪开，或者拿平底锅弹反。': '柯基举起警棍时按 LT 刹车、闪开，或者拿平底锅弹反。',
+  '★1–★2 时在柯基身边按 B 打铃：V我50，它就放过你。': '★1–★2 时在柯基身边按 BACK 打铃：V我50，它就放过你。',
 };

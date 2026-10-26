@@ -1,15 +1,16 @@
-// howto: three tabs — keyboard map, gamepad map, skills. ←→ (or click) switch tabs, Esc → menu.
+// howto: four tabs — keyboard map, gamepad map, skills, the new mechanics. ←→ (or click) switch tabs, Esc → menu.
 import './howto.css';
 import { Nav } from '../nav';
 import { HINT_BACK, HINT_LR, backdrop, h } from '../p5';
 import { frame, type ScreenFactory } from '../screen';
-import { gamepadPage, keyboardPage, skillsPage } from './howto-pages';
+import { gamepadPage, keyboardPage, newPage, skillsPage } from './howto-pages';
 import { recall, remember } from './memory';
 
 const TABS: Array<[string, string, () => HTMLDivElement]> = [
   ['键盘', 'KEYBOARD', keyboardPage],
   ['手柄', 'GAMEPAD', gamepadPage],
   ['技能', 'SKILLS', skillsPage],
+  ['新玩法', 'NEW', newPage],
 ];
 
 export const howtoScreen: ScreenFactory = (ctx) => {

@@ -73,3 +73,19 @@
 .br-ht-scd { position: absolute; left: 30px; bottom: 26px; padding: 2px 14px 0; background: var(--ink); color: var(--white); font-family: var(--f-cn-block); font-size: 28px; }
 .br-ht-sp { position: absolute; left: 0; top: 640px; display: flex; align-items: center; gap: 18px; font-family: var(--f-cn-play); font-weight: 400; font-size: 30px; color: rgba(255, 255, 255, 0.85); }
 .br-ht-sp .br-tag { font-size: 30px; }
+
+/* ---------- new mechanics (r4, SPEC §14–§21) ---------- */
+.br-ht-new { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: 1.25fr 1fr 1fr; gap: 18px; }
+.br-ht-ncard { position: relative; padding: 14px 16px 12px; background: rgba(255, 255, 255, 0.06); border-left: 10px solid var(--white); animation: br-rise 0.3s var(--ease-out) both; }
+.br-ht-ncard.is-wide { grid-column: span 2; border-color: var(--red); background: rgba(229, 25, 28, 0.12); }
+.br-ht-nhead { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+.br-ht-nhead b { font-family: var(--f-cn-block); font-weight: 400; font-size: 30px; }
+.br-ht-nhead span { font-family: var(--f-display); font-weight: 400; font-size: 19px; letter-spacing: 0.06em; color: var(--red); }
+.br-ht-nkey { display: flex; align-items: center; gap: 8px; margin: 3px 0; }
+.br-ht-nk { padding: 2px 9px 0; background: var(--white); color: var(--ink); font-family: var(--f-display); font-weight: 400; font-size: 19px; transform: skewX(var(--skew)); white-space: nowrap; }
+.br-ht-nk.is-pad { background: var(--ink); color: var(--white); box-shadow: 3px 3px 0 var(--red); }
+.br-ht-nkt { font-family: var(--f-cn-block); font-weight: 400; font-size: 21px; white-space: nowrap; }
+.br-ht-nlines { margin-top: 5px; }
+.br-ht-nlines p { margin: 0 0 2px; font-family: var(--f-cn-play); font-weight: 400; font-size: 21px; line-height: 1.32; color: rgba(255, 255, 255, 0.9); }
+.br-ht-ncard.is-wide .br-ht-nlines { column-count: 2; column-gap: 22px; }
+.br-ht-ncard.is-wide .br-ht-nlines p { break-inside: avoid; }

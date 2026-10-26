@@ -41,7 +41,7 @@ export function createHud(app: AppContext, layer: HTMLElement): Hud {
   const counters = new Counters(corner('tr'));
   const speedo = new Speedo(corner('bl'));
   const brCorner = corner('br');
-  const hints = new Hints(corner('bc'), () => cluster?.skills.ultState === 'ready');
+  const hints = new Hints(corner('bc'), () => cluster?.skills.ultState === 'ready', app.bus);
   const quip = new Quip(brCorner);
   const world = new WorldOverlay(proj, worldHost, edgesHost);
   const cutins = new CutinLayer(root, hudLayer, sfx);
@@ -132,6 +132,7 @@ export function createHud(app: AppContext, layer: HTMLElement): Hud {
     dispose() {
       unwire();
       r4.dispose();
+      hints.dispose();
       world.dispose();
       root.remove();
       session = null;

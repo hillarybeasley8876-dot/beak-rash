@@ -1,7 +1,8 @@
-// How-to pages: keyboard map, gamepad map (code-drawn controller with callouts), skills. The words come from
-// the content unit's data/strings.ts (HOWTO_*); this file owns the drawings and the layout.
+// How-to pages: keyboard map, gamepad map (code-drawn controller with callouts), skills, the new r4
+// mechanics. The words come from the content unit's data/strings.ts (HOWTO_*); this file owns the drawings
+// and the layout.
 import { PLAYER_SKILLS, PLAYER_ULT, SKILLS } from '../../data/skills';
-import { HOWTO_BASICS, HOWTO_GAMEPAD, HOWTO_KEYBOARD, HOWTO_SKILL_TIPS, HOWTO_SP, type HowtoGroup } from '../../data/strings';
+import { HOWTO_BASICS, HOWTO_GAMEPAD, HOWTO_KEYBOARD, HOWTO_NEW, HOWTO_SKILL_TIPS, HOWTO_SP, type HowtoGroup } from '../../data/strings';
 import { h, svg } from '../p5';
 
 type Group = HowtoGroup['id'] | null;
@@ -115,4 +116,25 @@ export function skillsPage(): HTMLDivElement {
   const sp = h('div', { class: 'br-ht-sp' }, h('span', { class: 'br-tag is-yellow', text: 'SP' }),
     h('span', { text: HOWTO_SP }));
   return h('div', { class: 'br-ht-page is-skills' }, h('div', { class: 'br-ht-cards' }, ...cards), sp);
+}
+
+/** The 「新玩法 NEW」 tab: one card per r4 mechanic, with its keyboard and gamepad keys. The words come
+ *  from the content unit's data/strings.ts (HOWTO_NEW); this file owns the cards and the grid. */
+export function newPage(): HTMLDivElement {
+  const grid = h('div', { class: 'br-ht-new' });
+  for (const card of HOWTO_NEW) {
+    const box = h('div', { class: `br-ht-ncard${card.wide ? ' is-wide' : ''}` });
+    box.append(h('div', { class: 'br-ht-nhead' }, h('b', { text: card.cn }), h('span', { text: card.en })));
+    for (const [kb, pad, text] of card.keys) {
+      box.append(h('div', { class: 'br-ht-nkey' },
+        h('kbd', { class: 'br-ht-nk', text: kb }),
+        h('kbd', { class: 'br-ht-nk is-pad', text: pad }),
+        h('span', { class: 'br-ht-nkt', text })));
+    }
+    const lines = h('div', { class: 'br-ht-nlines' });
+    for (const line of card.lines) lines.append(h('p', { text: line }));
+    box.append(lines);
+    grid.append(box);
+  }
+  return h('div', { class: 'br-ht-page is-new' }, grid);
 }

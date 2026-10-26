@@ -16,3 +16,6 @@
 }
 .ht-lbl { font: 400 32px/1 "ZCOOL QingKe HuangYou", sans-serif; }
 .ht-pre { font: 400 26px/1 "ZCOOL QingKe HuangYou", sans-serif; color: #c9c9cf; }
+/* The baton tell (r5): the same card, but the red frame is on the inside. */
+.ht-card.is-alarm { box-shadow: 0 0 0 4px var(--red), 9px 9px 0 4px var(--paper); }
+.ht-card.is-alarm .ht-head { border-right-color: var(--paper); }

@@ -5,7 +5,8 @@ import { el } from './dom';
 
 export type HudKey =
   | 'skill1' | 'skill2' | 'skill3' | 'ult' | 'confirm' | 'up'
-  | 'attackL' | 'attackR' | 'heavy' | 'drift' | 'hop';
+  | 'attackL' | 'attackR' | 'heavy' | 'drift' | 'hop'
+  | 'steer' | 'brake' | 'bell';
 
 /** [keyboard, gamepad] labels for core/input.ts KEYMAP / PADMAP (same names as the pause sheet). */
 export const KEY_LABELS: Record<HudKey, readonly [string, string]> = {
@@ -20,6 +21,9 @@ export const KEY_LABELS: Record<HudKey, readonly [string, string]> = {
   heavy: ['K', 'Y'],
   drift: ['SHIFT', 'RB'],
   hop: ['SPACE', 'A'],
+  steer: ['A D', '摇杆'],
+  brake: ['S', 'LT'],
+  bell: ['B', 'BACK'],
 };
 
 /** The skill slots' keys in diamond order (U / I / O). */
