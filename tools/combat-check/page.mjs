@@ -87,7 +87,17 @@ export function installHelpers() {
         c.give(r.id, 'none');
         if (!r.isPlayer && !keep.includes(r.id)) c.pin(r.id, -60 - r.id * 12, 0, true);
       }
-      br.teleport(0, cc.P().s, 0);
+      // A flat, jump-free stretch from here on (the r5 tracks have jump hills: a case that rides over one gets
+      // airborne, lands and earns SP the case does not expect).
+      const t = s.track;
+      const jumps = t.features.filter((f) => f.kind === 'ramp' || f.kind === 'jumpCrest');
+      let at = cc.P().s;
+      for (let k = 0; k < 600; k++) {
+        if (at > t.length - 400) at = 200;
+        if (!jumps.some((f) => f.s1 > at - 40 && f.s0 < at + 320)) break;
+        at += 10;
+      }
+      br.teleport(0, at, 0);
       Object.assign(cc.P(), { vx: 0, yaw: 0 });
       cc.lane = 0;
       cc.ctl({});
