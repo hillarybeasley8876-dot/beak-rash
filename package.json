@@ -1,7 +1,7 @@
 {
   "name": "beak-rash",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.5.0",
   "type": "module",
   "description": "暴力鹈鹕 BEAK RASH — a 3D pelican-on-a-bicycle combat racer",
   "scripts": {
