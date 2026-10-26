@@ -64,7 +64,7 @@ export class R4Hud {
   constructor(bus: EventBus<GameEvents>, private deps: R4Deps, corner: HTMLElement, popHost: HTMLElement, stage: HTMLElement) {
     this.wanted = new WantedBadge(corner);
     this.style = new StyleMeter(corner);
-    this.banner = new R4Banner(stage);
+    this.banner = new R4Banner(stage, () => deps.cutins.screenBusy);
     this.baton = new BatonWarn(popHost);
     this.trick = new TrickPop(popHost);
     this.parry = new ParryPop(popHost);

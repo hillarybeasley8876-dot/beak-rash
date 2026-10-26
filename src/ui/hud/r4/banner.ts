@@ -19,13 +19,16 @@ export interface BannerSpec {
 }
 
 const LIFE = 2.4;
+/** A banner waits at most this long (s) behind a cut-in before it shows over it anyway. */
+const MAX_WAIT = 2.5;
 
-interface Live { root: HTMLDivElement; t: number; life: number }
+interface Live { root: HTMLDivElement; t: number; life: number; wait: number }
 
 export class R4Banner {
   private live: Live | null = null;
 
-  constructor(private host: HTMLElement) {}
+  /** `busy`: a splash, the skill band or a cinematic owns the screen — the banner waits (hidden, clock stopped). */
+  constructor(private host: HTMLElement, private busy: () => boolean = () => false) {}
 
   /** Show a banner now: the one on stage leaves at once (the newest warning is the one that matters). */
   show(spec: BannerSpec): void {
@@ -40,8 +43,9 @@ export class R4Banner {
       for (const c of spec.faces) faces.append(badge(c));
     }
     const life = spec.life ?? LIFE;
-    this.live = { root, t: 0, life };
+    this.live = { root, t: 0, life, wait: 0 };
     this.frame(this.live, 0);
+    if (this.busy()) root.style.visibility = 'hidden';
   }
 
   clear(): void {
@@ -52,6 +56,13 @@ export class R4Banner {
   update(dt: number): void {
     const l = this.live;
     if (!l) return;
+    // Behind a cut-in the banner would pile on top of it: wait (hidden, its clock frozen) until the screen is free.
+    if (l.t === 0 && l.wait < MAX_WAIT && this.busy()) {
+      l.wait += dt;
+      l.root.style.visibility = 'hidden';
+      return;
+    }
+    l.root.style.visibility = '';
     l.t += dt;
     if (l.t >= l.life) {
       this.clear();
