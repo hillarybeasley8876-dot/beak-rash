@@ -1,6 +1,6 @@
 // The seeded schedule of the track events (SPEC §19): one or two spots per race, drawn from the middle of
-// the track, never two of them close together, never inside a tunnel or on a bridge and never near the
-// finish. The spot is where the event is announced; the props of an event reach around it.
+// the track, never two of them close together, never inside a tunnel, on a bridge or under a jump's flight,
+// and never near the finish. The spot is where the event is announced; the props of an event reach around it.
 import type { Rng } from '../../../core/rng';
 import type { Track } from '../../../core/contracts';
 import type { TrackId } from '../../../core/types';
@@ -62,12 +62,16 @@ function findSpot(rng: Rng, track: Track, kind: EventKind, taken: readonly Plann
   return null;
 }
 
-/** Does a tunnel or a bridge sit between s0 and s1 (with a margin)? */
+/** How far past a jump (m) its flight and landing reach: no event props there. */
+const JUMP_FLIGHT = 45;
+
+/** Does a tunnel, a bridge or a jump (with its flight path) sit between s0 and s1 (with a margin)? */
 function covered(track: Track, s0: number, s1: number): boolean {
   const clear = T.featureClear;
   for (const f of track.features) {
-    if (f.kind !== 'tunnel' && f.kind !== 'bridge') continue;
-    if (s1 >= f.s0 - clear && s0 <= f.s1 + clear) return true;
+    const jump = f.kind === 'ramp' || f.kind === 'jumpCrest';
+    if (f.kind !== 'tunnel' && f.kind !== 'bridge' && !jump) continue;
+    if (s1 >= f.s0 - clear && s0 <= f.s1 + clear + (jump ? JUMP_FLIGHT : 0)) return true;
   }
   return false;
 }
