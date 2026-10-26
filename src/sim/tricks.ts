@@ -42,7 +42,7 @@ function dirOf(kind: TrickKind, c: Controls): Side {
   return 1;
 }
 
-/** A steer, brake or hop during the superman hold disqualifies it. */
+/** A steer, brake or hop during the superman hold turns it into that trick (see updateAirTricks). */
 function interferes(c: Controls): boolean {
   return Math.abs(c.steer) > K.steerMin || c.brake > K.brakeMin || c.hop;
 }
@@ -77,8 +77,15 @@ export function updateAirTricks(ctx: SimCtx, sr: SimRider, c: Controls, dt: numb
     if (!c.drift) endSuperman(sr);
     else sr.supermanHold += dt;
   } else if (sr.supermanHold >= 0) {
-    if (!c.drift || interferes(c)) sr.supermanHold = -1; // released or spoiled before it started
-    else {
+    if (!c.drift) sr.supermanHold = -1; // released before it started
+    else if (interferes(c)) {
+      // Shift came a moment before the direction (two keys are rarely pressed on the same frame): the late
+      // steer / brake / hop picks its trick instead of spoiling the superman.
+      sr.supermanHold = -1;
+      const kind = pickKind(c);
+      const left = airLeft(sr) - K.predictMargin;
+      if (canTrick(r) && left >= (kind === 'spin' ? K.spinDur : K.flipDur) * K.snap) startTrick(ctx, sr, kind, dirOf(kind, c));
+    } else {
       sr.supermanHold += dt;
       if (sr.supermanHold >= K.supermanHold) startTrick(ctx, sr, 'superman', 1);
     }
