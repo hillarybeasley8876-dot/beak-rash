@@ -70,8 +70,10 @@ await withPage(async (page, h) => {
   await wait(600);
   expect(await anyText(page, '宿敌'), 'race:nemesis → 宿敌 on screen (card / tag)');
   await emit('race:alliance', { phase: 'form', members: [goose, 2], target: 0, reason: 'leader' });
-  await wait(400);
-  expect(await anyText(page, '围剿'), 'race:alliance form → 围剿 banner');
+  // the banner waits behind the 宿敌 card (a cut-in owns the screen), so give it until the card is gone
+  let ally = false;
+  for (let i = 0; i < 16 && !ally; i++) { await wait(250); ally = await anyText(page, '围剿'); }
+  expect(ally, 'race:alliance form → 围剿 banner (after the 宿敌 card)');
   await emit('race:alliance', { phase: 'break', members: [goose, 2], target: 0, reason: 'betrayal' });
   await wait(400);
   expect(await anyText(page, '塑料友谊'), 'race:alliance betrayal → 塑料友谊');
