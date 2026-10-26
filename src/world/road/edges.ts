@@ -68,8 +68,8 @@ export function buildEdges(ctx: WorldCtx, field: TerrainField): void {
   };
   for (const side of [-1, 1] as const) {
     for (const [kind, s0, s1] of runs(ctx, side)) {
-      const ex = (prof: Profile, col: (face: number, s: number) => Color, closed = false): void =>
-        extrudeEdge(ctx, batch, side, s0, s1, prof, bound, col, { closed });
+      const ex = (prof: Profile, col: (face: number, s: number) => Color, closed = false, step?: number): void =>
+        extrudeEdge(ctx, batch, side, s0, s1, prof, bound, col, { closed, step });
       switch (kind) {
         case 'barrier':
           ex(BARRIER, (_f, s) => (Math.floor(s / 4) % 2 === 0 ? PAL.red : PAL.white));
@@ -110,7 +110,8 @@ export function buildEdges(ctx: WorldCtx, field: TerrainField): void {
         case 'quay':
           if (ctx.id === 'watertown') {
             // A stone quay: the coping at the kerb and the wall that drops into the canal.
-            ex(WT_QUAY, (f) => (f === 1 ? PAL.stoneC : f <= 3 ? PAL.stoneA : PAL.stoneB));
+            // 1 m rows: the coping is only 9 cm high, and over a jump hill's sag a 2 m chord lifts it above that.
+            ex(WT_QUAY, (f) => (f === 1 ? PAL.stoneC : f <= 3 ? PAL.stoneA : PAL.stoneB), false, 1);
             // Mooring posts stand in the canal, a little above the water.
             along(side, s0 + 4, s1 - 4, 13, 0.8, (x, y, z) => {
               pile(batch.at(x, z), x, y - 1.1, z);

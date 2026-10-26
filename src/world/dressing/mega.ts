@@ -102,9 +102,10 @@ function column(d: MegaWorld, s: number, side: -1 | 1, u: number, w = 0.5): void
 function coastMega(d: MegaWorld, crest: number): void {
   const side = d.side(1);
   board(d, crest - 30, side, '飞', '起飞！MEGA', 2.8, 2.2);
-  const sp = d.place.spot(crest - 4, side, 3.6);
+  // The deck is 8 m deep: centred 4.5 m out, its front edge stays 0.5 m clear of the bound.
+  const sp = d.place.spot(crest - 4, side, 4.5);
   timberDeck(d.props.at(sp.pos.x, sp.pos.z), sp.pos.x, sp.pos.y, sp.pos.z, sp.faceRoad, 9, 8);
-  crowd(d, crest - 8, crest + 1, side, 4.6, 6);
+  crowd(d, crest - 8, crest + 1, side, 5.5, 6);
   // The bunting the riders pass under on the way up.
   const a = d.place.spot(crest - 44, d.side(-1), 1.4);
   const b = d.place.spot(crest - 44, side, 1.4);
