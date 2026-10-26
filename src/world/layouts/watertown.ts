@@ -5,6 +5,7 @@
 // Water sits at y = 0; the town's lanes run at y = 1.6. Every canal crossing is a segment whose
 // ground profile drops away (detached), so the road is a bridge there.
 import type { GroundDef, LayoutDef, SideDef } from '../layout/types';
+import { fixCrestPeaks, kicker } from './jumps';
 
 const G = (g: Partial<GroundDef>): GroundDef => ({
   step: 0, stepW: 2, flat: 4, slope: 0.3, target: 30, rough: 3, abs: false, detached: false, mat: 'grass', ...g,
@@ -108,10 +109,10 @@ export const WATERTOWN: LayoutDef = {
         { kind: 'house', at: 0, x: 1, data: { len: 70 } },
       ],
     },
-    { len: 8, name: 'hump', rise: 1.6, vEase: 8, ease: 8, sideEase: 6, left: humpL, right: humpR },
+    { len: 8, name: 'hump', rise: 2.6, vEase: 8, ease: 8, sideEase: 6, left: humpL, right: humpR },
     {
-      len: 8, name: 'hump', rise: -1.6, vEase: 8, ease: 8, sideEase: 6, left: humpL, right: humpR,
-      features: [{ kind: 'jumpCrest', at: -8, len: 16, x0: -3.6, x1: 3.6 }],
+      len: 8, name: 'hump', rise: -2.6, vEase: 8, ease: 8, sideEase: 6, left: humpL, right: humpR,
+      features: [{ kind: 'jumpCrest', at: -8, len: 16, x0: -3.6, x1: 3.6, data: { big: 1 } }],
     },
     {
       len: 70, name: 'hump', rise: -2, left: quayL, right: laneR, sideEase: 8,
@@ -122,12 +123,15 @@ export const WATERTOWN: LayoutDef = {
     },
     // ---- 906 – 1156: the market quay. Stalls on the town side, the canal and the boats on the left.
     {
-      len: 310, name: 'market', left: quayL, right: stallR,
+      len: 380, name: 'market', left: quayL, right: stallR,
       features: [
         { kind: 'pickupRow', at: 70, len: 12, x0: -2.4, x1: -2.4, data: { kind: 'fish' } },
         { kind: 'puddle', at: 140, len: 6, x0: -2.47, x1: -1.12 },
         { kind: 'boostPad', at: 190, len: 6, x0: 1.2, x1: 3.3, data: { power: 0.3, time: 1 } },
         { kind: 'pickupRow', at: 214, len: 12, x0: 2.25, x1: 2.25, data: { kind: 'crate' } },
+        // Two stone humps on the market quay: the lane jumps over the canal's edge.
+        kicker('low', 94, 0.3, 3.0),
+        kicker('low', 274, 0.3, 3.0),
       ],
       marks: [
         { kind: 'stalls', at: 10, x: 1, data: { len: 210 } },
@@ -179,10 +183,10 @@ export const WATERTOWN: LayoutDef = {
         { kind: 'house', at: 0, x: 1, data: { len: 70 } },
       ],
     },
-    { len: 8, name: 'hump', rise: 1.6, vEase: 8, ease: 8, sideEase: 6, left: humpL, right: humpR },
+    { len: 8, name: 'hump', rise: 2.6, vEase: 8, ease: 8, sideEase: 6, left: humpL, right: humpR },
     {
-      len: 8, name: 'hump', rise: -1.6, vEase: 8, ease: 8, sideEase: 6, left: humpL, right: humpR,
-      features: [{ kind: 'jumpCrest', at: -8, len: 16, x0: -3.6, x1: 3.6 }],
+      len: 8, name: 'hump', rise: -2.6, vEase: 8, ease: 8, sideEase: 6, left: humpL, right: humpR,
+      features: [{ kind: 'jumpCrest', at: -8, len: 16, x0: -3.6, x1: 3.6, data: { big: 1 } }],
     },
     {
       len: 70, name: 'hump', rise: -2, left: laneL, right: laneR, sideEase: 8,
@@ -194,7 +198,10 @@ export const WATERTOWN: LayoutDef = {
     // ---- 1912 – 2142: the memorial archway (牌坊) over the lane, the town's landmark.
     {
       len: 120, name: 'archway', left: laneL, right: laneR,
-      features: [{ kind: 'pickupRow', at: 60, len: 15, x0: -2.25, x1: 2.25, data: { kind: 'coin' } }],
+      features: [
+        { kind: 'pickupRow', at: 60, len: 15, x0: -2.25, x1: 2.25, data: { kind: 'coin' } },
+        kicker('low', 88, 0.3, 3.0),
+      ],
       marks: [
         { kind: 'archway', at: 66, x: 0 },
         { kind: 'house', at: 0, x: -1, data: { len: 120 } },
@@ -303,6 +310,7 @@ export const WATERTOWN: LayoutDef = {
     },
     {
       len: 200, name: 'finish', left: apronL, right: apronR,
+      features: [kicker('low', 88, 0.3, 3.0)],
       marks: [
         { kind: 'stands', at: 30, x: -1, data: { len: 150 } },
         { kind: 'stands', at: 30, x: 1, data: { len: 150 } },
@@ -313,3 +321,6 @@ export const WATERTOWN: LayoutDef = {
     },
   ],
 };
+
+// The jump crests need the absolute s of their top: the layout's own segment list knows where they are.
+fixCrestPeaks(WATERTOWN.segments);

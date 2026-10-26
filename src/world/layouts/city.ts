@@ -9,6 +9,7 @@
 // avenue → hairpin R28 round a roundabout → sprint between billboards → finish under the big screen.
 import { CityTerrain } from '../env/city-terrain';
 import type { GroundDef, LayoutDef, SegmentDef, SideDef } from '../layout/types';
+import { fixCrestPeaks, hill, kicker } from './jumps';
 
 /** Street level (m above the harbour water). */
 export const STREET = 9;
@@ -41,6 +42,9 @@ const TO_CREST: SegmentDef[] = [
     len: 160, name: 'start',
     marks: [{ kind: 'startGantry', at: 46, x: 0 }],
   },
+  // The plaza's jump hill: the road climbs and drops away right after the start line, so the rider
+  // flies over the crest and lands on the long boulevard.
+  ...hill('boulevard', 7),
   {
     len: 300, name: 'boulevard', radius: 900, ease: 60, left: walk, right: walk,
     features: [
@@ -73,6 +77,7 @@ const TO_CREST: SegmentDef[] = [
       { kind: 'puddle', at: 60, len: 6, x0: -4.5, x1: -1.5 },
       { kind: 'pickupRow', at: 130, len: 12, x0: -3, x1: -3, data: { kind: 'can' } },
       { kind: 'puddle', at: 200, len: 7, x0: 1.0, x1: 4.0 },
+      kicker('mid', 70, 0.4, 6.4),
     ],
     marks: [{ kind: 'stalls', at: 20, x: -1, data: { len: 220 } }],
   },
@@ -90,7 +95,7 @@ const TO_CREST: SegmentDef[] = [
     ],
     marks: [{ kind: 'warnCrest', at: 150, x: 1 }],
   },
-  { len: 50, name: 'crest', rise: 2.5, vEase: 20 },
+  { len: 50, name: 'crest', rise: 5, vEase: 20 },
 ];
 
 /** s of the crest top (start of the 'drop' segment). */
@@ -99,7 +104,7 @@ const CREST = TO_CREST.reduce((s, g) => s + g.len, 0);
 /** Crest jump drop → riverside → bridge → underpass + tunnel → avenue → hairpin → sprint → finish. */
 const FROM_CREST: SegmentDef[] = [
   {
-    len: 70, name: 'drop', rise: -11.5, vEase: 5,
+    len: 70, name: 'drop', rise: -14, vEase: 5,
     features: [{ kind: 'jumpCrest', at: -8, len: 16, x0: -7, x1: 7, data: { peak: CREST } }],
   },
   {
@@ -107,6 +112,7 @@ const FROM_CREST: SegmentDef[] = [
     features: [
       { kind: 'pickupRow', at: 100, len: 15, x0: -3.5, x1: -3.5, data: { kind: 'fish' } },
       { kind: 'puddle', at: 210, len: 7, x0: -5.0, x1: -2.0 },
+      kicker('mid', 120, 0.4, 6.4),
     ],
     marks: [{ kind: 'busStop', at: 160, x: 1 }, { kind: 'crossing', at: 190, x: 0 }],
   },
@@ -130,6 +136,9 @@ const FROM_CREST: SegmentDef[] = [
     ],
   },
   { len: 104, name: 'underpass', rise: 8, ease: 30, left: cut, right: cut, sideEase: 4 },
+  // The avenue's jump hill: the road out of the underpass climbs and drops away, so the rider
+  // flies over the crest and lands on the avenue's long run to the roundabout.
+  ...hill('avenue', 7),
   {
     len: 160, name: 'avenue', left: walk, right: walk,
     features: [{ kind: 'pickupRow', at: 70, len: 12, x0: -3.5, x1: -3.5, data: { kind: 'can' } }],
@@ -146,6 +155,7 @@ const FROM_CREST: SegmentDef[] = [
     features: [
       { kind: 'boostPad', at: 110, len: 6, x0: 1.6, x1: 5.0, data: { power: 0.3, time: 1 } },
       { kind: 'pickupRow', at: 200, len: 15, x0: -2, x1: -2, data: { kind: 'coin' } },
+      kicker('low', 80, 0.4, 6.4),
     ],
     marks: [{ kind: 'busStop', at: 60, x: 1 }, { kind: 'crossing', at: 160, x: 0 }],
   },
@@ -170,3 +180,6 @@ export const CITY: LayoutDef = {
   right: plaza,
   segments: [...TO_CREST, ...FROM_CREST],
 };
+
+// The jump crests need the absolute s of their top: the layout's own segment list knows where they are.
+fixCrestPeaks(CITY.segments);

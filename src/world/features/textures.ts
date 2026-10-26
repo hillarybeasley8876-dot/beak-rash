@@ -150,3 +150,81 @@ export function gridTexture(renderer: WebGLRenderer, slotsX: number[], halfWidth
     }
   }, renderer);
 }
+
+/** The jump arrow: three yellow chevrons painted on the road, pointing forward (up the canvas). */
+export function jumpArrowTexture(renderer: WebGLRenderer): CanvasTexture {
+  return make(256, 512, (g) => {
+    g.clearRect(0, 0, 256, 512);
+    g.fillStyle = '#ffe600';
+    g.strokeStyle = '#0b0b0f';
+    g.lineWidth = 9;
+    for (let i = 0; i < 3; i++) {
+      const y = 150 + i * 150;
+      g.beginPath();
+      g.moveTo(34, y);
+      g.lineTo(128, y - 86);
+      g.lineTo(222, y);
+      g.lineTo(222, y + 38);
+      g.lineTo(128, y - 48);
+      g.lineTo(34, y + 38);
+      g.closePath();
+      g.fill();
+      g.stroke();
+    }
+  }, renderer);
+}
+
+/** The kicker lip: a red / white band painted across the road (the top of a jump hill). */
+export function kickerBandTexture(renderer: WebGLRenderer): CanvasTexture {
+  return make(64, 128, (g) => {
+    g.fillStyle = '#f4f2ec';
+    g.fillRect(0, 0, 64, 128);
+    g.fillStyle = '#e5191c';
+    g.fillRect(0, 0, 64, 22);
+    g.fillRect(0, 53, 64, 22);
+    g.fillRect(0, 106, 64, 22);
+  }, renderer);
+}
+
+/**
+ * The JUMP sign: a yellow board with a black arrow and the word. The font may arrive after the
+ * board is drawn, so the face is repainted once it does (like the painted road words).
+ */
+export function jumpSignTexture(renderer: WebGLRenderer, text: string): CanvasTexture {
+  const font = /[^\x00-\x7f]/.test(text) ? FONT.cn : FONT.en;
+  const spec = `400 120px ${font}`;
+  const paint = (g: CanvasRenderingContext2D): void => {
+    g.clearRect(0, 0, 512, 256);
+    g.fillStyle = '#ffe600';
+    g.fillRect(0, 0, 512, 256);
+    g.strokeStyle = '#0b0b0f';
+    g.lineWidth = 18;
+    g.strokeRect(9, 9, 494, 238);
+    // A black arrow on the left, the word on the right.
+    g.fillStyle = '#0b0b0f';
+    g.beginPath();
+    g.moveTo(120, 34);
+    g.lineTo(196, 128);
+    g.lineTo(152, 128);
+    g.lineTo(152, 222);
+    g.lineTo(88, 222);
+    g.lineTo(88, 128);
+    g.lineTo(44, 128);
+    g.closePath();
+    g.fill();
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.font = spec;
+    g.fillText(text, 340, 132);
+  };
+  const t = make(512, 256, paint, renderer);
+  if (typeof document !== 'undefined' && document.fonts && !document.fonts.check(spec, text)) {
+    document.fonts.load(spec, text).then(() => {
+      const g = (t.image as HTMLCanvasElement).getContext('2d');
+      if (!g) return;
+      paint(g);
+      t.needsUpdate = true;
+    }, (err: unknown) => console.warn('[track] jump sign font failed', text, err));
+  }
+  return t;
+}

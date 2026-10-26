@@ -6,6 +6,7 @@ import { glowMat } from '../mats';
 import type { TerrainField } from '../terrain/field';
 import { buildBridge } from './bridge';
 import { buildDecals } from './decals';
+import { buildJumpMarkers } from './jump';
 import { buildRamp } from './ramp';
 import { buildTunnel, tunnelHalfW } from './tunnel';
 import { tunnelInterior } from './tunnel-kit';
@@ -25,6 +26,8 @@ export function buildFeatures(ctx: WorldCtx, field: TerrainField): void {
     }
     else if (f.kind === 'bridge') buildBridge(ctx, structure, field, f);
   }
+  // The jump markers: the signs, the arrows and the kicker lips of the big jumps.
+  buildJumpMarkers(ctx, props);
   props.finish();
   structure.finish();
   tubes.finish();

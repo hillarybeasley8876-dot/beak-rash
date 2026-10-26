@@ -6,6 +6,7 @@
 // lakeside straight into the sunset → finish gantry with paper lanterns.
 import { MountainTerrain } from '../env/mountain-relief';
 import type { GroundDef, LayoutDef, SideDef } from '../layout/types';
+import { fixCrestPeaks, hill, kicker } from './jumps';
 
 const G = (g: Partial<GroundDef>): GroundDef => ({
   step: 0, stepW: 2, flat: 3, slope: 0.35, target: 40, rough: 3, abs: false, detached: false, mat: 'grass', ...g,
@@ -81,6 +82,9 @@ export const MOUNTAIN: LayoutDef = {
         { kind: 'signPelican', at: 125, x: 1 },
       ],
     },
+    // The village's jump hill: the road out of the square climbs and drops away, so the rider
+    // flies over the crest and lands on the pine climb.
+    ...hill('village', 6.5),
     {
       len: 200, name: 'pines', radius: -300, rise: 14, bank: -3, ease: 60, left: forestDown, right: forestUp,
       features: [{ kind: 'pickupRow', at: 110, len: 12, x0: 3, x1: 3, data: { kind: 'crate' } }],
@@ -127,6 +131,8 @@ export const MOUNTAIN: LayoutDef = {
       features: [
         { kind: 'oil', at: 80, len: 9, x0: 1.2, x1: 4.6 },
         { kind: 'pickupRow', at: 150, len: 18, x0: 4, x1: 4, data: { kind: 'coin' } },
+        // The cliff kicker: a wooden wedge on the high road.
+        kicker('mid', 108, 0, 6),
       ],
       marks: [{ kind: 'chevrons', at: 160, x: 1, data: { len: 60 } }],
     },
@@ -172,7 +178,7 @@ export const MOUNTAIN: LayoutDef = {
     { len: 60, name: 'crest', rise: 6, vEase: 24 },
     {
       len: 60, name: 'crest', rise: -8, vEase: 5,
-      features: [{ kind: 'jumpCrest', at: -8, len: 16, x0: -7.5, x1: 7.5, data: { peak: 0 } }],
+      features: [{ kind: 'jumpCrest', at: -8, len: 16, x0: -7.5, x1: 7.5 }],
       marks: [{ kind: 'pagoda', at: -4, x: 1 }],
     },
     // ---- fast descent: sweeper → S-chicane → ramp → down to the lake
@@ -199,8 +205,8 @@ export const MOUNTAIN: LayoutDef = {
     {
       len: 240, name: 'descent', radius: 380, rise: -32, bank: 3, ease: 50,
       features: [
-        { kind: 'ramp', at: 120, len: 7, x0: -4.6, x1: -1.0, data: { height: 1.2 } },
-        { kind: 'pickupRow', at: 133, len: 10, x0: -2.8, x1: -2.8, data: { kind: 'can' } },
+        kicker('mid', 120, -0.5, 6.4),
+        { kind: 'pickupRow', at: 136, len: 10, x0: -2.8, x1: -2.8, data: { kind: 'can' } },
       ],
       marks: [{ kind: 'warnRamp', at: 70, x: 1 }],
     },
@@ -215,6 +221,7 @@ export const MOUNTAIN: LayoutDef = {
         { kind: 'puddle', at: 60, len: 6, x0: 1.5, x1: 4.5 },
         { kind: 'boostPad', at: 140, len: 6, x0: -1.7, x1: 1.7, data: { power: 0.3, time: 1 } },
         { kind: 'pickupRow', at: 190, len: 15, x0: -3, x1: -3, data: { kind: 'crate' } },
+        kicker('low', 80, 0.4, 5.4),
       ],
       marks: [
         { kind: 'balloon', at: 72, x: 1 },
@@ -222,6 +229,9 @@ export const MOUNTAIN: LayoutDef = {
         { kind: 'lanterns', at: 120, x: 0, data: { len: 120, every: 40, style: 'posts' } },
       ],
     },
+    // The lakeside's jump hill: the road leaves the lake and drops away, so the rider flies over the
+    // crest and lands on the run to the finish gantry.
+    ...hill('lakeside', 6.5),
     {
       len: 160, name: 'finish', left: finishL, right: finishR,
       marks: [
@@ -235,12 +245,6 @@ export const MOUNTAIN: LayoutDef = {
   ],
 };
 
-// The crest-jump feature needs the absolute s of the crest top: the start of the second 'crest' segment.
-{
-  let s = 0;
-  for (const g of MOUNTAIN.segments) {
-    const crest = g.features?.find((f) => f.kind === 'jumpCrest');
-    if (crest) crest.data = { ...crest.data, peak: s };
-    s += g.len;
-  }
-}
+// The crest-jump feature needs the absolute s of the crest top: the layout's own segment list
+// knows where they are.
+fixCrestPeaks(MOUNTAIN.segments);

@@ -4,6 +4,7 @@
 // descent with ramp → headland tunnel → bridge over a cove → hillside → fish-market quay → final
 // sprint. Heights: sea level 0, road 1–37 m. Marks place landmarks, signs, hill villages and gulls.
 import type { GroundDef, LayoutDef, SideDef } from '../layout/types';
+import { fixCrestPeaks, hill, kicker } from './jumps';
 
 const G = (g: Partial<GroundDef>): GroundDef => ({
   step: 0, stepW: 2, flat: 4, slope: 0.3, target: 30, rough: 3, abs: false, detached: false, mat: 'grass', ...g,
@@ -66,12 +67,18 @@ export const COAST: LayoutDef = {
     },
     {
       len: 250, name: 'promenade', rise: -0.25, left: seawallL, right: villasR,
-      features: [{ kind: 'pickupRow', at: 90, len: 18, x0: -4.5, x1: 1.5, data: { kind: 'coin' } }],
+      features: [
+        { kind: 'pickupRow', at: 90, len: 18, x0: -4.5, x1: 1.5, data: { kind: 'coin' } },
+        kicker('low', 50, 0.4, 6.4),
+      ],
       marks: [
         { kind: 'umbrellas', at: 0, x: -1, data: { len: 250 } }, { kind: 'villas', at: 10, x: 1, data: { len: 230 } },
         { kind: 'sign', at: 25, x: 1, data: { sign: 'limit' } }, { kind: 'village', at: 180, x: 1 }, { kind: 'gulls', at: 150, x: -40 },
       ],
     },
+    // A jump hill on the promenade: the boardwalk's kicker — the road climbs and drops away, so the
+    // rider flies over the crest with a long, clear landing on the beach road.
+    ...hill('promenade', 7),
     {
       len: 300, name: 'beach', radius: -380, rise: -0.1, bank: -2, ease: 60, left: beachL,
       features: [
@@ -146,13 +153,13 @@ export const COAST: LayoutDef = {
     { len: 60, name: 'crest', rise: 6, vEase: 24, right: hillsR, sideEase: 40, marks: [{ kind: 'paint', at: 26, x: 0, data: { text: '飞' } }] },
     {
       len: 60, name: 'crest', rise: -8, vEase: 5,
-      features: [{ kind: 'jumpCrest', at: -8, len: 16, x0: -7, x1: 7, data: { peak: 1640 } }],
+      features: [{ kind: 'jumpCrest', at: -8, len: 16, x0: -7, x1: 7 }],
     },
     {
       len: 200, name: 'descent', radius: -420, rise: -11, vEase: 20, ease: 50,
       features: [
-        { kind: 'ramp', at: 112, len: 7, x0: 1.2, x1: 5.0, data: { height: 1.2 } },
-        { kind: 'pickupRow', at: 125, len: 10, x0: 3.1, x1: 3.1, data: { kind: 'can' } },
+        kicker('mid', 112, 0, 6.4),
+        { kind: 'pickupRow', at: 128, len: 10, x0: 3.1, x1: 3.1, data: { kind: 'can' } },
       ],
       marks: [{ kind: 'warnRamp', at: 60, x: 1 }],
     },
@@ -212,6 +219,9 @@ export const COAST: LayoutDef = {
         { kind: 'sign', at: 80, x: 1, data: { sign: 'lanes' } },
       ],
     },
+    // The quay's jump hill: the market street climbs and drops away, so the rider flies over the
+    // crest and lands on the long run to the finish.
+    ...hill('market', 7),
     {
       len: 320, name: 'market', ease: 50, left: quayL, right: marketR,
       features: [
@@ -229,7 +239,10 @@ export const COAST: LayoutDef = {
     },
     {
       len: 120, name: 'sprint', radius: 420, ease: 50, left: seawallL, right: villasR,
-      features: [{ kind: 'pickupRow', at: 50, len: 15, x0: 0, x1: 0, data: { kind: 'coin' } }],
+      features: [
+        { kind: 'pickupRow', at: 50, len: 15, x0: 0, x1: 0, data: { kind: 'coin' } },
+        kicker('low', 30, 0.4, 6.4),
+      ],
       marks: [{ kind: 'village', at: 40, x: 1 }, { kind: 'umbrellas', at: 0, x: -1, data: { len: 120 } }],
     },
     {
@@ -243,3 +256,6 @@ export const COAST: LayoutDef = {
     },
   ],
 };
+
+// The jump crests need the absolute s of their top: the layout's own segment list knows where they are.
+fixCrestPeaks(COAST.segments);

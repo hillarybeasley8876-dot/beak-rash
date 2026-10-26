@@ -8,6 +8,7 @@
 import { smoothstep } from '../../core/math';
 import type { TrackFrame } from '../../core/types';
 import type { GroundDef, LayoutDef, SideDef } from '../layout/types';
+import { fixCrestPeaks, hill, hillIn, kicker } from './jumps';
 
 /** Scratch frame for the terrain modifier (it is called once per far-grid vertex). */
 const scratch = {} as TrackFrame;
@@ -73,11 +74,13 @@ export const GOBI: LayoutDef = {
         { kind: 'boostPad', at: 180, len: 6, x0: -5.2, x1: -1.8, data: { power: 0.3, time: 1 } },
         { kind: 'pickupRow', at: 250, len: 15, x0: -4.5, x1: 1.5, data: { kind: 'coin' } },
         { kind: 'pickupRow', at: 320, len: 12, x0: 3.5, x1: 3.5, data: { kind: 'can' } },
-        { kind: 'oil', at: 380, len: 9, x0: 0.8, x1: 4.2 },
-        { kind: 'ramp', at: 395, len: 7, x0: 1.2, x1: 5.0, data: { height: 1.7 } },
+        { kind: 'oil', at: 365, len: 9, x0: 0.8, x1: 4.2 },
+        { kind: 'ramp', at: 340, len: 7, x0: 1.2, x1: 5.0, data: { height: 1.7 } },
+        // The dune kicker: a sand wedge on the long run.
+        kicker('mid', 150, 0.4, 6.4),
       ],
       marks: [
-        { kind: 'warnRamp', at: 365, x: 1 },
+        { kind: 'warnRamp', at: 300, x: 1 },
         { kind: 'turbines', at: 120, x: -1, data: { count: 3 } },
         { kind: 'poles', at: 0, x: -1, data: { len: 430 } },
         { kind: 'dustDevil', at: 260, x: 1, data: { count: 2 } },
@@ -85,9 +88,9 @@ export const GOBI: LayoutDef = {
       ],
     },
     // ---- 580 – 920: the first dune crossing. Up over a sand ridge, then the road drops away: a crest.
-    { len: 70, name: 'dune', rise: 7, vEase: 24, left: duneL, right: duneR },
+    { len: 70, name: 'dune', rise: 9, vEase: 24, left: duneL, right: duneR },
     {
-      len: 70, name: 'dune', rise: -8, vEase: 5,
+      len: 70, name: 'dune', rise: -10, vEase: 5,
       features: [{ kind: 'jumpCrest', at: -8, len: 16, x0: -8, x1: 8, data: { peak: 650 } }],
       marks: [{ kind: 'dunes', at: 0, x: 1, data: { len: 70 } }],
     },
@@ -117,9 +120,10 @@ export const GOBI: LayoutDef = {
     {
       len: 420, name: 'midRun', rise: -1, left: desertL, right: desertR,
       features: [
-        { kind: 'boostPad', at: 120, len: 6, x0: 1.6, x1: 5.0, data: { power: 0.3, time: 1 } },
-        { kind: 'pickupRow', at: 200, len: 15, x0: 0, x1: 0, data: { kind: 'coin' } },
+        { kind: 'pickupRow', at: 120, len: 12, x0: 0, x1: 0, data: { kind: 'coin' } },
+        { kind: 'boostPad', at: 230, len: 6, x0: 1.6, x1: 5.0, data: { power: 0.3, time: 1 } },
         { kind: 'pickupRow', at: 280, len: 12, x0: 3.5, x1: 3.5, data: { kind: 'can' } },
+        kicker('mid', 190, 0.4, 6.4),
       ],
       marks: [
         { kind: 'truckStop', at: 150, x: 1 },
@@ -143,8 +147,9 @@ export const GOBI: LayoutDef = {
         { kind: 'sign', at: 16, x: -1, data: { sign: 'sharp' } },
       ],
     },
-    // ---- 2080 – 2340: the oasis run (palm shade and a water hole by the road).
-    {
+    // ---- 2080 – 2340: the oasis run (palm shade and a water hole by the road) with a jump hill:
+    // the road climbs out of the sharp bends and drops away, so the rider flies over the crest.
+    ...hillIn({
       len: 260, name: 'oasisRun', rise: 2,
       features: [{ kind: 'pickupRow', at: 60, len: 12, x0: -2, x1: -2, data: { kind: 'crate' } }],
       marks: [
@@ -152,11 +157,11 @@ export const GOBI: LayoutDef = {
         { kind: 'billboard', at: 120, x: 1 },
         { kind: 'dustDevil', at: 180, x: 1, data: { count: 2 } },
       ],
-    },
+    }, 80, 8),
     // ---- 2340 – 2720: the salt lake. The road crests a rise, then the white pan opens up below it.
-    { len: 70, name: 'lake', rise: 5.5, vEase: 24, left: lakeL, right: lakeR },
+    { len: 70, name: 'lake', rise: 8, vEase: 24, left: lakeL, right: lakeR },
     {
-      len: 70, name: 'lake', rise: -6.5, vEase: 5,
+      len: 70, name: 'lake', rise: -9, vEase: 5,
       features: [{ kind: 'jumpCrest', at: -8, len: 16, x0: -8, x1: 8, data: { peak: 2410 } }],
     },
     {
@@ -181,24 +186,27 @@ export const GOBI: LayoutDef = {
         { kind: 'poles', at: 0, x: 1, data: { len: 320 } },
       ],
     },
+    // The final run's jump hill: the road leaves the turbine ridge and drops away, so the rider flies
+    // over the crest and lands on the run to the last dune.
+    ...hill('finalRun', 8),
     // ---- 3040 – 3420: the final run — a ramp, a boost pad, and the last dune ahead.
     {
       len: 380, name: 'finalRun', rise: -2, left: desertL, right: desertR,
       features: [
-        { kind: 'ramp', at: 120, len: 8, x0: -3.0, x1: 0.8, data: { height: 2.0 } },
-        { kind: 'pickupRow', at: 200, len: 12, x0: 3.5, x1: 3.5, data: { kind: 'can' } },
+        { kind: 'pickupRow', at: 120, len: 12, x0: 3.5, x1: 3.5, data: { kind: 'can' } },
+        { kind: 'ramp', at: 210, len: 8, x0: -3.0, x1: 0.8, data: { height: 2.0 } },
         { kind: 'boostPad', at: 300, len: 6, x0: -5.2, x1: -1.8, data: { power: 0.3, time: 1 } },
       ],
       marks: [
-        { kind: 'warnRamp', at: 90, x: 1 },
+        { kind: 'warnRamp', at: 180, x: 1 },
         { kind: 'dunes', at: 0, x: -1, data: { len: 380 } },
         { kind: 'dustDevil', at: 240, x: 1, data: { count: 3 } },
       ],
     },
     // ---- 3420 – 3560: the last dune crest before the oasis.
-    { len: 70, name: 'finalDune', rise: 6, vEase: 24, left: duneL, right: duneR },
+    { len: 70, name: 'finalDune', rise: 9, vEase: 24, left: duneL, right: duneR },
     {
-      len: 70, name: 'finalDune', rise: -7, vEase: 5,
+      len: 70, name: 'finalDune', rise: -10, vEase: 5,
       features: [{ kind: 'jumpCrest', at: -8, len: 16, x0: -8, x1: 8, data: { peak: 3490 } }],
     },
     // ---- 3560 – 3750: the oasis finish, under a caravanserai arch.
@@ -213,3 +221,6 @@ export const GOBI: LayoutDef = {
     },
   ],
 };
+
+// The jump crests need the absolute s of their top: the layout's own segment list knows where they are.
+fixCrestPeaks(GOBI.segments);

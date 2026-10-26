@@ -37,8 +37,7 @@ export function decal(
   return mesh;
 }
 
-function decalMat(ctx: WorldCtx, map: Texture, lit = true): MeshToonMaterial | MeshBasicMaterial {
-  const common = {
+export function decalMat(ctx: WorldCtx, map: Texture, lit = true): MeshToonMaterial | MeshBasicMaterial {  const common = {
     map, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2, side: DoubleSide,
   };
   return ctx.own(lit ? new MeshToonMaterial({ ...common, gradientMap: toonRamp() }) : new MeshBasicMaterial(common));
