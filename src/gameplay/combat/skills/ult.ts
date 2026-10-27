@@ -1,7 +1,8 @@
 // pelican.ult SHOWTIME (SP 100): ult:start (fx cut-in + slow-mo), leap to 8 m, dive-bomb; the impact
 // shockwave hits riders 40 m ahead / 20 m behind: 45 dmg + knock + 1 s stun (≤ 20 % HP left = KO), then
 // ult:impact. The leap homes forward onto the pack (ult-aim.ts; never backwards, so a cast can't cost places);
-// with nobody in reach the cast is denied (无目标！). Its hits and KOs refund no SP, nor does the caster's fighting
+// with nobody in reach the cast is denied (无目标！) — r6: a police officer in reach counts (SPEC §25: the shockwave
+// knocks out every officer it reaches, combat:obstacleHit with ko). Its hits and KOs refund no SP, nor does the caster's fighting
 // for SP.afterUlt s (sp.ts fightSp). The shockwave is drawn as bands hugging the road that part around riders.
 import { easeInCubic, easeOutCubic } from '../../../core/math';
 import type { RiderState } from '../../../core/types';
@@ -11,7 +12,7 @@ import { impact } from '../feedback';
 import { addStatus, removeStatus } from '../statuses';
 import { GroundRing } from '../visuals/ground-ring';
 import { Trail } from '../visuals/trail';
-import { skillHit } from './common';
+import { obstaclesIn, skillHit, skillObstacleHit } from './common';
 import { homeStep, planUlt, type UltPlan, type UltReach } from './ult-aim';
 import { TimedSkill, type EndReason, type SkillImpl } from './types';
 
@@ -33,8 +34,15 @@ const leapSpeed = (r: RiderState): number => Math.max(r.speed, BIKES[r.bike].top
 const REACH: UltReach = {
   ahead: ULT.ahead, behind: ULT.behind, lineGap: ULT.lineGap, flight: IMPACT_T, extra: ULT.diveSpeed * ULT.dive, speed: leapSpeed,
 };
-/** Where SHOWTIME would land now (null = nobody to hit short of the finish line: denied, SP kept). */
+/** Where SHOWTIME would land now (null = no rider to hit short of the finish line). */
 const plan = (ctx: CombatCtx, r: RiderState): UltPlan | null => planUlt(ctx, r, REACH);
+
+/** An officer the natural landing's shockwave would reach (short of the finish line): reason enough to cast. */
+function officerInReach(ctx: CombatCtx, r: RiderState): boolean {
+  const travel = leapSpeed(r) * IMPACT_T + REACH.extra;
+  if (r.s + travel >= ctx.session.track.length - ULT.lineGap) return false;
+  return obstaclesIn(ctx, r, (o, ds) => o.kind === 'police' && ds >= -ULT.behind && ds <= travel + ULT.ahead).length > 0;
+}
 
 class Showtime extends TimedSkill {
   private hit = false;
@@ -119,6 +127,10 @@ class Showtime extends TimedSkill {
       const out = skillHit(ctx, r, v, ID, { damage: ULT.damage, knock: ULT.knock, stun: ULT.stun, speedLoss: 0.3, heavy: true, impact: 'ult', countCombo: i === 0 });
       if (out === 'landed' && v.hp <= v.maxHp * ULT.execute) v.hp = 0; // KO'd in postStep, credited to the ult
     });
+    // The police (SPEC §25): every officer in the shockwave's reach is knocked out, whatever its HP.
+    for (const o of obstaclesIn(ctx, r, (ob, ds) => ob.kind === 'police' && ds <= ULT.ahead && ds >= -ULT.behind)) {
+      skillObstacleHit(ctx, r, o, ID, ULT.damage, true);
+    }
     const pos = ctx.pos(r, 0.2);
     ctx.bus.emit('ult:impact', { riderId: r.id, skillId: ID, pos, victims: victims.map((v) => v.id) });
     impact(ctx, 'ult', r, null); // coalesced with the victims' hits into one punch
@@ -137,5 +149,6 @@ class Showtime extends TimedSkill {
 }
 
 export const ult: SkillImpl = {
-  id: ID, noTarget: '无目标！', ready: (ctx, r) => plan(ctx, r) !== null, cast: (ctx, r) => new Showtime(ctx, r, plan(ctx, r)),
+  id: ID, noTarget: '无目标！', ready: (ctx, r) => plan(ctx, r) !== null || officerInReach(ctx, r),
+  cast: (ctx, r) => new Showtime(ctx, r, plan(ctx, r)),
 };

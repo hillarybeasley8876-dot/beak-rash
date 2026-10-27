@@ -54,3 +54,20 @@ skills / SHOWTIME cannot reach it at all.
 - `node tools/race-scenarios.mjs` → checks passed
 - `node tools/core-check.mjs` → core-check OK
 Look at your work: screenshots of the squad with shields and of an officer going down, under `shots/r6-police/`.
+
+## Lead review after round 1 (read this first when you resume)
+Good work: the fight plays well (6 wing hits, the officer in reach 89 % of the time). Changes now required:
+1. **Officer HP must be 40** (SPEC §25 and step 1 of this brief) — `police/tuning.ts` still says `hp: 60` (your status
+   file says "it has 60 HP"). The lead updated `tools/race-scenarios/chase.mjs` to read the HP from
+   `__br.race.police().hp`, so that check passes with 40.
+2. **Combat now routes the old skills to the officers itself** (lead change in combat, 2026-10-27): SHOWTIME
+   (`pelican.ult`) emits `combat:obstacleHit { skillId: 'pelican.ult', ko: true }` for every officer in its
+   shockwave, and its `ready()` accepts an officer in reach as a target (so it is no longer denied next to an
+   officer); the torpedo hits officers via the projectile's `onObstacle` (`combat:obstacleHit { skillId:
+   'pelican.torpedo', damage: 14 }`) and aims at an officer when no rival is in its cone; `cat.spin` hits officers
+   within its radius. Therefore in `police/skills.ts` REMOVE: the `skill:denied` → ult workaround, the
+   `ult:impact` → knockDown listener, the `projectile:end` proximity hack, and the `cat.spin` / `pelican.torpedo`
+   rules (they would now count twice). Keep `goose.honk` (stun only, combat sends no obstacle hit for it) and the
+   wing dash timer. Your `combat:obstacleHit` listener (with `ko`) is now the one path for skill damage; the
+   `skillHits` de-dup map is then no longer needed — remove it too if nothing else uses it.
+3. Keep everything else. Run the acceptance again (r6-police must still pass with the combat routing).

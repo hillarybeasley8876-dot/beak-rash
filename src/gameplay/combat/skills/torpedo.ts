@@ -1,9 +1,10 @@
 // pelican.torpedo — spit a homing salted fish at the nearest rival ahead (≤ 60 m, ±25°): flies at
-// rider speed + 22 m/s, 14 dmg + 0.6 s stun. With no target it flies straight and poofs.
+// rider speed + 22 m/s, 14 dmg + 0.6 s stun. With no rival in the cone it flies at the nearest police officer there
+// (r6 SPEC §25: combat:obstacleHit), else straight on, and poofs.
 import { DEG } from '../../../core/math';
 import type { RiderState } from '../../../core/types';
 import { nearest, targetable, type CombatCtx } from '../ctx';
-import { skillHit } from './common';
+import { obstaclesIn, skillHit, skillObstacleHit } from './common';
 import { aheadAngle, TimedSkill, type SkillImpl } from './types';
 
 const ID = 'pelican.torpedo';
@@ -24,8 +25,11 @@ class Torpedo extends TimedSkill {
       onHit: (victim) => {
         skillHit(ctx, r, victim, ID, { damage: TORPEDO.damage, stun: TORPEDO.stun, knock: TORPEDO.knock, speedLoss: 0.12 });
       },
+      onObstacle: (o) => skillObstacleHit(ctx, r, o, ID, TORPEDO.damage),
     });
-    if (target) p.vx = Math.max(-6, Math.min(6, (target.x - r.x) * 1.5));
+    const cop = target ? null : obstaclesIn(ctx, r, (o, ds, dx) => o.kind === 'police' && ds > 1 && ds <= TORPEDO.range && aheadAngle(ds, dx) <= TORPEDO.cone)[0];
+    const aimX = target?.x ?? cop?.x;
+    if (aimX !== undefined) p.vx = Math.max(-6, Math.min(6, (aimX - r.x) * 1.5));
   }
 
   protected tick(): void {}
