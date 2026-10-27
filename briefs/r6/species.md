@@ -33,6 +33,26 @@ Re-shoot the front and 3/4 close-ups of these three and look at them before you 
 - hamster: `meta.sleepy` ≤ 0.12 (today 0.34) · torso width / height ≥ 1.2 (today 1.08).
 Change the models (not the numbers), then look at the new front and 3/4 close-ups before you report.
 
+**Lead review after round 3** (`shots/r6-species/faces8.jpg`, the sheet): bananacat, cryingcat, xinxian and pedro
+are done — do not touch them. Four new checks in `tools/r6/species.mjs` fail and must pass (every old check stays
+green). They cast rays through the finished mesh and record which bone each ray meets first, so they measure what the
+camera shows:
+- **moodeng, skull through the helmet** (front 86 · 3/4 21 · side 12 head cells between helmet cells; ≤ 4): from the
+  front, two grey patches of skull break through the white shell above the eyes. The skull box
+  (`box c [0, 0.585, -0.315] h [0.125, 0.13, 0.175] round 0.045`) is bigger than the helmet ellipsoid
+  (`c [0, 0.625, -0.295] r [0.161, 0.185, 0.204]`) at the front corners. Make the helmet enclose the top of the skull
+  (bigger or further forward), or keep the skull's top inside it.
+- **moodeng, eyes from the front** (8.3 cm² of eyeball visible; ≥ 15): the eyes at y 0.552 (r 0.04) sit between the
+  muzzle box's top (≈ 0.52) and the helmet rim (0.546), so only a sliver shows. A hippo's eyes sit HIGH on the head and
+  bulge out: put them on top of the front corners of the skull, above the muzzle, with the helmet rim above them
+  (tilt the helmet back or raise it at the front). They may stay small; they must not be covered.
+- **hamster, sad mouth** (curve −0.32 cm; ≥ 0.3): the mouth line is a smile. Its centre (y 0.475) is lower than its
+  corners (0.485). For the sad hamster, the corners go DOWN and the centre stays up: an upside-down U (∩).
+- **hamster, no neck** (narrowest slice between the chest and the head / head width 0.6; ≥ 0.8): from the front
+  and the back the head sits on a thin neck, so the body reads as a peanut, not a ball. Fill the neck: fat cheek
+  pouches that flow into the shoulders, a wider chest top, the head lower into the body. Hands stay on the grips.
+Look at the front, 3/4 and back close-ups of these two after the fix.
+
 ## Read first
 SPEC.md §5 (art bible: designer-vinyl toys, cel shading + ink outline, chunky cartoon, readable from the chase cam),
 §23; the species kit `src/actors/kit/*` (mammal.ts `buildMammal` / `MammalSpec`, ears-tails.ts, gear.ts helmets,
