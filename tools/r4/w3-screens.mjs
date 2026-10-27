@@ -18,7 +18,7 @@ const opts = (page) => page.evaluate(() => {
 });
 const lastStart = async (page) => (await events(page, 'flow:startRace')).at(-1)?.e.config ?? null;
 
-// 1. quick race: five track cards on screen, the race options of the focused track, options reach the config
+// 1. quick race: five track cards (the focused one on screen), the race options of the focused track, options reach the config
 await withPage(async (page, h) => {
   await h.goto(`/?screen=trackSelect${STUB}`);
   await screenIs(page, 'trackSelect');
@@ -30,7 +30,10 @@ await withPage(async (page, h) => {
     return { id: el.getAttribute('data-track'), inside: r.left >= -2 && r.top >= -2 && r.right <= innerWidth + 2 && r.bottom <= innerHeight + 2 && r.width > 80 };
   }));
   expect(JSON.stringify(cards.map((c) => c.id)) === JSON.stringify(tracks), `one card per track in TRACK_ORDER (${cards.map((c) => c.id).join(',')})`);
-  expect(cards.length === 5 && cards.every((c) => c.inside), `all five cards fully on screen at 1280×720 (${cards.filter((c) => !c.inside).map((c) => c.id).join(',') || 'ok'})`);
+  // r6 (SPEC §26): three big cards in view, the row scrolls to the others — the focused card must be fully on screen
+  // (tools/r6/ui.mjs walks all five with → and checks each focused card is on screen).
+  const focused = await page.evaluate(() => { const f = document.querySelector('.br-tc.is-focus, .br-tc[aria-current="true"]'); return f?.getAttribute('data-track') ?? null; });
+  expect(cards.length === 5 && cards.some((c) => c.inside && c.id === focused), `five cards, the focused one (${focused}) fully on screen at 1280×720 (${cards.filter((c) => c.inside).map((c) => c.id).join(',')} in view)`);
   const first = await opts(page);
   expect(!!first && first.for === 'coast' && first.weather === 'clear' && first.reverse === '0' && first.route === '0',
     `the options panel shows the focused track's defaults (${JSON.stringify(first)})`);
