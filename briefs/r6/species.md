@@ -25,6 +25,14 @@ see on `shots/r6-species/sheet.png` and your own close-ups (`i1.png`, `h1.png`).
    on the pedals.
 Re-shoot the front and 3/4 close-ups of these three and look at them before you report.
 
+**Round 2 changed nothing** (it re-ran the old checks and reported). The lead review is now part of
+`tools/r6/species.mjs` as numbers — six checks fail on today's models and must pass:
+- bananacat: ≤ 3 banana-yellow vertices on the face between the eyes and the chin (today 33: the fourth flap).
+- moodeng: helmet rim gap ≤ 4.5 cm on every side (today 6.8 cm at the sides) · helmet colour ΔRGB ≥ 100 from the
+  grey skin (today 63) · muzzle as wide as the skull: front-30 % width / head width ≥ 0.95 (today 0.88).
+- hamster: `meta.sleepy` ≤ 0.12 (today 0.34) · torso width / height ≥ 1.2 (today 1.08).
+Change the models (not the numbers), then look at the new front and 3/4 close-ups before you report.
+
 ## Read first
 SPEC.md §5 (art bible: designer-vinyl toys, cel shading + ink outline, chunky cartoon, readable from the chase cam),
 §23; the species kit `src/actors/kit/*` (mammal.ts `buildMammal` / `MammalSpec`, ears-tails.ts, gear.ts helmets,
