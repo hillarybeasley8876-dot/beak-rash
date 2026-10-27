@@ -34,6 +34,10 @@ interface Item {
 const MAX = 3;
 const GAP = 96;
 
+/** The speedometer's own tag already says SLIPSTREAM (and shows the draft meter): a callout with the
+ *  same word would announce it twice (r6). */
+const REDUNDANT = new Set(['SLIPSTREAM']);
+
 const keyOf = (spec: CalloutSpec | null): string => (spec ? spec.key ?? spec.kind : '');
 
 export class Callouts {
@@ -46,6 +50,7 @@ export class Callouts {
   }
 
   push(spec: CalloutSpec): void {
+    if (REDUNDANT.has(spec.en)) return;
     const key = spec.key ?? spec.kind;
     const same = this.items.find((i) => keyOf(i.spec) === key);
     if (same) {

@@ -10,7 +10,6 @@ import { preloadPortraits } from './badge';
 import { CutinLayer } from './cutins/layer';
 import { el, w } from './dom';
 import { TICKET_HOLD, wireHudEvents } from './events';
-import { preloadHudFonts } from './fonts';
 import { Hints } from './hints';
 import { Counters, PlaceBlock } from './place';
 import { hudSfx } from './sfx';
@@ -27,7 +26,8 @@ export const REF_W = 1920;
 export const REF_H = 1080;
 
 export function createHud(app: AppContext, layer: HTMLElement): Hud {
-  void preloadHudFonts();
+  // The race fonts (the CJK subsets the HUD shouts in) load with the race, not at boot: the title and
+  // the menu only pay for the glyphs they draw. screens/loading.ts warms them while the track builds.
   const sfx = hudSfx(app.audio);
   const root = el('div', 'brh is-off', layer);
   const rootW = w(root);

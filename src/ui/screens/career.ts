@@ -1,8 +1,10 @@
-// career: 3 cups × 5 tracks ladder with locks and best places, detail panel for the focused event,
-// lifetime stats. Enter → flow:startRace (mode career, level = tier, with the event's weather /
-// direction / route). Top 3 unlocks the next event; top 3 on a cup's last event stamps the cup CLEAR
-// (all three = 巡回赛通关 chip by the stats). TAB / pad LB·RB (or the 成就 chip) opens the records sheet:
-// every achievement, earned or not, with counters.
+// career: 3 cups × 5 tracks, one cup at a time (SPEC §26). The cup tabs (or ↑↓ / the d-pad) switch the
+// cup; its five events are a ladder of big cards, three of them in view, the other two narrow slivers,
+// so the ladder reads at a glance. The detail panel keeps the full info of the focused event.
+// Enter → flow:startRace (mode career, level = tier, with the event's weather / direction / route).
+// Top 3 unlocks the next event; top 3 on a cup's last event stamps the cup CLEAR (all three =
+// 巡回赛通关 chip by the stats). TAB / pad LB·RB (or the 成就 chip) opens the records sheet: every
+// achievement, earned or not, with counters.
 import './career.css';
 import { TRACKS, TRACK_ORDER } from '../../data/tracks';
 import { CUPS, WEATHER_CN } from '../copy';
@@ -16,12 +18,10 @@ import { recordsSheet } from './records';
 import { weatherChip } from './weather-ui';
 
 const TIER_STARS = ['★', '★★', '★★★'];
-
-/** One chain-tape sticker over the locked events of a cup row (the events hold the grid's columns 2…n+1). */
-function chainTape(tier: number, firstLockedCol: number, allLocked: boolean): HTMLDivElement {
-  return h('div', { class: 'br-car-chain', style: `grid-row:${tier};grid-column:${firstLockedCol + 2} / ${TRACK_ORDER.length + 2}` },
-    h('b', { text: '???' }), h('span', { text: allLocked ? '上一杯通关后开放' : `上一站前 ${UNLOCK_PLACE} 名解锁` }));
-}
+/** How many event cards are wide at once; the others collapse to a sliver. */
+const WINDOW = 3;
+/** Events per cup. */
+const PER_CUP = TRACK_ORDER.length;
 
 const goalFor = (ev: CareerEvent, cup: string): string =>
   `前 ${UNLOCK_PLACE} 名${isCareerFinal(ev) ? '通关巡回赛' : isCupFinal(ev) ? `通关${cup}` : '解锁下一站'}`;
@@ -35,18 +35,27 @@ export const careerScreen: ScreenFactory = (ctx) => {
     careerCleared(save) ? h('span', { class: 'is-clear' }, h('b', { text: '★ 巡回赛通关' })) : null,
     ...[['比赛', st.races], ['冠军', st.wins], ['击倒', st.kos], ['被抓', st.busted]].map(([k, v]) => h('span', {}, h('i', { text: String(k) }), h('b', { text: String(v) })))));
 
-  const grid = h('div', { class: 'br-car-grid' });
-  const cells: HTMLDivElement[] = [];
-  for (const cup of CUPS) {
-    grid.append(h('div', { class: 'br-car-cup', vars: { '--t': cup.tier } },
+  // --- the cup tabs: the ladder shows one cup at a time ---
+  const tabs = h('div', { class: 'br-car-cups' });
+  const tabEls = CUPS.map((cup) => {
+    const el = h('div', { class: 'br-car-cup', attrs: { role: 'button', 'aria-label': `${cup.cn} ${cup.en}` }, data: { cup: cup.tier } },
       ransom(cup.cn, { seed: `cup${cup.tier}`, fonts: 'block', first: cup.tier === 3 ? 'wr' : 'bw' }),
-      h('b', { text: cup.en }), h('p', { class: 'br-car-motto', text: cup.motto }),
-      cupCleared(save, cup.tier) ? h('span', { class: 'br-car-clear', text: 'CLEAR!' }) : null));
-    const events = CAREER.filter((e) => e.tier === cup.tier);
-    events.forEach((ev) => {
-      const open = isUnlocked(save, ev);
-      const best = bestPlace(save, ev);
-      const cell = h('div', { class: `br-car-ev is-t${ev.tier}${open ? '' : ' is-locked'}`, vars: { '--clip': jagged(`ev${ev.key}`, { jx: 2, jy: 4, notches: 1 }) }, data: { event: ev.key } },
+      h('b', { text: cup.en }),
+      h('span', { class: 'br-car-cup-tier', text: TIER_STARS[cup.tier - 1] ?? '★' }),
+      cupCleared(save, cup.tier) ? h('span', { class: 'br-car-clear', text: 'CLEAR!' }) : null);
+    tabs.append(el);
+    return el;
+  });
+  const motto = h('p', { class: 'br-car-motto' });
+
+  // --- the ladder: every event cell stays in the DOM, only the active cup's are shown ---
+  const ladder = h('div', { class: 'br-car-row' });
+  const cells: HTMLDivElement[] = [];
+  for (const ev of CAREER) {
+    const open = isUnlocked(save, ev);
+    const best = bestPlace(save, ev);
+    const cell = h('div', { class: `br-car-ev is-t${ev.tier}${open ? '' : ' is-locked'}`, vars: { '--clip': jagged(`ev${ev.key}`, { jx: 2, jy: 4, notches: 1 }) }, data: { event: ev.key } },
+      h('div', { class: 'br-car-face' },
         h('div', { class: 'br-car-art', vars: { '--clip': torn(`ea${ev.key}`, 'bottom', 8, 16) } }, trackArt(ev.trackId)),
         h('span', { class: 'br-car-tier', text: TIER_STARS[ev.tier - 1] ?? '★' }),
         h('div', { class: 'br-car-name', text: TRACKS[ev.trackId].name }),
@@ -55,13 +64,11 @@ export const careerScreen: ScreenFactory = (ctx) => {
           h('span', { class: 'br-car-chip is-wx' }, weatherChip(ev.weather)),
           ev.reverse ? h('span', { class: 'br-car-chip', text: '反向' }) : null,
           ev.route > 0 ? h('span', { class: 'br-car-chip', text: `路线 #${ev.route}` }) : null),
-        h('i', { class: 'br-car-cur' }),
-        h('b', { class: 'br-car-sticker', text: open ? 'GO!' : 'LOCKED' }));
-      cells.push(cell);
-      grid.append(cell);
-    });
-    const firstLocked = events.findIndex((ev) => !isUnlocked(save, ev));
-    if (firstLocked >= 0) grid.append(chainTape(cup.tier, firstLocked, firstLocked === 0));
+        open ? null : h('div', { class: 'br-car-lock' }, h('b', { text: '???' }))),
+      h('i', { class: 'br-car-cur' }),
+      h('b', { class: 'br-car-sticker', text: open ? 'GO!' : 'LOCKED' }));
+    cells.push(cell);
+    ladder.append(cell);
   }
 
   const dName = h('div', { class: 'br-car-dname' });
@@ -70,7 +77,7 @@ export const careerScreen: ScreenFactory = (ctx) => {
   const go = h('div', { class: 'br-car-dgo', attrs: { role: 'button' } }, ...keyGlyph('ENTER', 'A'), h('span', { text: '出发！' }));
   const detail = h('div', { class: 'br-car-detail br-panel is-white', vars: { '--clip': jagged('cardetail', { jx: 2, jy: 3, notches: 2 }) } },
     h('span', { class: 'br-tag is-red br-car-dtag', text: 'NEXT RACE' }), dName, dEn, dRows, go);
-  f.stage.append(grid, detail);
+  f.stage.append(tabs, motto, ladder, detail);
 
   /** One detail row; the weather row carries the weather id (data-weather) for the menu and the tests. */
   const row = (k: string, v: string, weather?: string): HTMLDivElement =>
@@ -102,9 +109,51 @@ export const careerScreen: ScreenFactory = (ctx) => {
     onFocus: () => {
       remember('career', i);
       show(ev);
+      syncCup(ev.tier);
     },
-  })), { layout: 'grid', columns: TRACK_ORDER.length, start: recall('career', Math.max(0, highestOpen(save) - 1)), sfx: ctx.sfx }));
+  })), { layout: 'grid', columns: PER_CUP, start: recall('career', Math.max(0, highestOpen(save) - 1)), sfx: ctx.sfx }));
   go.addEventListener('click', () => nav.pointerActivate());
+
+  /** Only the active cup's events are on the ladder; the other cups stay in the DOM (hidden). */
+  function syncCup(tier: number): void {
+    for (const ev of CAREER) cells[ev.index - 1]?.classList.toggle('is-off', ev.tier !== tier);
+    for (const el of tabEls) el.classList.toggle('is-on', Number(el.dataset.cup) === tier);
+    motto.textContent = CUPS[tier - 1]?.motto ?? '';
+  }
+  /** The window of WINDOW wide cards around the focus; the rest collapse to a sliver. */
+  function paintWindow(focus: number): void {
+    const base = Math.floor(focus / PER_CUP) * PER_CUP;
+    const off = focus - base;
+    const lo = Math.max(0, Math.min(off - 1, PER_CUP - WINDOW));
+    for (let i = 0; i < PER_CUP; i++) cells[base + i]?.classList.toggle('is-sliver', i < lo || i > lo + WINDOW - 1);
+  }
+  /** ←→ walks the events of the active cup; ↑↓ switches the cup. */
+  function move(dir: 1 | -1): void {
+    const base = Math.floor(nav.index / PER_CUP) * PER_CUP;
+    const off = nav.index - base;
+    const next = base + ((off + dir + PER_CUP) % PER_CUP);
+    nav.focus(next);
+    paintWindow(next);
+  }
+  function switchCup(dir: 1 | -1): void {
+    const tier = Math.floor(nav.index / PER_CUP) + 1;
+    const next = Math.max(1, Math.min(CUPS.length, tier + dir));
+    if (next === tier) return;
+    const first = (next - 1) * PER_CUP;
+    nav.focus(first);
+    paintWindow(first);
+  }
+  for (const el of tabEls) {
+    el.addEventListener('click', () => {
+      const tier = Number(el.dataset.cup);
+      const first = (tier - 1) * PER_CUP;
+      nav.focus(first);
+      paintWindow(first);
+    });
+  }
+  // The ladder opens on the remembered event: its cup is the one on show.
+  syncCup(Math.floor(nav.index / PER_CUP) + 1);
+  paintWindow(nav.index);
 
   const records = recordsSheet(save, { onClose: () => setRecords(false), sfx: ctx.sfx });
   const recChip = h('div', { class: 'br-car-rec', attrs: { role: 'button' } }, ...keyGlyph('TAB', 'LB'), h('span', { text: '成就' }), h('b', { text: records.count }));
@@ -143,6 +192,14 @@ export const careerScreen: ScreenFactory = (ctx) => {
       if (a === 'back') {
         ctx.sfx('ui.back');
         ctx.go('menu');
+        return true;
+      }
+      if (a === 'left' || a === 'right') {
+        move(a === 'right' ? 1 : -1);
+        return true;
+      }
+      if (a === 'up' || a === 'down') {
+        switchCup(a === 'down' ? 1 : -1);
         return true;
       }
       return nav.handle(a);

@@ -10,6 +10,7 @@ import { calendarFor } from '../../data/strings';
 import { PAD_TIPS, TIPS } from '../../data/tips';
 import { TRACKS, TRACK_ORDER, TRACK_WEATHER } from '../../data/tracks';
 import { WEATHER_CN } from '../copy';
+import { preloadHudFonts } from '../hud/fonts';
 import { artImage, artReady, backdrop, h, jagged, ransom, riderIconSvg, svg, torn, wait } from '../p5';
 import { frame, type ScreenFactory } from '../screen';
 import { WEATHER_ICON as GOBI_ICON } from '../tracks/gobi';
@@ -46,6 +47,8 @@ const GLIDE = 'cubic-bezier(0.2, 0.7, 0.3, 1)';
 let lastTrack: TrackId | null = null;
 
 export const loadingScreen: ScreenFactory = (ctx) => {
+  // The race fonts (the HUD's CJK subsets) load with the race: this card is up while the track builds.
+  void preloadHudFonts();
   const trackId: TrackId = ctx.props.config?.trackId ?? 'coast';
   const info = TRACKS[trackId];
   const now = new Date();

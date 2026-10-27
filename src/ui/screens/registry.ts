@@ -10,6 +10,7 @@ import { howtoScreen } from './howto';
 import { loadingScreen } from './loading';
 import { menuScreen } from './menu';
 import { pauseScreen } from './pause';
+import { recordsScreen } from './records-screen';
 import { resultsScreen } from './results';
 import { settingsScreen } from './settings';
 import { titleScreen } from './title';
@@ -45,7 +46,7 @@ export const SCREENS: Record<ScreenId, ScreenFactory> = {
   credits: creditsScreen,
   race: (ctx) => errorScreen(ctx, 'race'),
   intro: (ctx) => errorScreen(ctx, 'intro'),
-  // r6 (SPEC §23, §26): placeholders until the screens land (jobs r6-roster, r6-ui)
+  // r6 (SPEC §23, §26): the roster screen is another job's; the records screen is here.
   roster: (ctx) => errorScreen(ctx, 'roster'),
-  records: (ctx) => errorScreen(ctx, 'records'),
+  records: recordsScreen,
 };

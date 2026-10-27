@@ -5,10 +5,14 @@ import type { Weather } from '../core/types';
 
 export interface MenuEntry { cn: string; en: string; to: ScreenId; blurb: string; padBlurb?: string }
 
+// The main-menu stair. The order matters: tools/ui-tour.mjs walks it by index (the third entry has to be
+// the garage, the sixth the credits), so the two new r6 entries go after 车库, not before it.
 export const MENU: MenuEntry[] = [
   { cn: '巡回赛', en: 'CAREER', to: 'career', blurb: '三杯九站，从菜鸟杯一路卷到鹈鹕神杯。' },
   { cn: '快速比赛', en: 'QUICK RACE', to: 'trackSelect', blurb: '随便挑条路，先撞了再说。' },
   { cn: '车库', en: 'GARAGE', to: 'garage', blurb: '从二八大杠到死飞，总有一辆配得上你的嘴。' },
+  { cn: '成就', en: 'RECORDS', to: 'records', blurb: '奖杯、彩蛋、毕生战绩，都挂在这儿。' },
+  { cn: '角色', en: 'ROSTER', to: 'roster', blurb: '选谁骑车？技能也在这儿配。' },
   { cn: '设置', en: 'CONFIG', to: 'settings', blurb: '音量、画质、震动，还有慢镜头的浓度。' },
   { cn: '操作', en: 'HOW TO', to: 'howto', blurb: 'J 往左扇，L 往右扇，K 用力扇。', padBlurb: 'X 往左扇，B 往右扇，Y 用力扇。' },
   { cn: '致谢', en: 'CREDITS', to: 'credits', blurb: '感谢所有把链条画在鹈鹕脖子上的大模型。' },

@@ -1,9 +1,9 @@
-// Records sheet (career screen, TAB / pad LB·RB): every achievement in catalogue order — earned ones with
-// their red star icon, locked ones as grey silhouettes — in a dense grid with a red jagged cursor. The
-// cells have no room for the description, so the focused achievement's FULL text (icon, name,
-// description, 已解锁 / 未解锁) lives in the detail strip: the keyboard and the pad read every one of
-// them, no mouse tooltip. Beside the grid: the nine easter eggs (SPEC §21) and the lifetime stats.
-// Read-only; the career screen opens and closes it.
+// Records sheet (career screen, TAB / pad LB·RB) and the standalone 成就 screen: every achievement in
+// catalogue order — earned ones with their red star icon, locked ones as grey silhouettes — in a dense
+// grid with a red jagged cursor. The cells have no room for the description, so the focused achievement's
+// FULL text (icon, name, description, 已解锁 / 未解锁) lives in the detail strip: the keyboard and the pad
+// read every one of them, no mouse tooltip. Beside the grid: the nine easter eggs (SPEC §21) and the
+// lifetime stats. Read-only; the career screen opens and closes it, the records screen shows it full size.
 import './records.css';
 import type { Action } from '../../core/input';
 import type { SaveStore } from '../../core/save';
@@ -25,6 +25,9 @@ export interface RecordsSheet {
   handle(a: Action): boolean;
   dispose(): void;
 }
+
+/** 'sheet': the modal over the career screen. 'screen': the standalone 成就 screen (always open). */
+export type RecordsMode = 'sheet' | 'screen';
 
 /** The achievement's star: red when earned, a grey silhouette when it is still locked. */
 function starFor(a: AchievementDef, earned: boolean): string {
@@ -83,7 +86,8 @@ function eggsSection(save: SaveStore): HTMLDivElement {
     h('div', { class: 'br-eggs-grid' }, ...cells));
 }
 
-export function recordsSheet(save: SaveStore, o: { onClose(): void; sfx(id: string): void }): RecordsSheet {
+export function recordsSheet(save: SaveStore, o: { onClose(): void; sfx(id: string): void; mode?: RecordsMode }): RecordsSheet {
+  const mode = o.mode ?? 'sheet';
   const earned = new Set(save.data.achievements);
   const got = ACHIEVEMENTS.filter((a) => earned.has(a.id)).length;
   const cups = ([1, 2, 3] as Tier[]).filter((t) => cupCleared(save, t)).length;
@@ -97,7 +101,7 @@ export function recordsSheet(save: SaveStore, o: { onClose(): void; sfx(id: stri
   // Past 42 achievements the cells tighten: the cut description moves into the detail strip.
   const dense = ACHIEVEMENTS.length > 42;
   const rows = Math.ceil(ACHIEVEMENTS.length / COLS);
-  let open = false;
+  let open = mode === 'screen';
 
   // The grid: one cell per achievement, in catalogue order, each with data-ach (the id).
   const cells = ACHIEVEMENTS.map((a) => cell(a, earned.has(a.id), dense));
@@ -134,7 +138,7 @@ export function recordsSheet(save: SaveStore, o: { onClose(): void; sfx(id: stri
 
   const sheet = h('div', { class: `br-rec-sheet br-panel is-white${dense ? ' is-dense' : ''}`, vars: { '--clip': jagged('recsheet', { jx: 1.5, jy: 2.5, notches: 2 }) } },
     h('div', { class: 'br-rec-head' },
-      h('b', { text: '成就' }), h('span', { class: 'br-rec-en', text: 'RECORDS' }),
+      h('div', { class: 'br-rec-title' }, h('b', { text: '成就' }), h('span', { class: 'br-rec-en', text: 'RECORDS' })),
       h('span', { class: 'br-rec-count' }, h('b', { text: String(got) }), h('i', { text: `/${ACHIEVEMENTS.length}` })),
       h('div', { class: 'br-rec-facts' }, ...facts.map(([k, v, note]) => h('span', note ? { title: note } : {}, h('i', { text: k }), h('b', { text: v }))))),
     h('div', { class: 'br-rec-body' },
@@ -142,8 +146,10 @@ export function recordsSheet(save: SaveStore, o: { onClose(): void; sfx(id: stri
       h('div', { class: 'br-rec-side' }, detail, eggsSection(save))),
     h('div', { class: 'br-rec-foot' },
       ...keyGlyph('←→↑↓', '✚'), h('span', { text: '查看' }),
-      ...keyGlyph('TAB', 'LB'), ...keyGlyph('ESC', 'B'), h('span', { text: '收起' })));
-  const el = h('div', { class: 'br-rec' }, sheet);
+      ...(mode === 'screen'
+        ? [...keyGlyph('ESC', 'B'), h('span', { text: '回主菜单' })]
+        : [...keyGlyph('TAB', 'LB'), ...keyGlyph('ESC', 'B'), h('span', { text: '收起' })])));
+  const el = h('div', { class: `br-rec${mode === 'screen' ? ' is-screen' : ''}` }, sheet);
   el.addEventListener('click', (e) => {
     if (open && e.target === el) o.onClose();
   });

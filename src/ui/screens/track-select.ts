@@ -1,6 +1,8 @@
-// trackSelect (quick race): five skewed track cards (still, name, blurb, ★ difficulty, the chosen weather)
-// and a race-options panel (weather / direction / route). ←→ choose the track, ↓ into the option rows,
-// ←→ cycles a row's value, Enter starts the race with the focused track and its options, Esc backs out.
+// trackSelect (quick race): five skewed track cards (still, name, blurb, ★ difficulty, the chosen
+// weather). Three of them are in view and big (SPEC §26: "3 cards per row at 1280×720"); ←→ walks the
+// tracks and the row scrolls (the focused card is always fully on screen, the other two shrink away).
+// The race options (weather / direction / route) sit in a compact strip under the row, reached with ↓.
+// Enter starts the race with the focused track and its options, Esc backs out.
 import './track-select.css';
 import type { Action } from '../../core/input';
 import type { TrackId } from '../../core/types';
@@ -19,6 +21,16 @@ const OPT_ROWS: readonly OptRow[] = ['weather', 'reverse', 'route'];
 const REVERSE_CYCLE = ['0', '1'] as const;
 const ROUTE_CYCLE: readonly RouteValue[] = ['0', 'random'];
 const ROUTE_SEED_MAX = 9999;
+/** How many track cards are in view at once (the others shrink away).
+ *  SPEC §26 wants "3 cards per row at 1280×720" (the pre-r4 look) and tools/r6/ui.mjs counts every
+ *  card whose rect touches the viewport (`shown <= 3`). The r4-era tools/r4/w3-screens.mjs wants all
+ *  five inside the viewport instead: a card that is inside is always counted by the r6 filter, so
+ *  five inside => shown = 5 > 3 — the two assertions cannot both hold. The three-card window is the
+ *  one the SPEC, the brief and the r6 check ask for; the one-line fix for the w3 side is in
+ *  shots/r6-ui/w3-five-cards.patch (not applied — the check is the lead's). */
+const WINDOW = 3;
+/** The three card slots (stage x). */
+const SLOTS = [225, 705, 1185];
 
 interface TrackOpts { weather: WeatherValue; reverse: '0' | '1'; route: RouteValue }
 
@@ -61,9 +73,11 @@ export const trackSelectScreen: ScreenFactory = (ctx) => {
   const bg = backdrop({ tone: 'black', seed: 'tracks', star: { x: '50%', y: '62%', size: 1700, color: '#16161d', spin: 80 },
     bands: [{ top: '64%', height: 300, color: '#e5191c', rotate: -6 }] });
   const f = frame({ id: 'tracks', bg, title: { cn: '快速比赛', en: 'QUICK RACE' }, hints: [HINT_LR, HINT_OK, HINT_BACK] });
+  const counter = h('span', { class: 'br-tracks-of', text: '01 / 05' });
   const sub = h('div', { class: 'br-tracks-sub' },
     h('span', { class: 'br-tag is-red', text: 'SELECT TRACK' }),
-    h('span', { class: 'br-tracks-rule', text: '7 名对手 · 交通 · 柯基警官巡逻中' }));
+    h('span', { class: 'br-tracks-rule', text: '7 名对手 · 交通 · 柯基警官巡逻中' }),
+    counter);
 
   // --- the five cards ---
   const row = h('div', { class: 'br-tracks-row' });
@@ -117,6 +131,21 @@ export const trackSelectScreen: ScreenFactory = (ctx) => {
   for (const id of TRACK_ORDER) paintCard(id);
 
   let cardIndex = 0;
+  /** The window of WINDOW big cards around the focus; the other two shrink away at the window's edge
+   *  (so only three cards are on screen, and the row scrolls with ←→). */
+  const paintWindow = (focus: number): void => {
+    const lo = Math.max(0, Math.min(focus - 1, TRACK_ORDER.length - WINDOW));
+    TRACK_ORDER.forEach((id, i) => {
+      const card = cards.get(id);
+      if (!card) return;
+      const slot = i - lo;
+      const inWindow = slot >= 0 && slot < WINDOW;
+      const at = inWindow ? slot : slot < 0 ? 0 : WINDOW - 1;
+      card.style.setProperty('--x', `${SLOTS[at] ?? SLOTS[0]}px`);
+      card.classList.toggle('is-parked', !inWindow);
+    });
+    counter.textContent = `${String(focus + 1).padStart(2, '0')} / ${String(TRACK_ORDER.length).padStart(2, '0')}`;
+  };
   /** Cycle one option of the focused track (the value is kept per track). */
   const cycle = (opt: OptRow, dir: 1 | -1): void => {
     const id = cardId(cardIndex);
@@ -143,7 +172,7 @@ export const trackSelectScreen: ScreenFactory = (ctx) => {
     ...cardEls.map((el, i) => ({
       el,
       confirm: () => start(),
-      onFocus: () => { cardIndex = i; remember('trackSelect', i); showPanel(cardId(i)); },
+      onFocus: () => { cardIndex = i; remember('trackSelect', i); showPanel(cardId(i)); paintWindow(i); },
     })),
     ...rowEls.map((r) => ({
       el: r.row,

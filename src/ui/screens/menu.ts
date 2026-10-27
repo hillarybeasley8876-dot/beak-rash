@@ -69,12 +69,12 @@ export const menuScreen: ScreenFactory = (ctx) => {
   const blurb = h('div', { class: 'br-menu-blurb', vars: { '--clip': jagged('blurb', { jx: 1.5, jy: 6, notches: 2 }) } });
   // Generated cut-out bursts out of the frame (P5 style); without it the framed portrait carries the hero.
   const heroFrame = h('div', { class: 'br-menu-frame', vars: { '--clip': jagged('menu-frame', { jx: 3, jy: 3, notches: 2 }) } });
-  // A drawn sticker stands in while the cut-out decodes; a broken file swaps in the portrait.
+  // The key art IS the hero (boot warms it early, right after the title art): the drawn pelican is only
+  // the fallback for a missing or broken file, never a stand-in under the art while it decodes.
   const framed = (): HTMLDivElement => portrait('pelican', { mood: 'main' });
-  const stand = portrait('pelican', { mood: 'main', drawn: true });
-  const heroArt = artImage(ART.menu, 'br-menu-art', () => stand.replaceWith(framed()), stand);
-  heroFrame.append(heroArt ? stand : framed());
-  if (heroArt) heroFrame.classList.add('is-backing');
+  const heroArt = artImage(ART.menu, 'br-menu-art', () => heroFrame.append(framed()));
+  if (!heroArt) heroFrame.append(framed());
+  else heroFrame.classList.add('is-backing');
   // The frame and the art share one box so the whole hero can gulp as one.
   const heroWrap = h('div', { class: 'br-menu-portrait' }, heroFrame);
   if (heroArt) heroWrap.append(heroArt);
@@ -167,7 +167,9 @@ export const menuScreen: ScreenFactory = (ctx) => {
 
   return {
     root: f.root,
-    ready: artReady(heroArt),
+    // The menu waits for its art (boot fetched it early); the cap keeps a broken disk from holding the
+    // screen up for ever.
+    ready: artReady(heroArt, 4000),
     onAction: (a) => {
       // The code runs on every action; its B and A steps are eaten (the menu must not react).
       const code = konami.push(a);

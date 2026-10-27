@@ -2,18 +2,18 @@
 .br-menu-slab.is-white { background: var(--white); clip-path: polygon(58% 0, 59.6% 0, 83.6% 100%, 82% 100%); }
 .br-menu-logo { position: absolute; left: 86px; top: 52px; font-size: 60px; rotate: -5deg; }
 
-.br-menu-list { position: absolute; left: 150px; top: 205px; width: 940px; height: 780px; }
+.br-menu-list { position: absolute; left: 150px; top: 168px; width: 940px; height: 780px; }
 .br-menu-item {
   position: absolute;
-  left: calc(var(--i) * 44px);
-  top: calc(var(--i) * 124px);
+  left: calc(var(--i) * 30px);
+  top: calc(var(--i) * 92px);
   display: flex;
   align-items: baseline;
   gap: 22px;
   padding: 2px 34px 0 26px;
   font-family: var(--f-cn-block);
   font-weight: 400;
-  font-size: 96px;
+  font-size: 82px;
   line-height: 1.08;
   color: var(--white);
   text-shadow: 6px 6px 0 var(--red-deep);
@@ -25,14 +25,14 @@
   animation-delay: calc(var(--i) * 30ms);
 }
 .br-menu-item::before { content: ''; position: absolute; inset: 0; background: var(--white); clip-path: var(--clip); z-index: -1; opacity: 0; transform: scaleX(0.6); transform-origin: left; transition: opacity 0.08s, transform 0.12s var(--ease-out); }
-.br-menu-en { font-family: var(--f-display); font-weight: 400; font-size: 46px; letter-spacing: 0.06em; color: var(--red); text-shadow: none; }
+.br-menu-en { font-family: var(--f-display); font-weight: 400; font-size: 42px; letter-spacing: 0.06em; color: var(--red); text-shadow: none; }
 .br-menu-item.is-focus { color: var(--ink); text-shadow: none; transform: skewX(var(--skew)) rotate(-5deg) translateX(18px) scale(1.08); }
 .br-menu-item.is-focus::before { opacity: 1; transform: none; }
 .br-menu-item.is-focus .br-menu-cn { animation: br-jitter 0.5s steps(6) infinite; display: inline-block; }
-/* Desktop shell: a 7th, smaller 退出游戏 step; the stair tightens so it still ends above the blurb and hints. */
-.br-menu-list.has-quit .br-menu-item { top: calc(var(--i) * 112px); }
-.br-menu-item.is-minor { margin-top: 10px; font-size: 62px; }
-.br-menu-item.is-minor .br-menu-en { font-size: 34px; }
+/* Desktop shell: a last, smaller 退出游戏 step; the stair tightens so it still ends above the blurb and hints. */
+.br-menu-list.has-quit .br-menu-item { top: calc(var(--i) * 90px); }
+.br-menu-item.is-minor { margin-top: 10px; font-size: 58px; }
+.br-menu-item.is-minor .br-menu-en { font-size: 32px; }
 
 .br-menu-cursor {
   position: absolute;
@@ -60,7 +60,7 @@
 .br-menu-cursor.is-instant { transition: none; }
 
 .br-menu-hero { position: absolute; left: 1150px; top: 128px; width: 660px; height: 800px; }
-.br-menu-frame { position: absolute; inset: 0 0 110px 0; background: var(--white); clip-path: var(--clip); rotate: 4deg; animation: br-pop 0.34s var(--ease-slam) 0.05s both; }
+.br-menu-frame { position: absolute; inset: 0 0 110px 0; background: var(--white); clip-path: var(--clip); rotate: 4deg; animation: br-pop 0.34s var(--ease-slam) 0.05s both; transition: inset 0.28s var(--ease-out); }
 .br-menu-frame .br-portrait { position: absolute; inset: 16px; background: var(--ink); }
 .br-menu-frame.is-backing { inset: 60px 30px 170px 40px; background: var(--ink); box-shadow: inset 0 0 0 14px var(--white); }
 .br-menu-art { position: absolute; left: -50px; top: -60px; width: 760px; height: 860px; object-fit: contain; filter: drop-shadow(12px 12px 0 var(--ink)); animation: br-pop 0.36s var(--ease-slam) 0.08s both; }

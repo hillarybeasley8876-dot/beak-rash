@@ -196,11 +196,13 @@ export class Hints {
     return this.clock - (this.lastShow.get(id) ?? -R4_COOLDOWN) >= R4_COOLDOWN;
   }
 
-  /** The moment a prompt belongs to is over: GO for the launch, the player went down for the others, and
-   *  SHOWTIME once a cast would be denied (nobody in reach any more). */
+  /** The moment a prompt belongs to is over: GO for the launch, the player went down for the others,
+   *  SHOWTIME once a cast would be denied (nobody in reach any more), and the air trick the moment
+   *  the wheels touch the road again (r6: the key card leaves with the landing). */
   private stale(id: HintId, s: Session): boolean {
     if (id === 'launch') return s.phase !== 'countdown';
     if (id === 'ult' && !this.ultReady()) return true;
+    if (id === 'trick' && !s.player.airborne) return true;
     return s.phase !== 'racing' || s.player.mode !== 'racing';
   }
 

@@ -3,17 +3,23 @@
    the keyboard and the pad can read them all. The 彩蛋 column stays on the right. */
 .br-rec { position: absolute; inset: 0; z-index: 20; display: none; place-items: center; background: rgba(11, 11, 15, 0.8); pointer-events: auto; }
 .br-rec.is-open { display: grid; }
+/* The standalone 成就 screen: the same sheet, but it owns the whole stage (no veil, no modal). */
+.br-rec.is-screen { display: grid; background: none; place-items: start; }
+.br-rec.is-screen .br-rec-sheet { position: absolute; left: 60px; top: 46px; width: 1800px; height: 936px; }
+.br-rec.is-screen .br-rec-title b { font-size: 58px; }
+.br-rec.is-screen .br-rec-title .br-rec-en { font-size: 34px; }
 /* The stage is 1920×1080: the sheet is sized in stage pixels, so it scales with the window. */
 .br-rec .br-rec-sheet { box-sizing: border-box; width: 1760px; height: 1000px; padding: 20px 40px 16px; rotate: -1deg; display: flex; flex-direction: column; color: var(--ink); animation: br-pop 0.22s var(--ease-slam) both; }
 .br-rec-head { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; }
-.br-rec-head > b { font-family: var(--f-cn-block); font-weight: 400; font-size: 48px; line-height: 1; }
+.br-rec-title { display: flex; align-items: baseline; gap: 14px; }
+.br-rec-title b { font-family: var(--f-cn-block); font-weight: 400; font-size: 48px; line-height: 1; }
 .br-rec-en { font-family: var(--f-display); font-weight: 400; font-size: 26px; letter-spacing: 0.06em; color: var(--red); }
 .br-rec-count { display: flex; align-items: baseline; padding: 0 14px; background: var(--red); color: var(--white); font-family: var(--f-display); transform: skewX(var(--skew)); box-shadow: 5px 5px 0 var(--ink); }
 .br-rec-count b { font-weight: 400; font-size: 38px; line-height: 1.1; }
 .br-rec-count i { font-style: normal; font-size: 24px; opacity: 0.8; }
 .br-rec-facts { display: flex; gap: 8px; margin-left: auto; }
 .br-rec-facts span { display: flex; align-items: baseline; gap: 6px; padding: 2px 10px 0; background: var(--ink); color: var(--white); transform: skewX(var(--skew)); box-shadow: 4px 4px 0 var(--red); }
-.br-rec-facts i { font-style: normal; font-family: var(--f-cn-block); font-size: 17px; }
+.br-rec-facts i { font-style: normal; font-family: var(--f-cn-block); font-size: 20px; }
 .br-rec-facts b { font-family: var(--f-display); font-weight: 400; font-size: 24px; }
 .br-rec-body { flex: 1 1 auto; min-height: 0; display: flex; align-items: stretch; gap: 24px; }
 .br-rec-main { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; }
@@ -62,7 +68,7 @@
 .br-egg { flex: 1 1 0; min-height: 0; display: flex; align-items: center; gap: 10px; padding: 3px 8px 4px; background: rgba(11, 11, 15, 0.07); border-left: 6px solid rgba(11, 11, 15, 0.2); }
 .br-egg.is-found { background: rgba(229, 25, 28, 0.12); border-left-color: var(--red); }
 .br-egg-name { flex: 0 0 120px; font-family: var(--f-cn-block); font-weight: 400; font-size: 21px; line-height: 1.15; }
-.br-egg-desc { font-size: 15px; line-height: 1.25; color: #55555e; }
+.br-egg-desc { font-size: 20px; line-height: 1.25; color: #55555e; }
 .br-egg:not(.is-found) .br-egg-name, .br-egg:not(.is-found) .br-egg-desc { color: #8a8a93; }
 
 /* Career-screen chip that opens the sheet. */

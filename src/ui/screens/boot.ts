@@ -25,7 +25,8 @@ export const bootScreen: ScreenFactory = () => {
     h('div', { class: 'br-boot-credit', text: 'A PELICAN-POWERED PRODUCTION · 鹈鹕出品' }),
   );
   const title = preloadArt([ART.title], 1500);
-  void title.then(() => preloadArt([ART.menu, ART.garage, ...LOADING_ART], 8000));
+  // The menu art comes next: the menu waits for it, so nothing big may queue up in front of it.
+  void title.then(() => preloadArt([ART.menu], 3000)).then(() => preloadArt([ART.garage, ...LOADING_ART], 8000));
   const ready = Promise.all([wait(HOLD_MS), title]).then(() => undefined);
   return { root: f.root, ready };
 };
