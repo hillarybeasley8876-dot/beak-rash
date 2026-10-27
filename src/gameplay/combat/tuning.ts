@@ -144,4 +144,28 @@ export const STATUS_MODS = {
   oiled: { grip: 0.25 },
   wet: { grip: 0.85 },
   chill: { speed: 0.85 },
+  // r6 (SPEC §24): ice stacks slow a little each, frozen = a block of ice that slides on; the pie roots you
+  cold: { speedPerStack: 0.06, maxStacks: 3 },
+  frozen: { steer: 0, accel: 0, speed: 0.55 },
+  rooted: { speed: 0.12, accel: 0.1 },
+} as const;
+
+/** r6 element auras (SPEC §24): how long each lasts (s), burn damage over time, rain's endless wet. */
+export const ELEMENTS = {
+  burn: 3, burnTick: 0.5, burnDamage: 3,  // fire: 3 dmg every 0.5 s for 3 s
+  cold: 4,                                // ice: each 'cold' stack slows (STATUS_MODS.cold); 3 stacks freeze
+  charged: 4,                             // thunder's mark, waiting for a partner element
+  wet: 4,                                 // water (rain refreshes it while it falls)
+  rainWet: 1,                             // rain keeps every racing rider wet, re-applied as it runs out
+} as const;
+
+/** r6 reactions (SPEC §24): damage, durations and radii. */
+export const REACT = {
+  coldStacks: 3,
+  vaporize: 24, melt: 24,                 // burst damage (fire + water / fire + ice)
+  freeze: 1.6,                            // s frozen (water + ice, or three cold stacks)
+  electro: 10, electroStun: 0.3, electroRadius: 18, // thunder + water: chains through every wet rider nearby
+  superconduct: 8, superconductSlow: 0.4, superconductTime: 2.5, // thunder + ice: the shield breaks, a big slow
+  overload: 20, overloadKnock: 9, overloadRadius: 4, // thunder + fire: an explosion
+  swirlRadius: 6,                         // wind + any aura: the aura spreads
 } as const;

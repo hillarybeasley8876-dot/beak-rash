@@ -45,4 +45,7 @@ export const SCREENS: Record<ScreenId, ScreenFactory> = {
   credits: creditsScreen,
   race: (ctx) => errorScreen(ctx, 'race'),
   intro: (ctx) => errorScreen(ctx, 'intro'),
+  // r6 (SPEC §23, §26): placeholders until the screens land (jobs r6-roster, r6-ui)
+  roster: (ctx) => errorScreen(ctx, 'roster'),
+  records: (ctx) => errorScreen(ctx, 'records'),
 };

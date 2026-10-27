@@ -7,7 +7,7 @@ import type { Input } from './input';
 import type { Rng } from './rng';
 import type { SaveStore } from './save';
 import type { Modules } from './modules';
-import type { BikeId, CharacterId, Controls, CrashCause, EnvLook, Obstacle, Quality, RiderId, RiderState, Side, Surface, TrackFeature, TrackFrame, TrackId, Vec3Like, WeaponId, Weather } from './types';
+import type { BikeId, CharacterId, Controls, CrashCause, EnvLook, Obstacle, Quality, RiderId, RiderState, Side, SkillLoadout, Surface, TrackFeature, TrackFrame, TrackId, Vec3Like, WeaponId, Weather } from './types';
 
 // ---------------------------------------------------------------- app
 export interface AppContext {
@@ -52,6 +52,11 @@ export interface RaceConfig {
   reverse?: boolean;
   route?: number;              // 0 / absent = the authored layout, else the seed of a generated route
   nemesis?: CharacterId | null; // the rival holding the biggest grudge (core fills it from SaveData.rivalry)
+  // ---- r6 (SPEC §23–§24) ----
+  /** The player's skills this race (core fills it from SaveData.loadouts / the 盲盒 roll, validated). */
+  loadout?: SkillLoadout;
+  /** Per rival (same order as `rivals`): their kits (core fills them; missing → data/loadouts rivalLoadout). */
+  rivalLoadouts?: SkillLoadout[];
 }
 
 /** How a track is built (SPEC §20). */
@@ -207,6 +212,7 @@ export interface FxSystem {
 export const SCREEN_IDS = [
   'boot', 'title', 'menu', 'career', 'garage', 'trackSelect', 'intro',
   'loading', 'race', 'pause', 'results', 'settings', 'howto', 'credits',
+  'roster', 'records', // r6 (SPEC §23, §26): character + skill select; the achievements & eggs screen
 ] as const;
 export type ScreenId = (typeof SCREEN_IDS)[number];
 

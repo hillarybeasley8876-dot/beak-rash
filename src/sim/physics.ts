@@ -28,6 +28,8 @@ export function createPhysics(session: Session): PhysicsSystem {
   const nearPasses = new NearPasses(ctx);
   const poser = new Poser(session.track);
   const idle = emptyControls();
+  /** r6 'confused' (SPEC §24): the rider's steering arrives mirrored (one scratch copy, no per-step allocation). */
+  const mirrored = emptyControls();
   let nanReported = false;
 
   const simOf = (r: RiderState): SimRider | undefined => {
@@ -45,7 +47,9 @@ export function createPhysics(session: Session): PhysicsSystem {
   const ride = (sr: SimRider, dt: number): void => {
     const r = sr.r;
     if (hasStatus(r, 'gulped')) return; // combat carries the rider while it is in the pouch
-    const c = session.controls.get(r.id) ?? idle;
+    if (r.mods.halted) return;          // r6 time stop: frozen in place, speed and knocks kept for afterwards
+    const raw = session.controls.get(r.id) ?? idle;
+    const c = r.mods.steerInvert ? Object.assign(mirrored, raw, { steer: -raw.steer }) : raw;
     // A fresh drift press (false → true) is what starts an air trick or an umbrella glide (SPEC §16/§15);
     // a drift held since before the take-off never does.
     sr.driftPressed = c.drift && !sr.driftPrev;

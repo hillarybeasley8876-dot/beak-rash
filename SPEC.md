@@ -474,3 +474,83 @@ below are the starting point. Everything stays kind and cartoonish (pillar 5): n
   race:nemesis · race:nemesisDown · race:alliance · race:event · secret:found.
 - save.ts: SaveData.rivalry, secrets, unlocks, settings.duckRider, stats.bestStyle / tricks / bribes (sanitized).
 - New per-session modules (loaded like achievements, stub fallback): `gameplay/style`, `gameplay/secrets`.
+
+## 23. r6 — Everyone is playable + the meme roster (actors / ui-screens / content / race)
+- Every racer is playable (`ROSTER[c].racer`, not the police corgi). The player picks a character on the new
+  **roster screen** (`ScreenId 'roster'`, menu entry 「角色」): a grid of every racer (portrait, name, title, the five
+  stat bars, the signature skill) and, for the focused character, its loadout (§24). The pick is saved
+  (`SaveData.character`) and used by every race (`RaceConfig.playerCharacter`; tests: `?character=<id>`). The field is
+  drawn from every other racer, so the pelican rides as a rival when the player picks someone else.
+- Six new racers (procedural species, kind tone, no real people): 香蕉猫 `bananacat` (a crying cat in a banana
+  costume), 泪眼猫猫 `cryingcat` (teary eyes, thumbs-up), 新鲜哥 `xinxian` (the orange stray who only eats food within
+  5 s of it dropping; never name the streamer), 弹跳猪 `moodeng` (the pygmy hippo calf, glossy grey-pink, bites),
+  佩德罗 `pedro` (the dancing raccoon: masked face, ringed tail), 悲伤仓鼠 `hamster` (huge glossy eyes, sad violin).
+  Each has a species file (`actors/species/<id>.ts`, ≤ 2600 budget, ink outline, face readable from the chase cam),
+  a signature skill (§24), 12 taunts + KO/hurt/victory/defeat/skill lines (data/roster.ts), a temperament
+  (ai/personality.ts), fallback stickers (ui/hud/heads.ts, ui/p5/art.ts). New racers ship with `racer: false` until
+  their species model passes actors-check; the lead flips them on. No voice clips for them (bubbles only).
+- Portraits for every character are rendered from the 3D models (`tools/r6/portraits.mjs` → `public/assets/
+  portraits/<id>_{main,smug,hurt,eyes}.webp`), so new racers look like their in-game model.
+- Pelican-only code is generalised: the player HUD kit, HOW TO skill cards, achievements ("亲手" = the player's own
+  hands whatever the species), results / menu hero use the player's character.
+
+## 24. r6 — Skills 2.0 (combat; poses = actors; visuals = combat/fx; sounds = audio)
+- Catalogue: data/skills.ts — 13 old + 6 new signature skills + 17 pool skills (anyone may equip) + 3 shared ults
+  (SP 100). Categories 攻击/控制/位移/防御/召唤/陷阱/整活; elements 火/冰/雷/水/风.
+- Loadout: `RiderState.loadout = { slots: [U, I, O], ult: P }`, filled by core at spawn from `RaceConfig.loadout`
+  (player) / `rivalLoadouts` (rivals: signature + one pool skill; the nemesis also brings an ult, never the time stop).
+  The player edits it per character on the roster screen (`SaveData.loadouts[c]`, validated by data/loadouts.ts
+  validLoadout); 「盲盒」 (`SaveData.blindBox`, `?blindbox=1`) rolls a random kit every race. The skill runner casts
+  from the loadout (combat/skills/runner.ts skillIn). AI (race/ai/skills.ts) uses slots 1 and 2 (and the ult) with a
+  rule per skill id; skills without a rule fall back to a generic rule by category.
+- New statuses → mods (combat/statuses.ts): burn (DoT), cold (stacks, −6 % speed each; 3 stacks → frozen), frozen
+  (no steer/attack, slides at 55 %), charged (thunder mark), confused (sim mirrors steering), rooted (eats the pie:
+  12 % speed), silenced (no skill casts), halted (time stop: sim skips the rider entirely).
+- Elements & reactions (combat/elements.ts, tuning ELEMENTS / REACT): fire+water 蒸发, fire+ice 融化 (burst
+  damage), water+ice 冻结, thunder+water 感电 (chains through every wet rider; rain keeps everyone wet), thunder+ice
+  超导 (shield breaks, big slow), thunder+fire 超载 (explosion), wind+aura 扩散. Events `combat:element`,
+  `combat:reaction`; fx shows an element glyph over the victim and a reaction burst; the HUD calls the reaction
+  name (蒸发！/感电！…) near the victim; audio has a sting per reaction.
+- Every skill can hit the police (§25): skills query `obstaclesIn()` and emit `combat:obstacleHit` with `skillId`
+  (helper `skillObstacleHit`).
+- Each skill: an implementation (combat/skills/<name>.ts, registry), a pose (actors/rig/cues.ts POSES; a generic
+  pose by category is fine for pool skills), visuals (combat/visuals; reuse waves/auras/bolts/trails), fx flair
+  (fx/react/skills.ts TABLE), a cast + hit sound (audio/sfx/skills.ts), a HUD glyph (the catalogue's).
+
+## 25. r6 — 薄纱警察: the police can be beaten (race unit; HUD = ui-hud; fx/audio)
+- Knocks keep the officer close: a hit pushes it ≤ 1.5 m aside for ≤ 0.4 s and it slows only a little (×0.85 for
+  0.8 s), so it stays in reach of the next swing. Officer HP 60 → 40; a heavy swing with a weapon downs it in two or
+  three hits, bare wings in five or six. Skills and thrown weapons hurt it (`combat:obstacleHit` with `skillId`);
+  `ko: true` (SHOWTIME, the shared ults) downs every officer it reaches at once.
+- An officer down: a 0.6 s slow-mo beat (clock layer `police`), the corgi tumbles off its bike, the line 「柯基下班了！」
+  (HUD banner + bubble), its baton drops as a pickup (`pickup:spawn` kind 'weapon', weapon 'baton' — the player may
+  use it: the only way to get one), and `police:bounty` pays the player 80 小鱼干 + refunds this race's fines.
+- Three officers down in one race → the 特警 squad (obstacles 910–912): three corgis with riot shields
+  (`police:squad` phase call/arrive/down/clear), 40 HP each, the shield blocks frontal swings (hit them from the
+  side or with skills). All three down → 「警局下班」 (`police:offDuty`): no police for the rest of the race (heat
+  frozen at 0), achievement `police_off`.
+- Achievements: `police_down` (down an officer), `police_three` (three in one race), `police_off` (警局下班),
+  `police_skill` (down one with a skill).
+
+## 26. r6 — UI back to readable + achievements you can find (ui-screens / ui-hud / content)
+- Main menu: a 「成就」 entry (`ScreenId 'records'`: the records sheet as a full screen with the egg column and the
+  stats) and a 「角色」 entry (roster). The career screen's Tab chip stays as a shortcut.
+- Loading: the menu never shows the drawn stand-in pelican: it waits (≤ 1.2 s) for the menu art behind the boot
+  splash / wipe; race-only fonts are not fetched at boot (fonts.ts preloadHudFonts runs when a race starts loading,
+  not in createHud); CJK fonts are subset to the glyphs the game uses (tools/r6/subset-fonts.py, build-time).
+- Density (compared with pre-r4 screenshots): career and quick race go back to big readable cards — 3 cards per row
+  at 1280×720, cup names ≥ 32 px, card names ≥ 28 px, chips ≤ 2 per card (weather + one), the race options panel
+  folds into the selected card. Race HUD: the STYLE meter and callouts move into one compact column, the air-trick
+  key strip shows only while airborne, and nothing overlaps the speedometer, skill diamonds or progress bar.
+- Phone landscape (844×390): every screen's interactive elements fit on screen.
+
+## 27. r6 contracts (core, applied by the integrator — units never edit core)
+- types.ts: CharacterId + bananacat | cryingcat | xinxian | moodeng | pedro | hamster · StatusId + burn | frozen | cold |
+  charged | confused | rooted | silenced | halted · Element · Reaction · SkillLoadout · RiderMods.steerInvert / halted /
+  silenced · RiderState.loadout.
+- contracts.ts: RaceConfig.loadout / rivalLoadouts · ScreenId + roster | records.
+- events-map.ts: combat:element · combat:reaction · combat:obstacleHit.skillId / ko · police:bounty · police:squad ·
+  police:offDuty.
+- save.ts: SaveData.character / loadouts / blindBox (sanitized; the police corgi is never playable).
+- data/loadouts.ts (defaults, rival kits, validation, 盲盒) · data/skills.ts SkillDef.category / element, slot 'pool'.
+- sim honours mods.steerInvert (mirrored steering) and mods.halted (rider frozen in place).

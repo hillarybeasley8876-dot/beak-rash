@@ -14,6 +14,7 @@ export type Mood = 'main' | 'smug' | 'hurt';
 export const SPECIES_GLYPH: Record<CharacterId, string> = {
   pelican: '鹕', goose: '鹅', capybara: '卡', cat: '猫', shiba: '柴',
   pigeon: '鸽', penguin: '企', seagull: '鸥', sloth: '懒', corgi: '警',
+  bananacat: '蕉', cryingcat: '泪', xinxian: '鲜', moodeng: '弹', pedro: '浣', hamster: '鼠',
 };
 
 function resolve(rel: string | undefined): string | null {

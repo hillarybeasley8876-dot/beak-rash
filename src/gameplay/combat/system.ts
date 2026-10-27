@@ -8,6 +8,7 @@ import { active, CombatCtx } from './ctx';
 import { applyPin, installCombatDebug } from './debug';
 import { listenExternal } from './external';
 import { flushImpacts } from './feedback';
+import { tickElements } from './elements';
 import { checkKos, listenKo } from './ko';
 import { PropLibrary } from './meshes/library';
 import { requestSwing, resolveSwings, runBuffered, tickAction } from './melee';
@@ -79,6 +80,7 @@ export function createCombat(session: Session): CombatSystem {
         }
         applyMods(r);
       }
+      if (ctx.racing) tickElements(ctx, dt);
       ctx.skills.pre(dt);
       flushImpacts(ctx);
     },

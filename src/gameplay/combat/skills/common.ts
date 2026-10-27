@@ -1,5 +1,6 @@
-// Helpers shared by skill files: damaging skill hits, debuff-only hits, cone and radius queries.
-import type { RiderState, StatusId } from '../../../core/types';
+// Helpers shared by skill files: damaging skill hits, debuff-only hits, cone and radius queries, and (r6 SPEC §25)
+// skill hits on the police and hittable props, which are obstacles, not riders.
+import type { Obstacle, ObstacleKind, RiderState, StatusId } from '../../../core/types';
 import { clampToRoad, finished, others, targetable, type CombatCtx } from '../ctx';
 import { applyHit, credit, type HitOutcome } from '../damage';
 import type { ImpactKind } from '../feedback';
@@ -56,6 +57,26 @@ export function inCone(ctx: CombatCtx, r: RiderState, range: number, halfAngle: 
 /** Targetable riders within `radius` metres of `r` (track-space distance, height ignored below 2 m). */
 export function inRadius(ctx: CombatCtx, r: RiderState, radius: number): RiderState[] {
   return others(ctx, r, (o, ds, dx) => targetable(ctx, o) && Math.hypot(ds, dx) <= radius && Math.abs(o.y - r.y) < 2);
+}
+
+/** Obstacles a skill may hit (r6 SPEC §25): the corgi officers and the special police squad, and hittable props. */
+const HITTABLE: ReadonlySet<ObstacleKind> = new Set<ObstacleKind>(['police', 'prop']);
+
+/** Active hittable obstacles relative to `r` passing `keep(o, ds, dx)` (ds = o.s − r.s). */
+export function obstaclesIn(ctx: CombatCtx, r: RiderState, keep: (o: Obstacle, ds: number, dx: number) => boolean): Obstacle[] {
+  return ctx.session.obstacles.filter((o) => o.active && HITTABLE.has(o.kind) && keep(o, o.s - r.s, o.x - r.x));
+}
+
+/**
+ * A skill reaches an obstacle (r6 SPEC §25): combat:obstacleHit with the skill id; the police unit turns it into
+ * damage on the officer (`ko` = knock it out whatever its HP: SHOWTIME and the big ults). Nothing past the line.
+ */
+export function skillObstacleHit(ctx: CombatCtx, a: RiderState, o: Obstacle, skillId: string, damage: number, ko = false): void {
+  if (finished(a)) return;
+  ctx.bus.emit('combat:obstacleHit', {
+    obstacleId: o.id, attacker: a.id, weapon: 'none', damage, thrown: false,
+    pos: ctx.world(o.s, o.x, 1.1).clone(), skillId, ko,
+  });
 }
 
 /** Lateral offsets tried, in order, when a skill puts a rider down somewhere new (ghost reappearing, SHOWTIME landing). */

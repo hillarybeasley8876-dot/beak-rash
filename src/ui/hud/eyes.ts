@@ -6,11 +6,13 @@ import type { CharacterId } from '../../core/types';
 const IRIS: Record<CharacterId, string> = {
   pelican: '#F5D33B', goose: '#4A3216', capybara: '#3B2A1C', cat: '#7BD148', shiba: '#5A3412',
   pigeon: '#FF8A1F', penguin: '#2A2F45', seagull: '#F2C230', sloth: '#2C2118', corgi: '#6B3B12',
+  bananacat: '#3B2A1C', cryingcat: '#4A6FA5', xinxian: '#C9A227', moodeng: '#2A1F1A', pedro: '#2B2116', hamster: '#1E1612',
 };
 
 /** Brow tilt per species (degrees, + = angrier). The capybara and sloth stay serene. */
 const BROW: Record<CharacterId, number> = {
   pelican: 16, goose: 24, capybara: -2, cat: 10, shiba: 6, pigeon: 12, penguin: 8, seagull: 14, sloth: -4, corgi: 14,
+  bananacat: -10, cryingcat: -12, xinxian: 8, moodeng: 18, pedro: 4, hamster: -14,
 };
 
 const K = '#0B0B0F';

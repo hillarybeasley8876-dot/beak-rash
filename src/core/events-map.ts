@@ -1,5 +1,5 @@
 // Every cross-unit event. Emitters own the payload shape; listeners must tolerate extra fields.
-import type { CharacterId, CrashCause, RiderId, Side, TrackId, TrickKind, Vec3Like, WeaponId } from './types';
+import type { CharacterId, CrashCause, Element, Reaction, RiderId, Side, TrackId, TrickKind, Vec3Like, WeaponId } from './types';
 import type { RaceConfig, RaceResult, ScreenId } from './contracts';
 
 export interface GameEvents {
@@ -65,8 +65,9 @@ export interface GameEvents {
   // ---- r4 combat (SPEC §15) ----
   'combat:throw': { riderId: RiderId; weapon: WeaponId; dir: 1 | -1; pos: Vec3Like; projectileId: number };
   'combat:parry': { riderId: RiderId; attacker: RiderId | null; obstacleId: number | null; weapon: WeaponId; pos: Vec3Like };
-  /** A swing or a thrown weapon reached an obstacle (traffic, a police corgi, event props, secret props). */
-  'combat:obstacleHit': { obstacleId: number; attacker: RiderId; weapon: WeaponId; damage: number; thrown: boolean; pos: Vec3Like };
+  /** A swing, a thrown weapon or a skill (r6: skillId set) reached an obstacle (traffic, a police corgi, event props,
+   *  secret props). `ko` (r6) = the blow is meant to knock an officer out whatever its HP (SHOWTIME, big ults). */
+  'combat:obstacleHit': { obstacleId: number; attacker: RiderId; weapon: WeaponId; damage: number; thrown: boolean; pos: Vec3Like; skillId?: string | null; ko?: boolean };
   /** Request: combat puts a pickup on the road (track events, secrets). */
   'pickup:spawn': { kind: 'coin' | 'fish' | 'can' | 'crate' | 'weapon'; s: number; x: number; weapon?: WeaponId };
   /** Request: a non-rider attacker (police baton, event hazard) strikes `victim`; `side` = the attacker's side of the
@@ -78,6 +79,10 @@ export interface GameEvents {
   'style:chain': { riderId: RiderId; action: string; label: string; points: number; total: number; mult: number; count: number };
   'style:bank': { riderId: RiderId; total: number; count: number; sp: number; coins: number; broken: boolean };
   'taunt': { riderId: RiderId; text: string; character: CharacterId };
+  // ---- r6 elements (SPEC §24): an element landed on a rider (aura applied), and the reactions between two of them ----
+  'combat:element': { attacker: RiderId | null; victim: RiderId; element: Element; pos: Vec3Like };
+  /** `victims` = every rider the reaction touched (electro chains, overload blasts, swirl spreads), victim first. */
+  'combat:reaction': { reaction: Reaction; attacker: RiderId | null; victim: RiderId; victims: RiderId[]; damage: number; pos: Vec3Like };
 
   // ---- police / traffic (gameplay/race) ----
   'police:alert': { riderId: RiderId; level: number; reason?: 'spawn' | 'lost' | 'busted' };
@@ -93,6 +98,13 @@ export interface GameEvents {
   'police:hurt': { obstacleId: number; attacker: RiderId; damage: number; hp: number; pos: Vec3Like };
   'police:down': { obstacleId: number; attacker: RiderId; pos: Vec3Like };
   'police:bribe': { riderId: RiderId; obstacleId: number; amount: number; accepted: boolean };
+  // ---- r6 police (SPEC §25): the bounty for an officer down, the 特警 squad after three downs, 警局下班 ----
+  /** An officer down paid the player: `bounty` coins, `refund` = fines of this race given back. */
+  'police:bounty': { riderId: RiderId; obstacleId: number; bounty: number; refund: number; downs: number; pos: Vec3Like };
+  /** The 特警 squad (obstacle ids 910+): called after the third officer down, arrives, each one down, all down. */
+  'police:squad': { phase: 'call' | 'arrive' | 'down' | 'clear'; obstacleId: number | null; left: number };
+  /** 警局下班: every squad member down — no police for the rest of the race. */
+  'police:offDuty': { riderId: RiderId };
   /** A line from a speaker that is not a session rider but rides an Obstacle (the police corgi): listeners follow
    *  `session.obstacles` by id for the anchor and drop the line once that obstacle is gone. */
   'npc:say': { obstacleId: number; character: CharacterId; text: string };

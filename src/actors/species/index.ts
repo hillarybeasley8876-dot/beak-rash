@@ -19,7 +19,11 @@ import { shiba } from './shiba';
 import { sloth } from './sloth';
 import type { SpeciesDef } from './types';
 
-const DEFS: Record<CharacterId, SpeciesDef> = { pelican, goose, capybara, cat, shiba, pigeon, penguin, seagull, sloth, corgi };
+const DEFS: Record<CharacterId, SpeciesDef> = {
+  pelican, goose, capybara, cat, shiba, pigeon, penguin, seagull, sloth, corgi,
+  // r6 meme roster (SPEC §23): stand-in bodies until each species file lands (job r6-species)
+  bananacat: cat, cryingcat: cat, xinxian: cat, moodeng: capybara, pedro: shiba, hamster: capybara,
+};
 
 export function speciesDef(id: CharacterId): SpeciesDef {
   return DEFS[id] ?? pelican;

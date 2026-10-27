@@ -3,6 +3,7 @@
 //   per frame:   views (pose from physics) → track scenery
 import { Group, Quaternion, Vector3 } from 'three';
 import { BIKES } from '../data/bikes';
+import { defaultLoadout, rivalLoadout } from '../data/loadouts';
 import { ROSTER } from '../data/roster';
 import { Clock } from './clock';
 import { createRiderState } from './rider';
@@ -67,9 +68,11 @@ export class RaceSession implements Session {
   private async spawnRiders(breathe: () => Promise<void>): Promise<void> {
     const { app, config } = this;
     const lineup = [
-      { character: config.playerCharacter, bike: config.playerBike, isPlayer: true },
+      { character: config.playerCharacter, bike: config.playerBike, isPlayer: true,
+        loadout: config.loadout ?? defaultLoadout(config.playerCharacter) },
       ...config.rivals.map((character, i) => ({
         character, bike: config.rivalBikes[i] ?? ROSTER[character].defaultBike, isPlayer: false,
+        loadout: config.rivalLoadouts?.[i] ?? rivalLoadout(character, character === config.nemesis),
       })),
     ];
     // Default grid: rows of three, 7 m apart; the player starts mid-pack. Race logic may re-grid.
@@ -79,6 +82,7 @@ export class RaceSession implements Session {
     order.splice(playerSlot, 0, 0);
     for (const [id, entry] of lineup.entries()) {
       const r = createRiderState(id, entry.character, entry.bike, entry.isPlayer);
+      r.loadout = { slots: [entry.loadout.slots[0], entry.loadout.slots[1], entry.loadout.slots[2]], ult: entry.loadout.ult };
       const slot = order.indexOf(id);
       r.s = 40 - Math.floor(slot / 3) * 7;
       r.x = ((slot % 3) - 1) * 3.2;

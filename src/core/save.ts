@@ -2,7 +2,7 @@
 // (core/save-sanitize.ts): unknown bike ids, quality names and bad numbers never reach the game.
 import { BIKES } from '../data/bikes';
 import { sanitizeSave } from './save-sanitize';
-import type { BikeId, CharacterId, Quality } from './types';
+import type { BikeId, CharacterId, Quality, SkillLoadout } from './types';
 
 export interface Settings {
   master: number;
@@ -33,6 +33,12 @@ export interface SaveData {
   /** r4 (SPEC §21): ids of found easter eggs (gameplay/secrets) and unlocked extras ('llm' bike, …). */
   secrets: string[];
   unlocks: string[];
+  /** r6 (SPEC §23): the character the player races as (any racer). */
+  character: CharacterId;
+  /** r6 (SPEC §24): the player's skill loadout per character (absent = the character's default kit). */
+  loadouts: Partial<Record<CharacterId, SkillLoadout>>;
+  /** r6 (SPEC §24): 盲盒 — roll a random loadout every race instead of the saved one. */
+  blindBox: boolean;
 }
 
 const KEY = 'beak-rash.save.v1';
@@ -49,6 +55,9 @@ export const defaultSave = (): SaveData => ({
   rivalry: {},
   secrets: [],
   unlocks: [],
+  character: 'pelican',
+  loadouts: {},
+  blindBox: false,
 });
 
 export class SaveStore {

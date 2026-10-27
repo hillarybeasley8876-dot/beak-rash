@@ -1,8 +1,8 @@
 // Skill runner: loadouts, cast checks (cooldown / SP / state → skill:denied), press buffering (behind a swing,
 // a hit stagger, the end of another skill, or the player's KO cinematic for SHOWTIME), running skills, crash
-// interrupts and disposal. Slots: 1–3 = U/I/O (rivals fire their 'sig' skill from slot 1), 4 = ult (P).
-import { PLAYER_SKILLS, PLAYER_ULT, SKILLS } from '../../../data/skills';
-import { ROSTER } from '../../../data/roster';
+// interrupts and disposal. Slots: 1–3 = U/I/O, 4 = ult (P), read from RiderState.loadout (r6 SPEC §24: core fills
+// it at spawn; rivals carry their signature skill in slot 1 and a pool skill in slot 2). Silenced riders cast nothing.
+import { SKILLS } from '../../../data/skills';
 import type { Controls, RiderState } from '../../../core/types';
 import { active, finished, type CombatCtx } from '../ctx';
 import { applyMods } from '../statuses';
@@ -47,8 +47,8 @@ export class SkillRunner {
 
   /** Skill id in a slot for this rider (null = empty). */
   skillIn(r: RiderState, slot: number): string | null {
-    if (r.character === 'pelican') return slot === ULT_SLOT ? PLAYER_ULT : PLAYER_SKILLS[slot - 1] ?? null;
-    return slot === 1 ? ROSTER[r.character].skill : null;
+    if (slot === ULT_SLOT) return r.loadout.ult;
+    return r.loadout.slots[slot - 1] ?? null;
   }
 
   /** Debug / tests: cast on the next preStep regardless of the rider's controller. */
@@ -165,7 +165,7 @@ export class SkillRunner {
 
   private check(r: RiderState, slot: number, id: string | null): Block | null {
     if (!id || !SKILLS[id] || !SKILL_IMPLS[id]) return 'state';
-    if (!active(r) || !r.mods.canAttack) return 'state';
+    if (!active(r) || !r.mods.canAttack || r.mods.silenced) return 'state';
     if (slot !== ULT_SLOT && (r.cooldowns[slot - 1] ?? 0) > 0) return 'cooldown';
     if (r.sp < (SKILLS[id]?.spCost ?? 0)) return 'sp';
     if (this.busy(r)) return this.lockLeft(r) <= SKILL_QUEUE ? 'busy' : 'state';

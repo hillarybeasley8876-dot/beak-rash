@@ -2,13 +2,14 @@
 // back to the defaults, so a stale bike id or quality name can never block a race or disable a unit.
 // Pure (type-only imports): tools/test-core-save.mjs runs it under plain Node.
 import type { SaveData, Settings } from './save';
-import type { BikeId, CharacterId, Quality } from './types';
+import type { BikeId, CharacterId, Quality, SkillLoadout } from './types';
 
 export const QUALITIES: readonly Quality[] = ['low', 'medium', 'high'];
 const SLOWMO: readonly Settings['slowmo'][] = ['full', 'short', 'off'];
 const MAX_COINS = 1e9;
-/** Species that can hold a grudge (SaveData.rivalry keys): every rival, not the player's pelican or the police. */
-const RIVALS: readonly CharacterId[] = ['goose', 'capybara', 'cat', 'shiba', 'pigeon', 'penguin', 'seagull', 'sloth'];
+/** Species that can hold a grudge (SaveData.rivalry keys): every racer (r6: any of them can be the player's rival). */
+const RIVALS: readonly CharacterId[] = ['pelican', 'goose', 'capybara', 'cat', 'shiba', 'pigeon', 'penguin', 'seagull', 'sloth',
+  'bananacat', 'cryingcat', 'xinxian', 'moodeng', 'pedro', 'hamster'];
 
 type Loose = Record<string, unknown>;
 
@@ -98,6 +99,24 @@ function statsOf(f: Fields, base: SaveData['stats']): SaveData['stats'] {
   return out;
 }
 
+/** A stored loadout keeps its shape only (skill ids are strings or null); data/loadouts.ts validLoadout() checks
+ *  the ids against the catalogue when the race is configured (this file stays free of data imports). */
+function loadoutOf(v: unknown): SkillLoadout | null {
+  if (!isRecord(v) || !Array.isArray(v.slots) || v.slots.length !== 3) return null;
+  const id = (x: unknown): string | null => (typeof x === 'string' && x.length > 0 && x.length < 64 ? x : null);
+  return { slots: [id(v.slots[0]), id(v.slots[1]), id(v.slots[2])], ult: id(v.ult) };
+}
+
+function loadoutsOf(f: Fields): SaveData['loadouts'] {
+  const out: SaveData['loadouts'] = {};
+  for (const [key, v] of Object.entries(f.raw)) {
+    const l = isOneOf(key, RIVALS) ? loadoutOf(v) : null;
+    if (l && isOneOf(key, RIVALS)) out[key] = l;
+    else f.fixed.push(`${f.path}${key}`);
+  }
+  return out;
+}
+
 function rivalryOf(f: Fields): SaveData['rivalry'] {
   const out: SaveData['rivalry'] = {};
   for (const [key, v] of Object.entries(f.raw)) {
@@ -129,5 +148,8 @@ export function sanitizeSave(raw: unknown, base: SaveData, bikes: readonly BikeI
     rivalry: rivalryOf(Fields.of(f.raw.rivalry, 'rivalry.', fixed)),
     secrets: f.strings('secrets'),
     unlocks: f.strings('unlocks'),
+    character: f.pick('character', RIVALS, base.character),
+    loadouts: loadoutsOf(Fields.of(f.raw.loadouts, 'loadouts.', fixed)),
+    blindBox: f.bool('blindBox', base.blindBox),
   };
 }

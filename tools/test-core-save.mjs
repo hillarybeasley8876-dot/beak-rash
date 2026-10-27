@@ -14,6 +14,9 @@ const base = () => ({
   rivalry: {},
   secrets: [],
   unlocks: [],
+  character: 'pelican',
+  loadouts: {},
+  blindBox: false,
 });
 const clean = (raw) => { const fixed = []; return { data: sanitizeSave(raw, base(), BIKES, fixed), fixed }; };
 
@@ -60,15 +63,26 @@ assert.equal(r.data.settings.quality, 'low');
 assert.equal(r.data.settings.master, 0.9);
 assert.deepEqual(r.fixed, [], 'missing fields are defaults, not repairs');
 
-// r4 fields: rivalry keys must be rival species with finite grudges (clamped 0..100); secrets / unlocks unique strings.
+// r4 fields: rivalry keys must be racers with finite grudges (clamped 0..100; r6: the pelican can be a rival, the
+// police corgi never is); secrets / unlocks unique strings.
 r = clean({ rivalry: { goose: 140, cat: -3, pelican: 50, corgi: 10, shiba: 'lots', pigeon: 42 }, secrets: ['duck_coast', 'duck_coast', 7], unlocks: 'llm' });
-assert.deepEqual(r.data.rivalry, { goose: 100, cat: 0, pigeon: 42 }, 'rivalry keeps rival species, clamps the grudge');
+assert.deepEqual(r.data.rivalry, { goose: 100, cat: 0, pelican: 50, pigeon: 42 }, 'rivalry keeps racers, clamps the grudge');
 assert.deepEqual(r.data.secrets, ['duck_coast'], 'secrets: unique strings');
 assert.deepEqual(r.data.unlocks, [], 'unlocks: a non-array falls back to none');
-assert.ok(r.fixed.includes('rivalry.pelican') && r.fixed.includes('rivalry.shiba') && r.fixed.includes('unlocks'), 'r4 repairs are reported');
+assert.ok(r.fixed.includes('rivalry.corgi') && r.fixed.includes('rivalry.shiba') && r.fixed.includes('unlocks'), 'r4 repairs are reported');
+
+// r6 fields (SPEC §23–§24): the player's character is a racer; loadouts keep their shape (ids are checked later);
+// the 盲盒 flag is a boolean.
+r = clean({ character: 'corgi', loadouts: { cat: { slots: ['cat.spin', 7, 'pool.pie'], ult: 'ult.storm' }, dragon: { slots: [], ult: null }, goose: 'x' }, blindBox: 'yes' });
+assert.equal(r.data.character, 'pelican', 'the police corgi is not playable: back to the pelican');
+assert.deepEqual(r.data.loadouts, { cat: { slots: ['cat.spin', null, 'pool.pie'], ult: 'ult.storm' } }, 'loadouts keep racer keys with a 3-slot shape');
+assert.equal(r.data.blindBox, false, 'blindBox: a non-boolean falls back to off');
+assert.ok(['character', 'loadouts.dragon', 'loadouts.goose', 'blindBox'].every((k) => r.fixed.includes(k)), 'r6 repairs are reported');
+assert.equal(clean({ character: 'moodeng' }).data.character, 'moodeng', 'a meme racer is a valid pick');
 r = clean({ coins: 5, stats: { races: 2 } });
 assert.deepEqual([r.data.rivalry, r.data.secrets, r.data.unlocks, r.data.settings.duckRider, r.data.stats.bestStyle], [{}, [], [], false, 0], 'a pre-r4 save gets r4 defaults');
 assert.deepEqual(r.fixed, [], 'pre-r4 saves are not reported as repaired');
+assert.deepEqual([r.data.character, r.data.loadouts, r.data.blindBox], ['pelican', {}, false], 'a pre-r6 save gets r6 defaults');
 
 assert.ok(isQuality('medium') && !isQuality('ultra') && !isQuality(undefined), 'isQuality');
 console.log('test-core-save OK');

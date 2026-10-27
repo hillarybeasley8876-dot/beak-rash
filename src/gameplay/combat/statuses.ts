@@ -7,7 +7,15 @@
 import type { RiderId, RiderState, StatusEffect, StatusId } from '../../core/types';
 import { STATUS_MODS } from './tuning';
 
-const NEGATIVE: ReadonlySet<StatusId> = new Set<StatusId>(['stun', 'slow', 'chill', 'blind', 'wobble', 'gulped', 'oiled', 'wet']);
+const NEGATIVE: ReadonlySet<StatusId> = new Set<StatusId>([
+  'stun', 'slow', 'chill', 'blind', 'wobble', 'gulped', 'oiled', 'wet',
+  'burn', 'frozen', 'cold', 'charged', 'confused', 'rooted', 'silenced', 'halted', // r6 (SPEC §24)
+]);
+
+/** Negative statuses a cleanse (pool.thermos) removes; 'gulped' and 'halted' are someone else's hold, not a debuff. */
+export const CLEANSABLE: ReadonlySet<StatusId> = new Set<StatusId>([
+  'stun', 'slow', 'chill', 'blind', 'wobble', 'oiled', 'burn', 'frozen', 'cold', 'charged', 'confused', 'rooted', 'silenced',
+]);
 const owned = new WeakSet<StatusEffect>();
 
 /** Protected riders shrug off new negative statuses (respawn invuln, ghosts, ult). */
@@ -75,6 +83,7 @@ export function applyMods(r: RiderState): void {
   m.speedMul = m.accelMul = m.steerMul = m.gripMul = 1;
   m.canAttack = true;
   m.intangible = m.invisible = m.shield = false;
+  m.steerInvert = m.halted = m.silenced = false;
   strengths.clear();
   for (const st of r.statuses) {
     if (st.time > 0) strengths.set(st.id, Math.max(strengths.get(st.id) ?? 0, st.strength));
@@ -117,6 +126,27 @@ export function applyMods(r: RiderState): void {
       case 'oiled': m.gripMul *= STATUS_MODS.oiled.grip; break;
       case 'wet': m.gripMul *= STATUS_MODS.wet.grip; break;
       case 'angry': break;
+      // ---- r6 (SPEC §24)
+      case 'burn': break;      // damage over time: elements.ts tickElements
+      case 'charged': break;   // the thunder mark: only reactions read it
+      case 'cold': m.speedMul *= 1 - STATUS_MODS.cold.speedPerStack * Math.min(STATUS_MODS.cold.maxStacks, k); break;
+      case 'frozen':
+        m.steerMul *= STATUS_MODS.frozen.steer;
+        m.accelMul *= STATUS_MODS.frozen.accel;
+        m.speedMul *= STATUS_MODS.frozen.speed;
+        m.canAttack = false;
+        break;
+      case 'confused': m.steerInvert = true; break;
+      case 'rooted':
+        m.speedMul *= STATUS_MODS.rooted.speed;
+        m.accelMul *= STATUS_MODS.rooted.accel;
+        m.canAttack = false;
+        break;
+      case 'silenced': m.silenced = true; break;
+      case 'halted':
+        m.halted = true;
+        m.canAttack = false;
+        break;
     }
   }
   if (m.invisible || m.intangible) m.canAttack = false; // nobody lands blows from where they can't be hit back

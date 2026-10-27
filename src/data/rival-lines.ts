@@ -19,6 +19,12 @@ export const NEMESIS_LINES: Record<CharacterId, string[]> = {
   seagull: ['MINE 回来啦！', '你的鱼，我记下了。', '上次顺走的，这次一起算。', '薯条可以给你，鱼不行。'],
   sloth: ['我……记得……那件事……', '慢……但是……会到的……', '这次……不会让你跑掉……', '急什么……账……又不会跑……'],
   corgi: ['又是你？站住！', '执法记录仪开着呢！'],
+  bananacat: ['上次你让我哭了，这次换你。', '香蕉皮，专门给你留的。', '哭着也要追上你！', '这笔账，泪里记着。'],
+  cryingcat: ['我没记仇……（记了）', '大拇指收回，账还没算。', '含泪也要讨个说法。', '这次，轮到你掉眼泪。'],
+  xinxian: ['上次抢我饭的，是你吧？', '这口气，我趁热出。', '五秒之内，追上你。', '新鲜的仇，最好报。'],
+  moodeng: ['上次那下，我咬住不放。', '小河马，记性很大。', '这次，弹到你脸上。', '别跑，我脾气还没消。'],
+  pedro: ['你扔的东西，我都记着。', '这次转圈，绕着你转。', '垃圾桶里，翻出了旧账。', '跳完这支舞，就算账。'],
+  hamster: ['小提琴为你拉响了。', '我难过，你也别想开心。', '那天的事，我腮帮子里存着。', '这一曲，叫复仇。'],
 };
 
 /** 围剿: the shout when the rivals gang up on the player. */
@@ -33,6 +39,12 @@ export const ALLIANCE_LINES: Record<CharacterId, string> = {
   seagull: '今天的鱼，全归我们！',
   sloth: '大家……一起上……虽然很慢……',
   corgi: '全体注意！',
+  bananacat: '大家一起，把它弄哭！',
+  cryingcat: '一起上，我给大家点赞。',
+  xinxian: '趁热，围上去！',
+  moodeng: '一起压上去，弹扁它！',
+  pedro: '围起来，转起来！',
+  hamster: '大家……一起悲伤地围上去。',
 };
 
 /** 塑料友谊: an ally that hits an ally. */
@@ -53,6 +65,12 @@ export const NEMESIS_DOWN_LINES: Record<CharacterId, string> = {
   seagull: 'MINE 还在我这儿呢！',
   sloth: '慢……会还的……',
   corgi: '记下了！',
+  bananacat: '呜哇……这次算你赢！',
+  cryingcat: '没事……我很好……（泪）',
+  xinxian: '凉了……下次趁热来。',
+  moodeng: '哼唧！下次咬回来！',
+  pedro: '转晕了……先记着。',
+  hamster: '小提琴……下次再拉。',
 };
 
 /** The intro card line of the nemesis (a grudge line). */
@@ -67,4 +85,10 @@ export const GRUDGE_LINES: Record<CharacterId, string> = {
   seagull: '顺路抢个鱼。',
   sloth: '慢……但还是来了。',
   corgi: '旧账新算。',
+  bananacat: '哭包回来报仇了。',
+  cryingcat: '含泪归来。',
+  xinxian: '新鲜的仇，趁热。',
+  moodeng: '小河马，没消气。',
+  pedro: '垃圾桶之王驾到。',
+  hamster: '小提琴响起来了。',
 };

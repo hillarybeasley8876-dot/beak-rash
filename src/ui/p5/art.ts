@@ -41,6 +41,8 @@ type Shape = 'bird' | 'cat' | 'dog' | 'capy' | 'sloth';
 const SHAPES: Record<CharacterId, Shape> = {
   pelican: 'bird', goose: 'bird', pigeon: 'bird', penguin: 'bird', seagull: 'bird',
   cat: 'cat', shiba: 'dog', corgi: 'dog', capybara: 'capy', sloth: 'sloth',
+  // r6 meme roster: stand-ins until the species stickers land (SPEC §23)
+  bananacat: 'cat', cryingcat: 'cat', xinxian: 'cat', moodeng: 'capy', pedro: 'sloth', hamster: 'capy',
 };
 
 /** Species head sticker (front view) in roster colours. 200×200. */

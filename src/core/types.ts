@@ -4,7 +4,9 @@
 
 export type CharacterId =
   | 'pelican' | 'goose' | 'capybara' | 'cat' | 'shiba'
-  | 'pigeon' | 'penguin' | 'seagull' | 'sloth' | 'corgi';
+  | 'pigeon' | 'penguin' | 'seagull' | 'sloth' | 'corgi'
+  // r6 meme roster (SPEC §23): hidden (ROSTER.racer false) until their species models land
+  | 'bananacat' | 'cryingcat' | 'xinxian' | 'moodeng' | 'pedro' | 'hamster';
 
 export type BikeId = 'roadbike' | 'erba' | 'shared' | 'fixie' | 'mtb' | 'tandem' | 'kidbike'
   | 'llm'; // 大模型限定款: secret, unlocked by the Konami code (SPEC §21); not in BIKE_ORDER until unlocked
@@ -53,7 +55,22 @@ export const emptyControls = (): Controls => ({
 
 export type StatusId =
   | 'stun' | 'slow' | 'chill' | 'boost' | 'shield' | 'invisible' | 'intangible'
-  | 'blind' | 'wobble' | 'gulped' | 'angry' | 'oiled' | 'wet';
+  | 'blind' | 'wobble' | 'gulped' | 'angry' | 'oiled' | 'wet'
+  // r6 elements & control (SPEC §24): fire DoT, ice (cold stacks → frozen), the thunder mark, inverted steering,
+  // stopped in place (eating the pie), no skills (the sad violin), time stop (halted: sim skips the rider)
+  | 'burn' | 'frozen' | 'cold' | 'charged' | 'confused' | 'rooted' | 'silenced' | 'halted';
+
+/** The five skill elements (SPEC §24). Water also comes from rain and puddles ('wet'). */
+export type Element = 'fire' | 'ice' | 'thunder' | 'water' | 'wind';
+
+/** Elemental reactions (SPEC §24): what an element does to a rider already carrying another one. */
+export type Reaction = 'vaporize' | 'melt' | 'freeze' | 'electro' | 'superconduct' | 'overload' | 'swirl';
+
+/** The skills a rider carries into a race: slots U / I / O (index 0..2) and the ult (P); null = empty. */
+export interface SkillLoadout {
+  slots: [string | null, string | null, string | null];
+  ult: string | null;
+}
 
 export interface StatusEffect {
   id: StatusId;
@@ -73,11 +90,15 @@ export interface RiderMods {
   invisible: boolean;
   shield: boolean;     // blocks next hit
   pushImmune: boolean; // rider contacts cost this rider no speed (the other rider is still pushed, rider:bump still fires)
+  steerInvert: boolean; // r6 'confused': sim flips the steering input (player and AI alike)
+  halted: boolean;      // r6 'halted' (time stop): sim leaves the rider where it is (speed kept for afterwards)
+  silenced: boolean;    // r6 'silenced': no skill casts (melee still works)
 }
 
 export const defaultMods = (): RiderMods => ({
   speedMul: 1, accelMul: 1, steerMul: 1, gripMul: 1,
   canAttack: true, intangible: false, invisible: false, shield: false, pushImmune: false,
+  steerInvert: false, halted: false, silenced: false,
 });
 
 export type RiderMode = 'grid' | 'racing' | 'crashed' | 'respawning' | 'finished' | 'busted';
@@ -148,6 +169,7 @@ export interface RiderState {
   mods: RiderMods;
   action: RiderAction | null;
   cooldowns: number[]; // seconds left per skill slot [s1, s2, s3]
+  loadout: SkillLoadout; // r6: the skills in the slots (core sets it at spawn from RaceConfig; combat casts from it)
   combo: number;       // consecutive hits without being hit
   comboTimer: number;
   kos: number;         // riders this rider knocked out

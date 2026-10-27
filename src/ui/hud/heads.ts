@@ -91,6 +91,66 @@ const HEADS: Record<CharacterId, string> = {
     eye(36, 56, 5.5, 1) + eye(64, 56, 5.5, 1) +
     `<path d="M20 34 C22 18 78 18 80 34 Z" fill="#1F4FD1"/><path d="M14 36 L86 36 L82 42 L18 42 Z" fill="${K}"/>` +
     `<circle cx="50" cy="27" r="5" fill="#FFE600"/>`,
+  // ---- r6 meme roster (SPEC §23)
+  bananacat:
+    `<path d="M18 100 C12 70 16 40 30 20 C34 40 36 56 40 66 Z" fill="#FFD84A"/>` +
+    `<path d="M82 100 C88 70 84 40 70 20 C66 40 64 56 60 66 Z" fill="#FFD84A"/>` +
+    `<path d="M50 2 C45 8 43 16 45 22 L55 22 C57 16 55 8 50 2 Z" fill="#6B4A1E"/>` +
+    `<path d="M26 34 C28 14 72 14 74 34 Z" fill="#FFD84A"/>` +
+    `<ellipse cx="50" cy="56" rx="26" ry="24" fill="#FFF8EC"/>` +
+    `<path d="M34 50 C38 45 42 45 46 50 M54 50 C58 45 62 45 66 50" fill="none" stroke-width="4"/>` +
+    `<path d="M38 53 L35 74 M62 53 L65 74" stroke="#5BC0FF" stroke-width="5"/>` +
+    `<ellipse cx="50" cy="67" rx="8" ry="6" fill="${K}"/>` +
+    `<path d="M22 100 C30 84 70 84 78 100 Z" fill="#FFD84A"/>`,
+  cryingcat:
+    `<path d="M18 42 L22 10 L42 28 Z" fill="#D9D4CC"/><path d="M82 42 L78 10 L58 28 Z" fill="#D9D4CC"/>` +
+    `<ellipse cx="50" cy="56" rx="36" ry="32" fill="#D9D4CC"/>` +
+    `<ellipse cx="36" cy="52" rx="11" ry="12" fill="#fff"/><ellipse cx="64" cy="52" rx="11" ry="12" fill="#fff"/>` +
+    `<circle cx="37" cy="54" r="7.5" fill="#4A6FA5" stroke="none"/><circle cx="65" cy="54" r="7.5" fill="#4A6FA5" stroke="none"/>` +
+    `<circle cx="39" cy="50" r="2.6" fill="#fff" stroke="none"/><circle cx="67" cy="50" r="2.6" fill="#fff" stroke="none"/>` +
+    `<path d="M26 60 C30 68 42 68 46 60 Z M54 60 C58 68 70 68 74 60 Z" fill="#8FD3FF" stroke="none"/>` +
+    `<path d="M26 38 L42 42 M74 38 L58 42" stroke-width="3.5"/>` +
+    `<path d="M42 75 C46 71 54 71 58 75" fill="none" stroke-width="3.5"/>` +
+    `<rect x="72" y="72" width="18" height="16" rx="6" fill="#D9D4CC"/><rect x="76" y="58" width="7" height="16" rx="3.5" fill="#D9D4CC"/>`,
+  xinxian:
+    `<path d="M14 42 L20 8 L42 28 Z" fill="#F08A24"/><path d="M86 42 L80 8 L58 28 Z" fill="#F08A24"/>` +
+    `<ellipse cx="50" cy="56" rx="37" ry="33" fill="#F08A24"/>` +
+    `<path d="M42 26 L44 36 M50 24 L50 36 M58 26 L56 36" stroke-width="4"/>` +
+    `<ellipse cx="54" cy="71" rx="19" ry="12" fill="#FFF1DC"/>` +
+    eye(38, 52, 7, 2) + eye(64, 52, 7, 2) +
+    `<path d="M51 63 L58 63 L54.5 67 Z" fill="#D9534F"/>` +
+    `<path d="M46 72 C50 79 58 79 62 72" fill="${K}"/>` +
+    `<circle cx="84" cy="20" r="12" fill="#3A9B4A"/>` +
+    `<path d="M89 13 L81 13 L80 20 C85 18 90 21 88 26 C86 29 81 29 79 27" fill="none" stroke="#fff" stroke-width="3"/>`,
+  moodeng:
+    `<ellipse cx="26" cy="22" rx="7" ry="6" fill="#6F7A8C"/><ellipse cx="60" cy="17" rx="7" ry="6" fill="#6F7A8C"/>` +
+    `<ellipse cx="44" cy="46" rx="32" ry="28" fill="#6F7A8C"/>` +
+    `<ellipse cx="68" cy="62" rx="26" ry="22" fill="#8C93A3"/>` +
+    `<path d="M48 70 C58 92 88 92 94 66 C84 74 60 76 48 70 Z" fill="#F2A7B5"/>` +
+    `<ellipse cx="78" cy="52" rx="3" ry="2.2" fill="${K}"/><ellipse cx="88" cy="56" rx="3" ry="2.2" fill="${K}"/>` +
+    eye(42, 38, 6, 1.6) + `<path d="M32 28 L50 33" stroke-width="4"/>` +
+    `<path d="M20 42 C22 32 28 26 34 24" stroke="#fff" stroke-width="3" fill="none"/>` +
+    `<rect x="70" y="72" width="5" height="6" fill="#fff"/>`,
+  pedro:
+    `<path d="M16 40 L20 12 L40 28 Z" fill="#8A8F99"/><path d="M84 40 L80 12 L60 28 Z" fill="#8A8F99"/>` +
+    `<path d="M22 32 L24 20 L32 27 Z M78 32 L76 20 L68 27 Z" fill="#2B2D33" stroke="none"/>` +
+    `<ellipse cx="50" cy="56" rx="38" ry="32" fill="#8A8F99"/>` +
+    `<path d="M50 28 L46 44 L54 44 Z" fill="#F4F4F4" stroke="none"/>` +
+    `<path d="M14 52 C24 40 42 42 50 50 C58 42 76 40 86 52 C76 62 60 62 50 56 C40 62 24 62 14 52 Z" fill="#2B2D33"/>` +
+    eye(36, 52, 6, 1.4) + eye(64, 52, 6, 1.4) +
+    `<ellipse cx="50" cy="73" rx="18" ry="12" fill="#F4F4F4"/><ellipse cx="50" cy="67" rx="6" ry="4" fill="${K}"/>` +
+    `<path d="M42 77 C46 81 54 81 58 77" fill="none" stroke-width="3"/>`,
+  hamster:
+    `<circle cx="24" cy="24" r="9" fill="#E8C49A"/><circle cx="76" cy="24" r="9" fill="#E8C49A"/>` +
+    `<circle cx="24" cy="24" r="4" fill="#FFB7A8" stroke="none"/><circle cx="76" cy="24" r="4" fill="#FFB7A8" stroke="none"/>` +
+    `<ellipse cx="50" cy="56" rx="38" ry="34" fill="#E8C49A"/>` +
+    `<ellipse cx="50" cy="71" rx="30" ry="18" fill="#FFF4E6"/>` +
+    `<ellipse cx="34" cy="50" rx="10" ry="12" fill="${K}"/><ellipse cx="66" cy="50" rx="10" ry="12" fill="${K}"/>` +
+    `<circle cx="37" cy="45" r="4" fill="#fff" stroke="none"/><circle cx="69" cy="45" r="4" fill="#fff" stroke="none"/>` +
+    `<circle cx="31" cy="55" r="1.8" fill="#fff" stroke="none"/><circle cx="63" cy="55" r="1.8" fill="#fff" stroke="none"/>` +
+    `<path d="M22 37 L40 31 M78 37 L60 31" stroke-width="3"/>` +
+    `<path d="M45 71 C48 67 52 67 55 71" fill="none" stroke-width="3"/>` +
+    `<path d="M27 61 C25 67 29 71 31 65 Z" fill="#8FD3FF"/>`,
 };
 
 /** Full SVG markup for a species head. */

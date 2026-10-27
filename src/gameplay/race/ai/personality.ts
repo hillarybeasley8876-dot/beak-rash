@@ -43,6 +43,12 @@ const TEMPER: Record<CharacterId, Temper> = {
   seagull: { aggression: 0.75, skill: 0.7, drafter: 0.6, drifter: 0.5, wander: 0.8, taunty: 1.3, skillUse: 0.9, bell: 0.3, grudge: 0.95 },
   sloth: { aggression: 0.1, skill: 0.4, drafter: 0.2, drifter: 0.1, wander: 0.2, taunty: 0.6, skillUse: 0.7, bell: 0.05, grudge: 0.1 },
   corgi: { aggression: 0.5, skill: 0.8, drafter: 0.2, drifter: 0.3, wander: 0.2, taunty: 1, skillUse: 1, bell: 0, grudge: 0.5 },
+  bananacat: { aggression: 0.35, skill: 0.7, drafter: 0.5, drifter: 0.6, wander: 0.7, taunty: 1.3, skillUse: 0.85, bell: 0.2, grudge: 0.6 },
+  cryingcat: { aggression: 0.3, skill: 0.75, drafter: 0.6, drifter: 0.5, wander: 0.4, taunty: 1, skillUse: 0.8, bell: 0.15, grudge: 0.5 },
+  xinxian: { aggression: 0.55, skill: 0.75, drafter: 0.7, drifter: 0.5, wander: 0.6, taunty: 1.1, skillUse: 0.85, bell: 0.3, grudge: 0.7 },
+  moodeng: { aggression: 0.9, skill: 0.55, drafter: 0.3, drifter: 0.2, wander: 0.5, taunty: 1.2, skillUse: 0.9, bell: 0.4, grudge: 1 },
+  pedro: { aggression: 0.5, skill: 0.8, drafter: 0.4, drifter: 0.9, wander: 0.9, taunty: 1.2, skillUse: 0.85, bell: 0.3, grudge: 0.6 },
+  hamster: { aggression: 0.2, skill: 0.65, drafter: 0.6, drifter: 0.3, wander: 0.3, taunty: 0.8, skillUse: 0.8, bell: 0.1, grudge: 0.3 },
 };
 
 /** Species temperament aggression (0..1) before level and dice. */
