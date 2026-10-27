@@ -13,6 +13,7 @@ import { SKILLS } from '../../data/skills';
 import { R4_HUD } from '../../data/strings';
 import { WEAPONS } from '../../data/weapons';
 import { HINT_CN } from './hints';
+import { TOUCH_CN } from '../touch-device';
 
 const LATIN = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!?/:.%+-×▲▼°−·';
 const FIXED_CN = '名次时间击倒双杀三连完美落地漂移擦肩而过尾流最后冲刺被抓了罚款小鱼干翻车终点第一二三四五六七八名冷却中不足冲鹈鹕天降复活中警察出没前方注意' +
@@ -27,7 +28,7 @@ function collectStrings(obj: unknown, out: string[] = []): string[] {
 }
 
 function hudCnText(): string {
-  const parts = [FIXED_CN, HINT_CN, '跳过'];
+  const parts = [FIXED_CN, HINT_CN, TOUCH_CN, '跳过'];
   // The r4 HUD copy (SPEC §14–§19): police, tricks, STYLE, weapons, rivals, track events.
   parts.push(...collectStrings(R4_HUD));
   // Bubbles show every roster line race / combat may shout: idle taunts, KO / hurt lines, skill shouts, and

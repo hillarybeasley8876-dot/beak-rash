@@ -21,6 +21,7 @@ import { R4Hud } from './r4';
 import { NetHud } from './net';
 import { Speedo } from './speedo';
 import { StatusBanner, type BannerState } from './statusbanner';
+import { TouchControls } from './touch/controls';
 import { WorldOverlay } from './world/overlay';
 import type { BubbleObstacles } from './world/bubbles';
 import { Projector } from './world/project';
@@ -80,6 +81,7 @@ export function createHud(app: AppContext, layer: HTMLElement): Hud {
   const r4Host = el('div', 'brh-layer brh-r4-host');
   root.insertBefore(r4Host, hudLayer);
   const r4 = new R4Hud(app.bus, { session: () => session, world, cutins, cluster: () => cluster }, r4Corner, r4Host, cutins.stage);
+  const touch = new TouchControls(root, app);
   let visible = false;
   let k = -1;
   /** Sim time of the player's last BUSTED (ticket-stop countdown), null = none this race. */
@@ -146,9 +148,11 @@ export function createHud(app: AppContext, layer: HTMLElement): Hud {
       readout.attach(s);
       rear.attach(s);
       installDebug();
+      touch.attach(s);
     },
     setVisible(v) {
       visible = v;
+      touch.setVisible(v);
     },
     update(dtReal) {
       const on = visible && session !== null;
@@ -175,6 +179,8 @@ export function createHud(app: AppContext, layer: HTMLElement): Hud {
       dyn.quip = quip.rect(app.size.width, app.size.height, k, quipRect);
       dyn.chips = cutins.chipsRect(app.size.width, k, chipsRect);
       dyn.callouts = cutins.calloutsRect(app.size.width, app.size.height, k, calloutsRect);
+      touch.update();
+      world.zones.hands = touch.shown;
       world.update(dtReal, k, dyn);
       statusBanner.update(p);
       readout.update(dtReal);
@@ -193,6 +199,7 @@ export function createHud(app: AppContext, layer: HTMLElement): Hud {
       netHud.dispose();
       readout.attach(null);
       rear.attach(null);
+      touch.dispose();
       root.remove();
       session = null;
       cluster = null;

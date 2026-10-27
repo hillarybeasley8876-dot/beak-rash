@@ -5,6 +5,7 @@ import './title.css';
 import { ART } from '../../data/assets';
 import { artImage, artReady, backdrop, h, pelicanSvg, ransom, starSvg, svg } from '../p5';
 import { frame, type ScreenFactory } from '../screen';
+import { wantsTouchHud } from '../touch-device';
 
 const BACK_KEYS = new Set(['Escape', 'Backspace']);
 
@@ -42,11 +43,11 @@ export const titleScreen: ScreenFactory = (ctx) => {
       h('span', { class: 'br-title-press-en', text: 'PRESS ANY KEY' })),
     h('div', { class: 'br-title-ver', text: 'v1.5 · 2026 · 本作没有真实鹈鹕受到伤害' }),
   );
-  // Phones and tablets: there are no touch controls, so say so instead of letting a tap lead into a race
-  // nobody can ride (a pad on a tablet still works).
-  if (globalThis.matchMedia?.('(pointer: coarse)').matches) {
+  // Phones, tablets, and Android WebView ride with the bottom touch bar. A tap still leaves the title;
+  // the line only says to turn the phone sideways. A keyboard or pad keeps working beside it.
+  if (wantsTouchHud(ctx.app.params)) {
     f.stage.append(h('div', { class: 'br-title-touch' },
-      h('b', { text: '手机上骑不动' }), h('span', { text: '请用电脑键盘，或者接上手柄再来' })));
+      h('b', { text: '横屏触控' }), h('span', { text: '底部就能骑' })));
   }
 
   let gone = false;
