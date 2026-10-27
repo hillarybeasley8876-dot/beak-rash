@@ -48,9 +48,11 @@ export const T = {
   lungeAccel: 12,
   /** At ★2+ the officer rides just behind the player instead of level with it (m behind). */
   tailGap: 0.2,
-  /** The officer's HP and how long it sits up after being knocked out. */
-  hp: 60,
+  /** The officer's HP: five or six wing hits, two or three with a weapon (SPEC §25). */
+  hp: 40,
   downTime: 3,
+  /** How long the downed officer rides off the road before it is lifted (s). */
+  leaveTime: 1.2,
 
   // ---- backup (★3) ----
   /** Seconds after the ★3 chase starts when the second corgi sprints in. */
@@ -151,6 +153,30 @@ export const CHASE = {
   knockHeat: 0.05,
   /** s: the pelican.wing duration (SPEC §7). */
   wingTime: 2.2,
+} as const;
+
+/** The r6 fight (SPEC §25 薄纱警察): the police can be beaten — the numbers of the payoff and the squad. */
+export const FIGHT = {
+  /** The bounty an officer the player downs pays (race coins) — on top of the fines of the race. */
+  bounty: 80,
+  /** The slow-mo beat when an officer goes down: the clock layer 'police', its scale and its length (s). */
+  slowScale: 0.35,
+  slowTime: 0.6,
+  /** How long the sim takes to get back to full speed (s). */
+  slowRamp: 0.25,
+  /** A shield member: a swing from more than this far behind it is blocked (m). */
+  shieldFront: 1,
+  /** The 特警 squad: how many officers the player must down before they come. */
+  squadAt: 3,
+  /** The HP of one squad member. */
+  squadHp: 40,
+  /** The obstacle ids of the three squad members. */
+  squadIds: [910, 911, 912] as const,
+  /** How long the call takes before the squad rides in (s). */
+  squadDelay: 2.5,
+  /** How far behind the player the first squad member rides (m) and the gap between them (m). */
+  squadGap: 4,
+  squadGapStep: 4,
 } as const;
 
 /** The lines the officer says when it lets the player go. */

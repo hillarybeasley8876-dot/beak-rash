@@ -9,7 +9,7 @@ import type { Group } from 'three';
 import { createCorgi, resetCorgi, type Corgi } from '../police-chase';
 import { PoliceView } from '../police-view';
 import { createBaton, resetBaton, type Baton } from './baton';
-import { T } from './tuning';
+import { FIGHT, T } from './tuning';
 
 export interface PoliceCorgi {
   /** The obstacle id the game knows this officer by (900 = the first, 901 = the backup). */
@@ -25,8 +25,14 @@ export interface PoliceCorgi {
   down: boolean;
   /** s since it went down. */
   downT: number;
+  /** s since it sat up and rode off (it leaves the road after T.leaveTime). */
+  leaveT: number;
   /** True while it rides off after the chase or after going down. */
   leaving: boolean;
+  /** s left of a stun (a honk): it cannot wind its baton up while stunned. */
+  stunT: number;
+  /** The 特警 squad member carries a riot shield: a frontal swing does not hurt it. */
+  shield: boolean;
   /** The speed it commits to while it winds the baton up (m/s). */
   lunge: number;
   /** The side of the player it rides on. */
@@ -37,7 +43,7 @@ export interface PoliceCorgi {
   active: boolean;
 }
 
-export function createCorgiUnit(app: AppContext, world: Group, id: number, riderId: number): PoliceCorgi {
+export function createCorgiUnit(app: AppContext, world: Group, id: number, riderId: number, opts: { shield?: boolean; hp?: number } = {}): PoliceCorgi {
   const st = createRiderState(riderId, 'corgi', 'mtb', false);
   st.name = ROSTER.corgi.name;
   st.mode = 'racing';
@@ -45,11 +51,12 @@ export function createCorgiUnit(app: AppContext, world: Group, id: number, rider
     id, kind: 'police', s: 0, x: 0, speed: 0, halfWidth: 0.45, halfLength: 0.9, height: 1.6,
     solid: false, active: false,
   };
-  const view = new PoliceView(app, world);
+  const view = new PoliceView(app, world, { shield: opts.shield === true });
   view.visible = false;
   return {
     id, st, ride: createCorgi(st), view, ob, baton: createBaton(),
-    hp: T.hp, down: false, downT: 0, leaving: false, lunge: 0, side: 1, lastSay: -99, active: false,
+    hp: opts.hp ?? T.hp, down: false, downT: 0, leaveT: 0, leaving: false, stunT: 0,
+    shield: opts.shield === true, lunge: 0, side: 1, lastSay: -99, active: false,
   };
 }
 
@@ -65,10 +72,12 @@ export function placeCorgi(c: PoliceCorgi, session: Session, behind: number, x: 
   c.st.speed = Math.max(session.player.speed + 4, 12);
   c.st.vx = 0;
   c.st.mode = 'racing';
-  c.hp = T.hp;
+  c.hp = c.shield ? FIGHT.squadHp : T.hp;
   c.down = false;
   c.downT = 0;
+  c.leaveT = 0;
   c.leaving = false;
+  c.stunT = 0;
   c.lunge = 0;
   resetBaton(c.baton);
   c.active = true;

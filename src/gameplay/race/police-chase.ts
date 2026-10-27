@@ -13,7 +13,14 @@ const ALONG_HOLD = 4;                        // …and for this long alongside
 const RESPRINT_MAX = 8, RESPRINT_HOLD = 3;   // one more sprint (s at most) and hold (s alongside) when trailing
 const CRUISE = 0.97;                         // × the player's flat-road top speed
 const TIRE_AFTER = 15, TIRED_TIME = 6, TIRED_MUL = 0.85;
-const KNOCK_TIME = 3, KNOCK_MUL = 0.7;
+// r6 (SPEC §25): a hit only nudges the officer — it stays in reach of the next swing instead of being
+// thrown three seconds down the road.
+const KNOCK_TIME = 0.8, KNOCK_MUL = 0.85;   // s of the nudge, and the speed it keeps while nudged
+const KNOCK_SHOVE = 1.2;                    // m/s sideways while it is shoved (≈0.5 m aside)
+const KNOCK_HOLD = 0.4;                     // s the shove lasts (then it steers back alongside)
+// At ★2+ the officer fights the player instead of chasing it: it matches the player's speed and holds
+// station beside it, so the player can hit it (r6 SPEC §25).
+const TAIL_TOP = 1.25;                      // × the player's flat top: the headroom it needs to close in again
 export const WALK_BACK = 2.5;                // m/s pushing the bike back to a stopped player
 const LOOK = 22;                             // m ahead the corgi watches for traffic
 
@@ -25,15 +32,18 @@ export interface Corgi {
   closeT: number;     // s chased within CLOSE m since the last rest
   tiredT: number;     // s left out of breath
   knockT: number;     // s left knocked back
+  tail: boolean;      // it fights the player (★2+): it matches the player's speed instead of cruising
 }
 
 const CLOSE = 12;                            // m: chasing this close wears the short legs out
 
-export const createCorgi = (st: RiderState): Corgi => ({ st, chaseT: 0, sprintT: SPRINT_MAX, alongT: 0, closeT: 0, tiredT: 0, knockT: 0 });
+export const createCorgi = (st: RiderState): Corgi =>
+  ({ st, chaseT: 0, sprintT: SPRINT_MAX, alongT: 0, closeT: 0, tiredT: 0, knockT: 0, tail: false });
 
 export function resetCorgi(c: Corgi): void {
   c.chaseT = c.alongT = c.closeT = c.tiredT = c.knockT = 0;
   c.sprintT = SPRINT_MAX;
+  c.tail = false;
 }
 
 /** Trailing the player: one more sprint back into whistle range, then a shorter hold alongside. */
@@ -62,17 +72,19 @@ export function tire(c: Corgi, dt: number, gap: number): boolean {
   return true;
 }
 
-/** Knocked aside by the player: slows at once, rides at reduced top for a few seconds. */
+/** Knocked aside by the player: a small shove and a short slowdown — it rides straight back alongside. */
 export function knock(c: Corgi, awayX: number): void {
   c.knockT = KNOCK_TIME;
-  c.st.speed *= 0.6;
-  c.st.vx = clamp(awayX * 4, -4, 4);
+  c.st.speed *= KNOCK_MUL;
+  c.st.vx = clamp(awayX * KNOCK_SHOVE, -KNOCK_SHOVE, KNOCK_SHOVE);
 }
 
 export const tired = (c: Corgi): boolean => c.tiredT > 0;
 
 function topSpeed(c: Corgi, w: RideWorld): number {
-  const base = sprinting(c) ? Math.max(w.playerTop * SPRINT_MUL, w.playerSpeed + SPRINT_CLOSE) : w.playerTop * CRUISE;
+  const base = sprinting(c)
+    ? Math.max(w.playerTop * SPRINT_MUL, w.playerSpeed + SPRINT_CLOSE)
+    : c.tail ? w.playerTop * TAIL_TOP : w.playerTop * CRUISE;
   return base * (c.tiredT > 0 ? TIRED_MUL : 1) * (c.knockT > 0 ? KNOCK_MUL : 1);
 }
 
@@ -146,7 +158,7 @@ export function ride(c: Corgi, w: RideWorld, dt: number, wantSpeed: number, tx: 
   }
   st.speed = approach(st.speed, want, (want > st.speed ? accel : 14) * dt);
   const target = clamp(tx, -hw + 0.6, hw - 0.6);
-  st.vx = c.knockT > KNOCK_TIME - 0.4 ? st.vx : clamp((target - st.x) * 2.5, -lat, lat);
+  st.vx = c.knockT > KNOCK_TIME - KNOCK_HOLD ? st.vx : clamp((target - st.x) * 2.5, -lat, lat);
   st.x = clamp(st.x + st.vx * dt, -hw + 0.4, hw - 0.4);
   st.s += st.speed * dt;
   st.yaw = Math.atan2(st.vx, Math.max(st.speed, 1));

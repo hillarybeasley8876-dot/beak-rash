@@ -14,10 +14,13 @@ export const basicScenarios = {
     await h.step(600);
     const caught = await h.eval('window.__br.race.police()');
     if (a.shots) { await h.eval("window.__br.race.spectate('side')"); await h.shot('shots/race/sc-police-alongside.png'); }
+    // Brake to a stop next to the officer. r6: braking during a baton wind-up dodges it — the officer's committed
+    // lunge carries it ~9 m past and it walks its bike back — so the ticket may take up to 8 s instead of 5.
     await h.controls({ throttle: 0, brake: 1 });
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 16; i++) {
       await h.step(30);
       if (a.verbose) console.log(JSON.stringify(await h.eval('window.__br.race.police()')), (await h.snapshot()).riders[0].v);
+      if ((await events(h, 'police:busted')).length) break;
     }
     const busted = await events(h, 'police:busted');
     const snap = await h.snapshot();

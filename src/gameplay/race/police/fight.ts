@@ -10,7 +10,7 @@ import { WEAPONS } from '../../../data/weapons';
 import { knock, tired } from '../police-chase';
 import { cooldownTime, startWindup, stepBaton, windupTime } from './baton';
 import type { PoliceCorgi } from './corgi';
-import { CHASE, T } from './tuning';
+import { CHASE, FIGHT, T } from './tuning';
 import type { Wanted } from './wanted';
 
 export interface FightCtx {
@@ -28,7 +28,7 @@ export interface FightCtx {
   /** A line from an officer (rate limited per officer). */
   say(c: PoliceCorgi, text: string): void;
   /** An officer was knocked out: the chase may call a backup. */
-  onDown(c: PoliceCorgi): void;
+  onDown(c: PoliceCorgi, attacker: RiderId): void;
   /** An offence the police counts (the heat it adds). */
   heat(v: number): void;
   /** Every officer on the road. */
@@ -37,10 +37,12 @@ export interface FightCtx {
   chasing(): boolean;
 }
 
-/** The damage a player swing does to an officer. */
+/** The damage a player swing does to an officer (40 HP, SPEC §25): bare wings need five or six light hits,
+ *  a weapon two or three, a heavy swing hits ×1.5. */
 export function swingDamage(weapon: WeaponId, heavy: boolean): number {
-  const base = WEAPONS[weapon]?.damage ?? 0;
-  return Math.round(base * (heavy ? 1.5 : 1));
+  const w = WEAPONS[weapon];
+  if (!w) return 0;
+  return heavy ? Math.round(w.heavyDamage * 1.5) : w.damage;
 }
 
 /** The officer winds up: the tell, the lunge and the pose the actors view plays. */
@@ -81,6 +83,7 @@ function canWindup(ctx: FightCtx, c: PoliceCorgi): boolean {
   if (ctx.wanted.level < 2) return no('level');
   if (c.baton.cooldown > 0 || c.baton.windup > 0) return no('cooldown');
   if (c.down || c.leaving) return no('gone');
+  if (c.stunT > 0) return no('stun');
   if (tired(c.ride) || c.ride.knockT > 0) return no('tired');
   if (ctx.player.mode !== 'racing') return no('player');
   if (ctx.now - ctx.state.lastWindup < T.windupGap) return no('gap');
@@ -94,6 +97,7 @@ function canWindup(ctx: FightCtx, c: PoliceCorgi): boolean {
 
 /** Drive one officer: the baton timer, the wind-up and the strike. */
 export function stepOfficer(ctx: FightCtx, c: PoliceCorgi, dt: number): void {
+  c.stunT = Math.max(0, c.stunT - dt);
   const winding = c.baton.windup > 0;
   stepBaton(c.st, c.baton, dt);
   if (winding && c.baton.windup <= 0) {
@@ -104,19 +108,22 @@ export function stepOfficer(ctx: FightCtx, c: PoliceCorgi, dt: number): void {
   if (canWindup(ctx, c)) beginWindup(ctx, c);
 }
 
-/** A player swing or a thrown weapon that reaches the officer. */
-export function hurtOfficer(ctx: FightCtx, c: PoliceCorgi, damage: number, attacker: RiderId): void {
-  c.hp = Math.max(0, c.hp - damage);
-  knock(c.ride, Math.sign(c.st.x - ctx.player.x) || 1);
-  ctx.app.bus.emit('police:hurt', { obstacleId: c.id, attacker, damage, hp: c.hp, pos: ctx.pos(c) });
+/** A player swing or a thrown weapon that reaches the officer. `ko` = the blow knocks it out whatever its HP. */
+export function hurtOfficer(ctx: FightCtx, c: PoliceCorgi, damage: number, attacker: RiderId, ko = false): void {
+  const dmg = ko ? Math.max(c.hp, damage) : damage;
+  c.hp = Math.max(0, c.hp - dmg);
+  // The blow already rocked it (the swing knocked it aside): do not shove it twice.
+  if (c.ride.knockT <= 0) knock(c.ride, Math.sign(c.st.x - ctx.player.x) || 1);
+  ctx.app.bus.emit('police:hurt', { obstacleId: c.id, attacker, damage: dmg, hp: c.hp, pos: ctx.pos(c) });
   if (c.hp <= 0) knockDown(ctx, c, attacker);
 }
 
 /** The officer is out of HP: it tumbles, clocks off and the stars go up. */
 export function knockDown(ctx: FightCtx, c: PoliceCorgi, attacker: RiderId): void {
-  if (c.down) return;
+  if (c.down || c.leaving) return;
   c.down = true;
   c.downT = 0;
+  c.leaveT = 0;
   c.st.mode = 'crashed';
   c.st.crash = {
     cause: 'ko', attacker: null, origin: ctx.pos(c),
@@ -124,14 +131,19 @@ export function knockDown(ctx: FightCtx, c: PoliceCorgi, attacker: RiderId): voi
   };
   ctx.app.bus.emit('police:down', { obstacleId: c.id, attacker, pos: ctx.pos(c) });
   ctx.wanted.bump(3);
-  ctx.onDown(c);
+  ctx.onDown(c, attacker);
+}
+
+/** A shield member: a swing from more than FIGHT.shieldFront behind it is blocked (the throw and the skills are not). */
+export function shielded(ctx: FightCtx, c: PoliceCorgi): boolean {
+  return c.shield && c.st.s - ctx.player.s > FIGHT.shieldFront;
 }
 
 /** A player swing (side = null: either side) or Wing Dash ram (weapon 'none') reaching an officer knocks it
- *  back and hurts it. */
-export function tryKnock(ctx: FightCtx, reach: number, sideSign: number | null, weapon: WeaponId, heavy: boolean): void {
+ *  back and hurts it. `damage` overrides the weapon's damage (a skill that hits harder than a swing). */
+export function tryKnock(ctx: FightCtx, reach: number, sideSign: number | null, weapon: WeaponId, heavy: boolean, damage = 0): void {
   if (!ctx.chasing()) return;
-  const damage = swingDamage(weapon, heavy);
+  const dmg = damage > 0 ? damage : swingDamage(weapon, heavy);
   for (const c of ctx.officers()) {
     if (!c.active || c.down || c.leaving || c.ride.knockT > 0) continue;
     const ds = c.st.s - ctx.player.s, dx = c.st.x - ctx.player.x;
@@ -140,7 +152,9 @@ export function tryKnock(ctx: FightCtx, reach: number, sideSign: number | null, 
     ctx.heat(CHASE.knockHeat);
     ctx.wanted.knock();
     ctx.app.bus.emit('police:knock', { riderId: ctx.player.id, weapon, pos: ctx.pos(c) });
-    if (damage > 0) hurtOfficer(ctx, c, damage, ctx.player.id);
+    if (shielded(ctx, c)) continue;   // the shield eats the blow (it still rocks the officer)
+    if (dmg <= 0) continue;
+    hurtOfficer(ctx, c, dmg, ctx.player.id);
   }
 }
 
@@ -152,10 +166,10 @@ export function listenFight(ctx: FightCtx): () => void {
     }),
     ctx.app.bus.on('combat:obstacleHit', (e) => {
       const c = ctx.officers().find((x) => x.id === e.obstacleId);
-      if (!c || !c.active || c.down) return;
+      if (!c || !c.active || c.down || c.leaving) return;
       ctx.heat(T.thrownHit);
       ctx.wanted.knock();
-      hurtOfficer(ctx, c, e.damage, e.attacker);
+      hurtOfficer(ctx, c, e.damage, e.attacker, e.ko === true);
     }),
     ctx.app.bus.on('rider:obstacleHit', (e) => {
       if (e.riderId !== ctx.player.id || e.kind === 'police') return;

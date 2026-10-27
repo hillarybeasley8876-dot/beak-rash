@@ -11,8 +11,8 @@ export interface CorgiLines {
   backup: readonly string[];
   /** The roadblock goes up ahead of the player. */
   roadblock: readonly string[];
-  /** The corgi is knocked out of the chase and clocks off. */
-  down: readonly string[];
+  /** The corgi is knocked out of the chase and clocks off (r6: the line of the down, said at once). */
+  down: string;
   /** The bribe is accepted. */
   bribeYes: readonly string[];
   /** The bribe is refused: at ★3. */
@@ -28,7 +28,7 @@ export const CORGI_LINES: CorgiLines = {
   strike: ['警棍警告！', '这一棍算你倒霉！', '敬酒不吃吃罚酒！'],
   backup: ['呼叫增援！', '单位呼叫单位！还有人！', '二队到位！'],
   roadblock: ['前方设卡，看你往哪跑！', '前面有卡口，下车！', '此路不通，请绕行——才怪！'],
-  down: ['柯基下班了！', '今天就到这儿吧……', '我下班了，你自求多福！'],
+  down: '柯基下班了！',
   bribeYes: ['……下不为例。', '拿钱买平安？行吧……', '这次就当没看见。'],
   bribeNoW3: ['这次不行！', '想都别想！', '风声正紧，走开！'],
   bribeNoCoins: ['小鱼干不够还想贿赂？', '至少五十条！少一条都不行！'],

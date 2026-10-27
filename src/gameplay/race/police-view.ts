@@ -7,6 +7,7 @@ import {
 import { outline, toon } from '../../render/toon';
 import type { AppContext, RiderView } from '../../core/contracts';
 import type { RiderState } from '../../core/types';
+import { createShield, type Shield } from './police/shield';
 
 function glowTexture(): CanvasTexture {
   const c = document.createElement('canvas');
@@ -31,9 +32,10 @@ export class PoliceView {
   private glowB: Sprite;
   private tex = glowTexture();
   private disposables: Array<{ dispose(): void }> = [];
+  private shield: Shield | null = null;
   private t = 0;
 
-  constructor(app: AppContext, parent: Group) {
+  constructor(app: AppContext, parent: Group, opts: { shield?: boolean } = {}) {
     this.view = app.modules.createRiderView(app, 'corgi', 'mtb', { isPlayer: false, quality: app.quality });
     this.view.root.name = 'race:police';
     parent.add(this.view.root);
@@ -59,6 +61,10 @@ export class PoliceView {
     this.glowB.position.copy(this.blue.position).add(new Vector3(0.1, 0, 0));
     this.beacon.add(pole, this.red, this.blue, this.glowR, this.glowB);
     this.view.root.add(this.beacon);
+    if (opts.shield) {
+      this.shield = createShield();
+      this.view.root.add(this.shield.group);
+    }
     this.disposables.push(pole.geometry, barGeo, this.red.material as MeshBasicMaterial, this.blue.material as MeshBasicMaterial, this.tex);
   }
 
@@ -81,6 +87,7 @@ export class PoliceView {
   dispose(): void {
     this.view.dispose();
     this.view.root.removeFromParent();
+    this.shield?.dispose();
     for (const d of this.disposables) d.dispose();
   }
 }

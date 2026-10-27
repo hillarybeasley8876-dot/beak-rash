@@ -4,7 +4,7 @@ import type { AppContext, Session } from '../../../core/contracts';
 import type { Rng } from '../../../core/rng';
 import type { RiderState, Vec3Like } from '../../../core/types';
 import { CORGI_LINES } from '../../../data/police-lines';
-import { bribeLine, judgeBribe, type BribeVerdict } from './bribe';
+import { bribeLine, judgeBribe, type BribeOffer } from './bribe';
 import { createCorgiUnit, disposeCorgiUnit, liftCorgi, placeCorgi, type PoliceCorgi } from './corgi';
 import { placeRoadblock, removeRoadblock, type Roadblock } from './roadblock';
 import { CHASE, T } from './tuning';
@@ -24,14 +24,6 @@ export interface FieldCtx {
   say(c: PoliceCorgi, text: string): void;
   /** Where an officer is in the world (its chest). */
   at(c: PoliceCorgi): Vec3Like;
-}
-
-export interface BribeOffer {
-  verdict: BribeVerdict;
-  /** The officer that answered (null when nobody was in reach). */
-  officer: PoliceCorgi | null;
-  /** The line it said. */
-  line: string;
 }
 
 export interface Field {
