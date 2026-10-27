@@ -228,15 +228,16 @@ export const chaseScenarios = {
     await start();
     await setHeat(0.97);
     await untilEvent('police:roadblock', 25);
+    const hp0 = await h.eval('window.__br.race.police()?.hp ?? 0');   // r6 (SPEC §25): the officer has 40 HP
     await h.eval(`window.__br.app.bus.emit('combat:obstacleHit', { obstacleId: 900, attacker: 0, weapon: 'pan', damage: 35, thrown: true, pos: { x: 0, y: 1, z: 0 } })`);
     await h.eval(`window.__runHuman(15, ${DT}, 1000, 'passive')`);
     await h.eval(`window.__br.app.bus.emit('combat:obstacleHit', { obstacleId: 900, attacker: 0, weapon: 'pan', damage: 35, thrown: true, pos: { x: 0, y: 1, z: 0 } })`);
     await h.eval(`window.__runHuman(15, ${DT}, 1000, 'passive')`);
     ev = await evs();
     const hurt = ev.filter((e) => e.t === 'police:hurt').map((e) => e.e.hp);
-    check('police 2.0: the officer has 60 HP and goes down at 0',
-      hurt.length === 2 && hurt[0] === 25 && hurt[1] === 0 && ev.some((e) => e.t === 'police:down'),
-      { hp: hurt, down: ev.some((e) => e.t === 'police:down') });
+    check(`police 2.0: the officer has ${hp0} HP and goes down at 0`,
+      hp0 > 0 && hurt.length === 2 && hurt[0] === Math.max(0, hp0 - 35) && hurt[1] === 0 && ev.some((e) => e.t === 'police:down'),
+      { hp0, hp: hurt, down: ev.some((e) => e.t === 'police:down') });
   },
 };
 
