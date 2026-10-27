@@ -30,10 +30,10 @@ const spec: MammalSpec = {
   // A hamster is a ball: a wide, short barrel and a short neck (the head sits right on the shoulders).
   body: { c: [0, 0.17, -0.05], r: [0.205, 0.155, 0.19], rot: 0.28 },
   chest: { c: [0, 0.26, -0.18], r: [0.175, 0.125, 0.15] },
-  head: { c: [0, 0.55, -0.29], r: [0.15, 0.14, 0.145] },
+  head: { c: [0, 0.55, -0.29], r: [0.14, 0.13, 0.132] },
   snout: { c: [0, 0.508, -0.408], r: [0.055, 0.04, 0.045] },
   // Chubby cream cheek pouches.
-  cheeks: { c: [-0.098, 0.505, -0.362], r: [0.055, 0.05, 0.05], color: CREAM },
+  cheeks: { c: [-0.088, 0.505, -0.362], r: [0.048, 0.05, 0.05], color: CREAM },
   noseAt: [0, 0.532, -0.442], noseR: [0.014, 0.01, 0.009],
   chin: { c: [0, 0.472, -0.39], r: [0.045, 0.024, 0.038] },
   arm: [0.054, 0.05, 0.056], leg: [0.082, 0.068, 0.058, 0.052],
@@ -42,11 +42,16 @@ const spec: MammalSpec = {
   // Enormous glossy black eyes.
   eye: { at: [-0.062, 0.565, -0.398], r: 0.056, dir: [-0.28, 0.04, -0.96], pupil: 0.038, glint: 0.38 },
   extra: [
+    // A fat roll of chest fur on the neck bone: the hamster's head flows straight into its ball body, no neck.
+    // (A horizontal roll, so the whole neck is filled at a constant width; on a neck bone, so it does not widen
+    // the head nor the torso.)
+    { shape: { kind: 'capsule', a: [-0.05, 0.37, -0.28], b: [0.05, 0.37, -0.28], r: 0.13, r2: 0.13 }, color: CREAM, bone: B.neck2, k: 0.05, sigma: 0.03 },
     // A tear clinging to the lower lid.
     { shape: { kind: 'ellipsoid', c: [-0.07, 0.518, -0.408], r: [0.009, 0.013, 0.009] }, color: WET, bone: B.head, k: 0.005, sigma: 0.01, priority: 0.02 },
     { shape: { kind: 'ellipsoid', c: [0.07, 0.518, -0.408], r: [0.009, 0.013, 0.009] }, color: WET, bone: B.head, k: 0.005, sigma: 0.01, priority: 0.02 },
   ],
-  budget: 2000,
+  budget: 3200,
+  cell: 0.014,
 };
 
 const J = mammalJoints(spec, {
@@ -67,11 +72,11 @@ export const hamster: SpeciesDef = {
   build(b) {
     buildMammal(b, J, spec);
     addEars(b, J, { kind: 'round', w: 0.05, h: 0.045, thick: 0.018, color: FUR, inner: PINK, tilt: 0.3, back: 0.3, turn: 0.35 });
-    // A small, sad, down-turned mouth.
-    addMouth(b, [[-0.034, 0.485, -0.43], [-0.017, 0.477, -0.44], [0, 0.475, -0.442], [0.017, 0.477, -0.44], [0.034, 0.485, -0.43]], 0.0042);
+    // A small, sad mouth: the corners turn DOWN, the centre stays up (an upside-down U).
+    addMouth(b, [[-0.034, 0.473, -0.43], [-0.017, 0.482, -0.44], [0, 0.486, -0.442], [0.017, 0.482, -0.44], [0.034, 0.473, -0.43]], 0.0042);
     extraGlint(b, spec.eye.at, spec.eye.dir, spec.eye.r, -1);
     extraGlint(b, spec.eye.at, spec.eye.dir, spec.eye.r, 1);
     addHelmet(b, { c: [0, 0.68, -0.28], r: [0.152, 0.1, 0.155], pitch: -0.2, color: 0xb08a5e, stripe: CREAM, round: true,
-      strap: { chin: [0, 0.47, -0.41] } });
+      strap: { chin: [0, 0.56, -0.37] } });
   },
 };

@@ -67,6 +67,26 @@ The lead's review notes are now numbers in `tools/r6/species.mjs`. I changed the
   → torso width/height 1.54.
 - The other three pass the helmet-gap check untouched (cryingcat 1.5 cm, pedro 2.5 cm, hamster 1.6 cm).
 
+## Round 4 (lead review 96b5cab: the review became ray-cast checks — four failed)
+The lead's new checks cast rays through the finished mesh and record which bone each ray meets first, so they
+measure what the camera sees. I changed the MODELS again (bananacat, cryingcat, xinxian and pedro are done —
+not touched):
+- **moodeng, skull through the helmet** (front 86 · 3/4 21 · side 12; ≤ 4): the skull box was bigger than the
+  white shell at the front corners, so two grey patches of skull broke through the helmet above the eyes.
+  Fix: the skull box is much smaller (h [0.1, 0.105, 0.14], round 0.035) and the skull ellipsoid shrank to
+  r [0.145, 0.145, 0.165], so the whole skull now sits inside the shell; the helmet moved 1.5 cm forward
+  (c_z −0.31) to close the gap at the back of the rim. → front 0 · 3/4 0 · side 0.
+- **moodeng, eyes from the front** (8.3 cm²; ≥ 15): the eyes sat between the muzzle's top and the helmet's rim
+  and the pink cheek blobs were in front of them. Fix: the cheeks moved down and back (they no longer cover the
+  eyes), the muzzle dropped 1 cm, and the eyes now bulge out of the skull (centre 2 cm in front of the surface,
+  high on the head, under the helmet's rim). → 20.5 cm².
+- **hamster, sad mouth** (−0.32 cm; ≥ 0.3): the mouth was a smile. Fix: the corners go DOWN and the centre
+  stays up (an upside-down U). → +1.31 cm.
+- **hamster, no neck** (0.6; ≥ 0.8): the head sat on a thin neck, so the body read as a peanut. Fix: a fat
+  roll of cream chest fur on a NECK bone (so it fills the neck without widening the head or the torso), a
+  slightly smaller head, a denser mesh (cell 0.014, budget 3200) and a shorter chin strap (a long strap was
+  itself letting the head show between the helmet's cells). → 0.83.
+
 ## How to test (exact commands)
 - `node tools/r4/tsc-own.mjs src/actors/` → TSC-OWN OK
 - `node tools/r6/species.mjs --sheet` → r6-species OK (sheet: shots/r6-species/sheet.png)
@@ -93,6 +113,12 @@ The lead's review notes are now numbers in `tools/r6/species.mjs`. I changed the
   ≤ 0.12)` · `hamster: a round ball of a body (torso width / height 1.54; ≥ 1.2)`.
 - Round 3 triangles at high: bananacat 6498 · cryingcat 6674 · xinxian 6428 · moodeng 7496 · pedro 6784 ·
   hamster 6220 (all inside 5 500–9 500).
+- Round 4 (all the lead's ray-cast checks PASS): `moodeng: no skull showing through the helmet shell (head cells
+  between helmet cells: front 0, 3/4 0, side 0; ≤ 4 each)` · `moodeng: the tiny eyes read from the front (visible
+  eyeball 20.5 cm², lids left out; ≥ 15)` · `hamster: the sad mouth turns down (centre 1.31 cm above the
+  corners; ≥ 0.3)` · `hamster: no neck (narrowest slice between chest and head / head width 0.83; ≥ 0.8)`.
+- Round 4 triangles at high: bananacat 6498 · cryingcat 6674 · xinxian 6428 · moodeng 7580 · pedro 6784 ·
+  hamster 7582 (all inside 5 500–9 500).
 
 ## Known issues
 - The six are still `racer: false` in src/data/roster.ts (the lead's call, per SPEC §23). Until then they can
