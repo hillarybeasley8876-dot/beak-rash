@@ -354,6 +354,17 @@ const POSES: Record<string, SkillPose> = {
   'pelican.torpedo': 'spit', 'pelican.gulp': 'gulp', 'pelican.wing': 'wingspread', 'goose.honk': 'honk',
   'capybara.chill': 'chill', 'cat.spin': 'spin', 'shiba.doge': 'doge', 'pigeon.ghost': 'ghost', 'penguin.slide': 'slide',
   'seagull.steal': 'grab', 'sloth.flash': 'flash', 'corgi.whistle': 'whistle',
+  // r6 meme roster (SPEC §23–§24).
+  'bananacat.peel': 'grab', 'cryingcat.tears': 'chill', 'xinxian.fresh': 'grab',
+  'moodeng.bounce': 'flash', 'pedro.trash': 'spin', 'hamster.violin': 'chill',
+  // r6 shared pool (SPEC §24): a generic pose per category.
+  'pool.firebreath': 'spit', 'pool.icelance': 'spit', 'pool.thunder': 'spit', 'pool.watergun': 'honk',
+  'pool.tornado': 'grab', 'pool.boomerang': 'spit', 'pool.pie': 'spin', 'pool.brainfight': 'honk',
+  'pool.rocket': 'flash', 'pool.blink': 'flash', 'pool.bubble': 'doge', 'pool.thermos': 'chill',
+  'pool.ducks': 'grab', 'pool.firecracker': 'grab', 'pool.popup': 'spin', 'pool.warsong': 'spin',
+  'pool.snowball': 'spit',
+  // r6 shared ults.
+  'ult.timestop': 'wingspread', 'ult.meteor': 'wingspread', 'ult.storm': 'wingspread',
 };
 
 export function skillPoseOf(skillId: string | null | undefined): SkillPose | null {

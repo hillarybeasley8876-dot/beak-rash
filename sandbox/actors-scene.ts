@@ -34,7 +34,10 @@ scene.add(ground, grid);
 const quality = (P.get('quality') ?? 'high') as Quality;
 export const app = { quality, params: P, bus: new EventBus<GameEvents>() } as unknown as AppContext;
 
-export const ROSTER_IDS: CharacterId[] = ['pelican', 'goose', 'capybara', 'cat', 'shiba', 'pigeon', 'penguin', 'seagull', 'sloth', 'corgi'];
+export const ROSTER_IDS: CharacterId[] = [
+  'pelican', 'goose', 'capybara', 'cat', 'shiba', 'pigeon', 'penguin', 'seagull', 'sloth', 'corgi',
+  'bananacat', 'cryingcat', 'xinxian', 'moodeng', 'pedro', 'hamster',
+];
 
 export interface Bench { view: RiderViewImpl; state: RiderState; base: Vector3 }
 export const riders: Bench[] = [];

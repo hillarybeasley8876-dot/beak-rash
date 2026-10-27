@@ -7,22 +7,28 @@ import { CharacterBuilder } from '../kit/builder';
 import { hullFor } from '../kit/outline';
 import { cullable } from '../lod';
 import { createRig, type Rig } from '../rig/skeleton';
+import { bananacat } from './bananacat';
 import { capybara } from './capybara';
 import { cat } from './cat';
 import { corgi } from './corgi';
+import { cryingcat } from './cryingcat';
 import { goose } from './goose';
+import { hamster } from './hamster';
+import { moodeng } from './moodeng';
+import { pedro } from './pedro';
 import { pelican } from './pelican';
 import { penguin } from './penguin';
 import { pigeon } from './pigeon';
 import { seagull } from './seagull';
 import { shiba } from './shiba';
 import { sloth } from './sloth';
+import { xinxian } from './xinxian';
 import type { SpeciesDef } from './types';
 
 const DEFS: Record<CharacterId, SpeciesDef> = {
   pelican, goose, capybara, cat, shiba, pigeon, penguin, seagull, sloth, corgi,
-  // r6 meme roster (SPEC §23): stand-in bodies until each species file lands (job r6-species)
-  bananacat: cat, cryingcat: cat, xinxian: cat, moodeng: capybara, pedro: shiba, hamster: capybara,
+  // r6 meme roster (SPEC §23): their own procedural models.
+  bananacat, cryingcat, xinxian, moodeng, pedro, hamster,
 };
 
 export function speciesDef(id: CharacterId): SpeciesDef {

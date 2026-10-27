@@ -23,6 +23,13 @@ export const SKILL_SPECS: SkillSpec[] = [
   { id: 'seagull.steal', character: 'seagull', dur: 0.42, lockout: false, statuses: [], minShown: 0.3 },
   { id: 'sloth.flash', character: 'sloth', dur: 3, lockout: false, statuses: [['boost', 3]], minShown: 2.4 },
   { id: 'corgi.whistle', character: 'corgi', dur: 0.8, lockout: false, statuses: [], minShown: 0.5 },
+  // r6 meme roster (SPEC §23–§24): durations mirror src/gameplay/combat/skills/meme/*.ts.
+  { id: 'bananacat.peel', character: 'bananacat', dur: 4, lockout: false, statuses: [], minShown: 0.4 },
+  { id: 'cryingcat.tears', character: 'cryingcat', dur: 3.2, lockout: false, statuses: [], minShown: 2.6 },
+  { id: 'xinxian.fresh', character: 'xinxian', dur: 5, lockout: false, statuses: [], minShown: 0.4 },
+  { id: 'moodeng.bounce', character: 'moodeng', dur: 1, lockout: true, statuses: [], minShown: 0.8 },
+  { id: 'pedro.trash', character: 'pedro', dur: 0.9, lockout: false, statuses: [], minShown: 0.6 },
+  { id: 'hamster.violin', character: 'hamster', dur: 3.5, lockout: false, statuses: [], minShown: 2.8 },
 ];
 
 /** Cast `id` on every bench rider the way combat does. */

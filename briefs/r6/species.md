@@ -4,6 +4,27 @@ The roster now has six new racers (`src/data/roster.ts`, `racer: false` until th
 borrows another species' body (`src/actors/species/index.ts` DEFS: bananacat/cryingcat/xinxian → cat, moodeng →
 capybara, pedro → shiba, hamster → capybara). Build each its own species file in the house style.
 
+## Lead review after round 1 (read this first when you resume)
+The six pass the mechanical checks and xinxian, pedro and cryingcat look right. Three models have defects you can
+see on `shots/r6-species/sheet.png` and your own close-ups (`i1.png`, `h1.png`). Fix them; keep every check green.
+1. **bananacat**: the fourth peel flap (`[0, 0.60, -0.44] → [0, 0.43, -0.485]`) hangs down the MIDDLE OF THE FACE:
+   from the front a yellow bar splits the face over the nose and the wailing mouth. The face must be fully visible
+   from the front and the 3/4 view (both eyes, the tear streaks, the open mouth). Move that flap below the chin onto
+   the chest, or drop it. The darker inner-peel capsules poke out of the side and back flaps as ragged dark slits and
+   torn yellow fringes (the back view): keep the inner colour inside each flap (a smaller inset prim, or a paint prim
+   on the flap's inner face) so each flap reads as one smooth peel strip.
+2. **moodeng**: the helmet hovers above the skull. In the 3/4 view there is sky between the helmet rim and the head,
+   and the strap ends stick out. Seat it on the skull like the capybara's helmet (no gap from any view). Give it a
+   colour that is not grey: today it disappears against the grey head. The model reads as a grey bear or gorilla with
+   blush. Make it read as a pygmy hippo calf: the muzzle is the widest, boxiest part of the head (rounded boxes like
+   capybara.ts), the two nostrils are bumps on top of the muzzle front, the ears are tiny, the eyes small and high,
+   and the body is a glossy barrel.
+3. **hamster**: the ENORMOUS glossy eyes are half hidden behind the lids (`sleepy: 0.34`), so the face reads as a
+   tired sloth. Open them (`sleepy` ≤ 0.12) and keep the sad look through the lid tilt, the brows and the tear. Make
+   the body rounder (a hamster is a ball: a wider, shorter barrel and a short neck). Hands stay on the grips and feet
+   on the pedals.
+Re-shoot the front and 3/4 close-ups of these three and look at them before you report.
+
 ## Read first
 SPEC.md §5 (art bible: designer-vinyl toys, cel shading + ink outline, chunky cartoon, readable from the chase cam),
 §23; the species kit `src/actors/kit/*` (mammal.ts `buildMammal` / `MammalSpec`, ears-tails.ts, gear.ts helmets,
