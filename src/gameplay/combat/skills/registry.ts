@@ -1,7 +1,8 @@
-// Skill id → implementation (ids match data/skills.ts). r6: the pool, meme-roster and ult folders list their own.
+// Skill id → implementation (ids match data/skills.ts). r6: the elem / gag pool, meme-roster and ult folders list their own.
 import { chill } from './chill';
+import { ELEM_SKILLS } from './elem/index';
+import { GAG_SKILLS } from './gag/index';
 import { MEME_SKILLS } from './meme/index';
-import { POOL_SKILLS } from './pool/index';
 import { ULT_SKILLS } from './ults/index';
 import { doge } from './doge';
 import { flash } from './flash';
@@ -18,6 +19,6 @@ import { whistle } from './whistle';
 import { wing } from './wing';
 
 export const SKILL_IMPLS: Record<string, SkillImpl | undefined> = Object.fromEntries(
-  [torpedo, gulp, wing, ult, honk, chill, spin, doge, ghost, slide, steal, flash, whistle, ...POOL_SKILLS, ...MEME_SKILLS, ...ULT_SKILLS]
+  [torpedo, gulp, wing, ult, honk, chill, spin, doge, ghost, slide, steal, flash, whistle, ...ELEM_SKILLS, ...GAG_SKILLS, ...MEME_SKILLS, ...ULT_SKILLS]
     .map((s) => [s.id, s]),
 );

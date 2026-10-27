@@ -99,15 +99,16 @@ await withPage(async (page, h) => {
   const refused = ev.find((x) => x.n === 'police:bribe');
   expect(!!refused && !refused.e.accepted && (await page.evaluate(() => window.__br.session().player.coins)) === 120, `★3: the bribe is refused, coins kept (${JSON.stringify(refused?.e)})`);
 
-  // 6. fight back: 60 HP, hurt events, then the corgi goes down
+  // 6. fight back: hurt events, then the corgi goes down (r6: officer HP is 40, read it from the summary)
   await clearEvents(page);
+  const hp0 = await page.evaluate(() => window.__br.race.police()?.hp ?? 0);
   for (let i = 0; i < 2; i++) {
     await page.evaluate(() => window.__br.app.bus.emit('combat:obstacleHit', { obstacleId: 900, attacker: 0, weapon: 'pan', damage: 35, thrown: true, pos: { x: 0, y: 1, z: 0 } }));
     await hold(page, RIDE, 10);
   }
   ev = await events(page);
   const hurt = ev.filter((x) => x.n === 'police:hurt').map((x) => x.e.hp);
-  expect(hurt.length === 2 && hurt[0] === 25 && hurt[1] === 0, `the corgi takes 35 + 35 of its 60 HP (${JSON.stringify(hurt)})`);
+  expect(hurt.length === 2 && hurt[0] === Math.max(0, hp0 - 35) && hurt[1] === 0, `the corgi takes 35 + 35 of its ${hp0} HP (${JSON.stringify(hurt)})`);
   expect(ev.some((x) => x.n === 'police:down' && x.e.obstacleId === 900 && x.e.attacker === 0), 'police:down when its HP is gone');
   await noErrors(h, 'police');
 }, { size: '1280x720' });

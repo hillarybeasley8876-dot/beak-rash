@@ -3,8 +3,9 @@
 import { CircleGeometry, Shape, ShapeGeometry, SphereGeometry, TorusGeometry, type BufferGeometry } from 'three';
 import type { WeaponId } from '../../../core/types';
 import { WEAPONS } from '../../../data/weapons';
+import { PROPS as ELEM_PROPS } from '../skills/elem/props';
+import { PROPS as GAG_PROPS } from '../skills/gag/props';
 import { PROPS as MEME_PROPS } from '../skills/meme/props';
-import { PROPS as POOL_PROPS } from '../skills/pool/props';
 import { PROPS as ULT_PROPS } from '../skills/ults/props';
 import { canGeometry, coinGeometry, crateGeometry, fishGeometry, shadowGeometry } from './pickup-props';
 import { saltfishGeometry, weaponGeometry } from './weapon-props';
@@ -39,7 +40,8 @@ const FIXED = {
   'pickup:can': canGeometry,
   'pickup:shadow': shadowGeometry,
   // r6 (SPEC §24): each skill folder's own props
-  ...POOL_PROPS,
+  ...ELEM_PROPS,
+  ...GAG_PROPS,
   ...MEME_PROPS,
   ...ULT_PROPS,
 } satisfies Record<string, Maker>;

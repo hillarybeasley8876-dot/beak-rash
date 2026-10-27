@@ -67,15 +67,15 @@ const ROWS: Record<string, Row> = {
   'pool.brainfight': pool({ name: '左右脑互搏', nameEn: 'BRAIN FIGHT', desc: '周围的人方向键左右颠倒，越想躲越往里撞。', cooldown: 13, glyph: '乱', category: 'control' }),
   'pool.rocket': pool({ name: '窜天猴', nameEn: 'BOTTLE ROCKET', desc: '屁股点火往前窜，身后留下一道烫脚的火线。', cooldown: 12, glyph: '窜', category: 'move', element: 'fire' }),
   'pool.blink': pool({ name: '闪现', nameEn: 'BLINK', desc: '原地一闪，直接出现在十几米外。', cooldown: 10, glyph: '闪', category: 'move' }),
-  'pool.bubble': pool({ name: '泡泡护盾', nameEn: 'BUBBLE SHIELD', desc: '吹个泡泡罩住自己，挡下一次攻击，破掉时溅湿旁人。', cooldown: 14, glyph: '泡', category: 'defense', element: 'water' }),
+  'pool.bubble': pool({ name: '泡泡护盾', nameEn: 'BUBBLE SHIELD', desc: '吹个泡泡罩住自己挡住拳脚，破掉时溅湿旁人。', cooldown: 14, glyph: '泡', category: 'defense', element: 'water' }),
   'pool.thermos': pool({ name: '枸杞保温杯', nameEn: 'GOJI THERMOS', desc: '喝口枸杞茶：回血，还能清掉身上的负面状态。', cooldown: 16, glyph: '杯', category: 'defense' }),
   'pool.ducks': pool({ name: '鸭鸭大军', nameEn: 'DUCK ARMY', desc: '放出五只小黄鸭往前冲，撞谁谁晃。', cooldown: 12, glyph: '鸭', category: 'summon' }),
   'pool.firecracker': pool({ name: '二踢脚', nameEn: 'FIRECRACKER', desc: '在身后放个二踢脚，有人靠近就炸。', cooldown: 10, glyph: '炮', category: 'trap', element: 'fire' }),
   'pool.popup': pool({ name: '开屏广告', nameEn: 'POP-UP AD', desc: '给前面的人弹个开屏广告，挡住视线好几秒。', cooldown: 12, glyph: '广', category: 'gag' }),
-  'pool.warsong': pool({ name: '战歌起', nameEn: 'WAR SONG', desc: '战歌一响：自己加速，拳头也更重。', cooldown: 15, glyph: '歌', category: 'gag' }),
+  'pool.warsong': pool({ name: '战歌起', nameEn: 'WAR SONG', desc: '战歌一响：自己加速，身边的对手听得腿软。', cooldown: 15, glyph: '歌', category: 'gag' }),
   'pool.snowball': pool({ name: '大雪球', nameEn: 'SNOWBALL', desc: '抛出一个大雪球，砸中一片人并冻上两层寒冷。', cooldown: 9, glyph: '雪', category: 'attack', element: 'ice' }),
   // ---- r6 shared ults (SPEC §24): SP 100, any character
-  'ult.timestop': ult({ name: '时间暂停', nameEn: 'TIME STOP', desc: 'SP 满时发动：除了你，所有人定格三秒；这期间的伤害解除时一起结算。', glyph: '停', category: 'control' }),
+  'ult.timestop': ult({ name: '时间暂停', nameEn: 'TIME STOP', desc: 'SP 满时发动：除了你，所有人定格三秒，随便你打。', glyph: '停', category: 'control' }),
   'ult.meteor': ult({ name: '陨石雨', nameEn: 'METEOR SHOWER', desc: 'SP 满时发动：前方路面下起陨石雨，砸中的人着火。', glyph: '陨', category: 'attack', element: 'fire' }),
   'ult.storm': ult({ name: '雷暴', nameEn: 'THUNDERSTORM', desc: 'SP 满时发动：前方一片雷雨，淋湿所有人再一道道劈下去。', glyph: '暴', category: 'attack', element: 'thunder' }),
 };
