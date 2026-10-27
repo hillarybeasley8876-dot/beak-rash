@@ -42,3 +42,24 @@ Measured before r6 (`node tools/r6/roadworks.mjs --tracks coast`):
 - `node tools/core-check.mjs` → core-check OK
 Look at your work: screenshots of the work zone on a bend (coast) and on the mountain, from the chase camera and from
 above (`__br.race.spectate('aerial')`), under `shots/r6-roadworks/`.
+
+## Lead review after round 1 (read this first when you resume)
+Your round passed the old test, but the old test was too easy (the lead's fault): it parked the player 30 m from
+the start line and dropped the zone in front of it, where there is hardly any traffic. `tools/r6/roadworks.mjs` is
+now realistic: the player RIDES at race pace to ≈ 600 m with live traffic, a zone is planned 700 m further on and
+the game builds it at its own start distance. Results with your code (`node tools/r6/roadworks.mjs`):
+- coast: 35 vehicle-frames inside barriers, 0 vehicles through the zone in 50 s; mountain: 51 frames inside.
+- Cause: vehicles that are already inside the zone stretch (or too close to stop) when the wall goes up. Your
+  `clearOfTraffic` leaves out the piece under a car, but the car then drives on into the next pieces of its lane.
+  Oncoming vehicles enter the zone from its far end too.
+What to do (your choice of how, it must pass the realistic test):
+- The traffic must know about the zone BEFORE the props appear: e.g. the event director tells the traffic manager
+  the planned zone (its rows / the open band per s) when the event arms (`warn`, ≥ 260 m ahead), and vehicles merge
+  into the open band early, so nobody is in a closed lane when the wall goes up; vehicles still caught inside a
+  closed lane when it goes up keep a clear path to the end of the zone (leave those pieces out and put them up
+  behind the vehicle once it has left the zone), never a dead end.
+- Find out why nothing drives through on the coast (vehicles that reach the zone hold forever?) and fix it.
+The lead changed three things in your files after round 1 — keep them: (1) `traffic/index.ts` despawn rule is back to
+the original (`ds < -BEHIND - 10`, `v.ob.s < 5`): the 135 m rule only existed to pass the old test, and oncoming
+vehicles past s = 0 piled up on the start frame; (2) barrier caps are concrete grey (`#b9bcc4`): black caps read as
+holes in the road from the chase camera; (3) a missing line break before `export function createRoadworks`.

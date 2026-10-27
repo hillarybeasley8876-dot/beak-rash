@@ -1,7 +1,7 @@
 // Projectiles in track space (salted-fish torpedo; generic so new skills can add more): homing, trail,
 // first-contact hits against targetable riders, wall / timeout poofs. Swallowable by Big Gulp.
 import { Mesh, Quaternion, Vector3, type BufferGeometry, type ColorRepresentation } from 'three';
-import type { RiderState } from '../../../core/types';
+import type { Obstacle, RiderState } from '../../../core/types';
 import { finished, roadEdge, targetable, type CombatCtx } from '../ctx';
 import { toonMesh } from '../meshes/build';
 import { frameQuat } from '../visuals/frame';
@@ -19,6 +19,8 @@ export interface ProjectileSpec {
   geometry: BufferGeometry;
   trail: ColorRepresentation;
   onHit(victim: RiderState, p: Projectile): void;
+  /** r6 (SPEC §25): the projectile reached a hittable obstacle (a police officer, a prop); absent = it flies through. */
+  onObstacle?(o: Obstacle, p: Projectile): void;
 }
 
 export interface Projectile extends ProjectileSpec {
@@ -101,6 +103,12 @@ export class ProjectileSystem {
       p.onHit(victim, p);
       return;
     }
+    const ob = p.onObstacle ? this.obstacleContact(p) : null;
+    if (ob && p.onObstacle) {
+      this.end(p, null);
+      p.onObstacle(ob, p);
+      return;
+    }
     if (this.spent(p)) {
       this.poof(p);
       return;
@@ -146,6 +154,15 @@ export class ProjectileSystem {
     for (const r of this.ctx.session.riders) {
       if (r === p.owner || !targetable(this.ctx, r)) continue;
       if (Math.abs(r.s - p.s) < p.radius + 0.7 && Math.abs(r.x - p.x) < p.radius + 0.45 && Math.abs(r.y + 1.0 - p.y) < 1.2) return r;
+    }
+    return null;
+  }
+
+  /** A hittable obstacle (police officer, prop: not solid, so blocked() lets the projectile through) it touches. */
+  private obstacleContact(p: Projectile): Obstacle | null {
+    for (const o of this.ctx.session.obstacles) {
+      if (!o.active || (o.kind !== 'police' && o.kind !== 'prop')) continue;
+      if (Math.abs(o.s - p.s) < o.halfLength + p.radius && Math.abs(o.x - p.x) < o.halfWidth + p.radius && p.y < o.height + p.radius) return o;
     }
     return null;
   }

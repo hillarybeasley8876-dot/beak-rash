@@ -14,12 +14,39 @@ const TRACKS = String(a.tracks ?? 'coast,mountain,city').split(',').filter(Boole
 for (const track of TRACKS) {
   await withPage(async (page, h) => {
     await race(page, h, { track, seed: 5, extra: '&traffic=1&police=0' });
-    await page.evaluate(() => { const b = window.__br, s = b.session(); for (const r of s.riders) if (!r.isPlayer) b.teleport(r.id, s.player.s + 1500 + r.id * 12, 0); });
-    // 1. Geometry: force a work zone 190 m ahead (inside the director's start distance) and inspect its barriers.
+    // The player RIDES at race pace (≈ 20 m/s, real traffic flowing around it) to ≈ 600 m, a work zone is planned
+    // 700 m further on (clear of tunnels and bridges), and the player keeps riding until the game builds the zone at
+    // its own distance. A vehicle in front of the player (within 160 m) must never vanish when the zone goes up.
+    const built = await page.evaluate(() => {
+      const b = window.__br, s = b.session(), L = s.track.length, p = s.player;
+      for (const r of s.riders) if (!r.isPlayer) b.teleport(r.id, Math.min(L - 5, 1500 + r.id * 12), 0);
+      const ride = () => { p.speed = Math.max(p.speed, 19); b.setControls({ throttle: 1, steer: Math.max(-1, Math.min(1, -p.x * 0.3)) }); b.step(2); };
+      while (p.s < 600) ride();
+      const covered = (x) => s.track.features.some((f) => (f.kind === 'tunnel' || f.kind === 'bridge') && x >= f.s0 - 40 && x <= f.s1 + 40);
+      let spot = p.s + 700;
+      while (spot < L - 200 && [-160, -100, -40, 20].some((d) => covered(spot + d))) spot += 40;
+      b.events.force('roadworks', spot);
+      let vanished = 0, frames = 0;
+      let prev = b.race.traffic();
+      for (; frames < 60 * 60; frames += 2) {
+        ride();
+        const now = b.race.traffic();
+        for (const v of prev) {
+          const ds = v.s - p.s;
+          if (ds > -10 && ds < 160 && !now.some((x) => x.id === v.id)) vanished++;
+        }
+        prev = now;
+        if (s.obstacles.some((o) => o.kind === 'barrier' && o.active)) break;
+      }
+      b.setControls({ throttle: 0, brake: 1 });
+      const bars = s.obstacles.filter((o) => o.kind === 'barrier' && o.active);
+      return { spot: Math.round(spot), at: Math.round(p.s), zone0: bars.length ? Math.round(Math.min(...bars.map((o) => o.s))) : null, vanished };
+    });
+    expect(built.zone0 !== null, `${track}: riding toward a planned work zone, the game builds it (${JSON.stringify(built)})`);
+    expect(built.vanished === 0, `${track}: no vehicle in front of the player vanishes when the zone goes up (${built.vanished})`);
+    // 1. Geometry: the barrier pieces the zone put up.
     const geo = await page.evaluate(() => {
       const b = window.__br, s = b.session();
-      b.events.force('roadworks', s.player.s + 190);
-      b.step(4);
       const bars = s.obstacles.filter((o) => o.kind === 'barrier' && o.active && o.solid).sort((p, q) => p.s - q.s || p.x - q.x);
       // overlapping pieces along the road at the same lateral spot = coincident faces (the flicker); pieces that butt
       // end to end with no gap overlap as soon as the road bends (rigid boxes): consecutive pieces keep a small gap
@@ -84,17 +111,18 @@ for (const track of TRACKS) {
       const bars = s.obstacles.filter((o) => o.kind === 'barrier' && o.active && o.solid);
       if (!bars.length) return null;
       const s0 = Math.min(...bars.map((o) => o.s)) - 10, s1 = Math.max(...bars.map((o) => o.s)) + 10;
-      // park the player out of the way just before the zone so the event stays alive, and let traffic run
-      b.teleport(0, s0 - 30, 0);
+      // the player stays parked on the verge just before the zone (the event stays alive), traffic runs
       let inside = 0, seen = new Set(), stopped = 0, vanished = 0, through = 0;
       const last = new Map(), entered = new Map();
       for (let f = 0; f < 60 * 50; f += 4) {
         p.speed = 0; p.s = s0 - 30; p.x = -(s.track.bounds(p.s).left) + 0.8;
         b.step(4);
         const now = b.race.traffic();
-        // a vehicle near the zone and the player must never just disappear (despawning cars to dodge the zone)
+        // a vehicle in front of the player near the zone must never just disappear (despawning cars to dodge the
+        // zone); vehicles well behind the player leave the simulation as they always did
         for (const [id, v] of last) {
-          if (!now.some((x) => x.id === id) && Math.abs(v.s - p.s) < 120) vanished++;
+          const ds = v.s - p.s;
+          if (!now.some((x) => x.id === id) && ds > -10 && ds < 160) vanished++;
         }
         last.clear();
         for (const v of now) {
