@@ -36,6 +36,19 @@
 ## In progress / next
 - Nothing: the job is complete. The lead can flip `racer: false` → true in data/roster.ts for the six.
 
+## Round 2 (resumed after the lead committed 8899efb)
+- Re-read the brief and the disk state: my six species files, the registry, the POSES map and the two sandbox
+  files are committed and unmodified; the only other work in the tree is the skills-ai job (not mine).
+- Re-ran all four acceptance commands on the current tree: TSC-OWN OK / r6-species OK / actors-check OK /
+  core-check OK (same numbers as round 1 — nothing else in the tree touched the actors).
+- End-to-end check in the real game (not just the sandbox): a race with the six as rivals
+  (`/?race=coast&seed=3&manual=1&rivals=bananacat,cryingcat,xinxian,moodeng,pedro,hamster&traffic=0&police=0`)
+  runs clean — `errors: []`, phase `racing`, all six on the grid with their name tags, and the chase-cam
+  screenshots (shots/r6-species/race_1.png, race_4.png) show the yellow hood, the grey hippo, the tan hamster
+  and the cream cryingcat reading correctly from behind, in the game HUD.
+- The six are still `racer: false`, so `?character=<id>` falls back to the pelican (isRacer in
+  src/core/race-config.ts); they can already be fielded as rivals. Flipping the flag is the lead's call.
+
 ## How to test (exact commands)
 - `node tools/r4/tsc-own.mjs src/actors/` → TSC-OWN OK
 - `node tools/r6/species.mjs --sheet` → r6-species OK (sheet: shots/r6-species/sheet.png)
@@ -57,7 +70,11 @@
   --sheet` → r6-species OK (no console errors).
 
 ## Known issues
-- The six are still `racer: false` in src/data/roster.ts (the lead's call, per SPEC §23).
+- The six are still `racer: false` in src/data/roster.ts (the lead's call, per SPEC §23). Until then they can
+  only be fielded as rivals (`?rivals=bananacat,...`), not as the player (`?character=` needs `racer: true`).
+- No portraits exist for the six yet: public/assets/portraits/ still has only the old cast's hand-drawn art,
+  and tools/r6/portraits.mjs (lead-owned) does not exist yet. The 3/4 views in shots/r6-species/faces*.jpg
+  show the models read at portrait size.
 - The cryingcat's thumbs-up is a small SDF bump on the left paw: it reads in the chill pose (the paw turns
   palm-out) but is small on the bar.
 - xinxian's "notched ear" is on the rider's left ear; the notch is ~3 cm and mostly reads from 3/4-behind.

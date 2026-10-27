@@ -1,101 +1,86 @@
-// When each species fires its signature skill (controls.skill1), and the pelican kit for autopilot.
-import { ROSTER } from '../../../data/roster';
-import type { Controls, RiderState } from '../../../core/types';
-import type { Blip } from './sense';
+// When a rider fires its kit: one decision per slot — the ult, then the three skill slots of its loadout — each
+// skill through its own rule (skill-rules.ts) and only when the runner would accept the cast (the cooldown, the
+// SP, no silence). The autopilot player rides the same table on its own loadout.
+import type { Controls } from '../../../core/types';
+import { ruleFor, type Rule, type SkillView } from './skill-rules';
 
-export interface SkillView {
-  me: RiderState;
-  blips: readonly Blip[];
-  blocked: boolean;        // the planner could not find a free lane
-  straight: number;        // m of nearly straight road ahead
-  player: RiderState;
-  /** Race seconds since GO. */
-  time: number;
-  /** Hunting the player out of a grudge: a valid chance is taken three times as eagerly. */
-  grudge: boolean;
-  /** 宿敌: the rider this one wants to hit first (the nemesis goes for the player). */
-  prefer: RiderState | null;
-  /** Riders in the race (bottom half / bottom 3). */
-  field: number;
-}
-
-/** Back on the bike after a crash for less than 12 s (the same window as the pace's no-catch-up rule). */
-const recovering = (v: SkillView): boolean => v.me.modeTime < 12 && v.time - v.me.modeTime > 5;
-
-type Rule = (v: SkillView) => boolean;
-
-const riders = (v: SkillView): Blip[] => v.blips.filter((b) => b.kind === 'rider' && b.rider !== null);
-const dist = (b: Blip, me: RiderState): number => Math.hypot(b.ds, b.x - me.x);
-const ahead = (b: Blip, me: RiderState, lo: number, hi: number, halfAngle: number): boolean =>
-  b.ds > lo && b.ds < hi && Math.abs(b.x - me.x) < b.ds * Math.tan(halfAngle) + 0.6;
-const threatened = (v: SkillView): boolean =>
-  riders(v).some((b) => dist(b, v.me) < 3 && b.rider?.action !== null && (b.rider?.action?.kind === 'attack' || b.rider?.action?.kind === 'heavy'));
-
-// Speed skills (slide, flash, doge, ghost) need a purpose, never fired on cooldown: an overtake (a rider 3–25 m
-// ahead in my lane), defence (threatened), or a comeback (behind the player or in the bottom half). Riders on the
-// podium places, anyone more than 20 m ahead of the player and a rider back from a crash for < 12 s keep them
-// holstered (defence only when hurt), so a speed skill is a way back into the race, not what decides the podium,
-// and a KO still buys a real gap.
-const LEAD_FREE = 20;
-const PODIUM = 3;
-const holstered = (v: SkillView): boolean => v.me.place <= PODIUM || v.me.s - v.player.s > LEAD_FREE || recovering(v);
-const hurt = (v: SkillView): boolean => v.me.hp < v.me.maxHp * 0.5;
-/** Shield / slide under attack: always when hurt, otherwise only off the podium places. */
-const defend = (v: SkillView): boolean => threatened(v) && (hurt(v) || !holstered(v));
-const overtaking = (v: SkillView): boolean => riders(v).some((b) => b.ds > 3 && b.ds < 25 && Math.abs(b.x - v.me.x) < 1.6);
-const comeback = (v: SkillView): boolean => v.player.s > v.me.s || v.me.place > v.field / 2;
-const purpose = (v: SkillView): boolean => !holstered(v) && (overtaking(v) || comeback(v));
-
-const SIG: Record<string, Rule> = {
-  'goose.honk': (v) => riders(v).some((b) => ahead(b, v.me, 2, 14, Math.PI / 6)),
-  'capybara.chill': (v) => riders(v).filter((b) => dist(b, v.me) < 10).length >= 2,
-  'cat.spin': (v) => riders(v).some((b) => dist(b, v.me) < 2.4),
-  'shiba.doge': (v) => defend(v) || (hurt(v) && !holstered(v) && riders(v).some((b) => dist(b, v.me) < 5))
-    || (purpose(v) && v.straight > 80 && riders(v).some((b) => b.ds > 5 && b.ds < 30)),
-  'pigeon.ghost': (v) => !holstered(v) && (v.blocked || riders(v).filter((b) => dist(b, v.me) < 5).length >= 2
-    || (v.player.s - v.me.s > 5 && v.player.s - v.me.s < 30)),
-  'penguin.slide': (v) => defend(v) || (purpose(v) && v.straight > 90),
-  'seagull.steal': (v) => riders(v).some((b) => dist(b, v.me) < 6 && b.rider !== null && ((b.rider.weapon !== 'none' && v.me.weapon === 'none') || b.rider.sp >= 20)),
-  // A lazy comeback tool: only from the bottom 3 (trailing the player too made the sloth a podium regular).
-  'sloth.flash': (v) => v.time > 8 && !holstered(v) && v.me.place > v.field - 3 && v.straight > 100
-    && riders(v).some((b) => b.ds > 3 && b.ds < 40),
-};
-
-/** Pelican autopilot: torpedo, gulp, wing dash, SHOWTIME. */
-function pelican(v: SkillView, c: Controls, roll: number): boolean {
-  const { me } = v;
-  const rs = riders(v);
-  if (me.sp >= 100 && rs.filter((b) => b.ds > 0 && b.ds < 40).length >= 2) { c.ult = true; return true; }
-  if (me.cooldowns[0] <= 0 && rs.some((b) => ahead(b, me, 5, 60, (25 * Math.PI) / 180)) && roll < 0.5) { c.skill1 = true; return true; }
-  if (me.cooldowns[1] <= 0 && rs.some((b) => dist(b, me) < 2.5)) { c.skill2 = true; return true; }
-  if (me.cooldowns[2] <= 0 && v.straight > 60 && rs.some((b) => b.ds > 2 && b.ds < 15)) { c.skill3 = true; return true; }
-  return false;
-}
+export type { SkillView } from './skill-rules';
 
 /** Skills that hit or rob: a grudge fires these eagerly; the rest (shields, slides, vanishing) wait, as they block the payback swing. */
 const PAYBACK = new Set(['goose.honk', 'cat.spin', 'seagull.steal']);
+
+/** The ult no AI casts: freezing the pack for three seconds is a cutscene, not a fight. */
+const NO_AI_ULT = new Set(['ult.timestop']);
+
+/**
+ * The eagerness of a pool skill relative to the signature skill in slot 1: the pool skills are the rider's
+ * backup, so they are taken a little less eagerly — but only a little. The rivals really do use their whole
+ * kit, and a pack that fights with everything is a pack the player cannot mash its way past: the SP bar fills
+ * at a sane pace and the ult stays a mid-race event (the SP economy, tools/combat-check.mjs --soak).
+ */
+const BACKUP_EAGER = 0.85;
+
+/** The slots a rider can press: 1–3 = U/I/O, 4 = the ult (P). */
+type Slot = 1 | 2 | 3 | 4;
+
+interface Candidate {
+  slot: Slot;
+  id: string;
+  rule: Rule;
+}
+
+/** The skills this rider could fire now, in the order they are tried: the ult first, then the slots. */
+function candidates(v: SkillView): Candidate[] {
+  const { me } = v;
+  const out: Candidate[] = [];
+  const ult = me.loadout.ult;
+  if (ult && !NO_AI_ULT.has(ult)) {
+    const rule = ruleFor(ult);
+    if (rule) out.push({ slot: 4, id: ult, rule });
+  }
+  for (let i = 0; i < 3; i++) {
+    const id = me.loadout.slots[i];
+    if (!id) continue;
+    const rule = ruleFor(id);
+    if (rule) out.push({ slot: (i + 1) as Slot, id, rule });
+  }
+  return out;
+}
+
+const press = (c: Controls, slot: Slot): void => {
+  if (slot === 1) c.skill1 = true;
+  else if (slot === 2) c.skill2 = true;
+  else if (slot === 3) c.skill3 = true;
+  else c.ult = true;
+};
 
 /** Decide and press a skill. `eager` 0..1 scales how quickly a valid chance is taken. */
 export function useSkill(v: SkillView, c: Controls, eager: number, roll: number): boolean {
   const { me } = v;
   if (me.mode !== 'racing' || !me.mods.canAttack || me.action !== null || me.airborne) return false;
-  if (me.character === 'pelican') return roll < eager * 0.3 && pelican(v, c, roll / Math.max(0.01, eager * 0.3));
-  const id = ROSTER[me.character].skill;
-  const rule = SIG[id];
-  if (!rule || me.cooldowns[0] > 0) return false;
+  if (me.mods.silenced) return false; // a silenced rider casts nothing (the runner would refuse it)
   const gate = v.grudge ? 0.75 : v.prefer ? 0.5 : 0.25;
-  if (roll > eager * gate) return false;
-  // A shield or a slide would block the payback swing: a rider that owes the player one keeps it holstered.
-  if (v.grudge && !PAYBACK.has(id)) return false;
-  // 宿敌: the signature skill goes at the player first.
-  if (v.prefer) {
-    const only: SkillView = { ...v, blips: v.blips.filter((b) => b.kind === 'rider' && b.rider === v.prefer) };
-    if (rule(only)) {
-      c.skill1 = true;
-      return true;
+  for (const cand of candidates(v)) {
+    // Never press a skill the runner would refuse: the cooldown, the SP and the ult's own target check.
+    if (cand.slot === 4) {
+      if (me.sp < 100 || !me.ultTarget) continue;
+    } else if ((me.cooldowns[cand.slot - 1] ?? 0) > 0) continue;
+    // A shield or a slide would block the payback swing: a rider that owes the player one keeps it holstered.
+    if (v.grudge && !PAYBACK.has(cand.id)) continue;
+    // The eagerness (one press per decision): a pool skill is the rider's backup and is taken less eagerly.
+    const weight = cand.id.startsWith('pool.') ? BACKUP_EAGER : 1;
+    if (roll > eager * gate * weight) continue;
+    if (!cand.rule(v)) continue;
+    // 宿敌: the skill goes at the player first.
+    if (v.prefer) {
+      const only: SkillView = { ...v, blips: v.blips.filter((b) => b.kind === 'rider' && b.rider === v.prefer) };
+      if (cand.rule(only)) {
+        press(c, cand.slot);
+        return true;
+      }
     }
+    press(c, cand.slot);
+    return true;
   }
-  if (!rule(v)) return false;
-  c.skill1 = true;
-  return true;
+  return false;
 }
