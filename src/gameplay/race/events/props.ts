@@ -50,14 +50,24 @@ export class PropPool {
     return this.used++;
   }
 
-  /** Place a reserved slot. */
-  set(slot: number, matrix: Matrix4): void {
-    this.mesh.setMatrixAt(slot, matrix);
+  /** Start the pool over (for a pool whose content is rebuilt every frame). */
+  reset(): void {
+    this.used = 0;
   }
 
-  /** Upload this frame's instance matrices. */
+  /** Place a reserved slot (the pool grows to cover it, so a direct `set` also counts as used). */
+  set(slot: number, matrix: Matrix4): void {
+    this.mesh.setMatrixAt(slot, matrix);
+    if (slot >= this.used) this.used = slot + 1;
+  }
+
+  /** Upload this frame's instance matrices (and draw only the slots in use). */
   commit(): void {
     this.mesh.instanceMatrix.needsUpdate = true;
+    // An unused slot keeps the identity matrix: drawn, it stacks a copy of the prop on the world origin
+    // (the flickering clutter the players saw). Only the used slots are drawn.
+    this.mesh.count = this.used;
+    this.hull.count = this.used;
   }
 
   dispose(): void {

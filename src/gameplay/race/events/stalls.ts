@@ -164,6 +164,8 @@ export function createStalls(setup: EventSetup): EventProps {
         p.y = Math.max(0.1, p.y + p.vy * dt);
         if (p.life <= 0) pieces.splice(i, 1);
       }
+      // The fruit is drawn again every frame: the pool starts over, so only the pieces in the air show.
+      debris.reset();
       for (let i = 0; i < pieces.length; i++) {
         const p = pieces[i];
         if (!p) continue;

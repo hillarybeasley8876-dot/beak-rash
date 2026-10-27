@@ -64,13 +64,19 @@ export const EVENT_TUNING = {
   roadworks: {
     /** The length of the work zone. */
     zone: 140,
-    /** The zone ends on the event spot: the barriers, the sign and the crew are already in view when the
-     *  event arms, and the player is well inside the zone before the first barrier row. */
-    lead: 140,
-    /** A barrier row every this many metres; the barriers are as long as the spacing (a continuous wall). */
-    rowEvery: 14,
-    /** The target width of one barrier block. */
-    blockWidth: 2,
+    /** The event spot is the middle of the work zone: the traffic is seen merging into the open lane
+     *  long before the wall goes up, and the player rides into the middle of the works. */
+    lead: 70,
+    /** The wall is built from short pieces: this is how long one piece is (along the road). */
+    pieceLength: 4,
+    /** The gap one piece leaves to the next one (so the ends never butt and overlap on a bend). */
+    pieceGap: 0.15,
+    /** The target width of one piece (across the road). */
+    pieceWidth: 3.2,
+    /** How many pieces the pool holds (the wall is one instanced draw call). */
+    pieceCap: 320,
+    /** How high the barrier sits: its lowest face is lifted this far above the asphalt (no z-fighting). */
+    base: 0.02,
     blockHeight: 1.05,
     /** The open lane is this wide (wide enough that the AI riders find a way through). */
     gapWidth: 6,
@@ -80,6 +86,8 @@ export const EVENT_TUNING = {
     gapInset: 1,
     /** A cone every this many metres along the closed side. */
     coneEvery: 7,
+    /** How many cones the pool holds. */
+    coneCap: 24,
     /** How long the zone stays after the player passed it. */
     linger: 20,
   },

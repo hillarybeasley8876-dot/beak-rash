@@ -1,12 +1,13 @@
 // One traffic vehicle's behaviour in track space: keep lane, follow the car ahead, change lanes with
 // blinkers, brake for riders lying in the road, hazard lights after a crash, honk at riders.
-import { clamp, smoothstep } from '../../../core/math';
+import { clamp } from '../../../core/math';
 import type { Rng } from '../../../core/rng';
 import type { Obstacle, RiderState } from '../../../core/types';
 import type { VehicleDef } from './types';
 
 export const BLINK_LEAD = 1.0;     // s of blinking before moving over
-const CHANGE_TIME = 2.3;           // s to cross one lane
+const LANE_RATE = 1.6;           // m/s of sideways movement in a normal lane change
+const MERGE_RATE = 2.6;          // m/s of sideways movement when merging around a solid obstacle
 const ACCEL = 2.2;
 const DECEL = 7;
 
@@ -16,8 +17,10 @@ export interface Vehicle {
   readonly dir: 1 | -1;            // +1 = with the race, −1 = oncoming
   readonly color: string;
   lane: number;                    // ±1 inner, ±2 outer (sign = side of the road)
-  fromLane: number;
-  laneT: number;                   // 0..1 progress of a lane change (1 = settled)
+  xTarget: number;                 // the lateral position the vehicle is heading for
+  merging: boolean;                // the move is a merge around a solid obstacle (blinkers on)
+  hold: boolean;                   // the move waits for a gap: the vehicle holds its line
+  gap: number;                     // the gap to the nearest thing ahead (debug)
   blinkT: number;                  // s of blinking left before moving
   cruise: number;
   speed: number;                   // ≥ 0, along dir
@@ -38,12 +41,6 @@ export function laneX(lane: number, hw: number): number {
   return side * hw * (Math.abs(lane) >= 2 ? 0.75 : 0.25);
 }
 
-/** Current lateral position, interpolating an ongoing lane change. */
-export function vehicleX(v: Vehicle, hw: number): number {
-  const a = laneX(v.fromLane, hw), b = laneX(v.lane, hw);
-  return a + (b - a) * smoothstep(0, 1, v.laneT);
-}
-
 export interface Surroundings {
   /** Gap (m, bumper to bumper) and speed of the nearest thing ahead in this lane. */
   leaderGap: number;
@@ -52,15 +49,16 @@ export interface Surroundings {
   riderAhead: RiderState | null;
 }
 
-export function startLaneChange(v: Vehicle, to: number): void {
-  v.fromLane = v.lane;
-  v.lane = to;
-  v.laneT = 0;
+/** Head for the lateral position `x` (a lane change, or a merge around a solid obstacle). */
+export function startMove(v: Vehicle, x: number, merging: boolean): void {
+  v.xTarget = x;
+  v.merging = merging;
+  v.hold = false;
   v.blinkT = BLINK_LEAD;
 }
 
 /** Advance one vehicle by dt. Returns true when it wants to honk. */
-export function driveVehicle(v: Vehicle, env: Surroundings, hw: number, dt: number, rng: Rng): boolean {
+export function driveVehicle(v: Vehicle, env: Surroundings, dt: number, rng: Rng): boolean {
   v.honkCd -= dt;
   v.laneCd -= dt;
   v.hazard = Math.max(0, v.hazard - dt);
@@ -71,15 +69,16 @@ export function driveVehicle(v: Vehicle, env: Surroundings, hw: number, dt: numb
   const prev = v.speed;
   v.speed = Math.max(0, v.speed + clamp(want - v.speed, -DECEL * dt, ACCEL * dt));
   v.braking = v.speed < prev - 0.5 * dt || (want < v.speed - 0.3);
-  const x0 = vehicleX(v, hw);
-  if (v.laneT < 1) {
-    if (v.blinkT > 0) v.blinkT -= dt;
-    else v.laneT = Math.min(1, v.laneT + dt / CHANGE_TIME);
+  // The lateral move: toward the target, at a limited rate (a merge is quicker than a lane change).
+  const x0 = v.ob.x;
+  if (!v.hold) {
+    const dx = v.xTarget - x0;
+    const maxRate = v.merging ? MERGE_RATE : LANE_RATE;
+    const rate = Math.min(maxRate, Math.abs(dx) * 2.5);
+    v.ob.x = x0 + clamp(dx, -rate * dt, rate * dt);
   }
-  const x1 = vehicleX(v, hw);
-  v.vxl = (x1 - x0) / Math.max(dt, 1e-4);
+  v.vxl = (v.ob.x - x0) / Math.max(dt, 1e-4);
   v.ob.s += v.dir * v.speed * dt;
-  v.ob.x = x1;
   v.ob.speed = v.dir * v.speed;
   v.wheelDist += v.speed * dt;
   if (env.riderAhead && v.honkCd <= 0) {
@@ -93,9 +92,8 @@ export function driveVehicle(v: Vehicle, env: Surroundings, hw: number, dt: numb
 export function blinkers(v: Vehicle, time: number): [boolean, boolean] {
   const on = Math.floor(time * 2.6) % 2 === 0;
   if (v.hazard > 0) return [on, on];
-  if (v.laneT >= 1) return [false, false];
-  // Vehicle's own left/right: for oncoming traffic the road's left is the driver's right.
-  const towardRoadRight = laneX(v.lane, 7) > laneX(v.fromLane, 7);
-  const right = v.dir > 0 ? towardRoadRight : !towardRoadRight;
+  if (!v.merging && Math.abs(v.xTarget - v.ob.x) <= 0.25) return [false, false];
+  // The vehicle's own left/right: for oncoming traffic the road's left is the driver's right.
+  const right = v.dir > 0 ? v.xTarget > v.ob.x : v.xTarget < v.ob.x;
   return [on && !right, on && right];
 }

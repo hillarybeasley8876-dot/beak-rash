@@ -3,6 +3,7 @@
 import type { Session } from '../../../core/contracts';
 import type { Rng } from '../../../core/rng';
 import type { EventKind } from '../../../data/event-lines';
+import type { Traffic } from '../traffic';
 
 export type { EventKind };
 
@@ -25,10 +26,14 @@ export interface EventSetup {
   rng: Rng;
   /** The first obstacle id of this event (every event gets its own range). */
   idBase: number;
+  /** The traffic manager (null when the race has no traffic): the events have to know what is on the road. */
+  traffic: Traffic | null;
 }
 
 /** One scheduled (or forced) event in the director. */
 export interface EventSlot {
+  /** The slot's own number: the traffic knows the planned zones by it. */
+  id: number;
   kind: EventKind;
   /** The event spot on the track. */
   s: number;

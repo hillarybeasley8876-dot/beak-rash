@@ -9,7 +9,7 @@ import type { Traffic } from '../traffic';
 import { createFishSpill } from './fish-spill';
 import { createGeese } from './geese';
 import { planEvents } from './plan';
-import { createRoadworks } from './roadworks';
+import { createRoadworks, roadworksPieces } from './roadworks';
 import { createStalls } from './stalls';
 import { EVENT_TUNING as T } from './tuning';
 import type { EventProps, EventSlot } from './types';
@@ -47,7 +47,7 @@ export function createEventDirector(ctx: RaceCtx, traffic: Traffic | null): Even
   warmReflectLayer(session);
 
   for (const p of planEvents(rng, track, session.config.level)) {
-    slots.push({ kind: p.kind, s: p.s, phase: 'planned', props: null });
+    slots.push({ id: slots.length, kind: p.kind, s: p.s, phase: 'planned', props: null });
   }
 
   const tmp = new Vector3();
@@ -59,8 +59,8 @@ export function createEventDirector(ctx: RaceCtx, traffic: Traffic | null): Even
   let made = 0;
   const create = (kind: EventKind, s: number): EventProps => {
     // Every event gets its own obstacle id range (a scheduled and a forced event of the same kind must
-    // not share ids).
-    const setup = { session, s, rng: rng.fork(0x9e37 + made), idBase: 5000 + made * 250 };
+    // not share ids). The roadworks puts up a whole wall of pieces, so the range is wide.
+    const setup = { session, s, rng: rng.fork(0x9e37 + made), idBase: 5000 + made * 500, traffic };
     made++;
     switch (kind) {
       case 'fishSpill': return createFishSpill(setup);
@@ -71,7 +71,7 @@ export function createEventDirector(ctx: RaceCtx, traffic: Traffic | null): Even
   };
 
   const force = (kind: EventKind, s: number): void => {
-    slots.push({ kind, s, phase: 'planned', props: null });
+    slots.push({ id: slots.length, kind, s, phase: 'planned', props: null });
   };
 
   const br = window.__br as (WithEvents & object) | undefined;
@@ -88,6 +88,10 @@ export function createEventDirector(ctx: RaceCtx, traffic: Traffic | null): Even
           if (d <= T.warnDist) {
             slot.phase = 'warned';
             emit(slot, 'warn');
+            // The traffic has to know about the work zone before its wall goes up: the cars merge into
+            // the open lane while the zone is only announced, so none of them stands in a closed lane
+            // when the barriers appear.
+            if (slot.kind === 'roadworks' && traffic) traffic.planZone(slot.id, roadworksPieces(session, slot.s));
           }
         }
         if (slot.phase === 'warned' && slot.s - player.s <= T.startDist) {
@@ -105,6 +109,7 @@ export function createEventDirector(ctx: RaceCtx, traffic: Traffic | null): Even
         slot.props.dispose();
         slot.props = null;
         slot.phase = 'ended';
+        traffic?.dropZone(slot.id);
         emit(slot, 'end');
       }
     },
@@ -112,6 +117,7 @@ export function createEventDirector(ctx: RaceCtx, traffic: Traffic | null): Even
       for (const slot of slots) {
         slot.props?.dispose();
         slot.props = null;
+        traffic?.dropZone(slot.id);
       }
       slots.length = 0;
       warm.dispose();

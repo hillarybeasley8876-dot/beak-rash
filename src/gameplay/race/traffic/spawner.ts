@@ -2,6 +2,7 @@
 // directions, never inside riders or other vehicles, never on the start straight or the finish run.
 import type { Rng } from '../../../core/rng';
 import type { RiderState } from '../../../core/types';
+import type { Blocker } from './blocks';
 import { laneX, type Vehicle } from './driver';
 import { VEHICLES, VEHICLE_TYPES, type VehicleDef, type VehicleType } from './types';
 
@@ -39,6 +40,8 @@ export interface SpawnWorld {
   halfWidth(s: number): number;
   riders: readonly RiderState[];
   vehicles: readonly Vehicle[];
+  /** The solid obstacles on the road that are not traffic (the work-zone wall, crates, the tipped truck). */
+  blocks: readonly Blocker[];
 }
 
 /** True when a vehicle of half-length `hl` at (s, lane) keeps clear of riders and other vehicles. */
@@ -51,6 +54,10 @@ export function spotIsFree(w: SpawnWorld, s: number, lane: number, hl: number): 
   for (const v of w.vehicles) {
     if (Math.sign(v.lane) !== Math.sign(lane)) continue;
     if (Math.abs(v.ob.s - s) < v.def.length / 2 + hl + 18) return false;
+  }
+  // A vehicle never appears inside a solid obstacle (the work-zone wall would swallow it).
+  for (const b of w.blocks) {
+    if (Math.abs(b.s - s) < b.halfLength + hl + 1 && Math.abs(b.x - x) < b.halfWidth + 1.6) return false;
   }
   return true;
 }
