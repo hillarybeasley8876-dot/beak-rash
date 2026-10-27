@@ -21,6 +21,8 @@ export interface ProjectileSpec {
   onHit(victim: RiderState, p: Projectile): void;
   /** r6 (SPEC §25): the projectile reached a hittable obstacle (a police officer, a prop); absent = it flies through. */
   onObstacle?(o: Obstacle, p: Projectile): void;
+  /** r6: an obstacle to home on when there is no rider target (a police officer). */
+  targetObstacle?: Obstacle | null;
 }
 
 export interface Projectile extends ProjectileSpec {
@@ -119,8 +121,10 @@ export class ProjectileSystem {
   /** Steer toward a live target (constant speed), else level out at about 1 m. */
   private home(p: Projectile, dt: number): void {
     const t = p.target && targetable(this.ctx, p.target) ? p.target : null;
-    if (t) {
-      const ds = t.s + t.speed * 0.12 - p.s, dx = t.x - p.x, dy = t.y + 1.0 - p.y;
+    const o = !t && p.targetObstacle?.active ? p.targetObstacle : null;
+    const aim = t ?? (o ? { s: o.s, x: o.x, y: 0, speed: o.speed } : null);
+    if (aim) {
+      const ds = aim.s + aim.speed * 0.12 - p.s, dx = aim.x - p.x, dy = aim.y + 1.0 - p.y;
       const len = Math.hypot(ds, dx, dy) || 1;
       const k = 1 - Math.exp(-p.turn * dt);
       p.vs += ((ds / len) * p.speed - p.vs) * k;
