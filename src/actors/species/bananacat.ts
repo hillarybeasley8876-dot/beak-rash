@@ -8,27 +8,25 @@ import { B } from '../rig/skeleton';
 import type { SpeciesDef } from './types';
 
 const FUR = 0xdde2e8, CREAM = 0xf7f9fb, PINK = 0xff9fb0;
-const BANANA = 0xffd84a, BANANA_D = 0xe6b92f, TIP = 0x6b4a1e, TEAR = 0x9ad9ff;
+const BANANA = 0xffd84a, TIP = 0x6b4a1e, TEAR = 0x9ad9ff;
 
 /** The peeled banana: a cap over the skull, a ring around the face, the stalk on top and three peel flaps
- *  hanging down over the shoulders and the back. */
+ *  hanging down over the shoulders and the back. Nothing hangs in front of the face. */
 function hood(): Prim[] {
   const out: Prim[] = [
-    { shape: { kind: 'ellipsoid', c: [0, 0.688, -0.295], r: [0.14, 0.095, 0.155] }, color: BANANA, bone: B.head, k: 0.035, sigma: 0.03 },
+    { shape: { kind: 'ellipsoid', c: [0, 0.695, -0.295], r: [0.14, 0.093, 0.155] }, color: BANANA, bone: B.head, k: 0.035, sigma: 0.03 },
     { shape: { kind: 'torus', c: [0, 0.6, -0.315], R: 0.15, r: 0.044 }, rot: [Math.PI / 2, 0, 0], color: BANANA, bone: B.head, k: 0.03, sigma: 0.03 },
-    { shape: { kind: 'capsule', a: [0, 0.735, -0.295], b: [0, 0.808, -0.288], r: 0.026, r2: 0.015 }, color: TIP, bone: B.head, k: 0.012, sigma: 0.02 },
+    { shape: { kind: 'capsule', a: [0, 0.74, -0.295], b: [0, 0.812, -0.288], r: 0.026, r2: 0.015 }, color: TIP, bone: B.head, k: 0.012, sigma: 0.02 },
   ];
-  // Peel flaps (a → b): the two over the shoulders, the one down the back and the small one over the chest.
+  // Peel flaps (a → b): the two over the shoulders and the one down the back. Each is one smooth strip —
+  // the darker inner peel is a paint band on the strip's own axis, never a second shape beside it.
   const flaps: Array<[V3, V3, number, number]> = [
     [[-0.15, 0.55, -0.30], [-0.235, 0.29, -0.02], 0.05, 0.026],
     [[0.15, 0.55, -0.30], [0.235, 0.29, -0.02], 0.05, 0.026],
     [[0, 0.575, -0.175], [0, 0.30, 0.10], 0.055, 0.028],
-    [[0, 0.60, -0.44], [0, 0.43, -0.485], 0.045, 0.03],
   ];
   for (const [a, b, r, r2] of flaps) {
     out.push({ shape: { kind: 'capsule', a, b, r, r2 }, color: BANANA, bone: B.head, k: 0.03, sigma: 0.035 });
-    // Darker inner peel along the flap so the folds read from the chase cam.
-    out.push({ shape: { kind: 'capsule', a: [a[0] * 0.72, a[1] - 0.03, a[2] * 0.72], b: [b[0] * 0.72, b[1] + 0.04, b[2] * 0.72], r: r * 0.42, r2: r2 * 0.4 }, color: BANANA_D, bone: B.head, k: 0.02, sigma: 0.03 });
   }
   return out;
 }

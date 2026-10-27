@@ -1,6 +1,7 @@
 // 弹跳猪 the pygmy hippo calf: a glossy dark grey barrel body with a pink belly, pink cheeks and a wide pink
-// mouth, nostrils on top of the broad muzzle, tiny eyes, small round ears and a painted shine stripe down the
-// back. Chubby short legs. Signature: BOUNCE SLAM.
+// mouth, a boxy muzzle that is the widest part of the head with the nostrils as bumps on top of it, tiny eyes,
+// tiny round ears and a painted shine stripe down the back. A white helmet seated on the skull. Signature:
+// BOUNCE SLAM.
 import { addEars, addMouth } from '../kit/ears-tails';
 import { addHelmet } from '../kit/gear';
 import { ARM_UP, buildMammal, mammalJoints, type MammalSpec } from '../kit/mammal';
@@ -13,14 +14,14 @@ const GREY = 0x6f7a8c, GREY_D = 0x59636f, PINK = 0xf2a7b5, SHINE = 0xd7e2ee;
 /** Pink cheeks, the wide pink mouth, the nostrils on top of the muzzle and the painted shine stripe. */
 function face(): Prim[] {
   const out: Prim[] = [
-    // Nostrils: two dark dots sitting on the front-top of the muzzle.
-    { shape: { kind: 'ellipsoid', c: [-0.05, 0.598, -0.505], r: [0.025, 0.016, 0.026] }, rot: [-0.25, 0, 0], color: 0x3a3038, bone: B.head, k: 0.006, sigma: 0.012 },
-    { shape: { kind: 'ellipsoid', c: [0.05, 0.598, -0.505], r: [0.025, 0.016, 0.026] }, rot: [-0.25, 0, 0], color: 0x3a3038, bone: B.head, k: 0.006, sigma: 0.012 },
-    // Pink mouth: a wide painted band across the front of the muzzle.
-    { shape: { kind: 'ellipsoid', c: [0, 0.458, -0.545], r: [0.1, 0.045, 0.03] }, op: 'paint', color: PINK, bone: B.head },
+    // Nostrils: two dark bumps on the front-top of the muzzle.
+    { shape: { kind: 'ellipsoid', c: [-0.05, 0.516, -0.498], r: [0.024, 0.015, 0.024] }, rot: [-0.25, 0, 0], color: 0x3a3038, bone: B.head, k: 0.006, sigma: 0.012 },
+    { shape: { kind: 'ellipsoid', c: [0.05, 0.516, -0.498], r: [0.024, 0.015, 0.024] }, rot: [-0.25, 0, 0], color: 0x3a3038, bone: B.head, k: 0.006, sigma: 0.012 },
+    // Pink mouth: a wide painted smile across the front of the muzzle.
+    { shape: { kind: 'ellipsoid', c: [0, 0.442, -0.55], r: [0.12, 0.04, 0.032] }, op: 'paint', color: PINK, bone: B.head },
     // Painted shine stripe down the back and over the muzzle (the wet-look highlight).
     { shape: { kind: 'ellipsoid', c: [0, 0.368, 0.072], r: [0.06, 0.035, 0.06] }, op: 'paint', color: SHINE, bone: B.spine },
-    { shape: { kind: 'ellipsoid', c: [0, 0.585, -0.45], r: [0.055, 0.025, 0.07] }, op: 'paint', color: SHINE, bone: B.head },
+    { shape: { kind: 'ellipsoid', c: [0, 0.527, -0.45], r: [0.055, 0.022, 0.06] }, op: 'paint', color: SHINE, bone: B.head },
   ];
   return out;
 }
@@ -29,23 +30,32 @@ const spec: MammalSpec = {
   fur: GREY, belly: PINK, muzzle: GREY_D, nose: 0x3a3038,
   body: { c: [0, 0.19, -0.05], r: [0.235, 0.215, 0.25], rot: 0.2 },
   chest: { c: [0, 0.33, -0.16], r: [0.2, 0.185, 0.19] },
-  head: { c: [0, 0.58, -0.3], r: [0.2, 0.17, 0.2] },
-  snout: { c: [0, 0.5, -0.47], r: [0.15, 0.11, 0.1] },
-  cheeks: { c: [-0.125, 0.53, -0.42], r: [0.055, 0.05, 0.05], color: PINK },
+  // A narrow, boxy skull ...
+  head: { c: [0, 0.58, -0.3], r: [0.152, 0.15, 0.17] },
+  // ... and a low, boxy muzzle, wider than the skull (rounded boxes, like the capybara's loaf head).
+  snout: { c: [0, 0.44, -0.45], r: [0.175, 0.085, 0.095] },
+  cheeks: { c: [-0.145, 0.5, -0.37], r: [0.045, 0.048, 0.045], color: PINK },
   bellyPatch: { c: [0, 0.21, -0.28], r: [0.14, 0.15, 0.05] },
-  noseAt: [0, 0.55, -0.55], noseR: [0.032, 0.022, 0.017],
-  chin: { c: [0, 0.45, -0.45], r: [0.1, 0.032, 0.06] },
+  noseAt: [0, 0.505, -0.545], noseR: [0.03, 0.02, 0.016],
+  chin: { c: [0, 0.4, -0.44], r: [0.09, 0.028, 0.05] },
   arm: [0.075, 0.068, 0.062], leg: [0.105, 0.09, 0.075, 0.068],
   hand: { r: [0.062, 0.048, 0.064], color: GREY_D, toes: 3 },
   foot: { r: [0.066, 0.048, 0.086], color: GREY_D, toes: 3, pad: PINK, drop: 0.01 },
-  // Tiny eyes high on the sides of the head.
-  eye: { at: [-0.118, 0.628, -0.435], r: 0.038, dir: [-0.42, 0.1, -0.9], pupil: 0.019, glint: 0.4 },
-  extra: face(),
-  budget: 2500,
+  // Tiny eyes on the sides of the skull, below the helmet's rim and above the muzzle, looking forward enough
+  // to read from the chase cam.
+  eye: { at: [-0.128, 0.552, -0.372], r: 0.04, dir: [-0.26, 0.1, -0.96], pupil: 0.019, glint: 0.4 },
+  extra: [
+    ...face(),
+    // Boxy skull and a squared-off muzzle: the rounded boxes are the hippo's blocky head.
+    { shape: { kind: 'box', c: [0, 0.585, -0.315], h: [0.125, 0.13, 0.175], round: 0.045 }, rot: [0.06, 0, 0], color: GREY, bone: B.head, k: 0.05, sigma: 0.02 },
+    { shape: { kind: 'box', c: [0, 0.44, -0.475], h: [0.175, 0.08, 0.09], round: 0.05 }, rot: [0.05, 0, 0], color: GREY_D, bone: B.head, k: 0.045, sigma: 0.02 },
+  ],
+  budget: 3200,
+  cell: 0.014,
 };
 
 const J = mammalJoints(spec, {
-  hat: [0, 0.755, -0.29], ear: [-0.165, 0.7, -0.2],
+  hat: [0, 0.625, -0.295], ear: [-0.12, 0.695, -0.22],
   clav: [-0.08, 0.35, -0.16], shoulder: [-0.16, 0.35, -0.21], elbow: [-0.26, 0.25, -0.32], wrist: [-0.22, 0.13, -0.42],
   hip: [-0.12, 0.08, -0.03], knee: [-0.15, 0.03, -0.31], ankle: [-0.15, -0.26, -0.26], toe: [-0.15, -0.3, -0.38],
   tail: [[0, 0.18, 0.22], [0, 0.21, 0.3]],
@@ -57,13 +67,15 @@ export const moodeng: SpeciesDef = {
   meta: {
     wings: false, hat: 'helmet', eyeDir: spec.eye.dir, lid: { open: -0.85, closed: 1.45 }, sleepy: 0.2, lidTilt: 0.18,
     neckReach: 0.04, tail: 'stub', earFlop: 0.08, hatWobble: 0.05, armUp: ARM_UP, gripDrop: 0.035, ankleLift: [0, 0.06, 0.05],
-    beak: [0, 0.46, -0.53], skin: GREY, skillPose: 'flash',
+    beak: [0, 0.45, -0.54], skin: GREY, skillPose: 'flash',
   },
   build(b) {
     buildMammal(b, J, spec);
-    addEars(b, J, { kind: 'round', w: 0.055, h: 0.05, thick: 0.02, color: GREY_D, inner: 0x8a6f78, tilt: 0.3, back: 0.35, turn: 0.35 });
-    addMouth(b, [[-0.06, 0.505, -0.555], [-0.03, 0.492, -0.563], [0, 0.488, -0.565], [0.03, 0.492, -0.563], [0.06, 0.505, -0.555]], 0.007);
-    addHelmet(b, { c: [0, 0.765, -0.29], r: [0.2, 0.135, 0.215], pitch: -0.14, color: 0x4b5560, stripe: SHINE, round: true,
-      strap: { chin: [0, 0.48, -0.43] } });
+    addEars(b, J, { kind: 'round', w: 0.045, h: 0.04, thick: 0.018, color: GREY_D, inner: 0x8a6f78, tilt: 0.3, back: 0.35, turn: 0.35 });
+    addMouth(b, [[-0.065, 0.45, -0.545], [-0.033, 0.44, -0.552], [0, 0.436, -0.554], [0.033, 0.44, -0.552], [0.065, 0.45, -0.545]], 0.007);
+    // A white helmet seated right down on the skull (its rim is buried in the head, so no sky shows between
+    // the rim and the skull from any side), with a pink stripe and a soft pink rim.
+    addHelmet(b, { c: [0, 0.625, -0.295], r: [0.161, 0.185, 0.204], pitch: -0.12, color: 0xffffff, stripe: PINK,
+      vent: 0xe9b7c2, round: true, detail: 1 });
   },
 };

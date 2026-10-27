@@ -27,30 +27,31 @@ function extraGlint(b: CharacterBuilder, eye: V3, dir: V3, r: number, side: -1 |
 
 const spec: MammalSpec = {
   fur: FUR, belly: CREAM, muzzle: CREAM, nose: PINK,
-  body: { c: [0, 0.16, -0.06], r: [0.175, 0.165, 0.2], rot: 0.32 },
-  chest: { c: [0, 0.27, -0.2], r: [0.15, 0.145, 0.145] },
-  head: { c: [0, 0.57, -0.3], r: [0.15, 0.14, 0.145] },
-  snout: { c: [0, 0.528, -0.418], r: [0.055, 0.04, 0.045] },
+  // A hamster is a ball: a wide, short barrel and a short neck (the head sits right on the shoulders).
+  body: { c: [0, 0.17, -0.05], r: [0.205, 0.155, 0.19], rot: 0.28 },
+  chest: { c: [0, 0.26, -0.18], r: [0.175, 0.125, 0.15] },
+  head: { c: [0, 0.55, -0.29], r: [0.15, 0.14, 0.145] },
+  snout: { c: [0, 0.508, -0.408], r: [0.055, 0.04, 0.045] },
   // Chubby cream cheek pouches.
-  cheeks: { c: [-0.098, 0.525, -0.372], r: [0.055, 0.05, 0.05], color: CREAM },
-  noseAt: [0, 0.552, -0.452], noseR: [0.014, 0.01, 0.009],
-  chin: { c: [0, 0.492, -0.4], r: [0.045, 0.024, 0.038] },
+  cheeks: { c: [-0.098, 0.505, -0.362], r: [0.055, 0.05, 0.05], color: CREAM },
+  noseAt: [0, 0.532, -0.442], noseR: [0.014, 0.01, 0.009],
+  chin: { c: [0, 0.472, -0.39], r: [0.045, 0.024, 0.038] },
   arm: [0.054, 0.05, 0.056], leg: [0.082, 0.068, 0.058, 0.052],
   hand: { r: [0.05, 0.04, 0.054], color: CREAM, toes: 3 },
   foot: { r: [0.05, 0.038, 0.072], color: CREAM, toes: 3, pad: PINK, drop: 0.01 },
   // Enormous glossy black eyes.
-  eye: { at: [-0.062, 0.585, -0.408], r: 0.056, dir: [-0.28, 0.04, -0.96], pupil: 0.038, glint: 0.38 },
+  eye: { at: [-0.062, 0.565, -0.398], r: 0.056, dir: [-0.28, 0.04, -0.96], pupil: 0.038, glint: 0.38 },
   extra: [
     // A tear clinging to the lower lid.
-    { shape: { kind: 'ellipsoid', c: [-0.07, 0.538, -0.418], r: [0.009, 0.013, 0.009] }, color: WET, bone: B.head, k: 0.005, sigma: 0.01, priority: 0.02 },
-    { shape: { kind: 'ellipsoid', c: [0.07, 0.538, -0.418], r: [0.009, 0.013, 0.009] }, color: WET, bone: B.head, k: 0.005, sigma: 0.01, priority: 0.02 },
+    { shape: { kind: 'ellipsoid', c: [-0.07, 0.518, -0.408], r: [0.009, 0.013, 0.009] }, color: WET, bone: B.head, k: 0.005, sigma: 0.01, priority: 0.02 },
+    { shape: { kind: 'ellipsoid', c: [0.07, 0.518, -0.408], r: [0.009, 0.013, 0.009] }, color: WET, bone: B.head, k: 0.005, sigma: 0.01, priority: 0.02 },
   ],
   budget: 2000,
 };
 
 const J = mammalJoints(spec, {
-  hat: [0, 0.69, -0.29], ear: [-0.1, 0.68, -0.25],
-  clav: [-0.07, 0.29, -0.24], shoulder: [-0.14, 0.28, -0.3], elbow: [-0.23, 0.16, -0.43], wrist: [-0.18, 0.02, -0.57],
+  hat: [0, 0.67, -0.28], ear: [-0.1, 0.66, -0.24],
+  clav: [-0.07, 0.28, -0.23], shoulder: [-0.14, 0.27, -0.29], elbow: [-0.23, 0.15, -0.42], wrist: [-0.18, 0.02, -0.57],
   hip: [-0.1, 0.08, -0.04], knee: [-0.13, 0.03, -0.33], ankle: [-0.13, -0.27, -0.27], toe: [-0.13, -0.31, -0.39],
   tail: [[0, 0.16, 0.19], [0, 0.2, 0.27]],
 });
@@ -59,18 +60,18 @@ export const hamster: SpeciesDef = {
   id: 'hamster',
   joints: J,
   meta: {
-    wings: false, hat: 'helmet', eyeDir: spec.eye.dir, lid: { open: -0.85, closed: 1.45 }, sleepy: 0.34, lidTilt: -0.28,
+    wings: false, hat: 'helmet', eyeDir: spec.eye.dir, lid: { open: -0.85, closed: 1.45 }, sleepy: 0.1, lidTilt: -0.3,
     neckReach: 0.04, tail: 'stub', earFlop: 0.06, hatWobble: 0.05, armUp: ARM_UP, gripDrop: 0.03, ankleLift: [0, 0.05, 0.05],
-    beak: [0, 0.49, -0.45], skin: FUR, skillPose: 'chill',
+    beak: [0, 0.47, -0.44], skin: FUR, skillPose: 'chill',
   },
   build(b) {
     buildMammal(b, J, spec);
     addEars(b, J, { kind: 'round', w: 0.05, h: 0.045, thick: 0.018, color: FUR, inner: PINK, tilt: 0.3, back: 0.3, turn: 0.35 });
     // A small, sad, down-turned mouth.
-    addMouth(b, [[-0.034, 0.505, -0.44], [-0.017, 0.497, -0.45], [0, 0.495, -0.452], [0.017, 0.497, -0.45], [0.034, 0.505, -0.44]], 0.0042);
+    addMouth(b, [[-0.034, 0.485, -0.43], [-0.017, 0.477, -0.44], [0, 0.475, -0.442], [0.017, 0.477, -0.44], [0.034, 0.485, -0.43]], 0.0042);
     extraGlint(b, spec.eye.at, spec.eye.dir, spec.eye.r, -1);
     extraGlint(b, spec.eye.at, spec.eye.dir, spec.eye.r, 1);
-    addHelmet(b, { c: [0, 0.7, -0.29], r: [0.152, 0.1, 0.155], pitch: -0.2, color: 0xb08a5e, stripe: CREAM, round: true,
-      strap: { chin: [0, 0.49, -0.42] } });
+    addHelmet(b, { c: [0, 0.68, -0.28], r: [0.152, 0.1, 0.155], pitch: -0.2, color: 0xb08a5e, stripe: CREAM, round: true,
+      strap: { chin: [0, 0.47, -0.41] } });
   },
 };
