@@ -83,7 +83,10 @@
 
 /* ---------- stat bars, meters, pills ---------- */
 .br-stat { display: flex; align-items: center; gap: 18px; font-family: var(--f-cn-block); font-weight: 400; font-size: 30px; }
-.br-stat-label { width: 4.2em; text-align: right; }
+/* The label's box is a fixed width, so the right-aligned text ends exactly at its edge: the CN display face
+   draws its glyphs wider than their advance and the last one loses its right stroke. The padding gives the
+   ink that room (the box keeps its width, so the bars stay where they are). */
+.br-stat-label { width: 4.2em; text-align: right; padding-right: 0.3em; }
 .br-stat-segs { display: inline-flex; gap: 6px; transform: skewX(var(--skew)); }
 .br-stat-segs i { display: block; width: 52px; height: 24px; background: rgba(255, 255, 255, 0.16); border: 3px solid var(--ink); }
 .br-stat-segs i.is-on { background: var(--white); box-shadow: inset 0 -6px 0 var(--red); }

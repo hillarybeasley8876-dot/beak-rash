@@ -8,6 +8,9 @@ import type { AchievementId } from '../../data/achievements';
 /** A rival skill during which it may pass the player (pigeon.ghost → 'pigeon', sloth.flash → 'sloth'). */
 export interface PassWindow { rider: RiderId; achievement: 'pigeon' | 'sloth'; wasBehind: boolean; until: number }
 
+/** The last blow that reached an officer: who hit it and whether it was a skill (SPEC §25). */
+export interface PoliceHit { attacker: RiderId; skill: boolean }
+
 export interface RaceFacts {
   started: boolean;              // race:start seen (launch boosts come just before it)
   attacked: boolean;             // player swung, cast a skill or the ult
@@ -33,6 +36,8 @@ export interface RaceFacts {
   wanted3: boolean;        // the player's wanted stars reached ★3 (police 2.0, SPEC §14)
   alliance: boolean;       // an alliance formed against the player (SPEC §18)
   events: number;          // track events that started in this race (SPEC §19)
+  policeDowns: number;     // officers the player downed in this race (SPEC §25)
+  policeHits: Map<number, PoliceHit>;  // the last blow on each officer (a swing takes a skill hit back)
 }
 
 export function newFacts(): RaceFacts {
@@ -44,6 +49,7 @@ export function newFacts(): RaceFacts {
     ult: { at: -Infinity, victims: new Set(), kos: 0 },
     robbedBy: new Map(), passes: [], chase: { active: false, busted: false },
     wanted3: false, alliance: false, events: 0,
+    policeDowns: 0, policeHits: new Map(),
   };
 }
 

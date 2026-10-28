@@ -73,6 +73,10 @@
 .br-ht-scd { position: absolute; left: 30px; bottom: 26px; padding: 2px 14px 0; background: var(--ink); color: var(--white); font-family: var(--f-cn-block); font-size: 28px; }
 .br-ht-sp { position: absolute; left: 0; top: 640px; display: flex; align-items: center; gap: 18px; font-family: var(--f-cn-play); font-weight: 400; font-size: 30px; color: rgba(255, 255, 255, 0.85); }
 .br-ht-sp .br-tag { font-size: 30px; }
+/* The 「KIT」 header: whose kit these four cards are. */
+.br-ht-shead { position: absolute; right: 0; top: 640px; display: flex; align-items: baseline; gap: 14px; }
+.br-ht-swho { font-family: var(--f-cn-block); font-weight: 400; font-size: 34px; }
+.br-ht-scode { font-family: var(--f-display); font-weight: 400; font-size: 24px; letter-spacing: 0.06em; color: var(--red); }
 
 /* ---------- new mechanics (r4, SPEC §14–§21) ---------- */
 .br-ht-new { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: 1.25fr 1fr 1fr; gap: 18px; }

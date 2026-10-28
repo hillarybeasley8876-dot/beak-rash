@@ -2,7 +2,7 @@
 // skill through its own rule (skill-rules.ts) and only when the runner would accept the cast (the cooldown, the
 // SP, no silence). The autopilot player rides the same table on its own loadout.
 import type { Controls } from '../../../core/types';
-import { ruleFor, type Rule, type SkillView } from './skill-rules';
+import { ruleFor, rammingAhead, SELF_SPEED, type Rule, type SkillView } from './skill-rules';
 
 export type { SkillView } from './skill-rules';
 
@@ -67,6 +67,8 @@ export function useSkill(v: SkillView, c: Controls, eager: number, roll: number)
     } else if ((me.cooldowns[cand.slot - 1] ?? 0) > 0) continue;
     // A shield or a slide would block the payback swing: a rider that owes the player one keeps it holstered.
     if (v.grudge && !PAYBACK.has(cand.id)) continue;
+    // A skill that speeds the caster up waits for the lane ahead: boosting into a slower rider rams it.
+    if (SELF_SPEED.has(cand.id) && rammingAhead(v)) continue;
     // The eagerness (one press per decision): a pool skill is the rider's backup and is taken less eagerly.
     const weight = cand.id.startsWith('pool.') ? BACKUP_EAGER : 1;
     if (roll > eager * gate * weight) continue;

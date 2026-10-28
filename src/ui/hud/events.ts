@@ -85,7 +85,7 @@ export function wireHudEvents(bus: EventBus<GameEvents>, p: HudParts): () => voi
     }),
     bus.on('ult:start', (e) => {
       if (me(e.riderId)) p.hints.done('ult');
-      p.cutins.ultStart(e.riderId);
+      p.cutins.ultStart(e.riderId, e.skillId);
     }),
     bus.on('cine:ult', (e) => p.cutins.cineUlt(e)),
     bus.on('cine:ko', (e) => p.cutins.cineKo(e)),

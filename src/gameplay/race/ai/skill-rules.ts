@@ -106,12 +106,39 @@ const playerPatch = (v: SkillView): boolean => Math.abs(v.me.s - v.player.s) < 1
 /** The rivals a shove may hit: the pack, never the player (a shove throws them out of the officer's lane). */
 const shoveable = (v: SkillView): Blip[] => targets(v).filter((b) => b.rider !== v.player);
 
+/**
+ * The hold a speed skill waits for: a rider in my own lane, a little way ahead, that I close on fast. Boosting
+ * into it would ram it (the boost pushes the rider into the slower one), so the skill waits until the lane is
+ * clear. The numbers: 0–15 m ahead, 1.6 m sideways, closing faster than 4 m/s.
+ */
+export const BOOST_HOLD = {
+  ahead: 15,     // m
+  lane: 1.6,     // m sideways
+  closing: 4,    // m/s
+} as const;
+
+/** The skills that speed the caster up: they all wait for the lane ahead to be clear. */
+export const SELF_SPEED: ReadonlySet<string> = new Set([
+  'pelican.wing', 'pigeon.ghost', 'penguin.slide', 'sloth.flash', 'xinxian.fresh', 'pool.rocket', 'pool.blink',
+  'pool.warsong', 'shiba.doge', 'cryingcat.tears', 'ult.timestop',
+]);
+
+/** A slower rider in my lane ahead that I close on fast: a speed skill would ram it, so it is held. */
+export const rammingAhead = (v: SkillView): boolean =>
+  riders(v).some((b) => b.ds > 0 && b.ds < BOOST_HOLD.ahead
+    && Math.abs(b.x - v.me.x) < BOOST_HOLD.lane
+    && v.me.speed - b.vs > BOOST_HOLD.closing);
+
 /** A rival right behind me (a chaser) within r m: the traps and the fire lines go there. */
 const chaser = (bs: Blip[], me: RiderState, r: number): boolean =>
   bs.some((b) => b.ds < 0 && b.ds > -r && Math.abs(b.x - me.x) < 3);
 
 /** The ult: SP full (the runner checks that) and a pack ahead to land it on. */
 const ULT: Rule = (v) => targets(v).filter((b) => b.ds > 0 && b.ds < 40).length >= 2;
+
+/** The meme signatures' own reach: the rain of 泪如雨下 falls over the caster, the Q弹冲击 slams 6 m ahead. */
+const TEARS = { rain: 9 };                     // m around the caster
+const BOUNCE = { ahead: 6, radius: 5 };        // m ahead of the caster, m around the slam
 
 // The generic rules (SPEC §24): what a skill of a category is worth when it has no rule of its own.
 const ATTACK: Rule = (v) => inRange(targets(v), v.me, 2, 25, 25 * DEG);
@@ -145,11 +172,18 @@ export const RULES: Record<string, Rule> = {
   'corgi.whistle': CONTROL,
   // ---- the r6 meme signatures (the generic rule of their category, until they ask for one of their own)
   'bananacat.peel': TRAP,
-  'cryingcat.tears': CONTROL,
+  // The rain falls over the caster: a rival inside it is slowed (and the cat speeds up — but not into a rider
+  // it is closing on, or the boost would ram it).
+  'cryingcat.tears': (v) => !rammingAhead(v) && near(targets(v), v.me, TEARS.rain) >= 1,
   'xinxian.fresh': MOVE,
-  'moodeng.bounce': ATTACK,
+  // The Q弹冲击 slams 6 m ahead with a 5 m radius: the AI uses it when a rival is inside that reach
+  // (the brief's window — 3–9 m ahead, within 3 m sideways — is the core of it).
+  'moodeng.bounce': (v) => targets(v).some((b) => Math.hypot(b.ds - BOUNCE.ahead, b.x - v.me.x) <= BOUNCE.radius),
   'pedro.trash': GAG,
-  'hamster.violin': CONTROL,
+  // The sad violin takes the skills away from everyone in earshot — the player included. Like the brainfight,
+  // it stays out of the player's patch of road: the player keeps its own skills, and the pack's formation
+  // under the player does not shift (the brakecheck counts a bump in that formation as a ram).
+  'hamster.violin': (v) => CONTROL(v) && !playerPatch(v),
   // ---- the r6 shared pool (SPEC §24): the ranges the skills' own job asked for. The skills that spray down the
   // road stay holstered while an officer is in the spray: the chase is the player's business.
   'pool.firebreath': (v) => !officerAhead(v) && inRange(targets(v), v.me, 4, 10, 30 * DEG),

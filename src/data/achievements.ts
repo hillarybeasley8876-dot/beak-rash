@@ -66,6 +66,10 @@ const DEFS = {
   parry: { name: '当！', desc: '用平底锅完美格挡一次', icon: '当' },
   wanted3: { name: '法外狂鹕', desc: '被通缉到三颗星，还把警察甩掉了', icon: '星' },
   bribe: { name: 'V我50', desc: '柯基警官收下了你的 50 小鱼干', icon: '贿' },
+  // ---- r6: 薄纱警察 (SPEC §25): the police can be beaten
+  police_three: { name: '一日三下班', desc: '一场比赛里让三名柯基警官提前下班', icon: '三' },
+  police_off: { name: '警局下班', desc: '打退特警小队，这一程再也没有警察', icon: '警' },
+  police_skill: { name: '降维打击', desc: '用技能让柯基警官下班', icon: '技' },
   // ---- r4: rivals & alliances (SPEC §18)
   nemesis: { name: '冤冤相报', desc: '击倒找你寻仇的宿敌', icon: '仇' },
   alliance_break: { name: '塑料友谊', desc: '围剿你的联盟自己打起来了', icon: '塑' },

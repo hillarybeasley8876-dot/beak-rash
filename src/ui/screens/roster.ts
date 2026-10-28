@@ -14,6 +14,8 @@ import { openSkillPicker, type SkillPicker } from './roster-picker';
 
 /** The grid is five wide; the fifteen racers make three rows. */
 const COLS = 5;
+/** The grid's rows: the last one is the row the slot row hangs under. */
+const ROWS = Math.ceil(RACERS.length / COLS);
 /** The loadout row: the slot, its in-race key (keyboard) and its pad button. */
 const SLOTS: ReadonlyArray<{ id: '1' | '2' | '3' | 'ult'; key: string; pad: string }> = [
   { id: '1', key: 'U', pad: 'LB' },
@@ -25,6 +27,9 @@ const SLOTS: ReadonlyArray<{ id: '1' | '2' | '3' | 'ult'; key: string; pad: stri
 const STATS: ReadonlyArray<[keyof CharacterDef['stats'], string]> = [
   ['power', '力量'], ['speed', '速度'], ['handling', '操控'], ['weight', '体重'], ['hp', '体力'],
 ];
+/** The slot under a column of the grid: the first three columns have a slot of their own, the last two share
+ *  the ult (the row is four slots wide under a five-column grid). */
+const SLOT_FOR_COLUMN: ReadonlyArray<number> = [0, 1, 2, 3, 3];
 const HINT_PICK: Hint = { kb: 'ENTER', pad: 'A', label: '出战', action: 'confirm' };
 const HINT_EDIT: Hint = { kb: 'ENTER', pad: 'A', label: '改技能' };
 /** The 盲盒 line: what the toggle does. */
@@ -36,7 +41,7 @@ export const rosterScreen: ScreenFactory = (ctx) => {
   const f = frame({ id: 'roster', bg, title: { cn: '角色', en: 'ROSTER' }, hints: [HINT_NAV, HINT_PICK, HINT_EDIT, HINT_BACK] });
 
   // ---- the grid: one card per racer, in RACERS order
-  const grid = h('div', { class: 'br-rs-grid', vars: { '--cols': COLS, '--rows': Math.ceil(RACERS.length / COLS) } });
+  const grid = h('div', { class: 'br-rs-grid', vars: { '--cols': COLS, '--rows': ROWS } });
   const cards = RACERS.map((id) => {
     const def = ROSTER[id];
     const el = h('div', { class: 'br-rs-card', data: { roster: id }, attrs: { role: 'button', 'aria-label': `${def.name} ${def.codename}` } },
@@ -156,24 +161,33 @@ export const rosterScreen: ScreenFactory = (ctx) => {
   }
   // ---- the two focus groups: the grid and the slot row
   let gridIndex = Math.max(0, RACERS.indexOf(save.data.character));
+  /** The card the slot row was entered from: ↑ goes back to it. */
+  let slotsFrom = gridIndex;
   let mode: 'grid' | 'slots' = 'grid';
   let picker: SkillPicker | null = null;
   let booting = true;
 
-  function toGrid(): void {
+  /** The card in the grid's bottom row (the row the slot row hangs under). */
+  const inBottomRow = (i: number): boolean => i >= (ROWS - 1) * COLS;
+  /** The slot under a column of the grid (the last two columns share the ult). */
+  const slotUnder = (i: number): number => SLOT_FOR_COLUMN[i % COLS] ?? 0;
+
+  function toGrid(i: number): void {
     mode = 'grid';
+    gridIndex = i;
     slotEls.forEach((el) => el.classList.remove('is-focus'));
-    gridNav.focus(gridIndex, true);
+    gridNav.focus(i, true);
   }
-  function toSlots(i: number): void {
+  function toSlots(i: number, from: number = gridIndex): void {
     mode = 'slots';
+    slotsFrom = from;
     cards.forEach((el) => el.classList.remove('is-focus'));
     slotNav.focus(i, true);
   }
-  function pick(c: CharacterId): void {
+  function pick(c: CharacterId, i: number): void {
     save.update((d) => { d.character = c; });
     ctx.toast(`${ROSTER[c].name} 出战！`, 'meme');
-    toSlots(0);
+    toSlots(0, i);
   }
   function openPicker(i: number): void {
     const c = RACERS[gridIndex];
@@ -192,12 +206,12 @@ export const rosterScreen: ScreenFactory = (ctx) => {
 
   const gridNav = ctx.nav(new Nav(cards.map((el, i) => ({
     el,
-    confirm: () => pick(RACERS[i]),
+    confirm: () => pick(RACERS[i], i),
     onFocus: () => {
       gridIndex = i;
       showDetail(RACERS[i]);
       showSlots(RACERS[i]);
-      if (mode === 'slots') toGrid();   // touching the grid takes the focus back
+      if (mode === 'slots') toGrid(i);   // touching the grid takes the focus back
     },
   })), { layout: 'grid', columns: COLS, start: gridIndex, sfx: ctx.sfx }));
   const slotNav = ctx.nav(new Nav(slotEls.map((el, i) => ({
@@ -227,11 +241,11 @@ export const rosterScreen: ScreenFactory = (ctx) => {
       if (mode === 'grid') {
         // Pad START picks like A (the keyboard's Esc sends 'pause' too, so this is gamepad-only).
         if (a === 'pause' && ctx.app.input.lastDevice === 'gamepad') return gridNav.handle('confirm');
-        // ↓ on the last card steps down into the slot row (the grid's bottom-right corner).
-        if (a === 'down' && gridIndex === RACERS.length - 1) { toSlots(0); return true; }
+        // ↓ on the bottom row steps down into the slot row, into the slot under that column.
+        if (a === 'down' && inBottomRow(gridIndex)) { toSlots(slotUnder(gridIndex)); return true; }
         return gridNav.handle(a);
       }
-      if (a === 'up') { toGrid(); return true; }
+      if (a === 'up') { toGrid(slotsFrom); return true; }
       return slotNav.handle(a);
     },
     dispose: () => {

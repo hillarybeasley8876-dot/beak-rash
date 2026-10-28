@@ -570,8 +570,8 @@ below are the starting point. Everything stays kind and cartoonish (pillar 5): n
   sends `go` when all have loaded (the grid waits, 「等待其他玩家…」, max 30 s, then late loaders are dropped).
 - **Online race rules** (they keep every client's sim identical): no police, no secrets/eggs, no intro flyby (the
   countdown starts at tick 0), no pause (Esc opens a menu over the running race; 退出 leaves the room), no KO
-  cinematics or slow-mo/hit-stop (presentation must not change sim time), STYLE still scores locally but pays no SP,
-  no nemesis/alliances. Remote humans are never AI-driven; a human who disconnects becomes an AI rider at the tick
+  cinematics or slow-mo/hit-stop (presentation must not change sim time), no STYLE chains (they pay SP from local-only
+  events), no nemesis/alliances. Remote humans are never AI-driven; a human who disconnects becomes an AI rider at the tick
   the relay marks (`left`). The race ends when every human has finished (or 45 s after the first human did); each
   client shows its own results (humans marked, the local one as YOU).
 - **Sim rules for several humans.** `RiderState.human` marks a human rider (offline: the player). The sim never reads

@@ -59,10 +59,9 @@
 .br-rs-dtitle { font-family: var(--f-cn-block); font-weight: 400; font-size: 30px; color: var(--white); }
 .br-rs-dtag { font-size: 24px; line-height: 1.3; color: rgba(255, 255, 255, 0.78); }
 .br-rs-dstats { display: flex; flex-direction: column; gap: 4px; padding-top: 4px; border-top: 3px solid rgba(255, 255, 255, 0.2); }
-/* The stat labels are set in the heavy body face: the display face's glyphs are drawn narrower than
-   their advance, so a right-aligned label in a fixed box loses the last glyph's edge. */
+/* The roster's stat panel is set in the heavy body face; the label's room comes from the shared
+   .br-stat-label rule (the display face draws its glyphs wider than their advance). */
 .br-rs-dstats .br-stat { font-family: var(--f-cn-heavy); }
-.br-rs-dstats .br-stat-label { padding-right: 0.3em; }
 .br-rs-dsig { display: flex; align-items: center; gap: 16px; padding-top: 10px; border-top: 3px solid rgba(255, 255, 255, 0.2); }
 .br-rs-sglyph {
   flex: 0 0 84px; height: 84px; display: grid; place-items: center;

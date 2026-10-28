@@ -124,13 +124,10 @@ export function skillsPage(save: SaveStore): HTMLDivElement {
   });
   const sp = h('div', { class: 'br-ht-sp' }, h('span', { class: 'br-tag is-yellow', text: 'SP' }),
     h('span', { text: HOWTO_SP }));
-  const head = h('div', {
-    class: 'br-ht-shead',
-    style: 'position:absolute;right:0;top:640px;display:flex;align-items:baseline;gap:14px',
-  },
+  const head = h('div', { class: 'br-ht-shead' },
     h('span', { class: 'br-tag is-red', text: 'KIT' }),
-    h('b', { text: ROSTER[who].name, style: 'font-family:var(--f-cn-block);font-weight:400;font-size:34px' }),
-    h('span', { text: ROSTER[who].codename, style: 'font-family:var(--f-display);font-weight:400;font-size:24px;letter-spacing:.06em;color:var(--red)' }));
+    h('b', { class: 'br-ht-swho', text: ROSTER[who].name }),
+    h('span', { class: 'br-ht-scode', text: ROSTER[who].codename }));
   return h('div', { class: 'br-ht-page is-skills' }, head, h('div', { class: 'br-ht-cards' }, ...cards), sp);
 }
 
