@@ -207,17 +207,32 @@ await withPage(async (page, h) => {
   await noErrors(h, 'race');
 }, { size: '1280x720' });
 
-// ---- HOW TO: the 「新玩法」 tab explains the elements and the reactions
+// ---- HOW TO: a tab explains the elements and the reactions, every line of it on screen at 1280×720 and 1920×1080
 if (want('visual')) {
-  await withPage(async (page, h) => {
-    await h.goto('/?screen=howto&stub=world,sim,camera,actors,combat,race,fx,audio');
-    await page.waitForFunction(() => window.__br?.app?.ui?.screen === 'howto', null, { timeout: 20000 });
-    for (let i = 0; i < 3; i++) { await page.keyboard.press('ArrowRight'); await new Promise((r) => setTimeout(r, 200)); }
-    const text = await page.evaluate(() => document.querySelector('.br-ht-page.is-on')?.textContent ?? '');
-    const names = Object.values(REACT_CN).filter((cn) => text.includes(cn));
-    expect(names.length === 7, `HOW TO → 新玩法 has a card for the element reactions naming all seven (${names.join(' ')})`);
-    await noErrors(h, 'howto');
-  }, { size: '1280x720' });
+  for (const size of ['1280x720', '1920x1080']) {
+    await withPage(async (page, h) => {
+      await h.goto('/?screen=howto&stub=world,sim,camera,actors,combat,race,fx,audio');
+      await page.waitForFunction(() => window.__br?.app?.ui?.screen === 'howto', null, { timeout: 20000 });
+      // walk the tabs with → until the page that names the reactions is up (at most 6 tabs)
+      let found = null;
+      for (let i = 0; i < 6 && !found; i++) {
+        found = await page.evaluate((names) => {
+          const pg = document.querySelector('.br-ht-page.is-on');
+          const text = pg?.textContent ?? '';
+          if (names.filter((n) => text.includes(n)).length < 7) return null;
+          const tab = document.querySelector('.br-ht-tab.is-focus')?.textContent ?? '';
+          // every text leaf of the page that names a reaction must be fully on screen
+          const leaves = [...pg.querySelectorAll('*')].filter((e) => !e.children.length && names.some((n) => (e.textContent ?? '').includes(n)));
+          const off = leaves.filter((e) => { const b = e.getBoundingClientRect(); return b.width === 0 || b.bottom > innerHeight + 1 || b.right > innerWidth + 1 || b.top < -1 || b.left < -1; }).length;
+          return { tab, leaves: leaves.length, off };
+        }, Object.values(REACT_CN));
+        if (!found) { await page.keyboard.press('ArrowRight'); await new Promise((r) => setTimeout(r, 250)); }
+      }
+      expect(!!found && found.leaves >= 7 && found.off === 0,
+        `${size}: HOW TO has a tab that explains the seven reactions, every line on screen (${found ? `tab 「${found.tab}」, ${found.leaves} lines, ${found.off} off screen` : 'no tab names all seven'})`);
+      await noErrors(h, `howto ${size}`);
+    }, { size });
+  }
 }
 
 finish('r6-present');
