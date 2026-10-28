@@ -103,8 +103,10 @@ export const fairScenarios = {
       window.__br.ko(r.id, 0); return r.id; })()`);
     const t0 = await h.eval('window.__br.session().time');
     const gaps = [];
-    // The passive player's own KO would hand the field the gap back: keep its HP topped up while measuring.
-    const topUp = 'window.__br.session().player.hp = window.__br.session().player.maxHp';
+    // The passive player's own KO would hand the field the gap back: keep its HP topped up while measuring. A
+    // third rider's crowd control (r6: a pie roots it, a violin silences it) would too: clear the player's
+    // statuses as well, so the check measures the rubber band, not who else is in the field.
+    const topUp = '(() => { const p = window.__br.session().player; p.hp = p.maxHp; p.statuses.length = 0; })()';
     for (const dt of [15, 30, 45]) {
       while ((await h.eval('window.__br.session().time')) < t0 + dt) {
         await h.eval(topUp);

@@ -7,9 +7,12 @@ const DT = 1 / 30;
 const police = (h) => h.eval('({ ...window.__br.race.police(), t: +window.__br.session().time.toFixed(1) })');
 
 /** Ride the passive human controller for `secs`, sampling the police every 0.5 s; stop early on `until`. */
-async function ride(h, secs, until = () => false) {
+async function ride(h, secs, until = () => false, { keepHp = false } = {}) {
   const rows = [];
   for (let i = 0; i < secs * 2; i++) {
+    // keepHp: the rivals' skills must not wreck the player in a test of the chase itself (r6 pool skills and
+    // reactions hit a passive player too; the bust rules have their own scenarios below).
+    if (keepHp) await h.eval('(() => { const p = window.__br.session().player; p.hp = p.maxHp; })()');
     await h.eval(`window.__runHuman(15, ${DT}, 1000, 'passive')`);
     const p = await police(h);
     rows.push(p);
@@ -108,7 +111,7 @@ export const chaseScenarios = {
     await h.eval(`window.__runHuman(600, ${DT}, 1000, 'passive')`);
     await h.eval('window.__br.race.setHeat(0.95)');
     const t0 = await h.eval('window.__br.session().time');
-    const rows = await ride(h, 60, (p) => p.mode === 'leaving' || p.mode === 'off');
+    const rows = await ride(h, 60, (p) => p.mode === 'leaving' || p.mode === 'off', { keepHp: true });
     const alerts = (await events(h, 'police:alert')).map((e) => ({ level: e.p.level, reason: e.p.reason ?? null, t: +(e.time - t0).toFixed(1) }));
     const lost = alerts.find((e) => e.reason === 'lost');
     const end = alerts.find((e) => e.level === 0);

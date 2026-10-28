@@ -7,6 +7,7 @@ const BUMPS = `window.__bumps = []; window.__br.app.bus.on('rider:bump', (p) => 
   window.__bumps.push({ t: +window.__br.session().time.toFixed(2), other: p.a === 0 ? p.b : p.a, k: +p.strength.toFixed(1) }); })`;
 const CHARS = 'Object.fromEntries(window.__br.session().riders.map((r) => [r.id, r.character]))';
 const HOT = new Set(['goose', 'seagull', 'cat', 'shiba', 'moodeng']);   // grudge ≥ 0.8 (ai/personality.ts TEMPER)
+const GRUDGE_FIELD = 'goose,seagull,cat,capybara,shiba,moodeng,sloth';
 const fmt = (bumps, chars) => bumps.map((b) => `${chars[b.other]}:${b.k}`).join(' ') || '-';
 
 export const contactScenarios = {
@@ -18,7 +19,9 @@ export const contactScenarios = {
   async grudge(page, h, { check, stub, a }) {
     let hotN = 0, hotA = 0, hotL = 0, early = 0, ranged = 0;
     for (const seed of String(a.seeds ?? '1,2,3,4,5,6').split(',').map(Number)) {
-      await openRace(h, `race=coast&seed=${seed}&level=1&manual=1&intro=0${stub}`);
+      // A pinned field (r6: the random field is drawn from 15 racers, so a seed may bring one hot temper or none):
+      // the five hot tempers and two calm ones, so every seed tests the grudge itself.
+      await openRace(h, `race=coast&seed=${seed}&level=1&manual=1&intro=0&rivals=${GRUDGE_FIELD}${stub}`);
       for (let i = 0; i < 10 && !(await h.eval('!!window.__rl.end')); i++) await h.eval(`window.__runHuman(300, ${DT}, 1000, 'brawler')`);
       const hits = (await events(h, 'combat:hit')).filter((e) => !e.p.blocked);
       const given = hits.filter((e) => e.p.attacker === 0 && e.time >= 6);
