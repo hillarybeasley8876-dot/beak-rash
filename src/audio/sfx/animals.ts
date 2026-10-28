@@ -1,5 +1,6 @@
 // Animal calls (formant synthesis, all original): pelican bill clatter, goose honk, capybara
-// squeak, cat meow, shiba "wan", pigeon coo, penguin bray, gull cry, sloth yawn, corgi yip.
+// squeak, cat meow, shiba "wan", pigeon coo, penguin bray, gull cry, sloth yawn, corgi yip, and
+// the r6 meme roster's six (banana cat, crying cat, stray cat, pygmy hippo, raccoon, hamster).
 // Used for taunts / KOs / skill barks when no TTS line exists, and inside skill sounds.
 import { pulseWave } from '../dsp/curves';
 import { call, hiss, span, tone, type S, type SfxFn } from './kit';
@@ -64,4 +65,39 @@ export const ANIMAL_SFX: Record<string, SfxFn> = {
     f: [210, 250, 170], times: [0, 0.35, 1.0], vowels: [A_, [720, 1150, 2450], O_], peak: 0.15, q: 5, breath: 0.3,
   }),
   'animal.corgi': (s) => span(bark(s, 0, 700), bark(s, 0.16, 760)),
+  // The r6 meme roster (SPEC §23): each call is its own animal, none of them a reused voice.
+  // 香蕉猫 — a whiny rising "huh?" meow that breaks into a sob halfway up.
+  'animal.bananacat': (s) => span(
+    call(s, { f: [380, 520, 650, 790, 700], times: [0, 0.1, 0.22, 0.38, 0.5], vowels: [U_, O_, A_, E_, A_], peak: 0.16, q: 7, breath: 0.22 }),
+    call(s, { at: 0.54, f: [640, 430], times: [0, 0.13], vowels: [A_, O_], peak: 0.12, q: 6, breath: 0.3 }),
+  ),
+  // 泪眼猫猫 — a wet sob-meow that wobbles on every breath and ends in a sniff.
+  'animal.cryingcat': (s) => span(
+    call(s, {
+      f: [540, 640, 510, 620, 490, 590, 450], times: [0, 0.07, 0.13, 0.2, 0.26, 0.33, 0.44],
+      vowels: [A_, E_, A_, E_, A_, E_, O_], peak: 0.15, q: 7, breath: 0.3,
+    }),
+    hiss(s, { at: 0.48, a: 0.01, d: 0.14, peak: 0.22, filt: { type: 'bandpass', f: 1400, to: 2700, q: 3 } }),
+  ),
+  // 新鲜哥 — a hungry chirp then a street-cat meow: lower and quicker than `animal.cat`.
+  'animal.xinxian': (s) => span(
+    call(s, { f: [720, 1000, 840], times: [0, 0.03, 0.07], vowels: [I_, E_, I_], peak: 0.4, q: 8 }),
+    call(s, { at: 0.09, f: [470, 610, 590, 420], times: [0, 0.05, 0.15, 0.27], vowels: [I_, A_, A_, O_], peak: 0.14, q: 7 }),
+  ),
+  // 弹跳猪 — a pygmy hippo, not a pig: a squeaky nasal snort dropping into a short wet grunt.
+  'animal.moodeng': (s) => span(
+    hiss(s, { d: 0.11, peak: 0.34, filt: { type: 'bandpass', f: 900, to: 2500, q: 3 } }),
+    tone(s, { type: 'triangle', f: 1150, to: 1850, glide: 0.09, d: 0.1, peak: 0.2 }),
+    call(s, { at: 0.15, f: [180, 220, 150], times: [0, 0.06, 0.21], vowels: [U_, O_, U_], peak: 0.2, q: 4, breath: 0.35 }),
+  ),
+  // 佩德罗 — a raccoon: three fast chittering trills (a trill is the pitch flipping per 25 ms).
+  'animal.pedro': (s) => span(...[0, 0.16, 0.32].map((at) => call(s, {
+    at, wave: pulseWave(s.ctx, 0.15), f: [950, 1350, 1000, 1400, 1050], times: [0, 0.025, 0.05, 0.075, 0.1],
+    vowels: [I_, E_, I_, E_, I_], peak: 0.5, q: 9,
+  }))),
+  // 悲伤仓鼠 — three tiny squeaks, each one sagging: the sadness is the falling pitch.
+  'animal.hamster': (s) => span(...[0, 0.16, 0.32].map((at, i) => call(s, {
+    at, type: 'triangle', f: [2150 - i * 260, 2550 - i * 300, 1900 - i * 260], times: [0, 0.03, 0.1],
+    vowels: [[700, 2300, 3300], [800, 2500, 3400], [650, 2100, 3100]], peak: 0.4, q: 8,
+  }))),
 };
