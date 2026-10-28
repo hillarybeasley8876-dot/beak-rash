@@ -18,9 +18,9 @@ const EASE_FROM = 40, EASE_FULL = 120;
 /** Level-1 reference top speed (m/s): the starter roadbike, independent of what the player rides. */
 export const REF_TOP = BIKES.roadbike.topSpeed;
 const CATCH_UP = 0.08;                // max catch-up above the pace, unseen riders only (SPEC ±8 %)
-const UNSEEN_BEHIND = 20;             // m behind the player: behind the chase camera
+const UNSEEN_BEHIND = 20;             // m behind the human: behind the chase camera
 const CATCH_FULL = 90;                // m behind where the catch-up is complete
-const SPRINT_BEHIND = 8;              // a hunter this far behind the player may sprint (unseen)
+const SPRINT_BEHIND = 8;              // a hunter this far behind the human may sprint (unseen)
 const MAX_RUBBER = 0.35;              // max top-speed factor above the rider's own bike (kidbike → pace + 8 %)
 const MIN_RUBBER = 0.7;               // floor of the factor that holds a fast bike to its cap (fixie 22.5 → 15.8 m/s)
 const RUBBER_RATE = 0.1;              // 1/s: how fast rider.rubber moves (0.08 settles in under a second)
@@ -28,22 +28,23 @@ const RUBBER_RATE = 0.1;              // 1/s: how fast rider.rubber moves (0.08 
  * when that is higher (a boosted player), for a few seconds, also in view: an angry rival visibly chasing you. */
 const PAYBACK_PACE = 1.06, PAYBACK_CLOSE = 1.5;
 const PAYBACK_RATE = 0.4;             // 1/s: rubber rate while closing in for a payback
-export const paybackPace = (pace: number, player: RiderState): number => Math.max(pace * PAYBACK_PACE, player.speed + PAYBACK_CLOSE);
+export const paybackPace = (pace: number, human: RiderState): number => Math.max(pace * PAYBACK_PACE, human.speed + PAYBACK_CLOSE);
 /** 复仇之心 (SPEC §18): the nemesis rides 3 % faster while it is behind the player, within 80 m. */
 const NEMESIS_BOOST = 1.03, NEMESIS_RANGE = 80;
 
 export interface PaceInput {
   rider: RiderState;
-  player: RiderState;
+  /** The human this rider is up against (offline: the player; online: its nearest human, SPEC §28). */
+  human: RiderState;
   level: number;
   /** Per-rider pace offset (fraction, ± a few %). */
   offset: number;
   huntingPlayer: boolean;
-  /** The chase camera is live (no look-back / cinematic), so riders behind the player are unseen. */
+  /** The chase camera is live (no look-back / cinematic), so riders behind the human are unseen. */
   chaseCam: boolean;
   /** Recently respawned (after a KO or crash): no catch-up, so the knock-down costs a real gap. */
   recovering: boolean;
-  /** A grudge closing the last metres to the player (Fighter.paybackChase): paybackPace(), also in view. */
+  /** A grudge closing the last metres to the human (Fighter.paybackChase): paybackPace(), also in view. */
   payback: boolean;
   /** 宿敌: this rider is the nemesis of the race (SPEC §18). */
   nemesis: boolean;
@@ -54,7 +55,7 @@ export const basePace = (level: number, offset: number): number => REF_TOP * (1 
 
 /** Target top-speed cap (m/s, before mods/boosts) for an AI rider; Infinity = pedal freely. */
 export function paceCap(i: PaceInput): number {
-  const { rider: r, player: p } = i;
+  const { rider: r, human: p } = i;
   const pace = basePace(i.level, i.offset);
   const d = r.s - p.s;
   if (d > 0) {
@@ -86,5 +87,5 @@ export function easeRubber(r: RiderState, cap: number, inView: number, unseen: b
 }
 
 /** Is a rider behind the player far enough to be out of the chase camera? */
-export const unseenBehind = (r: RiderState, p: RiderState, chaseCam: boolean, hunting: boolean): boolean =>
-  chaseCam && p.s - r.s > (hunting ? SPRINT_BEHIND : UNSEEN_BEHIND);
+export const unseenBehind = (r: RiderState, human: RiderState, chaseCam: boolean, hunting: boolean): boolean =>
+  chaseCam && human.s - r.s > (hunting ? SPRINT_BEHIND : UNSEEN_BEHIND);

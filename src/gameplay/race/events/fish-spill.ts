@@ -6,6 +6,7 @@ import { clamp } from '../../../core/math';
 import type { Obstacle } from '../../../core/types';
 import { box, cone, cylinder, rbox, sphere } from '../traffic/kit';
 import { trackPose } from '../pose';
+import { leadingHuman, trailingS } from '../humans';
 import { disposeProp, PropPool, propMesh } from './props';
 import { freeSpot } from './spot';
 import { Lifetime } from './lifetime';
@@ -48,15 +49,15 @@ export function createFishSpill(setup: EventSetup): EventProps {
   const { session, s, rng, idBase } = setup;
   const { track } = session;
   const bus = session.app.bus;
-  const player = session.player;
+  // The truck stops in the lane next to the LEADING human (it was in the way and tipped over): that human's
+  // own lane stays open, the wreck blocks the lane beside it (offline: the player, the only human).
+  const lead = leadingHuman(session);
   const group = new Group();
   group.name = 'race:event:fishSpill';
   session.world.add(group);
 
-  // The truck stops in the lane next to the player (it was in the way and tipped over): the player's own
-  // lane stays open, the wreck blocks the lane beside it.
   const bounds = track.bounds(s);
-  const playerX = clamp(player.x, -bounds.halfWidth + 1.4, bounds.halfWidth - 1.4);
+  const playerX = clamp(lead ? lead.x : 0, -bounds.halfWidth + 1.4, bounds.halfWidth - 1.4);
   const side = playerX <= 0 ? -1 : 1;
   const laneX = clamp(playerX + side * F.laneGap, -bounds.halfWidth + 1.2, bounds.halfWidth - 1.2);
 
@@ -121,13 +122,15 @@ export function createFishSpill(setup: EventSetup): EventProps {
   return {
     update(dt) {
       wait += dt;
-      if (tip < 0 && (player.s > truckS - F.tipDist || wait > 8)) tip = 0;
+      const l = leadingHuman(session);
+      if (tip < 0 && ((l !== null && l.s > truckS - F.tipDist) || wait > 8)) tip = 0;
       if (tip >= 0 && tip < F.tipTime) {
         tip += dt;
         const t = Math.min(1, tip / F.tipTime);
         pivot.rotation.z = fall * (Math.PI / 2) * (t * t * (3 - 2 * t));
       }
-      if (life.update(player.s, dt)) gone = true;
+      // The wreck is cleared when the LAST human has driven past it.
+      if (life.update(trailingS(session), dt)) gone = true;
     },
     get done() {
       return gone;

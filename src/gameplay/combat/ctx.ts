@@ -134,6 +134,30 @@ export function targetable(ctx: CombatCtx, r: RiderState): boolean {
   return active(r) && !r.mods.intangible && !r.mods.invisible && r.invuln <= 0 && !ctx.has(r, 'gulped');
 }
 
+/**
+ * The humans of the race (SPEC §28): offline the player, online every member still racing. The sim's
+ * "the player" is a human — never the local rider, which is presentation only.
+ */
+export const humansOf = (ctx: CombatCtx): readonly RiderState[] => ctx.session.humans;
+
+/** Is a human within `range` m of `r` (laterally included)? */
+export function humanNear(ctx: CombatCtx, r: RiderState, range: number): boolean {
+  for (const h of ctx.session.humans) {
+    if (Math.abs(h.s - r.s) < range && Math.abs(h.x - r.x) < range) return true;
+  }
+  return false;
+}
+
+/** The distance from `r` to the nearest human (the local rider is one of them). */
+export function humanDistance(ctx: CombatCtx, r: RiderState): number {
+  let best = Infinity;
+  for (const h of ctx.session.humans) {
+    const d = Math.hypot(h.s - r.s, h.x - r.x);
+    if (d < best) best = d;
+  }
+  return best;
+}
+
 /** Track-space filter for rider queries: ds = other.s − self.s, dx likewise. */
 export type Keep = (o: RiderState, ds: number, dx: number) => boolean;
 

@@ -27,7 +27,7 @@ export function createRaceLogic(session: Session): RaceLogic {
   const traffic = session.config.traffic ? createTraffic(session) : null;
   const police = session.config.police ? createPolice(ctx) : null;
   const rivals = createRivals(ctx, ai);
-  const events = createEventDirector(ctx, traffic);
+  const events = createEventDirector(ctx, traffic, ai);
   let finalResults: RaceResult[] | null = null;
   let intro: IntroCamera | null = null;
   let started = false;
@@ -82,6 +82,8 @@ export function createRaceLogic(session: Session): RaceLogic {
       events.postStep(dt);
     },
     results: () => finalResults ?? buildResults(standings.order),
+    // r6 (SPEC §28): a human left the room — an AI rides its rider from this tick on.
+    takeover: (id) => ai.takeover(id),
     dispose() {
       disposed = true;
       flow.dispose();

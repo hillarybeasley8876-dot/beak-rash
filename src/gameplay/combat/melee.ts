@@ -4,18 +4,18 @@ import { ROSTER } from '../../data/roster';
 import { WEAPONS } from '../../data/weapons';
 import type { Controls, RiderAction, RiderState, Side, WeaponId } from '../../core/types';
 import { consumeUse, knockLoose } from './armory';
-import { active, nearest, posing, targetable, type CombatCtx, type SwingTiming } from './ctx';
+import { active, humanNear, nearest, posing, targetable, type CombatCtx, type SwingTiming } from './ctx';
 import { applyHit } from './damage';
 import { armParry, commitTriple, critChance, parry, parryArmed, traitOf, tripleCount } from './traits';
 import { HEAVY_PHASES, HEAVY_TELL, INPUT_BUFFER, LIGHT_PHASES, MELEE, PRESS_HOLD, SWING_REF, TRAIT, powerMul } from './tuning';
 import { HeavyTell } from './visuals/tell';
 
-/** Swing timing for this weapon; a rival's heavy near the player is telegraphed (longer windup + glint). */
+/** Swing timing for this weapon; a rival's heavy near a human is telegraphed (longer windup + glint). */
 function timing(ctx: CombatCtx, r: RiderState, heavy: boolean): { ph: SwingTiming; tell: boolean } {
   const k = WEAPONS[r.weapon].swing / SWING_REF;
   const p = heavy ? HEAVY_PHASES : LIGHT_PHASES;
-  const me = ctx.session.player;
-  const tell = heavy && !r.isPlayer && Math.abs(r.s - me.s) < HEAVY_TELL.range && Math.abs(r.x - me.x) < HEAVY_TELL.range;
+  // The tell is shown when a human is close enough to read it (offline: the player; online: any member).
+  const tell = heavy && !r.human && humanNear(ctx, r, HEAVY_TELL.range);
   const windup = p.windup * k * (tell ? HEAVY_TELL.windupMul : 1), act = p.active * k, recover = p.recover * k;
   return { ph: { windup, active: act, recover, total: windup + act + recover }, tell };
 }

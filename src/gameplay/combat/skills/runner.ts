@@ -42,6 +42,9 @@ export class SkillRunner {
 
   /** A KO cinematic is on screen (SHOWTIME presses wait for it instead of cutting the money shot). */
   private get koCine(): boolean {
+    // Online (SPEC §28) the cinematics are presentation: a cast must never wait for a real-time clock, or
+    // the clients would cast at different ticks.
+    if (this.ctx.session.config.online) return false;
     return this.koCineAt !== null && this.realTime - this.koCineAt < ULT_KO_LATCH;
   }
 
@@ -170,7 +173,7 @@ export class SkillRunner {
     if (r.sp < (SKILLS[id]?.spCost ?? 0)) return 'sp';
     if (this.busy(r)) return this.lockLeft(r) <= SKILL_QUEUE ? 'busy' : 'state';
     if (slot === ULT_SLOT && r.airborne) return 'busy'; // a hop / crest press fires on landing (SKILL_QUEUE hold)
-    if (slot === ULT_SLOT && r.isPlayer && this.koCine) return 'held';
+    if (slot === ULT_SLOT && r.human && this.koCine) return 'held';
     const impl = SKILL_IMPLS[id];
     if (impl?.ready && !impl.ready(this.ctx, r)) return 'target';
     const a = r.action;

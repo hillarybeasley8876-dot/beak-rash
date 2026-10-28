@@ -1,16 +1,18 @@
-// Taunts: roster lines from rivals near the player, paced so the chatter never stacks up. One idle line
+// Taunts: roster lines from rivals near a human, paced so the chatter never stacks up. One idle line
 // at a time across the field (4.5–6.5 s apart, from the nearest rider in front of the camera), each rider
 // at most every ~8–14 s (longer when the pack is crowded), KO / respawn / signature-skill shouts ≥ 2 s after
 // any other line, and every rider draws its lines from a shuffled no-repeat bag.
+// The lines are chosen from the HUMANS of the race (SPEC §28), never from the local player: every client of an
+// online race hears the same chatter.
 import { ROSTER } from '../../../data/roster';
 import { NEMESIS_LINES } from '../../../data/rival-lines';
 import type { Session } from '../../../core/contracts';
 import type { Rng } from '../../../core/rng';
 import type { RiderId, RiderState } from '../../../core/types';
 
-const NEAR = 25;            // m from the player for idle taunts
-const EARSHOT = 60;         // m from the player for KO / respawn lines
-const BEHIND_CAM = -3;      // m: riders further behind the player are behind the chase camera
+const NEAR = 25;            // m from a human for idle taunts
+const EARSHOT = 60;         // m from a human for KO / respawn lines
+const BEHIND_CAM = -3;      // m: riders further behind the human are behind the chase camera
 const GAP = [8, 14];        // s between idle taunts per rider (÷ taunty)
 const CROWD = 0.15;         // per-rider gap grows by this per extra rider within NEAR
 const IDLE_GAP = [4.5, 6.5]; // s between idle taunts across the whole field
@@ -41,16 +43,16 @@ export class Taunts {
     }));
     this.offs.push(bus.on('combat:ko', ({ attacker }) => {
       const r = attacker !== null ? session.rider(attacker) : undefined;
-      if (r && !r.isPlayer && this.rng.next() < 0.75) this.forced(r, 'koLines');
+      if (r && !r.human && this.rng.next() < 0.75) this.forced(r, 'koLines');
     }));
     this.offs.push(bus.on('rider:respawn', ({ riderId }) => {
       const r = session.rider(riderId);
-      if (r && !r.isPlayer && this.rng.next() < 0.45) this.forced(r, 'hurtLines');
+      if (r && !r.human && this.rng.next() < 0.45) this.forced(r, 'hurtLines');
     }));
     this.offs.push(bus.on('skill:cast', ({ riderId, slot }) => {
       const r = session.rider(riderId);
       // Shouted on the next tick, so a skill that already says something (seagull's MINE!) is not doubled.
-      if (r && !r.isPlayer && slot === 1 && this.rng.next() < SKILL_SHOUT) this.shouts.push(r);
+      if (r && !r.human && slot === 1 && this.rng.next() < SKILL_SHOUT) this.shouts.push(r);
     }));
   }
 
@@ -89,14 +91,29 @@ export class Taunts {
     return text;
   }
 
+  /** The human this rider is closest to (offline: the player; online: its nearest human). */
+  private nearHuman(r: RiderState): RiderState | null {
+    let best: RiderState | null = null;
+    let bestD = Infinity;
+    for (const h of this.session.humans) {
+      const d = Math.abs(h.s - r.s);
+      if (d < bestD) { bestD = d; best = h; }
+    }
+    return best;
+  }
+
+  /** Close enough to a human to be heard (offline: to the player). */
   private audible(r: RiderState, within: number): boolean {
-    const ds = r.s - this.session.player.s;
-    return Math.abs(ds) < within && !r.mods.invisible;
+    if (r.mods.invisible) return false;
+    for (const h of this.session.humans) {
+      if (Math.abs(r.s - h.s) < within) return true;
+    }
+    return false;
   }
 
   private gap(r: RiderState): number {
-    const p = this.session.player;
-    const crowd = this.session.riders.filter((o) => !o.isPlayer && Math.abs(o.s - p.s) < NEAR).length;
+    const h = this.nearHuman(r);
+    const crowd = h ? this.session.riders.filter((o) => !o.human && Math.abs(o.s - h.s) < NEAR).length : 0;
     const base = this.rng.range(GAP[0], GAP[1]) / Math.max(0.3, this.taunty(r.id));
     return base * (1 + CROWD * Math.max(0, crowd - 1));
   }
@@ -106,20 +123,23 @@ export class Taunts {
     for (const r of this.shouts) this.forced(r, 'skillLines');
     this.shouts.length = 0;
     if (this.session.phase !== 'racing' || this.time < this.idleAt || this.crowded()) return;
-    const p = this.session.player;
     let best: RiderState | null = null;
+    let bestD = Infinity;
     for (const r of this.session.riders) {
-      if (r.isPlayer || r.mode !== 'racing') continue;
+      if (r.human || r.mode !== 'racing') continue;
       const due = this.next.get(r.id);
       if (due === undefined) {
         // The nemesis has something to say early: its grudge is the story of this race.
         this.next.set(r.id, this.time + this.rng.range(r.id === this.nemesisId ? 1 : 2, r.id === this.nemesisId ? 3 : 9));
         continue;
       }
-      const ds = r.s - p.s;
+      const h = this.nearHuman(r);
+      if (!h) continue;
+      const ds = r.s - h.s;
       if (this.time < due || ds < BEHIND_CAM || !this.audible(r, NEAR)) continue;
       if (r.id === this.nemesisId) { best = r; break; }   // 宿敌 first: it speaks for the race
-      if (!best || Math.abs(ds) < Math.abs(best.s - p.s)) best = r;
+      const d = Math.abs(ds);
+      if (!best || d < bestD) { best = r; bestD = d; }
     }
     if (!best) return;
     this.say(best, this.nemesisId === best.id ? 'nemesisLines' : 'taunts');

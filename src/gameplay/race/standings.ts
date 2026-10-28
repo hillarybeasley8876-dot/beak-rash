@@ -1,14 +1,15 @@
 // Standings: progress, finish line, places, race:placeChange / race:finishLine / race:finalStretch.
 // Finish times are interpolated inside the substep and riders crossing in the same substep are placed
-// in crossing order, so the place announced at the line is the final place. Passes on the player only
-// count once the lead has held for PLAYER_HOLD s beyond PLAYER_MARGIN (no ping-pong callouts).
+// in crossing order, so the place announced at the line is the final place. Passes on a human only
+// count once the lead has held for HUMAN_HOLD s beyond HUMAN_MARGIN (no ping-pong callouts).
+// Online (SPEC §28) every human has its own hysteresis: the places of the humans do not wobble either.
 import { clamp, clamp01 } from '../../core/math';
 import type { RiderId, RiderState } from '../../core/types';
 import type { RaceCtx } from './ctx';
 
 const PASS_MARGIN = 0.35;    // m a rider must lead by to take a place (rider vs rider)
-const PLAYER_MARGIN = 1.0;   // m for passes involving the player…
-const PLAYER_HOLD = 0.4;     // …held this long
+const HUMAN_MARGIN = 1.0;    // m for passes involving a human…
+const HUMAN_HOLD = 0.4;      // …held this long
 const FINAL_STRETCH = 0.85;
 
 export interface Standings {
@@ -24,31 +25,51 @@ export function createStandings(ctx: RaceCtx): Standings {
   const { session } = ctx;
   const { bus } = session.app;
   const length = session.track.length;
-  const player = session.player;
   const order = session.riders.slice().sort((a, b) => a.place - b.place);
-  /** +1 = counted ahead of the player, −1 = behind; flips after PLAYER_HOLD s past the margin. */
-  const vsPlayer = new Map<RiderId, 1 | -1>(session.riders.map((r) => [r.id, r.place < player.place ? 1 : -1]));
-  const flipT = new Map<RiderId, number>();
+  /** human id → rider id → +1 (counted ahead of the human) / −1 (behind); flips after HUMAN_HOLD s. */
+  const vsHuman = new Map<RiderId, Map<RiderId, 1 | -1>>();
+  const flipT = new Map<string, number>();
   let finished = 0;
-  let finalStretchSent = false;
+  const stretched = new Set<RiderId>();
+
+  /** The side of `r` as the human `h` sees it (+1 = ahead). */
+  const sideOf = (h: RiderState, r: RiderState): 1 | -1 => {
+    let m = vsHuman.get(h.id);
+    if (!m) { m = new Map(); vsHuman.set(h.id, m); }
+    const v = m.get(r.id);
+    if (v !== undefined) return v;
+    const first: 1 | -1 = r.place < h.place ? 1 : -1;
+    m.set(r.id, first);
+    return first;
+  };
 
   const ahead = (a: RiderState, b: RiderState): boolean => {
     if (a.finishTime !== null) return b.finishTime === null || a.finishTime < b.finishTime;
     if (b.finishTime !== null) return false;
-    if (b.isPlayer) return vsPlayer.get(a.id) === 1;
-    if (a.isPlayer) return vsPlayer.get(b.id) === -1;
+    if (b.human) return sideOf(b, a) === 1;
+    if (a.human) return sideOf(a, b) === -1;
     return a.s > b.s + PASS_MARGIN;
   };
 
-  const trackPlayerPasses = (dt: number): void => {
-    for (const r of session.riders) {
-      if (r.isPlayer) continue;
-      const d = r.s - player.s;
-      const now = d > PLAYER_MARGIN ? 1 : d < -PLAYER_MARGIN ? -1 : 0;
-      if (now === 0 || now === vsPlayer.get(r.id)) { flipT.set(r.id, 0); continue; }
-      const t = (flipT.get(r.id) ?? 0) + dt;
-      flipT.set(r.id, t);
-      if (t >= PLAYER_HOLD) { vsPlayer.set(r.id, now); flipT.set(r.id, 0); }
+  /** Write the side of `r` as the human `h` sees it. */
+  const setSide = (h: RiderState, r: RiderState, v: 1 | -1): void => {
+    let m = vsHuman.get(h.id);
+    if (!m) { m = new Map(); vsHuman.set(h.id, m); }
+    m.set(r.id, v);
+  };
+
+  const trackHumanPasses = (dt: number): void => {
+    for (const h of session.humans) {
+      for (const r of session.riders) {
+        if (r === h) continue;
+        const key = `${h.id}:${r.id}`;
+        const d = r.s - h.s;
+        const now = d > HUMAN_MARGIN ? 1 : d < -HUMAN_MARGIN ? -1 : 0;
+        if (now === 0 || now === sideOf(h, r)) { flipT.set(key, 0); continue; }
+        const t = (flipT.get(key) ?? 0) + dt;
+        flipT.set(key, t);
+        if (t >= HUMAN_HOLD) { setSide(h, r, now); flipT.set(key, 0); }
+      }
     }
   };
 
@@ -68,6 +89,7 @@ export function createStandings(ctx: RaceCtx): Standings {
     for (const { r, t } of crossed) {
       r.finishTime = t;
       if (ctx.winnerTime === null) ctx.winnerTime = t;
+      if (r.human && ctx.firstHumanFinish === null) ctx.firstHumanFinish = t;
       finished++;
       if (r.mode === 'racing') { r.mode = 'finished'; r.modeTime = 0; }
       bus.emit('race:finishLine', { riderId: r.id, place: finished, time: t });
@@ -98,7 +120,7 @@ export function createStandings(ctx: RaceCtx): Standings {
       for (const r of session.riders) r.progress = clamp01(r.s / length);
       if (!racing) return;
       detectFinish(dt);
-      trackPlayerPasses(dt);
+      trackHumanPasses(dt);
       sort();
       order.forEach((r, i) => {
         const place = i + 1;
@@ -107,9 +129,11 @@ export function createStandings(ctx: RaceCtx): Standings {
         r.place = place;
         bus.emit('race:placeChange', { riderId: r.id, from, to: place });
       });
-      if (!finalStretchSent && player.progress >= FINAL_STRETCH) {
-        finalStretchSent = true;
-        bus.emit('race:finalStretch', { riderId: player.id });
+      // The final stretch is announced for every human (the HUD shows the one of its own rider).
+      for (const h of session.humans) {
+        if (stretched.has(h.id) || h.progress < FINAL_STRETCH) continue;
+        stretched.add(h.id);
+        bus.emit('race:finalStretch', { riderId: h.id });
       }
     },
   };

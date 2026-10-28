@@ -4,7 +4,7 @@ import type { Rng } from '../../../core/rng';
 import type { Controls, RiderId, RiderState, Weather } from '../../../core/types';
 import { Blunder, type BlunderGate } from './blunder';
 import { Driver, topOf } from './control';
-import { Fighter, type HuntToken } from './fight';
+import { Fighter, type HuntTokens } from './fight';
 import type { RacingLine } from './line';
 import type { Personality } from './personality';
 import { planLateral, type PlanOutput } from './plan';
@@ -13,6 +13,7 @@ import { useSkill } from './skills';
 import { cornerSpeed, GripModel, targetSpeed, updateDrift, type DriftPlan } from './speed';
 import { Showoff } from './tricks';
 import { Thrower } from './throw';
+import type { WorkZone } from '../ctx';
 
 export interface AiWorld {
   phase: 'intro' | 'countdown' | 'racing' | 'finished';
@@ -20,7 +21,12 @@ export interface AiWorld {
   /** Race seconds since GO. */
   time: number;
   riders: readonly RiderState[];
-  player: RiderState;
+  /** The humans of the race (SPEC §28): offline the player, online every member still racing. */
+  humans: readonly RiderState[];
+  /** The human this rider is up against: its NEAREST human (offline: the player). */
+  humanFor(r: RiderState): RiderState;
+  /** The work zone at a point of the road (null: none) — its open lane is the only way through. */
+  zoneAt(s: number): WorkZone | null;
   line: RacingLine;
   senses: Senses;
   bounds(s: number): { left: number; right: number; halfWidth: number };
@@ -79,9 +85,9 @@ export class Brain {
   /** 围剿: this rider is one of the rivals that gang up on the player (SPEC §18). */
   ally = false;
 
-  constructor(readonly r: RiderState, readonly c: Controls, readonly p: Personality, private rng: Rng, token: HuntToken, nemesis = false) {
+  constructor(readonly r: RiderState, readonly c: Controls, readonly p: Personality, private rng: Rng, tokens: HuntTokens, nemesis = false) {
     this.nemesis = nemesis;
-    this.fighter = new Fighter(r, p, rng, token, nemesis);
+    this.fighter = new Fighter(r, p, rng, tokens, nemesis);
     this.grip = new GripModel(p.risk * this.driver.authorityAtTop(r));
     this.blunder = new Blunder(r, p.skill, rng.fork(0xb1));
     this.thrower = new Thrower(r, rng.fork(0x7b), () => this.p.aggression);
@@ -98,6 +104,22 @@ export class Brain {
   setAlliance(members: readonly RiderId[], target: RiderId, feuds: ReadonlyMap<RiderId, RiderId>): void {
     this.ally = members.includes(this.r.id);
     this.fighter.setAlliance(members, target, feuds);
+  }
+
+  /**
+   * r6 (SPEC §28): the human that rode this rider left — an AI rides it from this tick on. The brain starts
+   * with a clean slate: no plan, no hunt, no grudge.
+   */
+  takeOver(): void {
+    this.fighter.release();
+    this.driver.reset();
+    this.drift.active = false;
+    this.plan = { x: this.r.x, followSpeed: null, followGap: Infinity, followKind: null, hopAt: null };
+    this.tx = this.r.x;
+    this.hopCd = 0;
+    this.stuckT = 0;
+    this.draft = null;
+    this.ringBell = false;
   }
 
   update(dt: number, w: AiWorld): void {
@@ -154,7 +176,14 @@ export class Brain {
     const lineX = w.line.x(r.s + Math.max(8, r.speed * 0.7));
     const bend = smoothstep(0.002, 0.009, Math.abs(w.line.peakCurv(r.s, r.s + 40)));
     const own = clamp(p.lineBias + p.wander * Math.sin(this.time * 0.23 + this.wanderPhase), -hw + 1.6, hw - 1.6);
-    const x = lerp(own, lineX, clamp(p.lineFollow * (0.35 + 0.65 * bend), 0, 1));
+    let x = lerp(own, lineX, clamp(p.lineFollow * (0.35 + 0.65 * bend), 0, 1));
+    // Inside a work zone the open lane is the only way through: the wall closes every other lane, and a
+    // hole in it is a dead end. Keep the racing line, but never leave the open lane.
+    const zone = w.zoneAt(r.s);
+    if (zone) {
+      const c = zone.centre(r.s + Math.max(8, r.speed * 0.5));
+      x = clamp(x, c - zone.half + 0.6, c + zone.half - 0.6);
+    }
     const goal = this.fighter.huntGoal();
     if (goal && Math.abs(goal.ds) < 25) return goal.x;
     // A throw in the making: line up on the target, beside it and not on top of it.
@@ -189,7 +218,7 @@ export class Brain {
     const b0 = w.bounds(r.s), b1 = w.bounds(look);
     const hw = Math.min(b0.halfWidth, b1.halfWidth);
     const lo = -Math.min(b0.left, b1.left) + 0.9, hi = Math.min(b0.right, b1.right) - 0.9;
-    this.fighter.chooseTarget(w.riders, w.player, w.time);
+    this.fighter.chooseTarget(w.riders, w.humans, w.time);
     const hunting = this.fighter.hunt;
     this.wantX = clamp(this.desiredX(w, hw), lo, hi);
     const blind = this.blunder.update(PLAN_EVERY, w.senses.blips, w.blunder);
@@ -205,8 +234,9 @@ export class Brain {
     if (this.skillT <= 0 && w.time >= this.firstSkillAt) {
       this.skillT = SKILL_EVERY;
       const straight = this.straightAhead(w);
-      const view = { me: r, blips: w.senses.blips, blocked: this.plan.followGap < 8, straight, player: w.player, time: w.time,
-        grudge: this.fighter.grudging, field: w.riders.length, prefer: this.nemesis || this.ally ? w.player : null, weather: w.weather };
+      const human = w.humanFor(r);
+      const view = { me: r, blips: w.senses.blips, blocked: this.plan.followGap < 8, straight, human, time: w.time,
+        grudge: this.fighter.grudging, field: w.riders.length, prefer: this.nemesis || this.ally ? human : null, weather: w.weather };
       useSkill(view, this.c, p.skillUse, this.rng.next());
     }
     if (this.ringBell) {
@@ -304,17 +334,17 @@ export class Brain {
   }
 
   /**
-   * A hunter rides alongside the player: match its speed, closing in from behind (brake on a slow player); ahead
-   * of it only ease off, unless it owes a payback (then brake to let the player come up). A rival is fought in
-   * passing: closing in from behind, then a slow overtake (RIVAL_PASS) while swinging, never waiting for it nor
-   * dropping below FIGHT_PACE of its own race speed (a slow rival gets one swing as the hunter goes by).
+   * A hunter rides alongside the human it is up against: match its speed, closing in from behind (brake on a
+   * slow human); ahead of it only ease off, unless it owes a payback (then brake to let it come up). A rival is
+   * fought in passing: closing in from behind, then a slow overtake (RIVAL_PASS) while swinging, never waiting
+   * for it nor dropping below FIGHT_PACE of its own race speed (a slow rival gets one swing as the hunter goes by).
    */
   private huntLimit(g: SpeedGoal): void {
     const goal = this.fighter.huntGoal();
     const prey = this.fighter.hunt;
     if (!goal || !prey || Math.abs(goal.ds) >= 25) return;
     const close = clamp(goal.ds * 0.8, -2.5, 5);
-    const t = prey.isPlayer ? prey.speed + close : Math.max(prey.speed + Math.max(RIVAL_PASS, close), g.target * FIGHT_PACE);
+    const t = prey.human ? prey.speed + close : Math.max(prey.speed + Math.max(RIVAL_PASS, close), g.target * FIGHT_PACE);
     if (t < g.target) {
       g.target = t;
       g.soft = (goal.ds < 0 && !this.fighter.owes) || (goal.ds >= 0 && this.r.speed - prey.speed < SOFT_CLOSING);

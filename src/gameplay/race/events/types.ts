@@ -4,6 +4,7 @@ import type { Session } from '../../../core/contracts';
 import type { Rng } from '../../../core/rng';
 import type { EventKind } from '../../../data/event-lines';
 import type { Traffic } from '../traffic';
+import type { WorkZone } from '../ctx';
 
 export type { EventKind };
 
@@ -39,4 +40,6 @@ export interface EventSlot {
   s: number;
   phase: 'planned' | 'warned' | 'started' | 'ended';
   props: EventProps | null;
+  /** The open lane of a work zone (set when the zone is announced, so the AI rides it). */
+  lane?: WorkZone | null;
 }

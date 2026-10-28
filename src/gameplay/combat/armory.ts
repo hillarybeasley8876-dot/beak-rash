@@ -22,12 +22,12 @@ export function rollWeapon(ctx: CombatCtx): WeaponId {
   return ARMORY[ARMORY.length - 1] ?? 'saltfish';
 }
 
-/** Rivals start armed by career level; the player starts with bare wings. */
+/** Rivals start armed by career level; the humans start with bare wings (offline: the player). */
 export function armRivals(ctx: CombatCtx): void {
   const odds = WEAPON_RULES.armedByLevel;
   const p = odds[Math.max(0, Math.min(odds.length - 1, ctx.session.config.level))] ?? 0.5;
   for (const r of ctx.session.riders) {
-    if (r.isPlayer) equip(ctx, r, 'none');
+    if (r.human) equip(ctx, r, 'none');
     else equip(ctx, r, ctx.rng.chance(p) ? rollWeapon(ctx) : 'none');
   }
 }

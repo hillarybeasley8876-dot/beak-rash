@@ -5,6 +5,7 @@ import { Group, Matrix4, Quaternion, Vector3, type BufferGeometry } from 'three'
 import type { Obstacle, RiderState } from '../../../core/types';
 import { cone, cylinder, sphere } from '../traffic/kit';
 import { trackPose } from '../pose';
+import { trailingS } from '../humans';
 import { disposeProp, PropPool } from './props';
 import { freeSpot } from './spot';
 import { Lifetime } from './lifetime';
@@ -41,7 +42,6 @@ export function createGeese(setup: EventSetup): EventProps {
   const { session, s, rng, idBase } = setup;
   const { track } = session;
   const bus = session.app.bus;
-  const player = session.player;
   const group = new Group();
   group.name = 'race:event:geese';
   session.world.add(group);
@@ -96,7 +96,7 @@ export function createGeese(setup: EventSetup): EventProps {
         touch(g, i, session.riders);
       }
       pool.commit();
-      if (life.update(player.s, dt)) gone = true;
+      if (life.update(trailingS(session), dt)) gone = true;
     },
     get done() {
       return gone;

@@ -10,12 +10,13 @@ export interface SkillView {
   blips: readonly Blip[];
   blocked: boolean;        // the planner could not find a free lane
   straight: number;        // m of nearly straight road ahead
-  player: RiderState;
+  /** The human this rider is up against (offline: the player; online: its nearest human, SPEC §28). */
+  human: RiderState;
   /** Race seconds since GO. */
   time: number;
-  /** Hunting the player out of a grudge: a valid chance is taken three times as eagerly. */
+  /** Hunting a human out of a grudge: a valid chance is taken three times as eagerly. */
   grudge: boolean;
-  /** 宿敌: the rider this one wants to hit first (the nemesis goes for the player). */
+  /** 宿敌: the rider this one wants to hit first (the nemesis goes for the human). */
   prefer: RiderState | null;
   /** Riders in the race (bottom half / bottom 3). */
   field: number;
@@ -40,18 +41,18 @@ const threatened = (v: SkillView): boolean =>
 const recovering = (v: SkillView): boolean => v.me.modeTime < 12 && v.time - v.me.modeTime > 5;
 
 // Speed skills (slide, flash, doge, ghost) need a purpose, never fired on cooldown: an overtake (a rider 3–25 m
-// ahead in my lane), defence (threatened), or a comeback (behind the player or in the bottom half). Riders on the
-// podium places, anyone more than 20 m ahead of the player and a rider back from a crash for < 12 s keep them
+// ahead in my lane), defence (threatened), or a comeback (behind the human or in the bottom half). Riders on the
+// podium places, anyone more than 20 m ahead of the human and a rider back from a crash for < 12 s keep them
 // holstered (defence only when hurt), so a speed skill is a way back into the race, not what decides the podium,
 // and a KO still buys a real gap.
 const LEAD_FREE = 20;
 const PODIUM = 3;
-const holstered = (v: SkillView): boolean => v.me.place <= PODIUM || v.me.s - v.player.s > LEAD_FREE || recovering(v);
+const holstered = (v: SkillView): boolean => v.me.place <= PODIUM || v.me.s - v.human.s > LEAD_FREE || recovering(v);
 const hurt = (v: SkillView): boolean => v.me.hp < v.me.maxHp * 0.5;
 /** Shield / slide under attack: always when hurt, otherwise only off the podium places. */
 const defend = (v: SkillView): boolean => threatened(v) && (hurt(v) || !holstered(v));
 const overtaking = (v: SkillView): boolean => riders(v).some((b) => b.ds > 3 && b.ds < 25 && Math.abs(b.x - v.me.x) < 1.6);
-const comeback = (v: SkillView): boolean => v.player.s > v.me.s || v.me.place > v.field / 2;
+const comeback = (v: SkillView): boolean => v.human.s > v.me.s || v.me.place > v.field / 2;
 const purpose = (v: SkillView): boolean => !holstered(v) && (overtaking(v) || comeback(v));
 
 const DEG = Math.PI / 180;
@@ -100,11 +101,11 @@ const officerAhead = (v: SkillView): boolean =>
 const officerNear = (v: SkillView): boolean =>
   v.blips.some((b) => b.kind === 'police' && Math.abs(b.ds) < 8 && Math.abs(b.x - v.me.x) < 4);
 
-/** The player's own patch of road: a disorienting skill here makes the confused riders swerve into each other. */
-const playerPatch = (v: SkillView): boolean => Math.abs(v.me.s - v.player.s) < 10;
+/** The human's own patch of road: a disorienting skill here makes the confused riders swerve into each other. */
+const playerPatch = (v: SkillView): boolean => Math.abs(v.me.s - v.human.s) < 10;
 
-/** The rivals a shove may hit: the pack, never the player (a shove throws them out of the officer's lane). */
-const shoveable = (v: SkillView): Blip[] => targets(v).filter((b) => b.rider !== v.player);
+/** The rivals a shove may hit: the pack, never the human (a shove throws them out of the officer's lane). */
+const shoveable = (v: SkillView): Blip[] => targets(v).filter((b) => b.rider !== v.human);
 
 /**
  * The hold a speed skill waits for: a rider in my own lane, a little way ahead, that I close on fast. Boosting
@@ -163,7 +164,7 @@ export const RULES: Record<string, Rule> = {
   'shiba.doge': (v) => defend(v) || (hurt(v) && !holstered(v) && riders(v).some((b) => dist(b, v.me) < 5))
     || (purpose(v) && v.straight > 80 && riders(v).some((b) => b.ds > 5 && b.ds < 30)),
   'pigeon.ghost': (v) => !holstered(v) && (v.blocked || riders(v).filter((b) => dist(b, v.me) < 5).length >= 2
-    || (v.player.s - v.me.s > 5 && v.player.s - v.me.s < 30)),
+    || (v.human.s - v.me.s > 5 && v.human.s - v.me.s < 30)),
   'penguin.slide': (v) => defend(v) || (purpose(v) && v.straight > 90),
   'seagull.steal': (v) => riders(v).some((b) => dist(b, v.me) < 6 && b.rider !== null && ((b.rider.weapon !== 'none' && v.me.weapon === 'none') || b.rider.sp >= 20)),
   // A lazy comeback tool: only from the bottom 3 (trailing the player too made the sloth a podium regular).
@@ -180,9 +181,9 @@ export const RULES: Record<string, Rule> = {
   // (the brief's window — 3–9 m ahead, within 3 m sideways — is the core of it).
   'moodeng.bounce': (v) => targets(v).some((b) => Math.hypot(b.ds - BOUNCE.ahead, b.x - v.me.x) <= BOUNCE.radius),
   'pedro.trash': GAG,
-  // The sad violin takes the skills away from everyone in earshot — the player included. Like the brainfight,
-  // it stays out of the player's patch of road: the player keeps its own skills, and the pack's formation
-  // under the player does not shift (the brakecheck counts a bump in that formation as a ram).
+  // The sad violin takes the skills away from everyone in earshot — the human included. Like the brainfight,
+  // it stays out of the human's patch of road: the human keeps its own skills, and the pack's formation
+  // under the human does not shift (the brakecheck counts a bump in that formation as a ram).
   'hamster.violin': (v) => CONTROL(v) && !playerPatch(v),
   // ---- the r6 shared pool (SPEC §24): the ranges the skills' own job asked for. The skills that spray down the
   // road stay holstered while an officer is in the spray: the chase is the player's business.
@@ -200,7 +201,7 @@ export const RULES: Record<string, Rule> = {
   'pool.pie': (v) => !officerAhead(v) && inLane(targets(v), v.me, 4, 20, 4),      // the pie's own reach, or it is refused
   'pool.brainfight': (v) => nearAhead(targets(v), v.me, 5) >= 2 && !playerPatch(v),   // it argues with the pack in front
   'pool.blink': (v) => !holstered(v) && (v.blocked || near(targets(v), v.me, 5) >= 2
-    || (v.player.s - v.me.s > 5 && v.player.s - v.me.s < 30)),
+    || (v.human.s - v.me.s > 5 && v.human.s - v.me.s < 30)),
   'pool.thermos': (v) => hurt(v),
   'pool.ducks': (v) => !officerAhead(v) && inRange(targets(v), v.me, 6, 20, 30 * DEG),
   'pool.popup': (v) => !officerAhead(v) && inLane(targets(v), v.me, 4, 24, 5),   // the ad's own reach, or it is refused

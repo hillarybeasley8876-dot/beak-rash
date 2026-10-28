@@ -11,6 +11,8 @@ import { ROADWORKS_SIGN } from '../../../data/event-lines';
 import { box, cone, cylinder, rbox, sphere } from '../traffic/kit';
 import type { ZonePiece } from '../traffic/blocks';
 import { trackPose } from '../pose';
+import { trailingS } from '../humans';
+import type { WorkZone } from '../ctx';
 import { disposeProp, PropPool, propMesh, signProp } from './props';
 import { spotFree, clearOfTraffic } from './spot';
 import { Lifetime } from './lifetime';
@@ -31,6 +33,20 @@ function bandCentre(session: Session, zone0: number, at: number): number {
   const t = Math.max(0, Math.min(1, (at - zone0) / F.zone));
   const shift = Math.min(F.laneShift, b.halfWidth - F.gapInset - F.gapWidth / 2);
   return shift * (1 - 2 * t);
+}
+
+/**
+ * The open lane of the work zone: the AI is told about it when the zone is announced, so it rides the lane
+ * instead of the racing line (the wall goes up 60 m later, and the closed side is a dead end).
+ */
+export function roadworksLane(session: Session, s: number): WorkZone {
+  const zone0 = s - F.lead;
+  return {
+    s0: zone0,
+    s1: zone0 + F.zone,
+    half: F.gapWidth / 2,
+    centre: (at: number) => bandCentre(session, zone0, at),
+  };
 }
 
 /**
@@ -112,7 +128,6 @@ function workerModel(): BufferGeometry[] {
 export function createRoadworks(setup: EventSetup): EventProps {
   const { session, s, idBase } = setup;
   const { track } = session;
-  const player = session.player;
   const group = new Group();
   group.name = 'race:event:roadworks';
   session.world.add(group);
@@ -240,7 +255,7 @@ export function createRoadworks(setup: EventSetup): EventProps {
         }
         barriers.commit();
       }
-      if (life.update(player.s, dt)) gone = true;
+      if (life.update(trailingS(session), dt)) gone = true;
     },
     get done() {
       return gone;

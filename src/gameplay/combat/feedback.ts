@@ -1,8 +1,9 @@
-// Impact punctuation (hit-stop, camera shake, gamepad rumble), scaled by how close the action is to the
-// player so rivals brawling 80 m ahead never freeze your race. Impacts are coalesced per substep: one AoE
+// Impact punctuation (hit-stop, camera shake, gamepad rumble), scaled by how close the action is to a
+// human so rivals brawling 80 m ahead never freeze your race. Impacts are coalesced per substep: one AoE
 // hitting six riders punches like its strongest hit, not six stacked hit-stops, shakes and rumbles.
+// The sim's "the player" is a human (SPEC §28): the feedback reads the humans, never the local rider.
 import type { RiderState } from '../../core/types';
-import type { CombatCtx } from './ctx';
+import { humanDistance, type CombatCtx } from './ctx';
 import { FEEDBACK_RANGE, HITSTOP, SHAKE } from './tuning';
 
 export type ImpactKind = keyof typeof HITSTOP;
@@ -10,14 +11,13 @@ export type ImpactKind = keyof typeof HITSTOP;
 interface Pending { kind: ImpactKind; k: number }
 const pending = new WeakMap<CombatCtx, Pending>();
 
-/** 1 = the player is involved, fades to 0 at FEEDBACK_RANGE metres from the player. */
+/** 1 = a human is involved, fades to 0 at FEEDBACK_RANGE metres from the nearest human. */
 export function involvement(ctx: CombatCtx, a: RiderState | null, b: RiderState | null): number {
-  if (a?.isPlayer || b?.isPlayer) return 1;
-  const p = ctx.session.player;
+  if (a?.human || b?.human) return 1;
   let best = Infinity;
   for (const r of [a, b]) {
     if (!r) continue;
-    best = Math.min(best, Math.hypot(r.s - p.s, r.x - p.x));
+    best = Math.min(best, humanDistance(ctx, r));
   }
   return best >= FEEDBACK_RANGE ? 0 : 0.5 * (1 - best / FEEDBACK_RANGE);
 }

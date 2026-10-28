@@ -93,8 +93,8 @@ export class Thrower {
     const me = this.me;
     const t = v.hunt;
     if (!t || t === me || !hittable(t)) return null;
-    // Nobody throws at the player in the first seconds of the race, nor at one that cannot be hit.
-    if (t.isPlayer && (v.time < THROW.calm || t.mode === 'crashed')) return null;
+    // Nobody throws at a human in the first seconds of the race, nor at one that cannot be hit.
+    if (t.human && (v.time < THROW.calm || t.mode === 'crashed')) return null;
     const ds = t.s - me.s;
     if (ds < THROW.min || ds > THROW.max) return null;
     return t;

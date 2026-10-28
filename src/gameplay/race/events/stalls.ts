@@ -6,6 +6,7 @@ import type { Obstacle, RiderState } from '../../../core/types';
 import { STALL_LINES } from '../../../data/event-lines';
 import { box, cone, rbox, sphere } from '../traffic/kit';
 import { trackPose } from '../pose';
+import { trailingS } from '../humans';
 import { disposeProp, PropPool, propMesh } from './props';
 import { freeSpot } from './spot';
 import { Lifetime } from './lifetime';
@@ -80,7 +81,6 @@ export function createStalls(setup: EventSetup): EventProps {
   const { session, s, rng, idBase } = setup;
   const { track } = session;
   const bus = session.app.bus;
-  const player = session.player;
   const group = new Group();
   group.name = 'race:event:stalls';
   session.world.add(group);
@@ -185,7 +185,7 @@ export function createStalls(setup: EventSetup): EventProps {
           break;
         }
       }
-      if (life.update(player.s, dt)) gone = true;
+      if (life.update(trailingS(session), dt)) gone = true;
     },
     get done() {
       return gone;

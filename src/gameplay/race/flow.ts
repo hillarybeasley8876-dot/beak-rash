@@ -1,5 +1,7 @@
 // Race flow: intro flyover → countdown 3-2-1-GO (launch boost for throttle held on GO) → racing →
 // player finishes (or 60 s after the winner) → race:end exactly once.
+// Online (SPEC §28): no intro flyby and no skip by key — the countdown starts at tick 0 — and the race ends
+// when every human has finished, or 45 s after the first human did (the same tick on every client).
 import type { RiderId } from '../../core/types';
 import type { RaceCtx } from './ctx';
 
@@ -8,6 +10,7 @@ const COUNT_STEP = 1.0;             // s per countdown number
 const END_DELAY = 3.0;              // s after the player's finish (FINISH splash) before race:end
 const DNF_AFTER = 60;               // s after the winner before unfinished riders are DNF
 const PERFECT_WINDOW = 2.0;         // countdown time after which a fresh press = perfect start
+export const FINISH_GRACE_MS = 45;  // s after the first human finished before the online race ends (the brief's name)
 
 export interface Flow {
   preStep(dt: number): void;
@@ -24,6 +27,7 @@ export function createFlow(ctx: RaceCtx, onEnd: (timedOut: boolean) => void): Fl
   const { session } = ctx;
   const { app } = session;
   const { bus } = app;
+  const online = ctx.online;
   let introT = 0;
   let countT = 0;
   let lastShown = 4;
@@ -77,7 +81,28 @@ export function createFlow(ctx: RaceCtx, onEnd: (timedOut: boolean) => void): Fl
     countT += dt;
   };
 
+  /**
+   * Online: the race is over when every human has crossed the line, or 45 s after the first one did. The
+   * humans are the same on every client and the race clock is the same, so the race ends on the same tick
+   * everywhere (SPEC §28).
+   */
+  const checkOnlineEnd = (): void => {
+    const humans = session.humans;
+    if (humans.length === 0) { session.phase = 'finished'; onEnd(false); return; }
+    let allDone = true;
+    for (const h of humans) {
+      if (h.finishTime === null) { allDone = false; break; }
+    }
+    if (allDone) { session.phase = 'finished'; onEnd(false); return; }
+    const first = ctx.firstHumanFinish;
+    if (first !== null && ctx.clock - first >= FINISH_GRACE_MS) {
+      session.phase = 'finished';
+      onEnd(true);
+    }
+  };
+
   const checkEnd = (dt: number): void => {
+    if (online) { checkOnlineEnd(); return; }
     const p = session.player;
     if (p.finishTime !== null) {
       if (session.phase === 'racing') session.phase = 'finished';
@@ -100,10 +125,13 @@ export function createFlow(ctx: RaceCtx, onEnd: (timedOut: boolean) => void): Fl
     }
   };
 
-  const unAction = app.input.onAction((a) => {
+  // The local key only skips the intro of an OFFLINE race: an online race has no intro to skip.
+  const unAction = online ? (): void => undefined : app.input.onAction((a) => {
     if (a === 'confirm' && session.phase === 'intro' && app.ui.screen === 'race') goToCountdown();
   });
-  if (app.params.get('intro') === '0') goToCountdown();
+  if (!online && app.params.get('intro') === '0') goToCountdown();
+  // Online: the countdown starts at tick 0 — the intro flyby does not run (SPEC §28).
+  if (online) { session.phase = 'countdown'; introT = INTRO_TIME; }
 
   return {
     get introProgress() { return Math.min(1, introT / INTRO_TIME); },

@@ -14,6 +14,11 @@ export interface Rivals {
 
 export function createRivals(ctx: RaceCtx, ai: AiDirector): Rivals {
   const { session } = ctx;
+  // Online (SPEC §28): no nemesis, no alliance, no rivalry — they all read the local player's grudge, and the
+  // race must be the same on every client (core sends no nemesis and writes no grudge in an online race).
+  if (ctx.online) {
+    return { preStep() {}, postStep() {}, dispose() {} };
+  }
   const rivalry = new Rivalry(session);
   const nemesis = new Nemesis(ctx, ai);
   const alliance = new Alliance(session, ai);

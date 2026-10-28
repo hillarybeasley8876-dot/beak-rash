@@ -1,4 +1,5 @@
-// Traffic manager: spawns/despawns vehicles around the player, drives them, keeps session.obstacles in
+// Traffic manager: spawns/despawns vehicles around the humans of the race (offline: the player; online: every
+// member, each with its own band and one shared budget), drives them, keeps session.obstacles in
 // sync (physics collides with them), honks, and poses the instanced meshes after each substep.
 import { Matrix4, Quaternion, Vector3 } from 'three';
 import { BILLBOARD_LINES } from '../../../data/memes';
@@ -61,6 +62,7 @@ export function createTraffic(session: Session): Traffic {
   let nextId = 1000;
   let spawnT = 0;
   let time = 0;
+  let spawnTurn = 0;      // whose band the next spawn belongs to (the humans in turn)
   // The solid obstacles on the road that are not traffic (the work-zone wall, a crate, the tipped
   // truck): the traffic drives around them instead of through them.
   const ownIds = new Set<number>();
@@ -107,14 +109,26 @@ export function createTraffic(session: Session): Traffic {
   };
 
   const fill = (): void => {
-    const p = session.player;
+    // One vehicle per human in turn (offline: the player alone), so every member of an online room gets
+    // traffic around it; the budget of vehicles is shared by the whole field.
+    const hs = session.humans;
+    if (hs.length === 0) return;
     for (let tries = 0; tries < target * 6 && vehicles.length < target; tries++) {
-      const spot = chooseSpot(world, rng, Math.max(START_CLEAR, p.s + AHEAD_NEAR + 120), p.s + far + SPAWN_BAND);
+      const h = hs[tries % hs.length];
+      const spot = chooseSpot(world, rng, Math.max(START_CLEAR, h.s + AHEAD_NEAR + 120), h.s + far + SPAWN_BAND);
       if (spot) spawn(spot);
     }
   };
 
   const here = new Vector3(), there = new Vector3();
+
+  /** Is the rider within earshot of a human (offline: of the player)? */
+  const nearHuman = (r: RiderState, within: number): boolean => {
+    for (const h of session.humans) {
+      if (Math.abs(r.s - h.s) < within) return true;
+    }
+    return false;
+  };
   /**
    * First s ≥ `far` ahead of the player that is also `far` away in a straight line (on a curve the road comes
    * closer than its length); null when even FOG_PUSH m more is not enough (try again on a later tick).
@@ -130,15 +144,27 @@ export function createTraffic(session: Session): Traffic {
     return null;
   };
 
+  /** Is the vehicle still in the band of some human (in front of it or just behind)? */
+  const inBand = (v: Vehicle): boolean => {
+    for (const h of session.humans) {
+      const ds = v.ob.s - h.s;
+      if (ds >= -BEHIND - 10 && ds <= far + FOG_PUSH + SPAWN_BAND + 20) return true;
+    }
+    return false;
+  };
+
   const manage = (): void => {
-    const p = session.player;
     for (let i = vehicles.length - 1; i >= 0; i--) {
       const v = vehicles[i] as Vehicle;
-      const ds = v.ob.s - p.s;
-      if (ds < -BEHIND - 10 || ds > far + FOG_PUSH + SPAWN_BAND + 20 || v.ob.s < 5 || (v.dir > 0 && v.ob.s > track.length - 25)) despawn(i);
+      if (!inBand(v) || v.ob.s < 5 || (v.dir > 0 && v.ob.s > track.length - 25)) despawn(i);
     }
     if (vehicles.length >= target) return;
-    const s0 = fogStart(p);
+    // One vehicle per human in turn: the traffic follows every member of the room.
+    const hs = session.humans;
+    if (hs.length === 0) return;
+    const h = hs[spawnTurn % hs.length];
+    spawnTurn++;
+    const s0 = fogStart(h);
     if (s0 === null) return;
     const spot = chooseSpot(world, rng, Math.max(START_CLEAR, s0), s0 + SPAWN_BAND);
     if (spot) spawn(spot);
@@ -170,7 +196,7 @@ export function createTraffic(session: Session): Traffic {
       const along = r.speed * v.dir;
       const stopped = r.mode === 'crashed' || r.mode === 'busted' || along < 2;
       if (v.dir > 0 && (stopped || along < v.speed) && gap < out.leaderGap) { out.leaderGap = gap; out.leaderSpeed = Math.max(0, along); }
-      if (gap < 16 && Math.abs(r.s - session.player.s) < AUDIBLE) out.riderAhead = r;
+      if (gap < 16 && nearHuman(r, AUDIBLE)) out.riderAhead = r;
     }
     return out;
   };

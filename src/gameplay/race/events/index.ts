@@ -1,19 +1,21 @@
-// Track events (SPEC §19): one or two seeded events per race ahead of the player — a fish truck tipping
-// over, geese crossing, roadworks, market stalls. The director arms an event when the player is 180–260 m
-// before its spot ('race:event' warn), puts the props up when the player gets close ('start') and reports
+// Track events (SPEC §19): one or two seeded events per race ahead of the humans — a fish truck tipping
+// over, geese crossing, roadworks, market stalls. The director arms an event when the leading human is
+// 180–260 m before its spot ('race:event' warn), puts the props up when it gets close ('start') and reports
 // the end when the props are gone ('end'). Wired by race/logic.ts (traffic is null when the race has none).
 import { Vector3 } from 'three';
 import type { EventKind } from '../../../data/event-lines';
 import type { RaceCtx } from '../ctx';
+import { leadingHuman, trailingHuman } from '../humans';
 import type { Traffic } from '../traffic';
 import { createFishSpill } from './fish-spill';
 import { createGeese } from './geese';
 import { planEvents } from './plan';
-import { createRoadworks, roadworksPieces } from './roadworks';
+import { createRoadworks, roadworksLane, roadworksPieces } from './roadworks';
 import { createStalls } from './stalls';
 import { EVENT_TUNING as T } from './tuning';
 import type { EventProps, EventSlot } from './types';
 import { buildEventWarmKit, warmReflectLayer } from './warm';
+import type { AiDirector } from '../ai';
 
 export interface EventDirector {
   preStep(dt: number): void;
@@ -30,7 +32,7 @@ export interface EventsDebug {
 
 type WithEvents = { events?: EventsDebug };
 
-export function createEventDirector(ctx: RaceCtx, traffic: Traffic | null): EventDirector {
+export function createEventDirector(ctx: RaceCtx, traffic: Traffic | null, ai: AiDirector): EventDirector {
   const { session } = ctx;
   const { app, track } = session;
   const rng = session.rng.fork(0x3e7e7);
@@ -80,11 +82,15 @@ export function createEventDirector(ctx: RaceCtx, traffic: Traffic | null): Even
 
   return {
     preStep() {
-      const player = session.player;
+      // The event arms and starts with the LEADING human and is over once the TRAILING human has passed it
+      // (SPEC §28: offline that is the player, the only human).
+      const lead = leadingHuman(session);
+      const trail = trailingHuman(session);
+      if (!lead || !trail) return;
       for (const slot of slots) {
         if (slot.phase === 'planned') {
-          const d = slot.s - player.s;
-          if (d < -60) { slot.phase = 'ended'; continue; }   // the player is already past the spot
+          const d = slot.s - lead.s;
+          if (slot.s - trail.s < -60) { slot.phase = 'ended'; continue; }   // everyone is already past the spot
           if (d <= T.warnDist) {
             slot.phase = 'warned';
             emit(slot, 'warn');
@@ -92,9 +98,15 @@ export function createEventDirector(ctx: RaceCtx, traffic: Traffic | null): Even
             // the open lane while the zone is only announced, so none of them stands in a closed lane
             // when the barriers appear.
             if (slot.kind === 'roadworks' && traffic) traffic.planZone(slot.id, roadworksPieces(session, slot.s));
+            // The AI is told the same: it rides the open lane instead of the racing line (the closed side
+            // of the wall is a dead end — a rider that gets in there cannot get out).
+            if (slot.kind === 'roadworks') {
+              slot.lane = roadworksLane(session, slot.s);
+              ai.setZone(slot.id, slot.lane);
+            }
           }
         }
-        if (slot.phase === 'warned' && slot.s - player.s <= T.startDist) {
+        if (slot.phase === 'warned' && slot.s - lead.s <= T.startDist) {
           slot.phase = 'started';
           slot.props = create(slot.kind, slot.s);
           emit(slot, 'start');
@@ -110,6 +122,9 @@ export function createEventDirector(ctx: RaceCtx, traffic: Traffic | null): Even
         slot.props = null;
         slot.phase = 'ended';
         traffic?.dropZone(slot.id);
+        // The wall is gone: the road is open again.
+        ai.setZone(slot.id, null);
+        slot.lane = null;
         emit(slot, 'end');
       }
     },
@@ -118,6 +133,8 @@ export function createEventDirector(ctx: RaceCtx, traffic: Traffic | null): Even
         slot.props?.dispose();
         slot.props = null;
         traffic?.dropZone(slot.id);
+        ai.setZone(slot.id, null);
+        slot.lane = null;
       }
       slots.length = 0;
       warm.dispose();
