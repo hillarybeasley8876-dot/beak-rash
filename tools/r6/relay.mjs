@@ -4,7 +4,7 @@
 // barrier, a 60 Hz tick stream that bundles every human's input (no edge lost or doubled), hash comparison, leaving
 // mid-race, limits. The protocol is src/net/protocol.ts.
 //   node tools/r6/relay.mjs [--port 8791]
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { parseArgs } from '../lib.mjs';
 
 const a = parseArgs(process.argv.slice(2));
@@ -17,11 +17,11 @@ const expect = (ok, msg) => { results.push(!!ok); console.log(`${ok ? 'PASS' : '
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 
 const relay = spawn('deno', ['run', '--allow-net', 'relay/main.ts', '--port', String(PORT), '--idle-ms', '1500', '--load-ms', '1500', '--grace-ms', '2000'],
-  { stdio: ['ignore', 'pipe', 'pipe'], shell: process.platform === 'win32' });
+  { stdio: ['ignore', 'pipe', 'pipe'] });
 let relayLog = '';
 relay.stdout.on('data', (d) => { relayLog += d; });
 relay.stderr.on('data', (d) => { relayLog += d; });
-const stopRelay = () => { try { relay.kill(); } catch { /* already gone */ } if (process.platform === 'win32') spawn('taskkill', ['/pid', String(relay.pid), '/t', '/f'], { stdio: 'ignore' }); };
+const stopRelay = () => { try { relay.kill(); } catch { /* gone */ } if (process.platform === 'win32') spawnSync('taskkill', ['/pid', String(relay.pid), '/t', '/f'], { stdio: 'ignore' }); };
 process.on('exit', stopRelay);
 
 /** A test client: a WebSocket with an inbox and helpers to wait for a message. */

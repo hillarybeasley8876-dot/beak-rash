@@ -5,7 +5,7 @@
 // ticks with each client's own (scripted) input, a skill press that the other client sees, the state hashes, and a
 // human leaving mid-race (an AI takes the bike over).
 //   node tools/r6/net-client.mjs [--port 8792] [--seconds 20]
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { parseArgs } from '../lib.mjs';
 import { expect, finish, noErrors, withPage } from '../r4/accept-lib.mjs';
 
@@ -14,11 +14,11 @@ const PORT = Number(a.port ?? 8792);
 const SECONDS = Number(a.seconds ?? 20);
 const RELAY = `ws://127.0.0.1:${PORT}/ws`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const relay = spawn('deno', ['run', '--allow-net', 'relay/main.ts', '--port', String(PORT)], { stdio: ['ignore', 'pipe', 'pipe'], shell: process.platform === 'win32' });
+const relay = spawn('deno', ['run', '--allow-net', 'relay/main.ts', '--port', String(PORT)], { stdio: ['ignore', 'pipe', 'pipe'] });
 let relayLog = '';
 relay.stdout.on('data', (d) => { relayLog += d; });
 relay.stderr.on('data', (d) => { relayLog += d; });
-const stopRelay = () => { try { relay.kill(); } catch { /* gone */ } if (process.platform === 'win32') spawn('taskkill', ['/pid', String(relay.pid), '/t', '/f'], { stdio: 'ignore' }); };
+const stopRelay = () => { try { relay.kill(); } catch { /* gone */ } if (process.platform === 'win32') spawnSync('taskkill', ['/pid', String(relay.pid), '/t', '/f'], { stdio: 'ignore' }); };
 process.on('exit', stopRelay);
 for (let i = 0; i < 60; i++) {
   const ok = await fetch(`http://127.0.0.1:${PORT}/`).then((r) => r.text()).catch(() => '');
