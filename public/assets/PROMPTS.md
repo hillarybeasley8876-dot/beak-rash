@@ -223,6 +223,7 @@ Model: nano_banana via the internal ys-api (IOA). Raw downloads are kept in `sho
 ### portraits/bananacat_main · 3:4 · cut
 {BANANACAT}, riding a tiny pink children's bicycle with training wheels and a white front basket, {MAIN}, pedalling furiously while wailing with tears streaming backwards in the wind. {STYLE}
 > model: nano_banana_2
+> cutout: --hole 1167,1978,135,195 --hole 756,1943,84,100 --hole 580,2008,46,78
 
 ### portraits/bananacat_smug · 3:4 · cut
 {BANANACAT}, {BUST}, still teary-eyed but with a smug little triumphant smile, holding up a banana peel in one paw like a trophy. {STYLE}
@@ -235,10 +236,12 @@ Model: nano_banana via the internal ys-api (IOA). Raw downloads are kept in `sho
 ### portraits/bananacat_eyes · 16:9 · strip
 {EYES} {BANANACAT}: two huge glossy wet grey-blue kitten eyes overflowing with tears, light blue tear streaks, the yellow banana-peel hood framing the top edge, the eyes exactly at the vertical centre of the frame. {EYES_CROP} {STYLE_STRIP}
 > model: nano_banana_2
+> cutout: --frame 0.56,0.58,0.84
 
 ### portraits/cryingcat_main · 3:4 · cut
 {CRYINGCAT}, riding a chunky sky-blue shared rental bicycle with a front basket and thick solid tyres, {MAIN}, crying buckets but pedalling bravely and giving the viewer a thumbs-up. {STYLE}
 > model: nano_banana_2
+> cutout: --hole 583,1907,265,410 --hole 1262,1794,172,262
 
 ### portraits/cryingcat_smug · 3:4 · cut
 {CRYINGCAT}, {BUST}, tears still in its eyes but a proud wobbly smile and a big thumbs-up. {STYLE}
@@ -251,10 +254,12 @@ Model: nano_banana via the internal ys-api (IOA). Raw downloads are kept in `sho
 ### portraits/cryingcat_eyes · 16:9 · strip
 {EYES} {CRYINGCAT}: two enormous glossy eyes brimming with tears, big light blue tear drops, grey-beige fur, the rim of a light grey-blue helmet at the top edge, the eyes exactly at the vertical centre of the frame. {EYES_CROP} {STYLE_STRIP}
 > model: nano_banana_2
+> cutout: --frame 0.5,0.46,0.9
 
 ### portraits/xinxian_main · 3:4 · cut
 {XINXIAN}, riding a heavy classic black vintage roadster bicycle with a long top tube, a chain guard and a rear rack, {MAIN}, lunging forward over the handlebars with its mouth open, eyes locked on a fish snack flying just ahead. {STYLE}
 > model: nano_banana_2
+> cutout: --hole 482,1794,310,452 --hole 1333,1540,195,375
 
 ### portraits/xinxian_smug · 3:4 · cut
 {XINXIAN}, {BUST}, a street-smart smirk with half-lidded eyes, chewing a freshly grabbed piece of fish. {STYLE}
@@ -267,10 +272,12 @@ Model: nano_banana via the internal ys-api (IOA). Raw downloads are kept in `sho
 ### portraits/xinxian_eyes · 16:9 · strip
 {EYES} {XINXIAN}: two keen sharp green eyes with narrow slit pupils, faint orange tabby stripes on the forehead, the notched ear tip at the edge, the eyes exactly at the vertical centre of the frame. {EYES_CROP} {STYLE_STRIP}
 > model: nano_banana_2
+> cutout: --frame 0.5,0.48,0.9
 
 ### portraits/moodeng_main · 3:4 · cut
 {MOODENG}, riding a sturdy white mountain bike with fat knobbly tyres, {MAIN}, bouncing on the pedals with its mouth wide open ready to bite. {STYLE}
 > model: nano_banana_2
+> cutout: --hole 488,1746,315,380 --hole 1315,1652,178,298
 
 ### portraits/moodeng_smug · 3:4 · cut
 {MOODENG}, {BUST}, a sassy cheeky open-mouthed grin, about to bite, glossy skin shining. {STYLE}
@@ -283,10 +290,12 @@ Model: nano_banana via the internal ys-api (IOA). Raw downloads are kept in `sho
 ### portraits/moodeng_eyes · 16:9 · strip
 {EYES} {MOODENG}: two small round shiny black eyes high on a glossy dark slate-grey hippo head, a feisty glare, the rim of a white helmet with a pink stripe at the top edge, the eyes exactly at the vertical centre of the frame. {EYES_CROP} {STYLE_STRIP}
 > model: nano_banana_2
+> cutout: --frame 0.5,0.47,0.9
 
 ### portraits/pedro_main · 3:4 · cut
 {PEDRO}, riding a yellow fixie bicycle with bullhorn handlebars, {MAIN}, pedalling while doing a happy little dance with one paw raised, eyes closed in bliss, the ringed tail swinging. {STYLE}
 > model: nano_banana_2
+> cutout: --hole 504,1904,300,432 --hole 1238,1693,195,326
 
 ### portraits/pedro_smug · 3:4 · cut
 {PEDRO}, {BUST}, dancing with a blissful closed-eye grin, swaying to music, one paw raised. {STYLE}
@@ -299,10 +308,12 @@ Model: nano_banana via the internal ys-api (IOA). Raw downloads are kept in `sho
 ### portraits/pedro_eyes · 16:9 · strip
 {EYES} {PEDRO}: two shiny dark eyes inside a black raccoon bandit mask with white brows above, grey fur, the rim of a black helmet with a yellow stripe at the top edge, the eyes exactly at the vertical centre of the frame. {EYES_CROP} {STYLE_STRIP}
 > model: nano_banana_2
+> cutout: --frame 0.5,0.6,0.84
 
 ### portraits/hamster_main · 3:4 · cut
 {HAMSTER}, riding a tiny mint green children's bicycle with training wheels, {MAIN}, pedalling with an endlessly sad face, tears welling in its huge eyes. {STYLE}
 > model: nano_banana_2
+> cutout: --hole 1308,1893,213,265 --hole 583,1842,135,200 --hole 429,2014,62,86 --hole 768,1966,57,64
 
 ### portraits/hamster_smug · 3:4 · cut
 {HAMSTER}, {BUST}, a tiny sad-but-proud smile, playing a tiny violin tucked under its chin, eyes glistening. {STYLE}
@@ -315,6 +326,7 @@ Model: nano_banana via the internal ys-api (IOA). Raw downloads are kept in `sho
 ### portraits/hamster_eyes · 16:9 · strip
 {EYES} {HAMSTER}: two ENORMOUS glossy black eyes with two white highlights each, slightly teary, golden-tan fur, the rim of a brown helmet at the top edge, the eyes exactly at the vertical centre of the frame. {EYES_CROP} {STYLE_STRIP}
 > model: nano_banana_2
+> cutout: --frame 0.5,0.56,0.88
 
 ## Key art
 

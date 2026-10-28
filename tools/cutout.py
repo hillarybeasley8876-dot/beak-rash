@@ -134,14 +134,33 @@ def clear_holes(light, bg, ellipses):
     return cleared
 
 
-def cut(rgb, ellipses=()):
+def clear_seeds(light, bg, seeds):
+    """Background seen through an enclosed gap picked by hand: the 4-connected light region that contains each
+    (x, y) seed becomes background (a wheel's white wedge the starburst does not cover). Returns how many."""
+    cleared = 0
+    if not seeds:
+        return 0
+    mask = light & ~bg
+    for x, y in seeds:
+        if not (0 <= y < mask.shape[0] and 0 <= x < mask.shape[1]) or not mask[y, x]:
+            continue
+        vals = np.ones(mask.shape, dtype=np.int32)
+        vals[y, x] = 0
+        region = mask & (propagate_min(mask, vals) == 0)
+        bg |= region
+        mask &= ~region
+        cleared += 1
+    return cleared
+
+
+def cut(rgb, ellipses=(), seeds=()):
     """RGB uint8 HxWx3 -> (RGBA uint8, specks removed, holes cleared)."""
     lo, hi = rgb.min(axis=2), rgb.max(axis=2)
     light = (lo >= LIGHT) | ((lo >= GREY_MIN) & (hi - lo <= GREY_SPREAD))
     bg = flood_from_border(~dilate(~light, INK_GROW))
     for _ in range(INK_GROW + 1):
         bg |= light & dilate(bg, 1)
-    holes = clear_holes(light, bg, ellipses)
+    holes = clear_holes(light, bg, ellipses) + clear_seeds(light, bg, seeds)
     band = dilate(bg, BAND) & ~bg
     out = np.dstack([rgb.astype(np.float64), np.full(light.shape, 255.0)])
     out[bg] = 0
@@ -235,6 +254,8 @@ def main():
     ap.add_argument('--canvas', metavar='S[,DY]', help='outpainting canvas: shrink by S, bottom-centred on white')
     ap.add_argument('--hole', action='append', default=[], metavar='X,Y,R[,RY]',
                     help='clear enclosed light regions inside this circle/ellipse (raw px, after --flip); repeatable')
+    ap.add_argument('--seed', action='append', default=[], metavar='X,Y',
+                    help='clear the one enclosed light region containing this point (raw px, after --flip); repeatable')
     args = ap.parse_args()
     if not (args.png or args.webp):
         ap.error('choose at least one of --png / --webp')
@@ -263,7 +284,10 @@ def main():
         ellipses = [tuple(int(v) for v in h.split(',')) for h in args.hole]
         if any(len(e) not in (3, 4) for e in ellipses):
             raise ValueError('--hole wants X,Y,R or X,Y,RX,RY')
-        rgba, specks, holes = cut(rgb, [e if len(e) == 4 else e + (e[2],) for e in ellipses])
+        seeds = [tuple(int(v) for v in p.split(',')) for p in args.seed]
+        if any(len(p) != 2 for p in seeds):
+            raise ValueError('--seed wants X,Y')
+        rgba, specks, holes = cut(rgb, [e if len(e) == 4 else e + (e[2],) for e in ellipses], seeds)
         coverage = 100.0 * float((rgba[:, :, 3] > 0).mean())
         im = trim(Image.fromarray(rgba))
     else:

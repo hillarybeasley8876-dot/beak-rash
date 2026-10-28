@@ -10,16 +10,22 @@ export const assetUrl = (rel: string): string => `${import.meta.env.BASE_URL}ass
 /** Per character: main = 3/4 riding pose, smug / hurt = busts (transparent cut-outs, about 3:4,
  *  ≤ 900 px tall); eyes = full-bleed 16:9 close-up strip for skill cut-ins. */
 export const PORTRAITS: Partial<Record<CharacterId, PortraitSet>> = {
+  bananacat: { main: 'portraits/bananacat_main.webp', smug: 'portraits/bananacat_smug.webp', hurt: 'portraits/bananacat_hurt.webp', eyes: 'portraits/bananacat_eyes.webp' },
   capybara: { main: 'portraits/capybara_main.webp', smug: 'portraits/capybara_smug.webp', hurt: 'portraits/capybara_hurt.webp', eyes: 'portraits/capybara_eyes.webp' },
   cat: { main: 'portraits/cat_main.webp', smug: 'portraits/cat_smug.webp', hurt: 'portraits/cat_hurt.webp', eyes: 'portraits/cat_eyes.webp' },
   corgi: { main: 'portraits/corgi_main.webp', smug: 'portraits/corgi_smug.webp', hurt: 'portraits/corgi_hurt.webp', eyes: 'portraits/corgi_eyes.webp' },
+  cryingcat: { main: 'portraits/cryingcat_main.webp', smug: 'portraits/cryingcat_smug.webp', hurt: 'portraits/cryingcat_hurt.webp', eyes: 'portraits/cryingcat_eyes.webp' },
   goose: { main: 'portraits/goose_main.webp', smug: 'portraits/goose_smug.webp', hurt: 'portraits/goose_hurt.webp', eyes: 'portraits/goose_eyes.webp' },
+  hamster: { main: 'portraits/hamster_main.webp', smug: 'portraits/hamster_smug.webp', hurt: 'portraits/hamster_hurt.webp', eyes: 'portraits/hamster_eyes.webp' },
+  moodeng: { main: 'portraits/moodeng_main.webp', smug: 'portraits/moodeng_smug.webp', hurt: 'portraits/moodeng_hurt.webp', eyes: 'portraits/moodeng_eyes.webp' },
+  pedro: { main: 'portraits/pedro_main.webp', smug: 'portraits/pedro_smug.webp', hurt: 'portraits/pedro_hurt.webp', eyes: 'portraits/pedro_eyes.webp' },
   pelican: { main: 'portraits/pelican_main.webp', smug: 'portraits/pelican_smug.webp', hurt: 'portraits/pelican_hurt.webp', eyes: 'portraits/pelican_eyes.webp' },
   penguin: { main: 'portraits/penguin_main.webp', smug: 'portraits/penguin_smug.webp', hurt: 'portraits/penguin_hurt.webp', eyes: 'portraits/penguin_eyes.webp' },
   pigeon: { main: 'portraits/pigeon_main.webp', smug: 'portraits/pigeon_smug.webp', hurt: 'portraits/pigeon_hurt.webp', eyes: 'portraits/pigeon_eyes.webp' },
   seagull: { main: 'portraits/seagull_main.webp', smug: 'portraits/seagull_smug.webp', hurt: 'portraits/seagull_hurt.webp', eyes: 'portraits/seagull_eyes.webp' },
   shiba: { main: 'portraits/shiba_main.webp', smug: 'portraits/shiba_smug.webp', hurt: 'portraits/shiba_hurt.webp', eyes: 'portraits/shiba_eyes.webp' },
   sloth: { main: 'portraits/sloth_main.webp', smug: 'portraits/sloth_smug.webp', hurt: 'portraits/sloth_hurt.webp', eyes: 'portraits/sloth_eyes.webp' },
+  xinxian: { main: 'portraits/xinxian_main.webp', smug: 'portraits/xinxian_smug.webp', hurt: 'portraits/xinxian_hurt.webp', eyes: 'portraits/xinxian_eyes.webp' },
 };
 
 /** Key art. title, garage: full-bleed 16:9 (garage keeps a dark calm centre for the 3D bike).

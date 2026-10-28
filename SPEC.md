@@ -489,8 +489,9 @@ below are the starting point. Everything stays kind and cartoonish (pillar 5): n
   a signature skill (§24), 12 taunts + KO/hurt/victory/defeat/skill lines (data/roster.ts), a temperament
   (ai/personality.ts), fallback stickers (ui/hud/heads.ts, ui/p5/art.ts). New racers ship with `racer: false` until
   their species model passes actors-check; the lead flips them on. No voice clips for them (bubbles only).
-- Portraits for every character are rendered from the 3D models (`tools/r6/portraits.mjs` → `public/assets/
-  portraits/<id>_{main,smug,hurt,eyes}.webp`), so new racers look like their in-game model.
+- Portraits for the new racers are drawn like the rest of the cast's (`tools/gen-image.mjs`, prompts in
+  `public/assets/PROMPTS.md` that describe each in-game model: colours, helmet, bike → `public/assets/portraits/
+  <id>_{main,smug,hurt,eyes}.webp`), so the roster reads as one set.
 - Pelican-only code is generalised: the player HUD kit, HOW TO skill cards, achievements ("亲手" = the player's own
   hands whatever the species), results / menu hero use the player's character.
 
