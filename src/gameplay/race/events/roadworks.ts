@@ -22,6 +22,8 @@ const F = T.roadworks;
 /** The sign board and its post (the board's height and the post's length, in metres). */
 const SIGN_H = 0.9;
 const SIGN_POST = 1.6;
+/** m of extra room a held-back piece needs around it (riders coming up to it included) before it goes up. */
+const DEFER_CLEAR = 3;
 
 /** The centre of the open lane at `at`: it tapers from the right side of the road to the left one. */
 function bandCentre(session: Session, zone0: number, at: number): number {
@@ -229,6 +231,10 @@ export function createRoadworks(setup: EventSetup): EventProps {
       if (deferred.size) {
         for (const [piece, carId] of deferred) {
           if (!carLeft(carId)) continue;
+          // ... and nobody is on that spot or about to ride into it (no wall springs up in a rider's face),
+          // and no other car has driven onto it meanwhile.
+          if (!spotFree(session, piece.s, piece.x, piece.halfLength + DEFER_CLEAR, piece.w / 2)) continue;
+          if (!clearOfTraffic(session, piece.s, piece.x, piece.halfLength, piece.w / 2)) continue;
           deferred.delete(piece);
           putUp(piece);
         }

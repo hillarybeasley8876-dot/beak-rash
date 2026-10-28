@@ -6,7 +6,7 @@ const DT = 1 / 30;
 const BUMPS = `window.__bumps = []; window.__br.app.bus.on('rider:bump', (p) => { if (p.a === 0 || p.b === 0)
   window.__bumps.push({ t: +window.__br.session().time.toFixed(2), other: p.a === 0 ? p.b : p.a, k: +p.strength.toFixed(1) }); })`;
 const CHARS = 'Object.fromEntries(window.__br.session().riders.map((r) => [r.id, r.character]))';
-const HOT = new Set(['goose', 'seagull', 'cat', 'shiba']);   // grudge ≥ 0.6 (ai/personality.ts)
+const HOT = new Set(['goose', 'seagull', 'cat', 'shiba', 'bananacat', 'xinxian', 'moodeng', 'pedro']);   // grudge ≥ 0.6 (ai/personality.ts)
 const fmt = (bumps, chars) => bumps.map((b) => `${chars[b.other]}:${b.k}`).join(' ') || '-';
 
 export const contactScenarios = {

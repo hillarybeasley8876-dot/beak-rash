@@ -221,7 +221,7 @@ export const ROSTER: Record<CharacterId, CharacterDef> = {
     victoryLines: ['赢了！感动到哭！', '喜极而泣，香蕉版。', '冠军的眼泪，是甜的。', '奖杯湿了，是我哭的。'],
     defeatLines: ['输了，哭得更大声了。', '哭够了再来比。', '没关系，本来就在哭。', '香蕉皮，也会被踩扁的。'],
     skillLines: ['香蕉皮，接好了！', '滑倒吧，陪我一起哭！', '剥一个，扔一个！'],
-    racer: false,
+    racer: true,
   },
   cryingcat: {
     id: 'cryingcat', name: '泪眼猫猫', codename: 'TEARY', title: '含泪竖大拇指',
@@ -239,7 +239,7 @@ export const ROSTER: Record<CharacterId, CharacterDef> = {
     victoryLines: ['冠军！给自己点个赞。', '感动的泪，咸咸的。', '原来赢的时候也想哭。', '领奖台好高，有点怕。'],
     defeatLines: ['没事的，真的没事。（泪）', '输了，拇指照样竖着。', '哭一场，明天再比。', '猫猫尽力了……'],
     skillLines: ['泪水攻势，发动！', '都别动，我要哭了！', '泪如雨下——！'],
-    racer: false,
+    racer: true,
   },
   xinxian: {
     id: 'xinxian', name: '新鲜哥', codename: 'FRESH', title: '只吃五秒内的饭',
@@ -257,7 +257,7 @@ export const ROSTER: Record<CharacterId, CharacterDef> = {
     victoryLines: ['冠军！趁热领奖！', '最新鲜的第一名。', '奖杯刚出炉，烫手。', '今天的饭，格外香。'],
     defeatLines: ['没赶上热的，可惜。', '这名次，有点馊了。', '等下一碗新鲜的。', '喂食器没响，不算。'],
     skillLines: ['新鲜的，全是我的！', '五秒之内，统统吃掉！', '开饭啦！'],
-    racer: false,
+    racer: true,
   },
   moodeng: {
     id: 'moodeng', name: '弹跳猪', codename: 'MOODENG', title: '爱咬人的小河马',
@@ -275,7 +275,7 @@ export const ROSTER: Record<CharacterId, CharacterDef> = {
     victoryLines: ['冠军是我，全园最弹！', '赢了，回去泡个澡。', '小小冠军，大大脾气。', '领奖台，我一屁股坐稳。'],
     defeatLines: ['哼！不玩了！', '咬人的心，已经有了。', '不服！咬一口奖杯。', '回水里泡一泡再说。'],
     skillLines: ['弹跳——砸！', 'Q弹冲击！', '全体，接住这一弹！'],
-    racer: false,
+    racer: true,
   },
   pedro: {
     id: 'pedro', name: '佩德罗', codename: 'PEDRO', title: '垃圾桶之王',
@@ -293,7 +293,7 @@ export const ROSTER: Record<CharacterId, CharacterDef> = {
     victoryLines: ['冠军！转个圈庆祝！', '奖杯？洗洗再收。', '最佳舞步奖，也是我。', '今晚的宝藏，就是第一名。'],
     defeatLines: ['没关系，垃圾桶还在。', '转太多，转偏了。', '下次，换个桶翻。', '舞还没跳完呢。'],
     skillLines: ['开桶！看看有啥！', '接住！随机惊喜！', '统统扔给你！'],
-    racer: false,
+    racer: true,
   },
   hamster: {
     id: 'hamster', name: '悲伤仓鼠', codename: 'SADHAM', title: '自带小提琴配乐',
@@ -311,7 +311,7 @@ export const ROSTER: Record<CharacterId, CharacterDef> = {
     victoryLines: ['赢了……但还是想哭。', '冠军的小提琴，是欢快的。', '这一刻，瓜子管够。', '大眼睛里，闪着奖杯。'],
     defeatLines: ['果然，悲伤才是常态。', '小提琴，拉得更响了。', '回笼里，静静地难过。', '算了，我习惯了。'],
     skillLines: ['来点悲伤的配乐。', '大家，一起难过吧。', '小提琴，起！'],
-    racer: false,
+    racer: true,
   },
 };
 

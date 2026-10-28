@@ -5,7 +5,7 @@
 export type CharacterId =
   | 'pelican' | 'goose' | 'capybara' | 'cat' | 'shiba'
   | 'pigeon' | 'penguin' | 'seagull' | 'sloth' | 'corgi'
-  // r6 meme roster (SPEC §23): hidden (ROSTER.racer false) until their species models land
+  // r6 meme roster (SPEC §23): racers since their species models passed review
   | 'bananacat' | 'cryingcat' | 'xinxian' | 'moodeng' | 'pedro' | 'hamster';
 
 export type BikeId = 'roadbike' | 'erba' | 'shared' | 'fixie' | 'mtb' | 'tandem' | 'kidbike'
