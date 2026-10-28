@@ -42,6 +42,12 @@ Model: nano_banana via the internal ys-api (IOA). Raw downloads are kept in `sho
 - `{SEAGULL}` a white seagull with grey wings with black tips, a yellow beak with a red spot near the tip, shifty narrowed suspicious eyes, one golden french fry held in its beak, a yellow cycling helmet, yellow legs
 - `{SLOTH}` a shaggy brown three-toed sloth with long scruffy fur, a pale beige face, dark brown eye patches, an eternal gentle smile, slow half-blinking eyes, long curved claws, a dark brown cycling helmet
 - `{CORGI}` an orange and white Pembroke corgi dog with huge upright ears, a white muzzle and chest, very short stubby legs, a blue police cap, a blue police vest with a gold star badge (no text), a silver whistle on a cord
+- `{BANANACAT}` a small fluffy white kitten wearing a peeled banana as a hood: a bright yellow banana-skin hood framing its round face with three wide peel strips hanging down over its shoulders and back like a bonnet and a little brown banana stalk on top, small white cat ears poking out of the hood, HUGE glossy wet grey-blue eyes overflowing with tears, light blue tear streaks running down both cheeks, the mouth wide open in a dramatic wail, a tiny pink nose (no helmet: the banana hood is its helmet)
+- `{CRYINGCAT}` a soft grey-beige cat with a round head, ENORMOUS glossy watery eyes brimming with tears, big light blue tear drops on its cheeks, a wobbly trembling mouth, one paw giving a brave thumbs-up, a small light grey-blue cycling helmet
+- `{XINXIAN}` a lean scrappy orange stray tabby cat (wiry and sharp, not chubby) with an orange coat and faint darker stripes, a cream muzzle, alert pointy ears with a small notch bitten out of one ear, keen narrow green eyes, a green collar with a small round silver tag, no helmet
+- `{MOODENG}` a baby pygmy hippo: a round glossy dark slate-grey barrel body with a shiny highlight on the back, a wide boxy muzzle with pink lips and two nostril bumps on top, pink cheeks and a pink belly, tiny round ears, small round eyes set high on the head, chubby short legs, a white cycling helmet with one pink stripe down the middle, feisty and ready to bite
+- `{PEDRO}` a cheerful raccoon with grey fur, the classic black bandit eye mask, white brows and a white muzzle, a black nose, a big bushy tail ringed grey and black, dark little hands, a black cycling helmet with one yellow stripe
+- `{HAMSTER}` a round golden-tan hamster shaped like a ball, a cream belly and chubby cream cheek pouches, tiny round ears, ENORMOUS glossy black eyes with two white highlights each and a little teary, a tiny pink nose, a small sad down-turned mouth, a brown cycling helmet with one white stripe
 
 ## Portraits
 
@@ -213,6 +219,102 @@ Model: nano_banana via the internal ys-api (IOA). Raw downloads are kept in `sho
 > cutout: --frame 0.5,0.44,0.88
 > model: nano_banana_2
 > note: edit (picked e1): {REDRAW}
+
+### portraits/bananacat_main · 3:4 · cut
+{BANANACAT}, riding a tiny pink children's bicycle with training wheels and a white front basket, {MAIN}, pedalling furiously while wailing with tears streaming backwards in the wind. {STYLE}
+> model: nano_banana_2
+
+### portraits/bananacat_smug · 3:4 · cut
+{BANANACAT}, {BUST}, still teary-eyed but with a smug little triumphant smile, holding up a banana peel in one paw like a trophy. {STYLE}
+> model: nano_banana_2
+
+### portraits/bananacat_hurt · 3:4 · cut
+{BANANACAT}, {BUST}, {DIZZY}, the banana hood knocked askew. {STYLE}
+> model: nano_banana_2
+
+### portraits/bananacat_eyes · 16:9 · strip
+{EYES} {BANANACAT}: two huge glossy wet grey-blue kitten eyes overflowing with tears, light blue tear streaks, the yellow banana-peel hood framing the top edge, the eyes exactly at the vertical centre of the frame. {EYES_CROP} {STYLE_STRIP}
+> model: nano_banana_2
+
+### portraits/cryingcat_main · 3:4 · cut
+{CRYINGCAT}, riding a chunky sky-blue shared rental bicycle with a front basket and thick solid tyres, {MAIN}, crying buckets but pedalling bravely and giving the viewer a thumbs-up. {STYLE}
+> model: nano_banana_2
+
+### portraits/cryingcat_smug · 3:4 · cut
+{CRYINGCAT}, {BUST}, tears still in its eyes but a proud wobbly smile and a big thumbs-up. {STYLE}
+> model: nano_banana_2
+
+### portraits/cryingcat_hurt · 3:4 · cut
+{CRYINGCAT}, {BUST}, {DIZZY}, the small helmet knocked crooked, tears flying. {STYLE}
+> model: nano_banana_2
+
+### portraits/cryingcat_eyes · 16:9 · strip
+{EYES} {CRYINGCAT}: two enormous glossy eyes brimming with tears, big light blue tear drops, grey-beige fur, the rim of a light grey-blue helmet at the top edge, the eyes exactly at the vertical centre of the frame. {EYES_CROP} {STYLE_STRIP}
+> model: nano_banana_2
+
+### portraits/xinxian_main · 3:4 · cut
+{XINXIAN}, riding a heavy classic black vintage roadster bicycle with a long top tube, a chain guard and a rear rack, {MAIN}, lunging forward over the handlebars with its mouth open, eyes locked on a fish snack flying just ahead. {STYLE}
+> model: nano_banana_2
+
+### portraits/xinxian_smug · 3:4 · cut
+{XINXIAN}, {BUST}, a street-smart smirk with half-lidded eyes, chewing a freshly grabbed piece of fish. {STYLE}
+> model: nano_banana_2
+
+### portraits/xinxian_hurt · 3:4 · cut
+{XINXIAN}, {BUST}, {DIZZY}, a half-eaten fish snack falling from its paw. {STYLE}
+> model: nano_banana_2
+
+### portraits/xinxian_eyes · 16:9 · strip
+{EYES} {XINXIAN}: two keen sharp green eyes with narrow slit pupils, faint orange tabby stripes on the forehead, the notched ear tip at the edge, the eyes exactly at the vertical centre of the frame. {EYES_CROP} {STYLE_STRIP}
+> model: nano_banana_2
+
+### portraits/moodeng_main · 3:4 · cut
+{MOODENG}, riding a sturdy white mountain bike with fat knobbly tyres, {MAIN}, bouncing on the pedals with its mouth wide open ready to bite. {STYLE}
+> model: nano_banana_2
+
+### portraits/moodeng_smug · 3:4 · cut
+{MOODENG}, {BUST}, a sassy cheeky open-mouthed grin, about to bite, glossy skin shining. {STYLE}
+> model: nano_banana_2
+
+### portraits/moodeng_hurt · 3:4 · cut
+{MOODENG}, {BUST}, {DIZZY}, the white helmet knocked crooked. {STYLE}
+> model: nano_banana_2
+
+### portraits/moodeng_eyes · 16:9 · strip
+{EYES} {MOODENG}: two small round shiny black eyes high on a glossy dark slate-grey hippo head, a feisty glare, the rim of a white helmet with a pink stripe at the top edge, the eyes exactly at the vertical centre of the frame. {EYES_CROP} {STYLE_STRIP}
+> model: nano_banana_2
+
+### portraits/pedro_main · 3:4 · cut
+{PEDRO}, riding a yellow fixie bicycle with bullhorn handlebars, {MAIN}, pedalling while doing a happy little dance with one paw raised, eyes closed in bliss, the ringed tail swinging. {STYLE}
+> model: nano_banana_2
+
+### portraits/pedro_smug · 3:4 · cut
+{PEDRO}, {BUST}, dancing with a blissful closed-eye grin, swaying to music, one paw raised. {STYLE}
+> model: nano_banana_2
+
+### portraits/pedro_hurt · 3:4 · cut
+{PEDRO}, {BUST}, {DIZZY}, a banana peel and a crumpled can flying out of a toppled trash bin behind it. {STYLE}
+> model: nano_banana_2
+
+### portraits/pedro_eyes · 16:9 · strip
+{EYES} {PEDRO}: two shiny dark eyes inside a black raccoon bandit mask with white brows above, grey fur, the rim of a black helmet with a yellow stripe at the top edge, the eyes exactly at the vertical centre of the frame. {EYES_CROP} {STYLE_STRIP}
+> model: nano_banana_2
+
+### portraits/hamster_main · 3:4 · cut
+{HAMSTER}, riding a tiny mint green children's bicycle with training wheels, {MAIN}, pedalling with an endlessly sad face, tears welling in its huge eyes. {STYLE}
+> model: nano_banana_2
+
+### portraits/hamster_smug · 3:4 · cut
+{HAMSTER}, {BUST}, a tiny sad-but-proud smile, playing a tiny violin tucked under its chin, eyes glistening. {STYLE}
+> model: nano_banana_2
+
+### portraits/hamster_hurt · 3:4 · cut
+{HAMSTER}, {BUST}, {DIZZY}, cheek pouches puffed out, a few sunflower seeds flying. {STYLE}
+> model: nano_banana_2
+
+### portraits/hamster_eyes · 16:9 · strip
+{EYES} {HAMSTER}: two ENORMOUS glossy black eyes with two white highlights each, slightly teary, golden-tan fur, the rim of a brown helmet at the top edge, the eyes exactly at the vertical centre of the frame. {EYES_CROP} {STYLE_STRIP}
+> model: nano_banana_2
 
 ## Key art
 

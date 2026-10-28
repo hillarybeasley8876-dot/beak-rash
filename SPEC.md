@@ -554,3 +554,40 @@ below are the starting point. Everything stays kind and cartoonish (pillar 5): n
 - save.ts: SaveData.character / loadouts / blindBox (sanitized; the police corgi is never playable).
 - data/loadouts.ts (defaults, rival kits, validation, 盲盒) · data/skills.ts SkillDef.category / element, slot 'pool'.
 - sim honours mods.steerInvert (mirrored steering) and mods.halted (rider frozen in place).
+
+## 28. r6 — Online rooms (联机): 2–4 friends race through a relay (net unit + relay; core contracts §29)
+- **Model: server-paced deterministic lockstep.** Every client runs the whole race (riders, AI, traffic, combat) from
+  the same RaceConfig and the same per-tick inputs; only inputs travel. A relay (no game logic) owns the clock: at
+  60 ticks/s it bundles the latest input of every human into one tick message and broadcasts it; each tick is two
+  sim substeps of 1/120 s. A client advances only through ticks it received (a short jitter buffer, 2 ticks); its
+  own input takes effect when its tick comes back (input delay = round trip + buffer; never predicted).
+- **Rooms.** 「联机 ONLINE」 on the main menu → create a room (a 4-letter code, alphabet without I/O/0/1/L) or join
+  one by code; 2–4 humans; AI fills the grid to 8. The lobby shows every member (name, character portrait, ready);
+  members pick their racer and kit as on the roster screen; the host picks the track, weather and direction and
+  starts when everyone is ready. The host's client builds the RaceConfig (seed, track, AI field, loadouts — never
+  from anyone's save: no nemesis, no 盲盒 roll after start) and the relay forwards it. Everyone loads; the relay
+  sends `go` when all have loaded (the grid waits, 「等待其他玩家…」, max 30 s, then late loaders are dropped).
+- **Online race rules** (they keep every client's sim identical): no police, no secrets/eggs, no intro flyby (the
+  countdown starts at tick 0), no pause (Esc opens a menu over the running race; 退出 leaves the room), no KO
+  cinematics or slow-mo/hit-stop (presentation must not change sim time), STYLE still scores locally but pays no SP,
+  no nemesis/alliances. Remote humans are never AI-driven; a human who disconnects becomes an AI rider at the tick
+  the relay marks (`left`). The race ends when every human has finished (or 45 s after the first human did); each
+  client shows its own results (humans marked, the local one as YOU).
+- **Sim rules for several humans.** `RiderState.human` marks a human rider (offline: the player). The sim never reads
+  `isPlayer` or `session.player` (those are the LOCAL rider: camera, HUD, audio, achievements). Where the sim reasons
+  about "the player" it uses the humans: the AI rubber band and fairness rules (calm start, one hunter per human,
+  hit budget, grudges) work per human, each AI rider against its nearest human; traffic spawns around every human;
+  a track event starts when the leading human approaches and lives until the last human has passed.
+- **Determinism contract.** (1) Same inputs per tick → bit-identical state on Chromium, Firefox and WebKit, at any
+  quality and frame rate. (2) `Math.sin/cos/tan/asin/acos/atan/atan2/exp/expm1/log/log1p/log2/log10/pow/sinh/cosh/tanh/
+  cbrt/hypot` are replaced at boot by pure-JS ports of fdlibm (`src/net/detmath.ts`): only + − × ÷ and sqrt, which
+  IEEE 754 makes identical everywhere. (3) No sim state lives in module scope across races; no sim decision reads
+  wall-clock time, the camera, the frame rate, the local input outside the tick's controls, the local save or the
+  render quality; presentation never consumes `session.rng`. (4) Every 60 ticks each client sends `session.hash()`;
+  the relay compares and broadcasts `desync`, and clients end the race with 「联机不同步」.
+- **Relay** (`relay/`, Deno, no dependencies): WebSocket `/ws`, JSON messages (protocol in `src/net/protocol.ts`, shared
+  by relay and client). Per room a drift-corrected 60 Hz tick loop; per human the latest analog input (steer
+  −127..127, throttle/brake 0..255, held bits) and the OR of the edge bits since the last tick (an edge is never lost
+  or doubled: a late message lands in the next tick). Limits: 4 humans/room, 4 KB/message, 120 messages/s/client, idle
+  timeout 20 s, rooms die with their last member. `GET /` answers `beak-rash relay ok`. Runs locally with
+  `deno run --allow-net relay/main.ts --port 8790`; the client's relay URL is `?relay=ws://…` or the build's default.

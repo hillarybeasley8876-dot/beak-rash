@@ -16,8 +16,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
-const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const API = 'https://ys-api.xaminim.com/api';
 const PROMPTS = path.join(ROOT, 'public/assets/PROMPTS.md');
 const DEST = path.join(ROOT, 'public/assets');
@@ -199,7 +200,7 @@ async function generate(job, rawFile, editFrom = null) {
 /** Run tools/cutout.py with args; resolves with its summary line. */
 function py(args) {
   return new Promise((resolve, reject) => {
-    const p = spawn('python3', ['-E', path.join(ROOT, 'tools/cutout.py'), ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
+    const p = spawn(process.platform === 'win32' ? 'python' : 'python3', ['-E', path.join(ROOT, 'tools/cutout.py'), ...args], { stdio: ['ignore', 'pipe', 'pipe'] });
     let out = '';
     p.stdout.on('data', (d) => { out += d; });
     p.stderr.on('data', (d) => { out += d; });
@@ -383,7 +384,7 @@ async function main() {
   if (failed.length) process.exitCode = 1;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === new URL(import.meta.url).pathname) {
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main().catch((e) => {
     console.error(`[gen-image] ${e.message}`);
     process.exitCode = 1;
