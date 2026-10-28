@@ -167,7 +167,8 @@ if (!skip.has('net')) {
     cdp.on('Network.responseReceived', (e) => { if (/\.woff2?(\?|$)/.test(e.response.url)) fonts.set(e.requestId, 0); });
     cdp.on('Network.loadingFinished', (e) => { if (fonts.has(e.requestId)) fonts.set(e.requestId, e.encodedDataLength); });
     await page.goto(base + '/', { waitUntil: 'load', timeout: 300000 });
-    await page.waitForFunction(() => window.__br?.app?.ui?.screen === 'title', null, { timeout: 300000 });
+    // the title takes the key once its wipe is done (ui.busy false)
+    await page.waitForFunction(() => window.__br?.app?.ui?.screen === 'title' && !window.__br.app.ui.busy, null, { timeout: 300000 });
     await page.keyboard.press('Enter');
     await page.waitForFunction(() => window.__br.app.ui.screen === 'menu', null, { timeout: 300000 });
     // sample the menu for 3 s: the drawn stand-in (.br-portrait.is-fallback inside the hero) must never be visible
