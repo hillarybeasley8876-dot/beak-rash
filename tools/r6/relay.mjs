@@ -30,7 +30,10 @@ function client(label) {
   const c = { label, ws, inbox: [], closed: false, id: null };
   ws.addEventListener('message', (e) => { try { c.inbox.push(JSON.parse(String(e.data))); } catch { c.inbox.push({ t: '?', raw: String(e.data) }); } });
   ws.addEventListener('close', () => { c.closed = true; });
-  c.open = () => new Promise((res, rej) => { ws.addEventListener('open', () => res(c), { once: true }); ws.addEventListener('error', () => rej(new Error(`${label}: cannot connect`)), { once: true }); });
+  // listen for open right away: a socket may open before the test gets round to waiting for it
+  const opened = new Promise((res, rej) => { ws.addEventListener('open', () => res(c), { once: true }); ws.addEventListener('error', () => rej(new Error(`${label}: cannot connect`)), { once: true }); });
+  opened.catch(() => undefined);
+  c.open = () => opened;
   c.send = (m) => ws.send(typeof m === 'string' ? m : JSON.stringify(m));
   /** Wait for the next message matching `f` (removes it and everything before it); null on timeout. */
   c.next = async (f, ms = 2000) => {
@@ -142,8 +145,11 @@ try {
   const consecutive = ns.every((n, i) => n === i);
   const rate = ticksA.length / elapsed;
   expect(consecutive && rate > 56 && rate < 64, `ticks arrive numbered 0, 1, 2 … at 60 Hz (${ticksA.length} in ${elapsed.toFixed(2)} s = ${rate.toFixed(1)}/s; consecutive ${consecutive})`);
-  expect(ticksA.every((m) => Array.isArray(m.i) && m.i.length === 2) && JSON.stringify(ticksA.map((m) => m.i)) === JSON.stringify(ticksB.slice(0, ticksA.length).map((m) => m.i)),
-    'every tick carries one input per human slot, the same for every member');
+  // compare the ticks both members have received so far (one may be a tick ahead when the inboxes are read)
+  const common = Math.min(ticksA.length, ticksB.length);
+  expect(ticksA.every((m) => Array.isArray(m.i) && m.i.length === 2) && common >= ticksA.length - 2
+    && JSON.stringify(ticksA.slice(0, common).map((m) => m.i)) === JSON.stringify(ticksB.slice(0, common).map((m) => m.i)),
+    `every tick carries one input per human slot, the same for every member (${common} ticks compared)`);
   const steerAfter = ticksA.filter((m, i) => i > 10).every((m) => m.i[0][0] === 50);
   expect(steerAfter, 'a held input stays in every tick until the human sends a new one (A steers 50)');
   const hops = ticksA.filter((m) => (m.i[1][4] & 1) !== 0).length;
