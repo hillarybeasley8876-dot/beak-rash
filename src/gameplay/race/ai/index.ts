@@ -75,6 +75,7 @@ export function createAi(session: Session, form: FormTable): AiDirector {
     senses: new Senses(session),
     bounds: (s) => track.bounds(s),
     blunder,
+    weather: config.weather,
   };
   const offs = [
     app.bus.on('combat:hit', ({ attacker, victim, blocked }) => {

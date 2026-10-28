@@ -1,7 +1,7 @@
 // One AI rider: perception → lane plan → steering/speed → drift/hop → fights/skills.
 import { clamp, lerp, smoothstep } from '../../../core/math';
 import type { Rng } from '../../../core/rng';
-import type { Controls, RiderId, RiderState } from '../../../core/types';
+import type { Controls, RiderId, RiderState, Weather } from '../../../core/types';
 import { Blunder, type BlunderGate } from './blunder';
 import { Driver, topOf } from './control';
 import { Fighter, type HuntToken } from './fight';
@@ -26,6 +26,8 @@ export interface AiWorld {
   bounds(s: number): { left: number; right: number; halfWidth: number };
   /** The director's once-a-race, in-view traffic blunder (blunder.ts). */
   blunder: BlunderGate;
+  /** The race's weather (the thunder skill is keener in the rain: everyone is wet). */
+  weather?: Weather;
 }
 
 const PLAN_EVERY = 0.05;
@@ -204,7 +206,7 @@ export class Brain {
       this.skillT = SKILL_EVERY;
       const straight = this.straightAhead(w);
       const view = { me: r, blips: w.senses.blips, blocked: this.plan.followGap < 8, straight, player: w.player, time: w.time,
-        grudge: this.fighter.grudging, field: w.riders.length, prefer: this.nemesis || this.ally ? w.player : null };
+        grudge: this.fighter.grudging, field: w.riders.length, prefer: this.nemesis || this.ally ? w.player : null, weather: w.weather };
       useSkill(view, this.c, p.skillUse, this.rng.next());
     }
     if (this.ringBell) {
