@@ -10,3 +10,4 @@ desktop/*.log
 desktop/*.ok
 dist-single
 desktop/electron-win
+__pycache__

@@ -1,10 +1,10 @@
-// Fonts used by canvas-drawn signs and road paint (bundled @fontsource, unicode-range slices).
+// Fonts used by canvas-drawn signs and road paint. The Chinese faces come from the generated subset
+// (src/ui/fonts-cjk.css, tools/fonts/subset.py) — the ONE source for those families, so a
+// `document.fonts.load()` below never pulls a second @fontsource copy of the same face (SPEC §26).
 // ensureFonts() waits (bounded) until the glyphs for the given texts are loaded, so canvases drawn
 // right after never fall back to a system font; warmFonts() starts the download early (preload).
 import '@fontsource/anton/400.css';
-import '@fontsource/noto-sans-sc/900.css';
-import '@fontsource/zcool-qingke-huangyou/400.css';
-import '@fontsource/zcool-kuaile/400.css';
+import '../ui/fonts-cjk.css';
 
 export const FONT = {
   en: '"Anton", "Bebas Neue", sans-serif',

@@ -1,13 +1,12 @@
-// Fonts the HUD uses (bundled @fontsource, offline) and a warm-up so the first cut-in never shows
-// fallback glyphs: CJK families are split into unicode-range subsets that load only on first use.
+// Fonts the HUD uses (bundled Latin @fontsource, offline) and a warm-up so the first cut-in never shows
+// fallback glyphs. The Chinese faces come from the generated subset (src/ui/fonts-cjk.css,
+// tools/fonts/subset.py) — the ONE source for those families, so the `document.fonts.load()` calls below
+// fetch only the glyphs the game draws (SPEC §26).
 import '@fontsource/anton/400.css';
 import '@fontsource/bebas-neue/400.css';
 import '@fontsource/bangers/400.css';
 import '@fontsource/black-ops-one/400.css';
-import '@fontsource/zcool-kuaile/400.css';
-import '@fontsource/zcool-qingke-huangyou/400.css';
-import '@fontsource/ma-shan-zheng/400.css';
-import '@fontsource/noto-sans-sc/900.css';
+import '../fonts-cjk.css';
 import { ACHIEVEMENTS } from '../../data/achievements';
 import { POLICE_LINES, ROSTER } from '../../data/roster';
 import { SKILLS } from '../../data/skills';

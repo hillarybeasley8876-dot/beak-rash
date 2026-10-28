@@ -538,7 +538,7 @@ below are the starting point. Everything stays kind and cartoonish (pillar 5): n
   stats) and a 「角色」 entry (roster). The career screen's Tab chip stays as a shortcut.
 - Loading: the menu never shows the drawn stand-in pelican: it waits (≤ 1.2 s) for the menu art behind the boot
   splash / wipe; race-only fonts are not fetched at boot (fonts.ts preloadHudFonts runs when a race starts loading,
-  not in createHud); CJK fonts are subset to the glyphs the game uses (tools/r6/subset-fonts.py, build-time).
+  not in createHud); CJK fonts are subset to the glyphs the game uses (tools/fonts/subset.py, build-time).
 - Density (compared with pre-r4 screenshots): career and quick race go back to big readable cards — 3 cards per row
   at 1280×720, cup names ≥ 32 px, card names ≥ 28 px, chips ≤ 2 per card (weather + one), the race options panel
   folds into the selected card. Race HUD: the STYLE meter and callouts move into one compact column, the air-trick
