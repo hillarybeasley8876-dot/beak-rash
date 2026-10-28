@@ -33,7 +33,7 @@ export function createNet(app: AppContext): NetSystem {
     },
   });
   const room = new RoomState((m) => client.send(m));
-  const currentSession = sessionOf(app);
+  const currentSession = (): Session | null => app.session();
   const lock = new Lockstep(app, (m) => client.send(m), currentSession);
 
   /** The debug surface (window.__br.net) — it appears with the debug API. */
@@ -221,28 +221,4 @@ export function createNet(app: AppContext): NetSystem {
   };
   install();
   return net;
-}
-
-/**
- * The session of the running race. The AppContext has no session field (the core owns the session), so the net
- * unit takes the handle the core hands it: `app.ui.attach(session)` is called with the session when a race
- * starts and with null when it ends. If the core grows an `AppContext.session`, that one is used instead.
- */
-function sessionOf(app: AppContext): () => Session | null {
-  let current: Session | null = null;
-  const ui = app.ui;
-  if (typeof ui.attach === 'function') {
-    const attach = ui.attach.bind(ui);
-    ui.attach = (s: Session | null): void => {
-      current = s;
-      attach(s);
-    };
-  }
-  return (): Session | null => {
-    const own = (app as unknown as { session?: Session | null }).session;
-    if (own) return own;
-    if (current) return current;
-    const br = (window as unknown as { __br?: { session?: () => Session | null } }).__br;
-    return br?.session?.() ?? null;
-  };
 }

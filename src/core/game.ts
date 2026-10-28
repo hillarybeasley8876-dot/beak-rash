@@ -67,6 +67,7 @@ export class Game {
     app.fx = modules.createFx(app);
     app.ui = modules.createUi(app);
     app.audio = modules.createAudio(app);
+    app.session = () => this.session;
     app.net = modules.createNet(app);
     this.app = app;
     this.achievements = modules.createAchievements(app);

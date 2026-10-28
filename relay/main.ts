@@ -32,9 +32,19 @@ const log = (line: string): void => {
 const errText = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
 /** The flags of the relay: `--port`, `--idle-ms`, `--load-ms`, `--grace-ms`. */
+/** The port a host gives the relay through the environment (Render, Fly, …: PORT); run with --allow-env=PORT. */
+function envPort(): number | undefined {
+  try {
+    const v = Number(Deno.env.get('PORT'));
+    return Number.isInteger(v) && v > 0 ? v : undefined;
+  } catch {
+    return undefined;   // no --allow-env: the flag or the default
+  }
+}
+
 function parseFlags(args: string[]): Flags {
   const flags: Flags = {
-    port: 8790,
+    port: envPort() ?? 8790,
     idleMs: IDLE_TIMEOUT_MS,
     loadMs: LOAD_TIMEOUT_MS,
     graceMs: FINISH_GRACE_MS,

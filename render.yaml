@@ -1,0 +1,18 @@
+# Render Blueprint: the online rooms' relay (SPEC §28) as a free web service in Singapore (closest to the players).
+# One click: https://render.com/deploy?repo=https://github.com/hillarybeasley8876-dot/beak-rash
+# Free instances sleep after 15 minutes without traffic; the first player then waits about a minute (the client
+# shows 「服务器唤醒中」 and keeps trying). WebSocket messages count as traffic, so a race keeps it awake.
+services:
+  - type: web
+    name: beak-rash-relay
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./relay/Dockerfile
+    dockerContext: .
+    healthCheckPath: /
+    autoDeploy: true
+    buildFilter:
+      paths:
+        - relay/**
+        - src/net/protocol.ts

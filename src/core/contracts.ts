@@ -35,6 +35,8 @@ export interface AppContext {
   audio: AudioSystem;
   /** r6 (SPEC §28): online rooms — the relay connection, the lobby, and the lockstep driver of online races. */
   net: NetSystem;
+  /** The running race, or null (menus, loading before the session exists). */
+  session(): Session | null;
 }
 
 // ---------------------------------------------------------------- race session
