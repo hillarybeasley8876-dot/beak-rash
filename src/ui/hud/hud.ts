@@ -87,7 +87,7 @@ export function createHud(app: AppContext, layer: HTMLElement): Hud {
       bustAt = null;
       if (s) preloadPortraits(s.player.character, s.riders.filter((r) => !r.isPlayer).map((r) => r.character));
       cluster?.root.remove();
-      cluster = s ? new Cluster(brCorner, s.player.character) : null;
+      cluster = s ? new Cluster(brCorner, s.player.character, s.player.loadout) : null;
       quip.reset(s?.player.character ?? null);
       hints.attach(s, app.save.data.stats.races);
       progress.setRiders(s?.riders ?? []);

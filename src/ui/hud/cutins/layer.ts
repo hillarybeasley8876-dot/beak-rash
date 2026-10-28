@@ -2,7 +2,7 @@
 // chips and intro cards, and decides which cut-in each gameplay event deserves.
 import { approach } from '../../../core/math';
 import { ACHIEVEMENTS } from '../../../data/achievements';
-import { SKILLS } from '../../../data/skills';
+import { SKILLS, type SkillDef } from '../../../data/skills';
 import type { Session } from '../../../core/contracts';
 import type { GameEvents } from '../../../core/events-map';
 import type { CharacterId, RiderId } from '../../../core/types';
@@ -31,6 +31,9 @@ const PERFECT_LAUNCH = 0.25; // rider:boost 'launch' power: perfect 0.3, held th
 const STAMP_AT = 0.2;       // s: the BUSTED stamp lands (splash.ts slam 0.1 + 0.12)
 const PLACE_TICK_GAP = 0.4; // s between place-callout ticks (places flicker in a pack)
 const PICKUPS: Record<string, string> = { coin: '小鱼干', coins: '小鱼干', fish: '+HP 鱼', crate: '武器箱', can: '+SP 罐头', sp: '+SP 罐头' };
+
+/** A skill by id (null when the id is empty or unknown). */
+const skillOf = (id: string | null | undefined): SkillDef | null => (id && SKILLS[id] ? SKILLS[id] : null);
 
 interface PendingKo { attacker: RiderId | null; victim: RiderId; t: number }
 interface Cue { at: number; id: string; volume: number }
@@ -139,7 +142,9 @@ export class CutinLayer {
     const r = this.session?.rider(e.riderId);
     const def = SKILLS[e.skillId];
     if (!r || !def || def.slot === 'ult' || this.bandSeen.has(def.id)) return false;
-    const slot = typeof def.slot === 'number' ? def.slot : 1;
+    // The key is the slot the skill sits in (the rider's own kit), not the catalogue's slot.
+    const at = r.loadout.slots.indexOf(def.id);
+    const slot = at >= 0 ? at + 1 : (typeof def.slot === 'number' ? def.slot : 1);
     const cut = skillBand(def, r.character, SLOT_KEYS[slot - 1] ?? 'skill1');
     if (!this.director.bandIn(() => cut)) return false;
     this.bandSeen.add(def.id);
@@ -161,11 +166,14 @@ export class CutinLayer {
     if (b && this.isMe(e.owner) && e.kind === b.cut.skillId && this.clock - b.at < 0.25) b.cut.thin();
   }
 
-  ultStart(riderId: RiderId): void {
+  /** The SHOWTIME cut-in. `skillId` is the ult that was cast (the event carries it); without it the
+   *  rider's own kit decides — the ult may be any of the shared ones (SPEC §24). */
+  ultStart(riderId: RiderId, skillId?: string): void {
     const s = this.session;
     const r = s?.rider(riderId);
     if (!s || !r) return;
-    const def = Object.values(SKILLS).find((k) => k.owner === r.character && k.slot === 'ult');
+    const def = skillOf(skillId) ?? skillOf(r.loadout.ult)
+      ?? Object.values(SKILLS).find((k) => k.owner === r.character && k.slot === 'ult') ?? null;
     if (!r.isPlayer) {
       if (def) this.chips.push(r.character, def);
       return;

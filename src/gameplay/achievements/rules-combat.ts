@@ -4,9 +4,11 @@
 import type { WeaponId } from '../../core/types';
 import type { AchievementId } from '../../data/achievements';
 import { ROSTER } from '../../data/roster';
+import { SKILLS } from '../../data/skills';
 import type { RuleCtx } from './facts';
 
-const ULT = 'pelican.ult';
+/** r6 (SPEC §23): any ult counts as SHOWTIME — the player may ride a racer with a shared ult (雷暴 …). */
+const isUlt = (skillId: string | null): boolean => skillId !== null && SKILLS[skillId]?.slot === 'ult';
 const DOUBLE_WINDOW = 3;    // s between two KOs for 一鱼两吃
 const TRIPLE_WINDOW = 6;    // s spanning three KOs for 一条龙服务
 const ULT_WINDOW = 3;       // s after the SHOWTIME shockwave that its victims' KOs still count for it
@@ -28,7 +30,7 @@ export function combatRules(ctx: RuleCtx): Array<() => void> {
   /** SHOWTIME's own KOs, and its victims' KOs right after the shockwave (knocked into traffic, finished off). */
   const ultKo = (victim: number, skillId: string | null, t: number): void => {
     const ult = facts.ult;
-    if (skillId !== ULT && !(ult.victims.has(victim) && t - ult.at <= ULT_WINDOW)) return;
+    if (!isUlt(skillId) && !(ult.victims.has(victim) && t - ult.at <= ULT_WINDOW)) return;
     ult.kos += 1;
     if (ult.kos >= 3) ctx.unlock('showtime');
   };
@@ -57,7 +59,7 @@ export function combatRules(ctx: RuleCtx): Array<() => void> {
     ultKo(victim, skillId, t);
     const robbed = ctx.character(victim) === 'seagull' ? facts.robbedBy.get(victim) : undefined;
     if (robbed !== undefined && t - robbed <= PAYBACK_WINDOW) ctx.unlock('payback');
-    if (skillId !== ULT) handKo(victim, skillId, weapon, t);
+    if (!isUlt(skillId)) handKo(victim, skillId, weapon, t);
   };
 
   const onPlayerSkillHit = (skillId: string, victim: number): void => {

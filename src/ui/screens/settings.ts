@@ -75,7 +75,7 @@ export const settingsScreen: ScreenFactory = (ctx) => {
   });
   f.stage.append(list, h('div', { class: 'br-set-desc' },
     h('div', { class: 'br-set-desc-box', vars: { '--clip': jagged('setdesc', { jx: 2, jy: 5, notches: 2 }) } }, h('span', { class: 'br-tag is-red', text: 'INFO' }), desc),
-    portrait('pelican', { mood: 'smug', className: 'br-set-pelican' })));
+    portrait(app.save.data.character, { mood: 'smug', className: 'br-set-pelican' })));
   const resetRow = widgets[ROWS.findIndex((d) => d.kind === 'action')]?.el;
   if (live && resetRow) {
     resetRow.classList.add('is-disabled');

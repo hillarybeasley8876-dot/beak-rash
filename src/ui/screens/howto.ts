@@ -1,12 +1,13 @@
 // howto: four tabs — keyboard map, gamepad map, skills, the new mechanics. ←→ (or click) switch tabs, Esc → menu.
 import './howto.css';
+import type { SaveStore } from '../../core/save';
 import { Nav } from '../nav';
 import { HINT_BACK, HINT_LR, backdrop, h } from '../p5';
 import { frame, type ScreenFactory } from '../screen';
 import { gamepadPage, keyboardPage, newPage, skillsPage } from './howto-pages';
 import { recall, remember } from './memory';
 
-const TABS: Array<[string, string, () => HTMLDivElement]> = [
+const TABS: Array<[string, string, (save: SaveStore) => HTMLDivElement]> = [
   ['键盘', 'KEYBOARD', keyboardPage],
   ['手柄', 'GAMEPAD', gamepadPage],
   ['技能', 'SKILLS', skillsPage],
@@ -19,7 +20,7 @@ export const howtoScreen: ScreenFactory = (ctx) => {
   const f = frame({ id: 'howto', bg, title: { cn: '操作', en: 'HOW TO' }, hints: [HINT_LR, HINT_BACK] });
   const bar = h('div', { class: 'br-ht-tabs' });
   const body = h('div', { class: 'br-ht-body' });
-  const pages = TABS.map(([, , build]) => build());
+  const pages = TABS.map(([, , build]) => build(ctx.app.save));
   const tabs = TABS.map(([cn, en], i) => {
     const tab = h('div', { class: 'br-ht-tab', vars: { '--i': i } }, h('b', { text: cn }), h('span', { text: en }));
     bar.append(tab);

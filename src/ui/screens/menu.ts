@@ -51,7 +51,9 @@ export const menuScreen: ScreenFactory = (ctx) => {
   const bg = backdrop({ tone: 'red', seed: 'menu', star: { x: '74%', y: '46%', size: 1500, color: '#ff1e3c', spin: 60 } });
   bg.append(h('div', { class: 'br-menu-slab' }), h('div', { class: 'br-menu-slab is-white' }));
   const f = frame({ id: 'menu', bg, hints: [HINT_NAV, HINT_OK, HINT_BACK] });
-  const pel = ROSTER.pelican;
+  // r6 (SPEC §23): the hero is the character the player picked. The key art is the PELICAN's, so any
+  // other pick shows its portrait in the same frame instead.
+  const who = ROSTER[app.save.data.character] ?? ROSTER.pelican;
   const cursor = h('div', { class: 'br-menu-cursor', vars: { '--clip': jagged('menu-cursor', { jx: 3, jy: 16, notches: 2 }) } });
   const entries: Entry[] = MENU.map((m, i) => ({ ...m, pick: () => {
     remember('menu', i);
@@ -69,10 +71,10 @@ export const menuScreen: ScreenFactory = (ctx) => {
   const blurb = h('div', { class: 'br-menu-blurb', vars: { '--clip': jagged('blurb', { jx: 1.5, jy: 6, notches: 2 }) } });
   // Generated cut-out bursts out of the frame (P5 style); without it the framed portrait carries the hero.
   const heroFrame = h('div', { class: 'br-menu-frame', vars: { '--clip': jagged('menu-frame', { jx: 3, jy: 3, notches: 2 }) } });
-  // The key art IS the hero (boot warms it early, right after the title art): the drawn pelican is only
+  // The key art IS the hero (boot warms it early, right after the title art): the drawn portrait is only
   // the fallback for a missing or broken file, never a stand-in under the art while it decodes.
-  const framed = (): HTMLDivElement => portrait('pelican', { mood: 'main' });
-  const heroArt = artImage(ART.menu, 'br-menu-art', () => heroFrame.append(framed()));
+  const framed = (): HTMLDivElement => portrait(who.id, { mood: 'main' });
+  const heroArt = who.id === 'pelican' ? artImage(ART.menu, 'br-menu-art', () => heroFrame.append(framed())) : null;
   if (!heroArt) heroFrame.append(framed());
   else heroFrame.classList.add('is-backing');
   // The frame and the art share one box so the whole hero can gulp as one.
@@ -83,10 +85,10 @@ export const menuScreen: ScreenFactory = (ctx) => {
   f.stage.append(
     h('div', { class: 'br-menu-logo' }, ransom('暴力鹈鹕', { seed: 'menu-logo', fonts: 'block', styles: ['wb', 'bw', 'wr'] })),
     list,
-    h('div', { class: 'br-menu-hero' },
+    h('div', { class: 'br-menu-hero', data: { character: who.id } },
       heroWrap,
-      h('div', { class: 'br-menu-name' }, h('b', { text: pel.name }), h('span', { text: pel.codename })),
-      h('div', { class: 'br-menu-epithet', text: pel.title })),
+      h('div', { class: 'br-menu-name' }, h('b', { text: who.name }), h('span', { text: who.codename })),
+      h('div', { class: 'br-menu-epithet', text: who.title })),
     blurb,
     coins.el,
   );

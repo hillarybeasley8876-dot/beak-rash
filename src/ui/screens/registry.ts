@@ -12,6 +12,7 @@ import { menuScreen } from './menu';
 import { pauseScreen } from './pause';
 import { recordsScreen } from './records-screen';
 import { resultsScreen } from './results';
+import { rosterScreen } from './roster';
 import { settingsScreen } from './settings';
 import { titleScreen } from './title';
 import { trackSelectScreen } from './track-select';
@@ -46,7 +47,7 @@ export const SCREENS: Record<ScreenId, ScreenFactory> = {
   credits: creditsScreen,
   race: (ctx) => errorScreen(ctx, 'race'),
   intro: (ctx) => errorScreen(ctx, 'intro'),
-  // r6 (SPEC §23, §26): the roster screen is another job's; the records screen is here.
-  roster: (ctx) => errorScreen(ctx, 'roster'),
+  // r6 (SPEC §23, §26): the roster screen (every racer + the skill loadout); the records screen is here.
+  roster: rosterScreen,
   records: recordsScreen,
 };

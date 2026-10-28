@@ -34,7 +34,7 @@ const DEFS = {
   torpedo: { name: '鱼到病除', desc: '用咸鱼鱼雷击倒对手', icon: '鱼' },
   gulp: { name: '吃了吗您', desc: '用大嘴吞噬吞下小个子对手', icon: '吞' },
   wing: { name: '大鹏展翅', desc: '一次翼展冲刺撞开三名对手', icon: '翼' },
-  showtime: { name: 'SHOWTIME', desc: '用鹈鹕天降一次击倒三名对手', icon: '天' },
+  showtime: { name: 'SHOWTIME', desc: '用大招一次击倒三名对手', icon: '天' },
   // ---- riding
   perfect_start: { name: '赢在起跑线', desc: '完美起步', icon: '起' },
   drift3: { name: '粉色火花', desc: '放出一次三段漂移加速', icon: '漂' },

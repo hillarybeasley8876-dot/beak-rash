@@ -1,7 +1,10 @@
 // How-to pages: keyboard map, gamepad map (code-drawn controller with callouts), skills, the new r4
 // mechanics. The words come from the content unit's data/strings.ts (HOWTO_*); this file owns the drawings
 // and the layout.
-import { PLAYER_SKILLS, PLAYER_ULT, SKILLS } from '../../data/skills';
+import type { SaveStore } from '../../core/save';
+import { validLoadout } from '../../data/loadouts';
+import { ROSTER } from '../../data/roster';
+import { SKILLS } from '../../data/skills';
 import { HOWTO_BASICS, HOWTO_GAMEPAD, HOWTO_KEYBOARD, HOWTO_NEW, HOWTO_SKILL_TIPS, HOWTO_SP, type HowtoGroup } from '../../data/strings';
 import { h, svg } from '../p5';
 
@@ -95,13 +98,19 @@ export function gamepadPage(): HTMLDivElement {
   return page;
 }
 
-export function skillsPage(): HTMLDivElement {
+/** The 技能 tab: the picked character's current kit (SPEC §24) — its three slots and its ult, with the
+ *  in-race key under each card and the tip the content unit wrote for the skills that have one. */
+export function skillsPage(save: SaveStore): HTMLDivElement {
   const keys = ['U', 'I', 'O'];
   const padKeys = ['LB', '✚↑', '✚↓'];
-  const cards = [...PLAYER_SKILLS, PLAYER_ULT].map((id, i) => {
+  const who = save.data.character;
+  const loadout = validLoadout(save.data.loadouts[who], who);
+  const ids: Array<string | null> = [loadout.slots[0], loadout.slots[1], loadout.slots[2], loadout.ult];
+  const cards = ids.map((id, i) => {
+    if (!id) return null;
     const s = SKILLS[id];
     if (!s) return null;
-    const ult = id === PLAYER_ULT;
+    const ult = i === 3;
     const tip = HOWTO_SKILL_TIPS[id];
     return h('div', { class: `br-ht-skill${ult ? ' is-ult' : ''}`, vars: { '--i': i } },
       h('div', { class: 'br-ht-diamond' }, h('b', { text: s.glyph })),
@@ -115,7 +124,14 @@ export function skillsPage(): HTMLDivElement {
   });
   const sp = h('div', { class: 'br-ht-sp' }, h('span', { class: 'br-tag is-yellow', text: 'SP' }),
     h('span', { text: HOWTO_SP }));
-  return h('div', { class: 'br-ht-page is-skills' }, h('div', { class: 'br-ht-cards' }, ...cards), sp);
+  const head = h('div', {
+    class: 'br-ht-shead',
+    style: 'position:absolute;right:0;top:640px;display:flex;align-items:baseline;gap:14px',
+  },
+    h('span', { class: 'br-tag is-red', text: 'KIT' }),
+    h('b', { text: ROSTER[who].name, style: 'font-family:var(--f-cn-block);font-weight:400;font-size:34px' }),
+    h('span', { text: ROSTER[who].codename, style: 'font-family:var(--f-display);font-weight:400;font-size:24px;letter-spacing:.06em;color:var(--red)' }));
+  return h('div', { class: 'br-ht-page is-skills' }, head, h('div', { class: 'br-ht-cards' }, ...cards), sp);
 }
 
 /** The 「新玩法 NEW」 tab: one card per r4 mechanic, with its keyboard and gamepad keys. The words come

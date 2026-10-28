@@ -1,0 +1,153 @@
+/* Roster screen (SPEC §23): a grid of every racer on the left, the focused one's detail, its loadout
+   slots and the 盲盒 toggle on the right. Sized in stage pixels (the stage is 1920×1080). */
+.br-rs-grid {
+  position: absolute;
+  left: 56px; top: 246px; width: 1060px; height: 754px;
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 5), 1fr);
+  grid-template-rows: repeat(var(--rows, 3), 1fr);
+  gap: 18px 16px;
+}
+.br-rs-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 8px 8px;
+  background: var(--white);
+  color: var(--ink);
+  transform: skewX(var(--skew));
+  box-shadow: 6px 6px 0 rgba(11, 11, 15, 0.9);
+  transition: transform 0.12s var(--ease-out), box-shadow 0.12s;
+}
+.br-rs-card > * { transform: skewX(calc(var(--skew) * -1)); }
+.br-rs-pic { width: 100%; flex: 1 1 auto; min-height: 0; background: var(--ink); overflow: hidden; }
+.br-rs-pic .br-portrait { width: 100%; height: 100%; }
+.br-rs-cname { font-family: var(--f-cn-block); font-weight: 400; font-size: 30px; line-height: 1.1; white-space: nowrap; }
+.br-rs-ccode { font-family: var(--f-display); font-weight: 400; font-size: 20px; letter-spacing: 0.06em; color: var(--red); white-space: nowrap; }
+/* 出战: the badge of the character the player rides. */
+.br-rs-badge {
+  position: absolute; right: -6px; top: -10px;
+  display: none;
+  padding: 2px 12px 0;
+  background: var(--red); color: var(--white);
+  font-family: var(--f-cn-block); font-size: 24px;
+  transform: skewX(calc(var(--skew) * -1)) rotate(-4deg);
+  box-shadow: 4px 4px 0 var(--ink);
+}
+.br-rs-card.is-picked { box-shadow: 6px 6px 0 var(--red); }
+.br-rs-card.is-picked .br-rs-badge { display: block; }
+.br-rs-card.is-focus { transform: skewX(var(--skew)) translate(-6px, -6px) scale(1.05); box-shadow: 10px 10px 0 var(--red); z-index: 2; }
+
+/* ---------- the right column: detail, loadout, 盲盒 ---------- */
+.br-rs-side { position: absolute; left: 1160px; top: 40px; width: 720px; height: 960px; display: flex; flex-direction: column; gap: 14px; }
+.br-rs-detail {
+  flex: 1 1 auto; min-height: 0;
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 16px 20px 18px;
+  background: var(--ink);
+  border: 4px solid var(--white);
+  box-shadow: 8px 8px 0 rgba(229, 25, 28, 0.85);
+}
+.br-rs-dtop { display: flex; gap: 18px; }
+.br-rs-dpic { flex: 0 0 232px; height: 268px; background: var(--white); overflow: hidden; }
+.br-rs-dpic .br-portrait { width: 100%; height: 100%; }
+.br-rs-did { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.br-rs-dname .br-rn { font-size: 56px; }
+.br-rs-dcode { font-family: var(--f-display); font-weight: 400; font-size: 34px; letter-spacing: 0.06em; color: var(--red); }
+.br-rs-dtitle { font-family: var(--f-cn-block); font-weight: 400; font-size: 30px; color: var(--white); }
+.br-rs-dtag { font-size: 24px; line-height: 1.3; color: rgba(255, 255, 255, 0.78); }
+.br-rs-dstats { display: flex; flex-direction: column; gap: 4px; padding-top: 4px; border-top: 3px solid rgba(255, 255, 255, 0.2); }
+/* The stat labels are set in the heavy body face: the display face's glyphs are drawn narrower than
+   their advance, so a right-aligned label in a fixed box loses the last glyph's edge. */
+.br-rs-dstats .br-stat { font-family: var(--f-cn-heavy); }
+.br-rs-dstats .br-stat-label { padding-right: 0.3em; }
+.br-rs-dsig { display: flex; align-items: center; gap: 16px; padding-top: 10px; border-top: 3px solid rgba(255, 255, 255, 0.2); }
+.br-rs-sglyph {
+  flex: 0 0 84px; height: 84px; display: grid; place-items: center;
+  background: var(--red); color: var(--white);
+  font-family: var(--f-cn-block); font-size: 44px;
+  transform: rotate(-4deg);
+  box-shadow: 5px 5px 0 var(--white);
+}
+.br-rs-stext { flex: 1 1 auto; min-width: 0; }
+.br-rs-sname { display: block; font-family: var(--f-cn-block); font-weight: 400; font-size: 30px; color: var(--white); }
+.br-rs-sen { display: block; font-family: var(--f-display); font-weight: 400; font-size: 22px; letter-spacing: 0.06em; color: var(--yellow); }
+.br-rs-sdesc { margin: 2px 0 0; font-size: 21px; line-height: 1.25; color: rgba(255, 255, 255, 0.8); }
+.br-rs-smeta { flex: 0 0 auto; padding: 4px 12px 2px; background: var(--white); color: var(--ink); font-family: var(--f-cn-block); font-size: 24px; transform: skewX(var(--skew)); }
+
+/* ---------- the loadout row ---------- */
+.br-rs-slots { flex: 0 0 auto; display: flex; gap: 12px; }
+.br-rs-slot {
+  flex: 1 1 0; min-width: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 10px 6px 8px;
+  background: var(--white); color: var(--ink);
+  transform: skewX(var(--skew));
+  box-shadow: 5px 5px 0 rgba(11, 11, 15, 0.9);
+}
+.br-rs-slot > * { transform: skewX(calc(var(--skew) * -1)); }
+.br-rs-slot-glyph {
+  width: 78px; height: 78px; display: grid; place-items: center;
+  background: var(--ink); color: var(--white);
+  font-family: var(--f-cn-block); font-size: 40px;
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+.br-rs-slot-name { font-family: var(--f-cn-block); font-weight: 400; font-size: 23px; line-height: 1.1; text-align: center; white-space: nowrap; }
+.br-rs-slot-key { font-family: var(--f-display); font-weight: 400; font-size: 20px; letter-spacing: 0.06em; color: var(--red); }
+.br-rs-slot.is-empty { background: rgba(255, 255, 255, 0.4); }
+.br-rs-slot.is-empty .br-rs-slot-name { color: #7a7a84; }
+.br-rs-slot.is-focus { background: var(--red); color: var(--white); box-shadow: 7px 7px 0 var(--ink); }
+.br-rs-slot.is-focus .br-rs-slot-glyph { background: var(--white); color: var(--ink); }
+.br-rs-slot.is-focus .br-rs-slot-key { color: var(--white); }
+.br-rs-slot.is-focus .br-rs-slot-name { color: var(--white); }
+
+/* ---------- 盲盒 ---------- */
+.br-rs-blind {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: 16px;
+  padding: 8px 18px 6px;
+  background: var(--ink); color: var(--white);
+  border: 3px solid var(--white);
+  cursor: pointer;
+  transform: skewX(var(--skew));
+}
+.br-rs-blind > * { transform: skewX(calc(var(--skew) * -1)); }
+.br-rs-blind-tag { padding: 2px 14px 0; background: var(--white); color: var(--ink); font-family: var(--f-cn-block); font-size: 28px; }
+.br-rs-blind-note { flex: 1 1 auto; font-size: 22px; color: rgba(255, 255, 255, 0.8); }
+.br-rs-blind-state { font-family: var(--f-cn-block); font-size: 24px; color: var(--grey); }
+.br-rs-blind.is-on { border-color: var(--red); }
+.br-rs-blind.is-on .br-rs-blind-tag { background: var(--red); color: var(--white); }
+.br-rs-blind.is-on .br-rs-blind-state { color: var(--yellow); }
+
+/* ---------- the skill picker (over the screen) ---------- */
+.br-rs-pick { position: absolute; inset: 0; z-index: 20; display: grid; place-items: center; background: rgba(11, 11, 15, 0.74); pointer-events: auto; }
+.br-rs-pick-panel { width: 1080px; height: 900px; display: flex; flex-direction: column; gap: 10px; }
+.br-rs-pick-head { display: flex; align-items: baseline; gap: 16px; }
+.br-rs-pick-head b { font-family: var(--f-cn-block); font-weight: 400; font-size: 40px; }
+.br-rs-pick-char { font-family: var(--f-display); font-weight: 400; font-size: 26px; letter-spacing: 0.06em; color: var(--red); }
+.br-rs-pick-list { position: relative; flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; }
+.br-rs-pick-cat {
+  position: sticky; top: 0; z-index: 1;
+  padding: 3px 14px 1px;
+  background: var(--red); color: var(--white);
+  font-family: var(--f-cn-block); font-weight: 400; font-size: 26px;
+}
+.br-rs-pick-row { display: flex; align-items: center; gap: 14px; padding: 6px 12px 8px; border-bottom: 2px solid rgba(255, 255, 255, 0.12); }
+.br-rs-pick-glyph {
+  flex: 0 0 56px; height: 56px; display: grid; place-items: center;
+  background: var(--white); color: var(--ink);
+  font-family: var(--f-cn-block); font-size: 30px;
+}
+.br-rs-pick-text { flex: 1 1 auto; min-width: 0; }
+.br-rs-pick-name { font-family: var(--f-cn-block); font-weight: 400; font-size: 26px; color: var(--white); }
+.br-rs-pick-en { margin-left: 12px; font-family: var(--f-display); font-weight: 400; font-size: 18px; letter-spacing: 0.06em; color: var(--yellow); }
+.br-rs-pick-desc { margin: 0; font-size: 19px; line-height: 1.25; color: rgba(255, 255, 255, 0.75); }
+.br-rs-pick-cd { flex: 0 0 auto; font-family: var(--f-display); font-weight: 400; font-size: 22px; color: var(--white); white-space: nowrap; }
+.br-rs-pick-el { flex: 0 0 auto; width: 46px; height: 46px; display: grid; place-items: center; background: var(--yellow); color: var(--ink); font-family: var(--f-cn-block); font-size: 24px; }
+.br-rs-pick-row.is-focus { background: var(--red); }
+.br-rs-pick-row.is-focus .br-rs-pick-desc { color: var(--white); }
+.br-rs-pick-row.is-focus .br-rs-pick-glyph { background: var(--white); }
+.br-rs-pick-foot { display: flex; align-items: center; justify-content: flex-end; gap: 10px; font-family: var(--f-cn-block); font-weight: 400; font-size: 22px; }
+

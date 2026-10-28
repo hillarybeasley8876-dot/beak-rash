@@ -4,7 +4,7 @@
 import './css/cluster.css';
 import { approach, clamp01 } from '../../core/math';
 import { ROSTER } from '../../data/roster';
-import type { CharacterId, RiderState } from '../../core/types';
+import type { CharacterId, RiderState, SkillLoadout } from '../../core/types';
 import { shake } from './anim';
 import { PortraitCard } from './badge';
 import { CastTag } from './casttag';
@@ -41,11 +41,11 @@ export class Cluster {
 
   private gaugeOp = 1;
 
-  constructor(parent: HTMLElement, character: CharacterId) {
+  constructor(parent: HTMLElement, character: CharacterId, loadout: SkillLoadout) {
     const def = ROSTER[character];
     this.root = el('div', 'cl', parent);
     this.rootW = w(this.root);
-    this.skills = new SkillRow(this.root, character);
+    this.skills = new SkillRow(this.root, loadout);
     const bars = el('div', 'cl-bars', this.root);
     this.hp = this.makeBar(bars, 'cl-hp', 'HP', true);
     this.sp = this.makeBar(bars, 'cl-sp', 'SP', false);

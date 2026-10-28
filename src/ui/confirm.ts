@@ -2,6 +2,9 @@
 // big slanted buttons and a pelican sticker. Keyboard/pad: ←→ pick, Enter/Space/A confirm, Esc/B = no.
 import './confirm.css';
 import type { Action } from '../core/input';
+import { SaveStore } from '../core/save';
+import type { CharacterId } from '../core/types';
+import { ROSTER } from '../data/roster';
 import { button, h, jagged, portrait, ransom, starSvg, svg } from './p5';
 import { Nav } from './nav';
 
@@ -13,6 +16,13 @@ export interface Modal {
 
 /** A double-click that opened the modal must not land its second click on the veil and cancel it. */
 const VEIL_GUARD_MS = 320;
+
+/** r6 (SPEC §23): the sticker is the character the player rides. The shell owns the modal and hands over
+ *  no save, so the sticker reads the profile from the store. */
+function pickedCharacter(): CharacterId {
+  const c = new SaveStore().data.character;
+  return ROSTER[c]?.racer ? c : 'pelican';
+}
 
 export function openConfirm(
   host: HTMLElement, title: string, text: string, yes: string, no: string, sfx: (id: string) => void,
@@ -29,7 +39,7 @@ export function openConfirm(
         ransom(title, { seed: `m${title}`, slam: true, fonts: 'block', first: 'wr', className: 'br-modal-title' })),
       h('div', { class: 'br-modal-text', text }),
       h('div', { class: 'br-modal-row' }, yesBtn, noBtn)),
-    portrait('pelican', { mood: 'hurt', className: 'br-modal-pelican' }));
+    portrait(pickedCharacter(), { mood: 'hurt', className: 'br-modal-pelican' }));
   const veil = h('div', { class: 'br-modal' }, box);
   const openedAt = performance.now();
   let veilDown = false;
