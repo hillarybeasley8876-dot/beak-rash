@@ -93,3 +93,26 @@
 .br-ht-nlines p { margin: 0 0 2px; font-family: var(--f-cn-play); font-weight: 400; font-size: 21px; line-height: 1.32; color: rgba(255, 255, 255, 0.9); }
 .br-ht-ncard.is-wide .br-ht-nlines { column-count: 2; column-gap: 22px; }
 .br-ht-ncard.is-wide .br-ht-nlines p { break-inside: avoid; }
+
+/* ---------- elements & reactions (r6, SPEC §24) ---------- */
+/* Five badges across the top of the 1760×740 body, each: the element in its colour, what it leaves on the
+   rider, and the skills that carry it. */
+.br-ht-el-row { position: absolute; left: 0; top: 0; width: 1760px; display: flex; gap: 20px; }
+.br-ht-el { width: 336px; height: 250px; padding: 16px 18px 0; background: rgba(255, 255, 255, 0.06); border-left: 10px solid var(--c); animation: br-rise 0.3s var(--ease-out) both; animation-delay: calc(var(--i) * 50ms); }
+.br-ht-el-badge { width: 74px; height: 74px; display: grid; place-items: center; background: var(--c); rotate: 45deg; box-shadow: 6px 6px 0 var(--ink); }
+.br-ht-el-badge b { rotate: -45deg; font-family: var(--f-cn-block); font-weight: 400; font-size: 44px; color: var(--ink); }
+.br-ht-el-leaves { margin-top: 20px; font-family: var(--f-cn-block); font-weight: 400; font-size: 30px; color: var(--white); white-space: nowrap; }
+.br-ht-el-skills { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 4px 8px; }
+.br-ht-el-skills span { padding: 1px 8px 0; background: rgba(0, 0, 0, 0.45); border-left: 4px solid var(--c); font-family: var(--f-cn-play); font-weight: 400; font-size: 28px; color: rgba(255, 255, 255, 0.92); white-space: nowrap; }
+/* The seven reactions in two columns of four: 「A + B = 反应」 and one line of what it does. */
+.br-ht-rx { position: absolute; left: 0; top: 286px; width: 1760px; height: 454px; display: grid; grid-template-columns: 860px 860px; grid-auto-rows: 106px; gap: 10px 40px; }
+.br-ht-rxn { display: flex; align-items: center; gap: 14px; padding: 0 16px; background: rgba(255, 255, 255, 0.05); animation: br-fade-in 0.2s var(--ease-out) both; animation-delay: calc(var(--i) * 30ms); }
+.br-ht-rx-pair { display: flex; align-items: center; gap: 8px; }
+.br-ht-chip { min-width: 54px; padding: 2px 8px 0; background: var(--c); color: var(--ink); font-family: var(--f-cn-block); font-weight: 400; font-size: 34px; text-align: center; transform: skewX(var(--skew)); }
+.br-ht-chip.is-any { background: var(--white); font-size: 28px; }
+.br-ht-op { font-family: var(--f-display); font-weight: 400; font-size: 30px; color: rgba(255, 255, 255, 0.7); }
+.br-ht-word { font-family: var(--f-cn-block); font-weight: 400; font-size: 40px; color: var(--c); white-space: nowrap; }
+.br-ht-rtext { font-family: var(--f-cn-play); font-weight: 400; font-size: 28px; color: rgba(255, 255, 255, 0.88); }
+.br-ht-note { display: flex; align-items: center; gap: 14px; padding: 0 16px; background: rgba(229, 25, 28, 0.14); border-left: 10px solid var(--red); font-family: var(--f-cn-heavy); font-weight: 900; font-size: 29px; color: var(--white); }
+.br-ht-note .br-tag { font-size: 28px; }
+

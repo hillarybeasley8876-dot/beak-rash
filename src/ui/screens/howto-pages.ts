@@ -4,8 +4,8 @@
 import type { SaveStore } from '../../core/save';
 import { validLoadout } from '../../data/loadouts';
 import { ROSTER } from '../../data/roster';
-import { SKILLS } from '../../data/skills';
-import { HOWTO_BASICS, HOWTO_GAMEPAD, HOWTO_KEYBOARD, HOWTO_NEW, HOWTO_SKILL_TIPS, HOWTO_SP, type HowtoGroup } from '../../data/strings';
+import { ELEMENT_CN, ELEMENT_COLOR, REACTION_CN, REACTION_COLOR, SKILLS } from '../../data/skills';
+import { HOWTO_BASICS, HOWTO_ELEMENTS, HOWTO_ELEMENTS_NOTE, HOWTO_GAMEPAD, HOWTO_KEYBOARD, HOWTO_NEW, HOWTO_REACTIONS, HOWTO_SKILL_TIPS, HOWTO_SP, type HowtoGroup } from '../../data/strings';
 import { h, svg } from '../p5';
 
 type Group = HowtoGroup['id'] | null;
@@ -150,4 +150,38 @@ export function newPage(): HTMLDivElement {
     grid.append(box);
   }
   return h('div', { class: 'br-ht-page is-new' }, grid);
+}
+
+/** A skill's display name, or its id when the catalogue no longer has it (never a blank chip). */
+function skillName(id: string): string {
+  const s = SKILLS[id];
+  if (!s) console.warn(`[ui] howto: no SKILLS entry for "${id}"`);
+  return s ? s.name : id;
+}
+
+/** The 「元素 ELEMENTS」 tab (SPEC §24): the five element badges, the seven reactions and the rain note.
+ *  The words come from the content unit's HOWTO_ELEMENTS / HOWTO_REACTIONS; the colours from skills.ts. */
+export function elementsPage(): HTMLDivElement {
+  const row = h('div', { class: 'br-ht-el-row' });
+  for (const [i, el] of HOWTO_ELEMENTS.entries()) {
+    row.append(h('div', { class: 'br-ht-el', vars: { '--i': i, '--c': ELEMENT_COLOR[el.id] } },
+      h('div', { class: 'br-ht-el-badge' }, h('b', { text: ELEMENT_CN[el.id] })),
+      h('div', { class: 'br-ht-el-leaves', text: el.leaves }),
+      h('div', { class: 'br-ht-el-skills' }, ...el.skills.map((id) => h('span', { text: skillName(id) })))));
+  }
+  const grid = h('div', { class: 'br-ht-rx' });
+  for (const [i, r] of HOWTO_REACTIONS.entries()) {
+    const pair = h('div', { class: 'br-ht-rx-pair' },
+      h('span', { class: 'br-ht-chip', vars: { '--c': ELEMENT_COLOR[r.a] }, text: ELEMENT_CN[r.a] }),
+      h('span', { class: 'br-ht-op', text: '+' }),
+      r.b === 'any'
+        ? h('span', { class: 'br-ht-chip is-any', text: '元素' })
+        : h('span', { class: 'br-ht-chip', vars: { '--c': ELEMENT_COLOR[r.b] }, text: ELEMENT_CN[r.b] }),
+      h('span', { class: 'br-ht-op', text: '=' }));
+    grid.append(h('div', { class: 'br-ht-rxn', vars: { '--i': i } }, pair,
+      h('b', { class: 'br-ht-word', vars: { '--c': REACTION_COLOR[r.reaction] }, text: REACTION_CN[r.reaction] }),
+      h('span', { class: 'br-ht-rtext', text: r.text })));
+  }
+  grid.append(h('div', { class: 'br-ht-note' }, h('span', { class: 'br-tag is-red', text: '雨' }), h('span', { text: HOWTO_ELEMENTS_NOTE })));
+  return h('div', { class: 'br-ht-page is-elements' }, row, grid);
 }

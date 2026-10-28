@@ -1,10 +1,11 @@
-// howto: four tabs — keyboard map, gamepad map, skills, the new mechanics. ←→ (or click) switch tabs, Esc → menu.
+// howto: five tabs — keyboard map, gamepad map, skills, the new mechanics, the elements. ←→ (or click)
+// switch tabs, Esc → menu.
 import './howto.css';
 import type { SaveStore } from '../../core/save';
 import { Nav } from '../nav';
 import { HINT_BACK, HINT_LR, backdrop, h } from '../p5';
 import { frame, type ScreenFactory } from '../screen';
-import { gamepadPage, keyboardPage, newPage, skillsPage } from './howto-pages';
+import { elementsPage, gamepadPage, keyboardPage, newPage, skillsPage } from './howto-pages';
 import { recall, remember } from './memory';
 
 const TABS: Array<[string, string, (save: SaveStore) => HTMLDivElement]> = [
@@ -12,6 +13,7 @@ const TABS: Array<[string, string, (save: SaveStore) => HTMLDivElement]> = [
   ['手柄', 'GAMEPAD', gamepadPage],
   ['技能', 'SKILLS', skillsPage],
   ['新玩法', 'NEW', newPage],
+  ['元素', 'ELEMENTS', elementsPage],
 ];
 
 export const howtoScreen: ScreenFactory = (ctx) => {

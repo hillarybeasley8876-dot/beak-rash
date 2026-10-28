@@ -1,6 +1,6 @@
 // UI copy owned by the content unit: how-to, credits, loading-calendar 宜/忌, grade quotes, announcer
 // callouts and wreck lines. Screens/HUD read these; keep keys stable (add, never rename).
-import type { CrashCause, TrackId } from '../core/types';
+import type { CrashCause, Element, Reaction, TrackId } from '../core/types';
 import { CALENDAR_LINES as GOBI_CALENDAR } from './track-content/gobi';
 import { CALENDAR_LINES as WATERTOWN_CALENDAR } from './track-content/watertown';
 
@@ -129,21 +129,49 @@ export const HOWTO_NEW: HowtoNewCard[] = [
     '反向：同一条路倒着骑',
     '随机路线：同种子同一条路',
   ] },
-  // r6 (SPEC §24): the elements and the reactions they make.
-  { id: 'elements', cn: '元素反应', en: 'REACTIONS', wide: true, keys: [], lines: [
-    '火 + 水 = 蒸发：爆发伤害',
-    '火 + 冰 = 融化：爆发伤害',
-    '水 + 冰 = 冻结：冻住对方',
-    '雷 + 水 = 感电：电流传给周围湿身的人',
-    '雷 + 冰 = 超导：对方减速，护盾破碎',
-    '雷 + 火 = 超载：爆炸掀开周围的人',
-    '风 + 元素 = 扩散：元素吹给旁边的人',
-    '火：烧，持续掉血',
-    '冰：叠三层寒冷就冻住',
-    '雷：留下感电标记',
-    '水：淋湿；下雨天全员湿身',
-  ] },
 ];
+
+// ---------------------------------------------------------------- how to play: the elements (r6, SPEC §24)
+/** One element badge on the 「元素 ELEMENTS」 tab: what it leaves on the rider it hits, and the skills
+ *  that carry it (ids from data/skills.ts SKILLS — the tab prints their names). */
+export interface HowtoElement {
+  id: Element;
+  /** What the element leaves on whoever it hits. */
+  leaves: string;
+  /** Two or three skills that put it there. */
+  skills: string[];
+}
+
+/** One reaction row: 「A + B = 反应」 and what it does. `b` is the second element; 'wind' pairs with any. */
+export interface HowtoReaction {
+  a: Element;
+  b: Element | 'any';
+  reaction: Reaction;
+  text: string;
+}
+
+/** 火 水 冰 雷 leave a mark on the rider; 风 carries other people's marks around. */
+export const HOWTO_ELEMENTS: HowtoElement[] = [
+  { id: 'fire', leaves: '着火：持续掉血', skills: ['pool.firebreath', 'pool.rocket', 'ult.meteor'] },
+  { id: 'water', leaves: '淋湿：减速，雷能顺着他传', skills: ['pool.watergun', 'pool.bubble', 'cryingcat.tears'] },
+  { id: 'ice', leaves: '寒冷：叠三层就冻住', skills: ['pool.icelance', 'pool.snowball'] },
+  { id: 'thunder', leaves: '感电：等一个湿身的人', skills: ['pool.thunder', 'ult.storm'] },
+  { id: 'wind', leaves: '扩散：把身上的元素吹给旁人', skills: ['pool.tornado'] },
+];
+
+/** The seven reactions (SPEC §24), in the order the tab lists them. */
+export const HOWTO_REACTIONS: HowtoReaction[] = [
+  { a: 'fire', b: 'water', reaction: 'vaporize', text: '爆发伤害' },
+  { a: 'fire', b: 'ice', reaction: 'melt', text: '爆发伤害' },
+  { a: 'water', b: 'ice', reaction: 'freeze', text: '当场冻住' },
+  { a: 'thunder', b: 'water', reaction: 'electro', text: '电流顺着湿身的人传一串' },
+  { a: 'thunder', b: 'ice', reaction: 'superconduct', text: '减速，护盾破碎' },
+  { a: 'thunder', b: 'fire', reaction: 'overload', text: '爆炸掀开周围的人' },
+  { a: 'wind', b: 'any', reaction: 'swirl', text: '身上的元素吹给旁边的人' },
+];
+
+/** The tab's closing line: why rain changes every fight. */
+export const HOWTO_ELEMENTS_NOTE = '下雨天所有人都是湿的——一个雷就能电一串';
 
 // ---------------------------------------------------------------- credits
 export const CREDITS: Array<[role: string, name: string]> = [
