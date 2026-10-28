@@ -234,7 +234,8 @@ export const rosterScreen: ScreenFactory = (ctx) => {
       if (picker) return picker.handle(a);
       if (a === 'back') {
         ctx.sfx('ui.back');
-        ctx.go('menu');
+        // r6 (SPEC §28): the roster opened from the lobby goes back to the lobby, not to the menu.
+        ctx.go(ctx.from === 'lobby' ? 'lobby' : 'menu');
         return true;
       }
       if (a === 'bell') { toggleBlind(); return true; }

@@ -12,7 +12,7 @@ import { HINT_BACK, HINT_LR, HINT_OK, backdrop, button, h, reducedMotion } from 
 import { applyRewards, careerEvent, cupName, isCareerFinal, type Reward } from '../progress';
 import { frame, type ScreenFactory } from '../screen';
 import { achievementChips, achievementPanel } from './results-achievements';
-import { DEMO_ACHIEVEMENTS, demoResults, leaveRace, nextRace } from './results-flow';
+import { DEMO_ACHIEVEMENTS, backToRoom, demoResults, leaveRace, nextRace } from './results-flow';
 import { coinCounter, gradeBlock, podium, raceReport, standingsTable } from './results-parts';
 
 const LOCK_MS = 900;   // after the reveal: the RESULTS slam lands before the row can arm
@@ -34,13 +34,15 @@ export const resultsScreen: ScreenFactory = (ctx) => {
   const seed = config?.seed ?? 0;
   const track = TRACKS[config?.trackId ?? 'coast'];
   const career = config?.mode === 'career';
+  // r6 (SPEC §28): an online race ends in the room, not in a new local race.
+  const online = !!config?.online;
   const bg = backdrop({ tone: 'red', seed: 'results', star: { x: '78%', y: '34%', size: 1500, color: '#ff1e3c', spin: 50 } });
   bg.append(h('div', { class: 'br-res-slab' }));
   const home = career ? 'career' : 'menu';
-  const f = frame({ id: 'results', bg, hints: [HINT_LR, HINT_OK, { ...HINT_BACK, label: career ? '巡回赛' : '主菜单' }] });
+  const f = frame({ id: 'results', bg, hints: [HINT_LR, HINT_OK, { ...HINT_BACK, label: online ? '回到房间' : career ? '巡回赛' : '主菜单' }] });
   const counter = coinCounter(reward, ctx.sfx);
   ctx.sfx('ui.cutin'); // RESULTS slam
-  const sub = `${career ? `CAREER · TIER ${config.level}` : 'QUICK RACE'} · ${track.name}`;
+  const sub = `${online ? 'ONLINE ROOM' : career ? `CAREER · TIER ${config.level}` : 'QUICK RACE'} · ${track.name}`;
   const best = reward.newBest ? '新纪录 NEW BEST!' : reward.firstFinish ? '首次完赛 FIRST FINISH' : null;
   const unlock = reward.unlocked ? `解锁 ${TRACKS[reward.unlocked.trackId].name} · TIER ${reward.unlocked.tier}` : null;
   const clear = clearText(reward);
@@ -66,22 +68,25 @@ export const resultsScreen: ScreenFactory = (ctx) => {
   const next = nextRace(ctx, config);
   const ev = careerEvent(config);
   const finalEvent = ev !== null && isCareerFinal(ev);
-  const actions = [
-    { label: '再来一局', sub: 'RETRY', run: () => ctx.app.bus.emit('flow:restartRace', {}) },
-    reward.clear?.career
-      ? { label: '通关！', sub: 'FINALE', run: () => leaveRace(ctx, config, 'finale') }
-      : { label: '下一站', sub: 'NEXT', run: () => next && ctx.app.bus.emit('flow:startRace', { config: next }),
-        disabled: () => next === null,
-        onDenied: () => ctx.toast(finalEvent ? '已经是最后一站了：前三名即可通关' : '前三名才能解锁下一站', 'warn') },
-    { label: '车库', sub: 'GARAGE', run: () => leaveRace(ctx, config, 'garage') },
-    career
-      ? { label: '巡回赛', sub: 'CAREER', run: () => leaveRace(ctx, config, 'career') }
-      : { label: '主菜单', sub: 'MENU', run: () => leaveRace(ctx, config, 'menu') },
-  ];
+  const actions = online
+    ? [{ label: '回到房间', sub: 'ROOM', run: () => backToRoom(ctx) }]
+    : [
+      { label: '再来一局', sub: 'RETRY', run: () => ctx.app.bus.emit('flow:restartRace', {}) },
+      reward.clear?.career
+        ? { label: '通关！', sub: 'FINALE', run: () => leaveRace(ctx, config, 'finale') }
+        : { label: '下一站', sub: 'NEXT', run: () => next && ctx.app.bus.emit('flow:startRace', { config: next }),
+          disabled: () => next === null,
+          onDenied: () => ctx.toast(finalEvent ? '已经是最后一站了：前三名即可通关' : '前三名才能解锁下一站', 'warn') },
+      { label: '车库', sub: 'GARAGE', run: () => leaveRace(ctx, config, 'garage') },
+      career
+        ? { label: '巡回赛', sub: 'CAREER', run: () => leaveRace(ctx, config, 'career') }
+        : { label: '主菜单', sub: 'MENU', run: () => leaveRace(ctx, config, 'menu') },
+    ];
   const row = h('div', { class: 'br-res-actions' });
   const items: NavItem[] = actions.map((a) => {
     const el = button(a.label, { sub: a.sub, seed: `res-${a.sub}` });
     if (a.disabled?.()) el.classList.add('is-disabled');
+    if (online) el.classList.add('br-res-choice');
     row.append(el);
     return { el, confirm: a.run, disabled: a.disabled, onDenied: a.onDenied };
   });
@@ -99,7 +104,7 @@ export const resultsScreen: ScreenFactory = (ctx) => {
   f.stage.append(row);
   // Default focus moves on (下一站 / 通关! / 巡回赛 in a career, 主菜单 after a quick race), never RETRY:
   // a stray press does not throw the result screen away for a reload of the same race.
-  const nav = ctx.nav(new Nav(items, { layout: 'horizontal', start: (career && next !== null) || reward.clear?.career ? 1 : 3, sfx: ctx.sfx }));
+  const nav = ctx.nav(new Nav(items, { layout: 'horizontal', start: online ? 0 : (career && next !== null) || reward.clear?.career ? 1 : 3, sfx: ctx.sfx }));
   let enteredAt = Infinity;
   let armed = false;
   let armedAt = Infinity;
@@ -159,18 +164,34 @@ export const resultsScreen: ScreenFactory = (ctx) => {
     if (!armed) skipShow();
   };
   window.addEventListener('pointerdown', onPointer);
+  // The show runs on the screen's own clock as well: the game may be frozen (the tests step a race by
+  // hand), so the stamp, the coin count-up and the arming must not wait for the game's frame loop.
+  let lastAdvance = performance.now();
+  const advance = (dt: number): void => {
+    elapsed += dt;
+    counting = counter.tick(dt);
+    if (elapsed >= STAMP_AT) stamp();
+    if (elapsed >= UNLOCK_AT) soundUnlock();
+    if (!armed && stamped && !counting && performance.now() - enteredAt >= LOCK_MS && ctx.sincePress() >= QUIET_MS) arm();
+  };
+  const showClock = window.setInterval(() => {
+    const now = performance.now();
+    if (now - lastAdvance < 120) return;   // the game's loop is driving the show
+    advance((now - lastAdvance) / 1000);
+    lastAdvance = now;
+  }, 50);
   return {
     root: f.root,
-    dispose: () => window.removeEventListener('pointerdown', onPointer),
+    dispose: () => {
+      window.removeEventListener('pointerdown', onPointer);
+      window.clearInterval(showClock);
+    },
     entered: () => {
       enteredAt = performance.now();
     },
     update: (dt) => {
-      elapsed += dt;
-      counting = counter.tick(dt);
-      if (elapsed >= STAMP_AT) stamp();
-      if (elapsed >= UNLOCK_AT) soundUnlock();
-      if (!armed && stamped && !counting && performance.now() - enteredAt >= LOCK_MS && ctx.sincePress() >= QUIET_MS) arm();
+      lastAdvance = performance.now();
+      advance(dt);
     },
     onAction: (a) => {
       if (panelOpen) {
@@ -183,7 +204,8 @@ export const resultsScreen: ScreenFactory = (ctx) => {
       }
       if (a === 'back') {
         ctx.sfx('ui.back');
-        leaveRace(ctx, config, home);
+        if (online) backToRoom(ctx);
+        else leaveRace(ctx, config, home);
         return true;
       }
       if (a === 'hop') {

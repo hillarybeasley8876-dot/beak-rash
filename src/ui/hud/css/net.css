@@ -1,0 +1,39 @@
+/* The online race's HUD layer (SPEC §28): the waiting cover and the relay's ping. */
+.brh-net { position: absolute; inset: 0; pointer-events: none; }
+.brh-net.is-off { display: none; }
+
+.brh-net-wait {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  padding: calc(26px * var(--k)) calc(56px * var(--k)) calc(22px * var(--k));
+  background: rgba(11, 11, 15, 0.82);
+  box-shadow: 0 0 0 calc(4px * var(--k)) var(--paper);
+  font-family: "ZCOOL KuaiLe", "Noto Sans SC", sans-serif;
+  font-weight: 400;
+  font-size: calc(52px * var(--k));
+  color: var(--paper);
+  white-space: nowrap;
+  animation: br-net-pulse 1.4s ease-in-out infinite;
+}
+.brh-net-wait.is-off { display: none; }
+@keyframes br-net-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+.brh-net-ping {
+  position: absolute;
+  left: calc(34px * var(--k));
+  top: 46%;
+  transform-origin: 0 0;
+  scale: var(--k);
+  padding: calc(4px * var(--k)) calc(12px * var(--k)) calc(2px * var(--k));
+  background: rgba(11, 11, 15, 0.7);
+  font-family: "Rubik Mono One", "Anton", sans-serif;
+  font-weight: 400;
+  font-size: calc(24px * var(--k));
+  color: var(--sp);
+}
+.brh-net-ping.is-off { display: none; }

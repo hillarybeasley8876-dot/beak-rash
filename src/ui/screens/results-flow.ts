@@ -52,3 +52,10 @@ export function leaveRace(ctx: ScreenCtx, config: RaceConfig | undefined, to: 'm
   ctx.app.bus.emit('flow:quitRace', {});
   if (to !== 'menu') ctx.go(to);
 }
+
+/** An online race (SPEC §28) ends in the room: the race is quit and the lobby opens again (the menu when
+ *  the room is gone — the relay closed it). */
+export function backToRoom(ctx: ScreenCtx): void {
+  ctx.app.bus.emit('flow:quitRace', {});
+  ctx.go(ctx.app.net.room ? 'lobby' : 'menu');
+}

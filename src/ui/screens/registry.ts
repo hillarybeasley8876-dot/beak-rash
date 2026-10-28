@@ -8,7 +8,9 @@ import { creditsScreen } from './credits';
 import { garageScreen } from './garage';
 import { howtoScreen } from './howto';
 import { loadingScreen } from './loading';
+import { lobbyScreen } from './lobby';
 import { menuScreen } from './menu';
+import { onlineScreen } from './online';
 import { pauseScreen } from './pause';
 import { recordsScreen } from './records-screen';
 import { resultsScreen } from './results';
@@ -50,7 +52,7 @@ export const SCREENS: Record<ScreenId, ScreenFactory> = {
   // r6 (SPEC §23, §26): the roster screen (every racer + the skill loadout); the records screen is here.
   roster: rosterScreen,
   records: recordsScreen,
-  // r6 (SPEC §28): the online rooms' screens are the net-client job's.
-  online: (ctx) => errorScreen(ctx, 'online'),
-  lobby: (ctx) => errorScreen(ctx, 'lobby'),
+  // r6 (SPEC §28): the online rooms' screens (create / join a room; the room before the race).
+  online: onlineScreen,
+  lobby: lobbyScreen,
 };

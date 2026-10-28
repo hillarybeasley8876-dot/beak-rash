@@ -16,6 +16,7 @@ import { hudSfx } from './sfx';
 import { ProgressStrip } from './progress';
 import { Quip } from './quip';
 import { R4Hud } from './r4';
+import { NetHud } from './net';
 import { Speedo } from './speedo';
 import { WorldOverlay } from './world/overlay';
 import type { BubbleObstacles } from './world/bubbles';
@@ -45,6 +46,8 @@ export function createHud(app: AppContext, layer: HTMLElement): Hud {
   const quip = new Quip(brCorner);
   const world = new WorldOverlay(proj, worldHost, edgesHost);
   const cutins = new CutinLayer(root, hudLayer, sfx);
+  // r6 (SPEC §28): the online race's waiting cover and the relay's ping, over everything else.
+  const netHud = new NetHud(app, root);
   let cluster: Cluster | null = null;
   let session: Session | null = null;
   // r4 (§14–§19): the wanted stars, the police warnings, the STYLE meter, the trick / parry pops and
@@ -102,6 +105,7 @@ export function createHud(app: AppContext, layer: HTMLElement): Hud {
     update(dtReal) {
       const on = visible && session !== null;
       rootW.cls('is-off', !on);
+      netHud.update(session);
       if (!on || !session) return;
       rootW.cls('is-pad', app.input.lastDevice === 'gamepad'); // key badges follow the device in use
       rootW.cls('is-reduced', reducedMotion()); // CSS loops calm down with 设置 › 动态效果 (switchable mid-race)
@@ -134,6 +138,7 @@ export function createHud(app: AppContext, layer: HTMLElement): Hud {
       r4.dispose();
       hints.dispose();
       world.dispose();
+      netHud.dispose();
       root.remove();
       session = null;
       cluster = null;

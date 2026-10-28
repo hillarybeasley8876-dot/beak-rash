@@ -1,0 +1,59 @@
+/* online (SPEC §28): the 联机 screen — a name, a room to create, a room to join. */
+.br-scr-online .br-on-card { position: absolute; left: 120px; top: 330px; width: 960px; }
+.br-scr-online .br-on-row { display: flex; align-items: center; gap: 26px; }
+.br-scr-online .br-on-label {
+  width: 190px;
+  font-family: var(--f-cn-block);
+  font-weight: 400;
+  font-size: 42px;
+  color: var(--yellow);
+  transform: skewX(var(--skew));
+}
+.br-scr-online .br-on-input {
+  flex: 1;
+  min-width: 0;
+  height: 78px;
+  padding: 4px 22px 2px;
+  border: 4px solid var(--white);
+  border-width: 0 0 4px 0;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--white);
+  font-family: var(--f-cn-block);
+  font-weight: 400;
+  font-size: 44px;
+  letter-spacing: 0.04em;
+  outline: none;
+  caret-color: var(--red);
+}
+.br-scr-online .br-on-input::placeholder { color: rgba(255, 255, 255, 0.35); }
+.br-scr-online .br-on-input:focus { border-bottom-color: var(--red); background: rgba(229, 25, 28, 0.16); }
+.br-scr-online .br-on-input.is-code { letter-spacing: 0.3em; font-family: var(--f-display); }
+.br-scr-online .br-on-input.is-bad { border-bottom-color: var(--red); }
+.br-scr-online .br-on-hint { margin: 6px 0 22px 216px; font-family: var(--f-cn-heavy); font-weight: 400; font-size: 24px; color: rgba(255, 255, 255, 0.55); }
+.br-scr-online .br-on-gap { height: 26px; }
+.br-scr-online .br-on-card .br-btn { width: 100%; justify-content: center; font-size: 46px; padding: 0.2em 0.4em 0.16em; }
+.br-scr-online .br-on-msg {
+  position: absolute;
+  left: 120px;
+  top: 830px;
+  width: 960px;
+  min-height: 40px;
+  font-family: var(--f-cn-heavy);
+  font-weight: 400;
+  font-size: 28px;
+  color: rgba(255, 255, 255, 0.72);
+}
+.br-scr-online .br-on-msg.is-warn { color: var(--yellow); }
+
+/* The side panel: what an online room is. */
+.br-scr-online .br-on-side { position: absolute; left: 1230px; top: 360px; width: 600px; }
+.br-scr-online .br-on-big { font-size: 96px; rotate: -3deg; }
+.br-scr-online .br-on-note {
+  margin: 26px 0 0;
+  font-family: var(--f-cn-play);
+  font-weight: 400;
+  font-size: 34px;
+  line-height: 1.35;
+  color: var(--white);
+}
+.br-scr-online .br-on-note.is-dim { color: rgba(255, 255, 255, 0.55); font-size: 28px; }

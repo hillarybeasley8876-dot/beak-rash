@@ -73,17 +73,35 @@ async function leaveRace(ctx: ScreenCtx, kind: 'restart' | 'quit'): Promise<void
   ctx.go('career');
 }
 
+/** r6 (SPEC §28): 离开联机 — an online race has no restart: the room is left and the menu opens. */
+async function leaveOnline(ctx: ScreenCtx): Promise<void> {
+  const asked = ctx.confirm('离开联机？', '这局不算成绩，房间也散了。', '离开', '再想想');
+  // The confirm opens on the safe answer; move the focus to 「离开」.
+  ctx.app.input.press('left');
+  if (!await asked) return;
+  ctx.app.net.leave();
+  ctx.app.bus.emit('flow:quitRace', {});
+  ctx.go('menu');
+}
+
 export const pauseScreen: ScreenFactory = (ctx) => {
   const session = ctx.session();
+  // r6 (SPEC §28): an online race runs on under this menu — there is no restart and no quality change.
+  const online = !!session?.config.online;
   const f = frame({ id: 'pause', bg: h('div', { class: 'br-pz-veil' }, h('div', { class: 'br-pz-slab' }), h('div', { class: 'br-halftone', vars: { '--dot': 'rgba(0,0,0,.35)' } })), hints: [HINT_NAV, HINT_OK, HINT_BACK] });
   const track = session ? TRACKS[session.config.trackId] : null;
   const list = h('div', { class: 'br-pz-list' });
-  const entries = [
-    { label: '继续', sub: 'RESUME', run: () => resume(ctx) },
-    { label: '重新开始', sub: 'RESTART', run: () => void leaveRace(ctx, 'restart') },
-    { label: '设置', sub: 'CONFIG', run: () => ctx.go('settings') },
-    { label: '退出比赛', sub: 'QUIT', run: () => void leaveRace(ctx, 'quit') },
-  ];
+  const entries = online
+    ? [
+      { label: '继续', sub: 'RESUME', run: () => resume(ctx) },
+      { label: '离开联机', sub: 'LEAVE', run: () => void leaveOnline(ctx) },
+    ]
+    : [
+      { label: '继续', sub: 'RESUME', run: () => resume(ctx) },
+      { label: '重新开始', sub: 'RESTART', run: () => void leaveRace(ctx, 'restart') },
+      { label: '设置', sub: 'CONFIG', run: () => ctx.go('settings') },
+      { label: '退出比赛', sub: 'QUIT', run: () => void leaveRace(ctx, 'quit') },
+    ];
   const items = entries.map((e, i) => {
     const el = button(e.label, { sub: e.sub, seed: `pz${i}`, className: 'is-inv' });
     el.style.setProperty('--i', String(i));
