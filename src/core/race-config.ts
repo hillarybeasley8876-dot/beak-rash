@@ -6,7 +6,8 @@ import { randomLoadout, rivalLoadout, validLoadout } from '../data/loadouts';
 import { RACERS, ROSTER } from '../data/roster';
 import { TRACKS, TRACK_WEATHER } from '../data/tracks';
 import { Rng } from './rng';
-import type { RaceConfig } from './contracts';
+import type { OnlineHuman, OnlineRace, RaceConfig } from './contracts';
+import { MAX_HUMANS } from '../net/protocol';
 import type { SaveStore } from './save';
 import type { BikeId, CharacterId, TrackId, Weather } from './types';
 
@@ -52,7 +53,56 @@ function nemesisOf(params: URLSearchParams, save: SaveStore, rivals: readonly Ch
   return best;
 }
 
+/** The grid of an online race: eight riders, the humans first. */
+const ONLINE_GRID = 8;
+
+/**
+ * An online race's config (SPEC §28) is the host's, identical on every client: built only from it — never from this
+ * client's URL or save (a ?traffic=0 or a grudge here would split the race). Humans and AI are validated like a
+ * local race's; the rest falls back to fixed defaults.
+ */
+export function onlineRaceConfig(o: Partial<RaceConfig> & { online: OnlineRace }): RaceConfig {
+  const humans: OnlineHuman[] = o.online.humans.slice(0, MAX_HUMANS).map((h, slot) => {
+    const character = valid(h.character, isRacer, 'pelican', 'online character');
+    return {
+      slot, member: h.member, name: String(h.name ?? '').slice(0, 12) || '骑手', character,
+      bike: valid(h.bike, isBike, ROSTER[character].defaultBike, 'online bike'), loadout: validLoadout(h.loadout, character),
+    };
+  });
+  if (humans.length === 0) throw new Error('online race without humans');
+  const local = Math.min(Math.max(0, Math.floor(finiteOr(o.online.local, 0))), humans.length - 1);
+  const me = humans[local] as OnlineHuman;
+  const seed = Math.floor(Math.abs(finiteOr(o.seed, 1)));
+  const rng = new Rng(seed);
+  const taken = new Set(humans.map((h) => h.character));
+  const asked = (o.rivals ?? []).filter((id): id is CharacterId => isRacer(id));
+  const rivals = (asked.length ? asked : rng.shuffle(RACERS.filter((c) => !taken.has(c)))).slice(0, ONLINE_GRID - humans.length);
+  const trackId = valid(o.trackId, isTrack, 'coast', 'track');
+  const ownWeather = TRACK_WEATHER[trackId][0] ?? 'clear';
+  return {
+    trackId,
+    mode: 'quick',
+    seed,
+    level: Math.min(MAX_LEVEL, Math.max(1, Math.round(finiteOr(o.level, 2)))),
+    playerCharacter: me.character,
+    playerBike: me.bike,
+    rivals,
+    rivalBikes: rivals.map((c, i) => valid(o.rivalBikes?.[i], isBike, ROSTER[c].defaultBike, 'rival bike')),
+    traffic: o.traffic ?? true,
+    police: false,
+    autopilot: false,
+    weather: valid(o.weather ?? ownWeather, isWeather, ownWeather, 'weather'),
+    reverse: o.reverse ?? false,
+    route: Math.max(0, Math.floor(finiteOr(o.route, 0))),
+    nemesis: null,
+    loadout: me.loadout,
+    rivalLoadouts: rivals.map((c, i) => (o.rivalLoadouts?.[i] ? validLoadout(o.rivalLoadouts[i], c) : rivalLoadout(c, false))),
+    online: { room: String(o.online.room ?? ''), humans, local },
+  };
+}
+
 export function buildRaceConfig(params: URLSearchParams, save: SaveStore, o: Partial<RaceConfig> = {}): RaceConfig {
+  if (o.online) return onlineRaceConfig({ ...o, online: o.online });
   const seed = Math.floor(Math.abs(finiteOr(o.seed ?? params.get('seed'), Math.floor(Math.random() * 1e9))));
   const rng = new Rng(seed);
   const rivalsParam = params.get('rivals');

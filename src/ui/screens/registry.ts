@@ -50,4 +50,7 @@ export const SCREENS: Record<ScreenId, ScreenFactory> = {
   // r6 (SPEC §23, §26): the roster screen (every racer + the skill loadout); the records screen is here.
   roster: rosterScreen,
   records: recordsScreen,
+  // r6 (SPEC §28): the online rooms' screens are the net-client job's.
+  online: (ctx) => errorScreen(ctx, 'online'),
+  lobby: (ctx) => errorScreen(ctx, 'lobby'),
 };

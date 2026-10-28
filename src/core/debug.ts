@@ -2,7 +2,7 @@
 import type { Game } from './game';
 import type { Action } from './input';
 import type { AppContext, RaceConfig, ScreenId, ScreenProps, Session } from './contracts';
-import type { Controls, RiderId } from './types';
+import { emptyControls, type Controls, type RiderId } from './types';
 
 export interface DebugApi {
   ready: boolean;
@@ -19,6 +19,8 @@ export interface DebugApi {
   /** Manual mode: the RAF loop stops advancing time; use step() for deterministic tests. */
   manual(on: boolean): void;
   step(frames: number, dt?: number): void;
+  /** Online races (SPEC §28): run one relay tick with these per-slot controls; returns the session hash after it. */
+  tick(inputs: Array<Partial<Controls>>, left?: RiderId[]): string;
   setScale(name: string, value: number, ramp?: number): void;
   teleport(id: RiderId, s: number, x?: number): void;
   /** Knock a rider out as if `attacker` landed the final hit. */
@@ -62,6 +64,12 @@ export function installDebug(game: Game, errors: string[]): DebugApi {
     press: (action) => game.app.input.press(action),
     manual: (on) => {
       game.manual = on;
+    },
+    tick: (inputs, left) => {
+      const s = game.session;
+      if (!s) return '';
+      s.tick(inputs.map((c) => ({ ...emptyControls(), ...c })), left);
+      return s.hash();
     },
     step: (frames, dt = 1 / 60) => {
       for (let i = 0; i < frames; i++) {

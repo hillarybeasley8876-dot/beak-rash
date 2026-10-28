@@ -31,6 +31,7 @@ export function createUi(app: AppContext): Ui {
       intro: '', loading: '加载中……', race: '', pause: '暂停 — Esc 继续 / Backspace 退出',
       results: '<b>RESULTS</b>' + (props?.results ?? []).map((r) => `<div>${r.place}. ${r.name}${r.isPlayer ? '（你）' : ''}</div>`).join('') + '<div>Enter 返回</div>',
       settings: '设置', howto: '操作说明', credits: '致谢', roster: '选择角色', records: '成就',
+      online: '联机', lobby: '房间',
     };
     panel.innerHTML = lines[s] + (props?.message ? `<div>${props.message}</div>` : '');
   };

@@ -7,6 +7,7 @@ import type { Input } from './input';
 import type { Rng } from './rng';
 import type { SaveStore } from './save';
 import type { Modules } from './modules';
+import type { MemberPick, RoomSetup } from '../net/protocol';
 import type { BikeId, CharacterId, Controls, CrashCause, EnvLook, Obstacle, Quality, RiderId, RiderState, Side, SkillLoadout, Surface, TrackFeature, TrackFrame, TrackId, Vec3Like, WeaponId, Weather } from './types';
 
 // ---------------------------------------------------------------- app
@@ -32,6 +33,8 @@ export interface AppContext {
   fx: FxSystem;
   ui: Ui;
   audio: AudioSystem;
+  /** r6 (SPEC §28): online rooms — the relay connection, the lobby, and the lockstep driver of online races. */
+  net: NetSystem;
 }
 
 // ---------------------------------------------------------------- race session
@@ -57,6 +60,29 @@ export interface RaceConfig {
   loadout?: SkillLoadout;
   /** Per rival (same order as `rivals`): their kits (core fills them; missing → data/loadouts rivalLoadout). */
   rivalLoadouts?: SkillLoadout[];
+  // ---- r6 online rooms (SPEC §28) ----
+  /** Set for an online race: the humans ride rider ids 0..n-1 (slot order), the AI `rivals` the rest. */
+  online?: OnlineRace;
+}
+
+/** One human of an online race. */
+export interface OnlineHuman {
+  /** Rider id (= index in OnlineRace.humans). */
+  slot: RiderId;
+  /** The relay's member id of this human. */
+  member: number;
+  name: string;
+  character: CharacterId;
+  bike: BikeId;
+  loadout: SkillLoadout;
+}
+
+/** The online part of a RaceConfig: identical on every client except `local`. */
+export interface OnlineRace {
+  room: string;
+  humans: OnlineHuman[];
+  /** This client's rider (its slot). Presentation only: the sim never reads it. */
+  local: RiderId;
 }
 
 /** How a track is built (SPEC §20). */
@@ -96,6 +122,15 @@ export interface Session {
   combat: CombatSystem;
   logic: RaceLogic;
   rider(id: RiderId): RiderState | undefined;
+  /** r6 (SPEC §28): the riders a human rides (offline: [player]; online: every member still racing), in id order. */
+  readonly humans: readonly RiderState[];
+  /** Online races: advance one relay tick (TICK_SUBSTEPS fixed substeps) with every human's controls for this tick
+   *  (`inputs[slot]`); `left` = slots whose human left right before it (an AI takes over). Never reads local input. */
+  tick(inputs: ReadonlyArray<Controls>, left?: readonly RiderId[]): void;
+  /** Update the rider views and the scenery for the sim time just advanced (once per rendered frame). */
+  present(dtSim: number, dtReal: number): void;
+  /** A hash of the sim state (riders, obstacles, rng, time): equal on every client of an online race. */
+  hash(): string;
 }
 
 // ---------------------------------------------------------------- world/
@@ -151,6 +186,8 @@ export interface RaceLogic {
   preStep(dt: number): void;   // AI controls, traffic, police decisions
   postStep(dt: number): void;  // standings, finish line, race end
   results(): RaceResult[];
+  /** r6 (SPEC §28): an online human left; an AI rides `id` from now on (called between two substeps). */
+  takeover?(id: RiderId): void;
   dispose(): void;
 }
 
@@ -213,6 +250,7 @@ export const SCREEN_IDS = [
   'boot', 'title', 'menu', 'career', 'garage', 'trackSelect', 'intro',
   'loading', 'race', 'pause', 'results', 'settings', 'howto', 'credits',
   'roster', 'records', // r6 (SPEC §23, §26): character + skill select; the achievements & eggs screen
+  'online', 'lobby',   // r6 (SPEC §28): create / join a room; the room before the race
 ] as const;
 export type ScreenId = (typeof SCREEN_IDS)[number];
 
@@ -244,4 +282,51 @@ export interface AudioSystem {
   setMuffle(amount: number): void;
   update(dtReal: number): void;
   setVolumes(v: { master?: number; music?: number; sfx?: number; voice?: number }): void;
+}
+
+// ---------------------------------------------------------------- net/ (r6, SPEC §28)
+export type NetState = 'offline' | 'connecting' | 'online' | 'error';
+
+/** A member of the room as the lobby shows it. */
+export interface NetMember extends MemberPick {
+  id: number;
+  name: string;
+  ready: boolean;
+}
+
+export interface NetRoom {
+  code: string;
+  host: number;
+  /** This client's member id. */
+  you: number;
+  members: NetMember[];
+  setup: RoomSetup | null;
+  state: 'lobby' | 'loading' | 'racing';
+}
+
+export interface NetSystem {
+  /** The relay connection (the lobby screens show it). */
+  readonly state: NetState;
+  /** The last error / status line for the player (Chinese), '' when none. */
+  readonly message: string;
+  /** Round-trip time to the relay (ms), null before the first pong. */
+  readonly ping: number | null;
+  readonly room: NetRoom | null;
+  /** Called after any change of state / message / ping / room; returns the unsubscribe. */
+  onChange(fn: () => void): () => void;
+  /** Connect to the relay (`?relay=ws://…` or the build's default) under this player name. */
+  connect(name: string): Promise<boolean>;
+  createRoom(): void;
+  joinRoom(code: string): void;
+  pick(p: MemberPick): void;
+  ready(on: boolean): void;
+  /** Host only. */
+  setup(s: RoomSetup): void;
+  /** Host only, every member ready: builds the RaceConfig and starts the race for the room. */
+  start(): void;
+  /** Leave the room (and an online race in progress) and disconnect. */
+  leave(): void;
+  /** Core calls it once per rendered frame during an online race: sends the local input, runs session.tick() for
+   *  the ticks that arrived (never more than a few per frame) and returns how many ran (0 = waiting). */
+  frame(dtReal: number): number;
 }

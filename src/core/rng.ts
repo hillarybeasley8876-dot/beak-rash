@@ -7,6 +7,11 @@ export class Rng {
     this.state = seed >>> 0 || 0x9e3779b9;
   }
 
+  /** The generator's state (the online desync hash compares it). */
+  get stateValue(): number {
+    return this.state;
+  }
+
   /** Float in [0, 1). */
   next(): number {
     this.state = (this.state + 0x6d2b79f5) >>> 0;

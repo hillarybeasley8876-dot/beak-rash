@@ -10,7 +10,7 @@ export function createRiderState(
   const def = ROSTER[character];
   const maxHp = 60 + def.stats.hp * 12 + BIKES[bike].durability;
   return {
-    id, character, bike, isPlayer, name: def.name,
+    id, character, bike, isPlayer, human: isPlayer, name: def.name,
     s: 0, x: 0, y: 0, speed: 0, vx: 0, vy: 0, yaw: 0, lean: 0,
     airborne: false, airTime: 0, drifting: false, driftCharge: 0, boostTime: 0, boostPower: 0,
     surface: 'road', draft: 0, trick: null, trickChain: 0, gliding: false,

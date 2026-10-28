@@ -1,7 +1,8 @@
 // Loads every unit through dynamic import. A unit that fails to load (or is listed in ?stub=a,b)
 // falls back to its core-owned stub, with a console.error so tests notice.
 import type {
-  AppContext, AudioSystem, CameraRig, CombatSystem, FxSystem, PhysicsSystem, RaceLogic, RiderView, RiderViewOpts, Session, Track, TrackOptions, Ui,
+  AppContext, AudioSystem, CameraRig, CombatSystem, FxSystem, NetSystem, PhysicsSystem, RaceLogic, RiderView, RiderViewOpts, Session, Track,
+  TrackOptions, Ui,
 } from './contracts';
 import type { Rng } from './rng';
 import type { BikeId, CharacterId, TrackId } from './types';
@@ -21,6 +22,8 @@ export interface Modules {
   createAchievements(app: AppContext): AchievementSystemLike;
   createStyle(app: AppContext): SessionModuleLike;
   createSecrets(app: AppContext): SessionModuleLike;
+  /** r6 (SPEC §28): online rooms. */
+  createNet(app: AppContext): NetSystem;
   /** Optional warm-up hooks (model/texture/audio preloading). */
   preload: Array<(app: AppContext) => Promise<void>>;
   stubbed: string[];
@@ -39,6 +42,7 @@ import * as audioStub from '../audio/stub';
 import * as achievementsStub from '../gameplay/achievements-stub';
 import * as styleStub from '../gameplay/style-stub';
 import * as secretsStub from '../gameplay/secrets-stub';
+import * as netStub from '../net/stub';
 
 type Loader<T> = () => Promise<T>;
 
@@ -59,7 +63,7 @@ async function pick<T>(name: string, stubs: Set<string>, real: Loader<T>, stub: 
 export async function loadModules(params: URLSearchParams): Promise<Modules> {
   const stubs = new Set((params.get('stub') ?? '').split(',').filter(Boolean));
   const used: string[] = [];
-  const [world, sim, camera, actors, combat, race, fx, ui, audio, achievements, style, secrets] = await Promise.all([
+  const [world, sim, camera, actors, combat, race, fx, ui, audio, achievements, style, secrets, net] = await Promise.all([
     pick('world', stubs, () => import('../world'), worldStub, used),
     pick('sim', stubs, () => import('../sim'), simStub, used),
     pick('camera', stubs, () => import('../camera'), cameraStub, used),
@@ -72,6 +76,7 @@ export async function loadModules(params: URLSearchParams): Promise<Modules> {
     pick('achievements', stubs, () => import('../gameplay/achievements'), achievementsStub, used),
     pick('style', stubs, () => import('../gameplay/style'), styleStub, used),
     pick('secrets', stubs, () => import('../gameplay/secrets'), secretsStub, used),
+    pick('net', stubs, () => import('../net'), netStub, used),
   ]);
   const preload: Modules['preload'] = [];
   for (const m of [world, actors, fx, ui, audio] as Array<{ preload?: (app: AppContext) => Promise<void> }>) {
@@ -90,6 +95,7 @@ export async function loadModules(params: URLSearchParams): Promise<Modules> {
     createAchievements: guard('achievements', achievements.createAchievements, achievementsStub.createAchievements, used),
     createStyle: guard('style', style.createStyle, styleStub.createStyle, used),
     createSecrets: guard('secrets', secrets.createSecrets, secretsStub.createSecrets, used),
+    createNet: guard('net', net.createNet, netStub.createNet, used),
     preload,
     stubbed: used,
   };

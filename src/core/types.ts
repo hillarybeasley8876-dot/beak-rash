@@ -129,7 +129,10 @@ export interface RiderState {
   readonly id: RiderId;
   readonly character: CharacterId;
   readonly bike: BikeId;
+  /** The LOCAL player's rider (camera, HUD, audio, achievements). The sim never reads it (SPEC §28). */
   readonly isPlayer: boolean;
+  /** r6 (SPEC §28): a human rides it (offline: the player; online: every member's rider). The sim's "the player". */
+  human: boolean;
   name: string;
   // --- kinematics, track space (owned by sim/) ---
   s: number;           // distance along the track centre line (m)

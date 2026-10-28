@@ -14,6 +14,7 @@ import { compileScene, drawEverything, nextFrame, type WarmupStats } from './war
 import type { AppContext, RaceConfig, ScreenId } from './contracts';
 import type { GameEvents } from './events-map';
 import type { Quality } from './types';
+import { TICK_DT } from '../net/protocol';
 
 const WARMUP_LAYER = 'warmup';
 const WARMUP_LABEL = '鹈鹕热身 WARM-UP';
@@ -66,6 +67,7 @@ export class Game {
     app.fx = modules.createFx(app);
     app.ui = modules.createUi(app);
     app.audio = modules.createAudio(app);
+    app.net = modules.createNet(app);
     this.app = app;
     this.achievements = modules.createAchievements(app);
     this.style = modules.createStyle(app);
@@ -90,10 +92,19 @@ export class Game {
   frame(raw: number): void {
     const { app } = this;
     if (raw > 0) this.fps = this.fps * 0.95 + (1 / raw) * 0.05;
-    const { dtReal, dtSim } = app.clock.advance(raw);
+    const clocked = app.clock.advance(raw);
+    const { dtReal } = clocked;
+    let dtSim = clocked.dtSim;
     app.input.update(dtReal);
-    this.session?.step(dtSim, dtReal);
-    if (this.session) {
+    const session = this.session;
+    if (session?.config.online) {
+      // An online race (SPEC §28) moves only with the relay's ticks; the clock's slow-mo / hit-stop never reach it.
+      dtSim = app.net.frame(dtReal) * TICK_DT;
+      session.present(dtSim, dtReal);
+    } else {
+      session?.step(dtSim, dtReal);
+    }
+    if (session) {
       this.style.update?.(dtSim, dtReal);
       this.secrets.update?.(dtSim, dtReal);
     }
@@ -133,8 +144,11 @@ export class Game {
       this.app.ui.attach(session);
       this.app.audio.attach?.(session);
       this.achievements.attach(session);
-      this.style.attach(session);
-      this.secrets.attach(session);
+      // Online (SPEC §28): no STYLE chains and no eggs — both act on local-only events and would split the race.
+      if (!config.online) {
+        this.style.attach(session);
+        this.secrets.attach(session);
+      }
       await this.warmUp(retire);
       await this.show('race', { config });
     } catch (err) {
@@ -218,7 +232,8 @@ export class Game {
     });
     bus.on('flow:pause', ({ paused }) => {
       if (!this.session) return;
-      clock.setScale('pause', paused ? 0 : 1);
+      // An online race runs on under the pause menu (the others are still racing).
+      if (!this.session.config.online) clock.setScale('pause', paused ? 0 : 1);
       this.app.audio.setMuffle(paused ? 1 : 0);
       void this.show(paused ? 'pause' : 'race');
     });
