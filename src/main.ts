@@ -1,3 +1,4 @@
+import './boot-math';
 import { captureErrors, installDebug } from './core/debug';
 import { Game } from './core/game';
 import { raceParam } from './core/race-config';
