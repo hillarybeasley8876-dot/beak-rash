@@ -70,6 +70,21 @@ async function press(page, h, ...keys) {
   }
 }
 
+/** On the main menu: move the focus to the entry whose text has `cn` (arrows, like a player) and press Enter. The
+ *  tour goes by name, so new menu entries (r6: 成就 / 角色 / 联机) do not shift it. */
+async function menu(page, h, cn) {
+  for (let i = 0; i < 16; i++) {
+    const at = await page.evaluate((cn) => {
+      const items = [...document.querySelectorAll('.br-menu-item')];
+      return { cur: items.findIndex((e) => e.classList.contains('is-focus')), want: items.findIndex((e) => (e.textContent ?? '').includes(cn)) };
+    }, cn);
+    if (at.want < 0) { problems.push(`menu: no entry 「${cn}」`); return; }
+    if (at.cur === at.want) break;
+    await press(page, h, at.cur < at.want ? 'ArrowDown' : 'ArrowUp');
+  }
+  await press(page, h, 'Enter');
+}
+
 /** Assert the UI landed on `want`; record a problem otherwise. */
 async function expectScreen(page, label, want) {
   const ui = await page.evaluate(() => window.__br.app.ui.screen);
@@ -87,20 +102,21 @@ async function fullTour(size) {
     await shot('title', 900);
     await press(page, h, 'KeyX');
     await shot('menu', 900);
-    await press(page, h, 'Enter');
+    await menu(page, h, '巡回赛');
     await shot('career');
     await press(page, h, 'ArrowRight', 'Enter');
     await shot('career-locked', 500);
     await press(page, h, 'Escape');
     await expectScreen(page, label('career-back'), 'menu');
-    await press(page, h, 'ArrowDown', 'Enter');
+    await menu(page, h, '快速比赛');
     await shot('track-select');
     await press(page, h, 'ArrowRight');
     await shot('track-select-2', 350);
     await press(page, h, 'ArrowDown', 'ArrowRight');   // into the race options (weather)
     await shot('track-select-opts', 350);
     await press(page, h, 'Escape');                     // back to the cards
-    await press(page, h, 'Escape', 'ArrowDown', 'Enter');
+    await press(page, h, 'Escape');
+    await menu(page, h, '车库');
     await shot('garage', 1200);
     await press(page, h, 'ArrowDown', 'ArrowDown', 'ArrowDown');
     await shot('garage-erba-too-pricey', 900);
@@ -108,22 +124,36 @@ async function fullTour(size) {
     await shot('garage-buy-modal', 450);
     await press(page, h, 'Escape');
     await expectScreen(page, label('garage-modal-closed'), 'garage');
-    await press(page, h, 'Escape', 'ArrowDown', 'Enter');
+    await press(page, h, 'Escape');
+    await menu(page, h, '成就');
+    await shot('records', 900);
+    await expectScreen(page, label('records'), 'records');
+    await press(page, h, 'Escape');
+    await menu(page, h, '角色');
+    await shot('roster', 900);
+    await expectScreen(page, label('roster'), 'roster');
+    await press(page, h, 'Escape');
+    await menu(page, h, '设置');
     await shot('settings');
+    await expectScreen(page, label('settings'), 'settings');
     await press(page, h, 'ArrowDown', 'ArrowLeft', 'ArrowDown', 'ArrowDown', 'ArrowDown');
     await shot('settings-quality', 350);
-    await press(page, h, 'Escape', 'ArrowDown', 'Enter');
+    await press(page, h, 'Escape');
+    await menu(page, h, '操作');
     await shot('howto-keyboard');
+    await expectScreen(page, label('howto'), 'howto');
     await press(page, h, 'ArrowRight');
     await shot('howto-gamepad', 400);
     await press(page, h, 'ArrowRight');
     await shot('howto-skills', 400);
-    await press(page, h, 'Escape', 'ArrowDown', 'Enter');
+    await press(page, h, 'Escape');
+    await menu(page, h, '致谢');
     await shot('credits', 1500);
+    await expectScreen(page, label('credits'), 'credits');
     await press(page, h, 'Escape');
     await expectScreen(page, label('credits-back'), 'menu');
     // Quick race on track 1, through loading into the race, pause, settings-from-pause, results.
-    await press(page, h, 'ArrowUp', 'ArrowUp', 'ArrowUp', 'ArrowUp', 'Enter');
+    await menu(page, h, '快速比赛');
     await expectScreen(page, label('quick'), 'trackSelect');
     await press(page, h, 'ArrowLeft', 'ArrowLeft');
     await page.keyboard.press('Enter'); // no idle wait: catch the loading card while it is up
