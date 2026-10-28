@@ -1,0 +1,18 @@
+/* Element badges over the riders (SPEC §24) and the reaction callout at the victim. */
+
+/* The element badge: a small round P5 disc just above the rider's name tag. */
+.el-b {
+  position: absolute; left: 0; top: 0; translate: -50% -50%;
+  width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--ink); box-shadow: 0 0 0 3px var(--paper), 3px 3px 0 var(--c, var(--red));
+  transform: rotate(-8deg);
+}
+.el-g { font: 400 26px/1 "ZCOOL QingKe HuangYou", sans-serif; color: var(--c, var(--paper)); }
+
+/* The reaction callout: a big inked word, tilted, that slams in at the victim. */
+.rx-b { position: absolute; left: 0; top: 0; translate: -50% -50%; width: max-content; }
+.rx-w {
+  display: inline-block; white-space: nowrap; font: 900 76px/1 "Noto Sans SC", "ZCOOL QingKe HuangYou", sans-serif;
+  color: var(--paper); -webkit-text-stroke: 10px var(--ink); paint-order: stroke fill;
+  transform-origin: 50% 50%;
+}

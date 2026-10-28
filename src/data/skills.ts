@@ -1,7 +1,7 @@
 // Skill catalogue (SPEC §7, r6 §24). Behaviour lives in gameplay/combat/skills/<id>.ts (combat unit); UI/audio read this.
 // Kinds: signature skills belong to one character (pelican: slots 1–3, rivals: 'sig'); 'pool' skills anyone may
 // equip; 'ult' skills cost SP (owner null = any character may equip it, SHOWTIME stays the pelican's).
-import type { CharacterId, Element } from '../core/types';
+import type { CharacterId, Element, Reaction } from '../core/types';
 
 /** What a skill is for (the loadout picker's tabs, SPEC §24). */
 export type SkillCategory = 'attack' | 'control' | 'move' | 'defense' | 'summon' | 'trap' | 'gag';
@@ -27,6 +27,22 @@ export const CATEGORY_CN: Record<SkillCategory, string> = {
 };
 
 export const ELEMENT_CN: Record<Element, string> = { fire: '火', ice: '冰', thunder: '雷', water: '水', wind: '风' };
+
+/** Each element's colour: the HUD badge over the rider, the aura flash, the reaction burst. */
+export const ELEMENT_COLOR: Record<Element, string> = {
+  fire: '#ff6a1e', ice: '#7fd8ff', thunder: '#ffe14d', water: '#3aa0ff', wind: '#9be7a0',
+};
+
+/** The seven element reactions (SPEC §24) and the word the HUD calls out at the victim. */
+export const REACTION_CN: Record<Reaction, string> = {
+  vaporize: '蒸发', melt: '融化', freeze: '冻结', electro: '感电', superconduct: '超导', overload: '超载', swirl: '扩散',
+};
+
+/** The reaction callout's colour (P5: the word is inked in it, on black). */
+export const REACTION_COLOR: Record<Reaction, string> = {
+  vaporize: '#dff3ff', melt: '#ffa04d', freeze: '#7fd8ff', electro: '#ffe14d',
+  superconduct: '#bfe9ff', overload: '#ff5a1e', swirl: '#9be7a0',
+};
 
 type Row = Omit<SkillDef, 'id'>;
 const sig = (owner: CharacterId, r: Omit<Row, 'owner' | 'slot' | 'spCost'>): Row => ({ owner, slot: 'sig', spCost: 0, ...r });

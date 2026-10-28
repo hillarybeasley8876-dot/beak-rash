@@ -3,6 +3,7 @@ import * as bodies from './bodies';
 import * as ground from './ground';
 import * as impacts from './impacts';
 import * as r4 from './r4';
+import * as r6 from './r6';
 import * as rewards from './rewards';
 import * as skills from './skills';
 import * as speed from './speed';
@@ -64,6 +65,23 @@ export const PRESETS: Readonly<Record<string, Preset>> = {
   gooseFeathers: r4.gooseFeathers,
   fruit: r4.fruit,
   quack: r4.quack,
+  // r6 (fx unit): the elements, the reactions and the meme skills (SPEC §24).
+  embers: r6.embers,
+  iceShards: r6.iceShards,
+  droplets: r6.droplets,
+  windDust: r6.windDust,
+  steam: r6.steam,
+  meltSplash: r6.meltSplash,
+  frostBurst: r6.frostBurst,
+  shatter: r6.shatter,
+  overload: r6.overload,
+  swirlBurst: r6.swirlBurst,
+  bananaBits: r6.bananaBits,
+  tears: r6.tears,
+  fishBits: r6.fishBits,
+  trashBits: r6.trashBits,
+  pieBits: r6.pieBits,
+  bubbles: r6.bubbles,
 };
 
 export const PRESET_NAMES = Object.keys(PRESETS);

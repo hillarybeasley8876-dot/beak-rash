@@ -9,6 +9,7 @@ import { el } from '../dom';
 import { Bubbles, type BubbleObstacles } from './bubbles';
 import { DamageNumbers } from './damage';
 import { EdgeWarnings } from './edges';
+import { ElementLayer } from './elements';
 import { IncomingWarning } from './incoming';
 import type { Projector } from './project';
 import { GaugeOcclusion } from './occlusion';
@@ -22,6 +23,8 @@ export class WorldOverlay {
   private tags: NameTags;
   private bubbles: Bubbles;
   private damage: DamageNumbers;
+  /** The element badges over the riders and the reaction callouts (SPEC §24). */
+  private elements: ElementLayer;
   readonly edges: EdgeWarnings;
   readonly incoming: IncomingWarning;
   /** Static HUD module rects + the keep-clear area above the vanishing point, for this viewport. */
@@ -35,6 +38,7 @@ export class WorldOverlay {
     this.root = el('div', 'brh-world', parent);
     this.tags = new NameTags(this.root);
     this.damage = new DamageNumbers(this.root);
+    this.elements = new ElementLayer(this.root);
     this.bubbles = new Bubbles(this.root);
     this.edges = new EdgeWarnings(edgesParent, this.root);
     this.incoming = new IncomingWarning(edgesParent);
@@ -51,6 +55,7 @@ export class WorldOverlay {
     this.damage.clear();
     this.edges.clear();
     this.incoming.clear();
+    this.elements.attach(session);
     const riders = session?.riders ?? [];
     this.tags.setRiders(riders);
     this.edges.setRiders(riders);
@@ -103,6 +108,7 @@ export class WorldOverlay {
 
   dispose(): void {
     this.tags.dispose();
+    this.elements.dispose();
   }
 
   /** Layout reads (tag sizes): call at the start of the HUD frame, before any DOM writes. */
@@ -116,6 +122,7 @@ export class WorldOverlay {
     if (!s) return;
     this.zones.update(this.proj.width, this.proj.height, k);
     this.tags.update(s, this.proj, this.zones, dyn.callouts, k, dt);
+    this.elements.update(s, this.proj, k, dt, this.tags.boxes());
     this.edges.update(s, this.proj, this.zones, k, dt);
     this.bubbles.update(s, this.proj, k, dt, [...this.tags.boxes(), ...this.edges.boxes()], this.zones, dyn);
     this.damage.update(this.proj, k, dt);

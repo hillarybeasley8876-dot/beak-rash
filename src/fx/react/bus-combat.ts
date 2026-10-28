@@ -3,6 +3,7 @@ import { Vector3 } from 'three';
 import { clamp } from '../../core/math';
 import { bodyBits } from './species';
 import { skillFlair } from './skills';
+import { subscribeR6 } from './bus-r6';
 import type { RiderId, Vec3Like, WeaponId } from '../../core/types';
 import type { FxContext } from '../context';
 
@@ -24,6 +25,7 @@ export function subscribeCombat(ctx: FxContext): Array<() => void> {
   };
 
   return [
+    ...subscribeR6(ctx),
     bus.on('combat:hit', (e) => {
       const v = ctx.tracker.get(e.victim);
       const scale = clamp(0.8 + e.damage / 30, 0.8, 1.5);

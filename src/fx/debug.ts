@@ -2,6 +2,7 @@
 import { Vector3 } from 'three';
 import { PRESET_NAMES } from './presets';
 import { GpuTimer } from './post/timer';
+import { reactionBursts } from './react/bus-r6';
 import type { DebugApi } from '../core/debug';
 import type { Vec3Like } from '../core/types';
 import type { FxInternals, FxPart } from './system';
@@ -102,7 +103,14 @@ export function fxDebugPart(ctx: FxInternals, tester: KoTester, director: KoDire
       return timer.averages();
     },
     stats() {
-      return { scene: { ...ctx.pipeline.sceneStats }, particles: ctx.particles.alive(), cine: director.info(), post: { ...ctx.post.cine, focus: ctx.post.cine.focus.toArray(), cast: ctx.post.cine.cast.size } };
+      return {
+        scene: { ...ctx.pipeline.sceneStats },
+        particles: ctx.particles.alive(),
+        cine: director.info(),
+        post: { ...ctx.post.cine, focus: ctx.post.cine.focus.toArray(), cast: ctx.post.cine.cast.size },
+        // r6 (SPEC §24): the element reactions that burst since this race started.
+        reactionBursts: reactionBursts(ctx.session()),
+      };
     },
   };
   let installed = false;
