@@ -14,6 +14,14 @@ import { makeRimMaterial, setRim, type RimMaterial } from './rim';
 export interface GlowOpts { additive?: boolean; side?: Side }
 
 /**
+ * Every ink-hull width the combat visuals draw (m). The width is baked into the hull's shader, so each one
+ * is a program of its own: the meme rain drops 0.01, the gag flyer / ad and the elemental cracker 0.02, the
+ * dropped weapons and the meme props 0.03, the pickups and the projectiles 0.035, the ult meteor 0.04 and
+ * its storm lid 0.05. They are cast in the middle of a race, so their hulls are warmed here, not on the cast.
+ */
+const HULL_WIDTHS = [0.01, 0.02, 0.03, 0.035, 0.04, 0.05];
+
+/**
  * One tiny triangle shaped like the real geometry of a variant: vertex colours (3) or colours + alphas (4)
  * and whether it has normals all change the compiled shader.
  */
@@ -85,7 +93,7 @@ export class MaterialPool {
     const [front, double, rim] = mats as [MeshBasicMaterial, MeshBasicMaterial, RimMaterial];
     const objects: Object3D[] = [
       new Mesh(solid, front), new Mesh(solid, double), new Mesh(solid, rim),
-      new Mesh(rgba, this.ribbon(false)), toonMesh(rgb, 0.03), toonMesh(rgb, 0.035), // drops / projectiles
+      new Mesh(rgba, this.ribbon(false)), ...HULL_WIDTHS.map((w) => toonMesh(rgb, w)), // drops / projectiles
     ];
     for (const o of objects) {
       o.scale.setScalar(1e-4);
