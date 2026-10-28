@@ -1,21 +1,36 @@
 // The seeded schedule of the track events (SPEC §19): one or two spots per race, drawn from the middle of
-// the track, never two of them close together, never inside a tunnel, on a bridge or under a jump's flight,
-// and never near the finish. The spot is where the event is announced; the props of an event reach around it.
+// the track, never two of them close together, never inside a tunnel, on a bridge or in a jump's run-up or
+// flight, and never near the finish. The spot is where the event is announced; the props reach around it.
 import type { Rng } from '../../../core/rng';
 import type { Track } from '../../../core/contracts';
 import type { TrackId } from '../../../core/types';
 import type { EventKind } from '../../../data/event-lines';
+import { roadworksSpan } from './roadworks';
+import { FREE_SPAN } from './spot';
 import { EVENT_TUNING as T } from './tuning';
 
 /** The tracks with a fruit market on the roadside. */
 const STALL_TRACKS: readonly TrackId[] = ['coast', 'city', 'watertown'];
 
-/** How far the props of an event reach around its spot (before, after). */
+/** A goose's own half length (geese.ts): the flock is spread over `spread` metres around the spot. */
+const GOOSE_HALF = 0.3;
+/** The market stalls stand one every this many metres (stalls.ts). */
+const STALL_EVERY = 6.5;
+
+/**
+ * How far the props of an event reach around its spot (before, after). This is the REAL extent of what
+ * the event puts on the road — a prop whose spot is taken is pushed on by `FREE_SPAN`, the work zone is
+ * the whole wall it builds — so a spot is only planned where every prop clears a jump's run-up.
+ */
 const SPAN: Record<EventKind, { before: number; after: number }> = {
-  fishSpill: { before: 80, after: 10 },
-  geese: { before: 8, after: 8 },
-  roadworks: { before: T.roadworks.lead, after: T.roadworks.zone - T.roadworks.lead },
-  stalls: { before: 6, after: 6 },
+  // The spilled fish lie `pickupBack` behind the truck; the truck itself may stop further on.
+  fishSpill: { before: T.fishSpill.pickupBack, after: FREE_SPAN + T.fishSpill.truckLength / 2 },
+  geese: { before: T.geese.spread / 2 + GOOSE_HALF, after: T.geese.spread / 2 + FREE_SPAN + GOOSE_HALF },
+  roadworks: roadworksSpan(),
+  stalls: {
+    before: T.stalls.length / 2,
+    after: STALL_EVERY * (T.stalls.count[1] - 1) + FREE_SPAN + T.stalls.length / 2,
+  },
 };
 
 export interface PlannedEvent {
@@ -34,44 +49,66 @@ export function eventKinds(trackId: TrackId): EventKind[] {
 /** The events of this race (empty when the level has no events yet). */
 export function planEvents(rng: Rng, track: Track, level: number): PlannedEvent[] {
   if (level < 1) return [];
+  // The schedule draws from its own child stream (like every other system that rolls): the props of an
+  // event are forked from `rng` after the plan (events/index.ts), so a planner that drew from it directly
+  // would shift every prop in the race as soon as one rule is added or retuned.
+  const draw = rng.fork(0x5c4ed);
   const kinds = eventKinds(track.id);
-  const want = rng.chance(0.55) ? 2 : 1;
+  const want = draw.chance(0.55) ? 2 : 1;
   const out: PlannedEvent[] = [];
   for (let i = 0; i < want; i++) {
-    const kind = kinds.splice(rng.int(0, kinds.length - 1), 1)[0];
+    const kind = kinds.splice(draw.int(0, kinds.length - 1), 1)[0];
     if (!kind) break;
-    const s = findSpot(rng, track, kind, out);
+    const s = findSpot(draw, track, kind, out);
     if (s === null) continue;
     out.push({ kind, s });
   }
   return out;
 }
 
-/** A spot that keeps every rule: mid-track, far from the other events, out of a tunnel, clear of the finish. */
+/** The step (m) the search for a spot that keeps every rule walks along the track. */
+const SPOT_STEP = 10;
+
+/**
+ * A spot that keeps every rule: inside the planned stretch of the track, far from the other events, out
+ * of a tunnel or a bridge, clear of a jump's run-up and flight, and clear of the finish.
+ */
+function allowed(track: Track, s: number, span: { before: number; after: number }, taken: readonly PlannedEvent[]): boolean {
+  const L = track.length;
+  if (s < T.spotFrom * L || s > T.spotTo * L) return false;
+  if (s > L - T.finishClear) return false;
+  if (s + span.after > L - 60) return false;
+  if (taken.some((o) => Math.abs(o.s - s) < T.minGap)) return false;
+  return !covered(track, s - span.before, s + span.after);
+}
+
+/**
+ * The spot of this event: the seeded draw, moved on to the next one that keeps every rule (forward first,
+ * then back). An event is never dropped for want of a spot — it is placed where it fits.
+ */
 function findSpot(rng: Rng, track: Track, kind: EventKind, taken: readonly PlannedEvent[]): number | null {
   const L = track.length;
   const span = SPAN[kind];
-  for (let tries = 0; tries < 60; tries++) {
-    const s = rng.range(T.spotFrom * L, T.spotTo * L);
-    if (s > L - T.finishClear) continue;
-    if (s + span.after > L - 60) continue;
-    if (taken.some((o) => Math.abs(o.s - s) < T.minGap)) continue;
-    if (covered(track, s - span.before, s + span.after)) continue;
-    return s;
+  const drawn = rng.range(T.spotFrom * L, T.spotTo * L);
+  for (let d = 0; d <= (T.spotTo - T.spotFrom) * L; d += SPOT_STEP) {
+    const ahead = drawn + d;
+    if (allowed(track, ahead, span, taken)) return ahead;
+    const behind = drawn - d;
+    if (behind !== ahead && allowed(track, behind, span, taken)) return behind;
   }
   return null;
 }
 
-/** How far past a jump (m) its flight and landing reach: no event props there. */
-const JUMP_FLIGHT = 45;
-
-/** Does a tunnel, a bridge or a jump (with its flight path) sit between s0 and s1 (with a margin)? */
+/** Does a tunnel, a bridge or a jump sit between s0 and s1 (with the clearance each of them needs)? */
 function covered(track: Track, s0: number, s1: number): boolean {
-  const clear = T.featureClear;
   for (const f of track.features) {
     const jump = f.kind === 'ramp' || f.kind === 'jumpCrest';
     if (f.kind !== 'tunnel' && f.kind !== 'bridge' && !jump) continue;
-    if (s1 >= f.s0 - clear && s0 <= f.s1 + clear + (jump ? JUMP_FLIGHT : 0)) return true;
+    // A rider lines up for a jump over the last JUMP_RUNUP metres and flies JUMP_FLIGHT past it: no prop
+    // of an event may stand in that lane (the run-up is ridden at full speed, the flight ends in a landing).
+    const before = jump ? T.jumpRunup : T.featureClear;
+    const after = jump ? T.featureClear + T.jumpFlight : T.featureClear;
+    if (s1 >= f.s0 - before && s0 <= f.s1 + after) return true;
   }
   return false;
 }

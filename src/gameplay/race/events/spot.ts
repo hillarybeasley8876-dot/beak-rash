@@ -23,9 +23,12 @@ export function clearOfTraffic(session: Session, s: number, x: number, halfS: nu
   return true;
 }
 
+/** How far on (m) a prop whose spot is taken may be pushed by `freeSpot`. */
+export const FREE_SPAN = 30;
+
 /** The first free spot at or after `s`, up to `span` metres further on; null when there is none. */
 export function freeSpot(
-  session: Session, s: number, x: number, halfS: number, halfX: number, span = 30,
+  session: Session, s: number, x: number, halfS: number, halfX: number, span = FREE_SPAN,
 ): number | null {
   for (let d = 0; d <= span; d += 3) {
     if (spotFree(session, s + d, x, halfS, halfX)) return s + d;

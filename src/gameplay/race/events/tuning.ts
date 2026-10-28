@@ -15,6 +15,10 @@ export const EVENT_TUNING = {
   finishClear: 150,
   /** No event inside (or this close to) a tunnel or a bridge. */
   featureClear: 20,
+  /** No event prop in the run-up before a jump: a rider lines up for the ramp over the last stretch. */
+  jumpRunup: 60,
+  /** How far past a jump (m) its flight and landing reach: no event prop there. */
+  jumpFlight: 45,
   /** How long the props stay after the player has driven past them. */
   linger: 22,
 

@@ -49,6 +49,23 @@ export function roadworksLane(session: Session, s: number): WorkZone {
   };
 }
 
+/** The grid the wall stands on: the pitch of its rows and how many rows the zone holds. */
+function wallGrid(): { pitch: number; rows: number } {
+  const pitch = F.pieceLength + F.pieceGap;
+  return { pitch, rows: Math.ceil((F.zone + F.pieceLength / 2) / pitch) };
+}
+
+/**
+ * How far the work zone reaches around the event's spot (metres, before and after it). This is the REAL
+ * extent of the pieces the zone builds — the whole grid of the wall, the taper at its head and the pieces
+ * that are held back for a car included — so a spot can be planned clear of a jump's run-up (plan.ts).
+ */
+export function roadworksSpan(): { before: number; after: number } {
+  const { pitch, rows } = wallGrid();
+  const half = F.pieceLength / 2;
+  return { before: F.lead + half, after: (rows - 1) * pitch + half - F.lead };
+}
+
 /**
  * The pieces of the work-zone wall. The traffic has to know them before the wall goes up: the cars merge
  * into the open lane while the zone is still only announced, so none of them is caught in a closed lane
@@ -56,8 +73,7 @@ export function roadworksLane(session: Session, s: number): WorkZone {
  */
 export function roadworksPieces(session: Session, s: number): ZonePiece[] {
   const zone0 = s - F.lead;
-  const pitch = F.pieceLength + F.pieceGap;
-  const rows = Math.ceil((F.zone + F.pieceLength / 2) / pitch);
+  const { pitch, rows } = wallGrid();
   const pieces: ZonePiece[] = [];
   for (let i = 0; i < rows; i++) {
     const rowS = zone0 + i * pitch;
@@ -136,8 +152,7 @@ export function createRoadworks(setup: EventSetup): EventProps {
   const zone1 = zone0 + F.zone;
   const half = zone0 + F.zone / 2;
   // One grid of short pieces along the road: every piece leaves a small gap to the next one.
-  const pitch = F.pieceLength + F.pieceGap;
-  const rows = Math.ceil((F.zone + F.pieceLength / 2) / pitch);
+  const { pitch, rows } = wallGrid();
   const coneRows = Math.max(1, Math.round(F.coneEvery / pitch));
   const barriers = new PropPool(barrierModel(), F.pieceCap, 0.03);
   const cones = new PropPool(coneModel(), F.coneCap, 0.02);
