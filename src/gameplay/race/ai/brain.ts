@@ -7,8 +7,8 @@ import { Driver, topOf } from './control';
 import { Fighter, type HuntTokens } from './fight';
 import type { RacingLine } from './line';
 import type { Personality } from './personality';
-import { planLateral, type PlanOutput } from './plan';
-import type { Senses } from './sense';
+import { blockGap, gapLane, planLateral, BLOCK_LOOK, type BlockGap, type PlanOutput } from './plan';
+import { freeLaneNear, type Senses } from './sense';
 import { useSkill } from './skills';
 import { cornerSpeed, GripModel, targetSpeed, updateDrift, type DriftPlan } from './speed';
 import { Showoff } from './tricks';
@@ -44,6 +44,12 @@ const CAP_SLACK = 0.5;      // m/s: aim this far above the pace cap (rubber make
 const DRAFT_TOP = 0.1;      // slipstream top-speed bonus (SPEC §6, sim tuning draftTop): a drafter may close on the wheel
 const RIVAL_PASS = 0.8;     // m/s: a hunted rival is fought in passing (never waited for)…
 const FIGHT_PACE = 0.9;     // …and never below this share of the hunter's own race speed, so a brawl costs little time
+const UNSTICK_SPEED = 4;    // m/s: below this the rider may be pinned (unstick)
+const UNSTICK_AFTER = 1.2;  // s crawling before the rider starts looking for a way out
+const UNSTICK_HOP = 3;      // s: last resort after that — hop over whatever pins it
+const UNSTICK_STEER = 0.9;  // steer per metre of lateral error while getting out
+const PRESSED_GAP = 0.4;    // m: this close to what the planner follows, the bike is pressed against it
+const ROLL = 1.5;           // m/s: below this the bike cannot steer (SPEC §6), so it has to keep pedalling
 
 /** Speed command of one step: target m/s and whether only easing off the pedals (never braking). */
 interface SpeedGoal { target: number; soft: boolean }
@@ -72,6 +78,8 @@ export class Brain {
   private draftT = 0;
   private stepDt = 0;
   private wantX = 0;              // last desired lane before the planner (debug summary)
+  private escapeX: number | null = null;   // the way out of a pin (unstick), null when none / not crawling
+  private gap: BlockGap | null = null;     // the barrier row ahead this rider is riding the gap of (debug)
   /** Rubber band: top-speed cap (m/s before mods/boosts) set by the director; Infinity = none. */
   paceTop = Infinity;
   /** Base pace of this rival (level reference + offset, m/s); Infinity when not racing / the player. */
@@ -118,6 +126,7 @@ export class Brain {
     this.tx = this.r.x;
     this.hopCd = 0;
     this.stuckT = 0;
+    this.escapeX = null;
     this.draft = null;
     this.ringBell = false;
   }
@@ -170,7 +179,7 @@ export class Brain {
     }
   }
 
-  private desiredX(w: AiWorld, hw: number): number {
+  private desiredX(w: AiWorld, hw: number, gap: BlockGap | null): number {
     const { r, p } = this;
     if (r.mode === 'finished') return this.rollOutX(hw);
     const lineX = w.line.x(r.s + Math.max(8, r.speed * 0.7));
@@ -184,6 +193,10 @@ export class Brain {
       const c = zone.centre(r.s + Math.max(8, r.speed * 0.5));
       x = clamp(x, c - zone.half + 0.6, c + zone.half - 0.6);
     }
+    // A row of barriers ahead with one way through (the police roadblock, SPEC §14) is not announced to the
+    // AI the way a work zone is, and its barriers stay outside the planner's horizon until it is too late to
+    // cross the road: ride the gap from the moment the row is in sight, keeping the line inside it.
+    if (gap) x = gapLane(gap, x, w.bounds(r.s + gap.ds));
     const goal = this.fighter.huntGoal();
     if (goal && Math.abs(goal.ds) < 25) return goal.x;
     // A throw in the making: line up on the target, beside it and not on top of it.
@@ -220,14 +233,21 @@ export class Brain {
     const lo = -Math.min(b0.left, b1.left) + 0.9, hi = Math.min(b0.right, b1.right) - 0.9;
     this.fighter.chooseTarget(w.riders, w.humans, w.time);
     const hunting = this.fighter.hunt;
-    this.wantX = clamp(this.desiredX(w, hw), lo, hi);
+    // The barrier row ahead and its one way through (SPEC §14), judged against the widest road up to it: a
+    // roadblock spans the whole road, and the gap may sit beyond this rider's own half width.
+    const far = w.bounds(r.s + BLOCK_LOOK);
+    const gap = this.gap = blockGap(w.senses.blips, -Math.max(hw, far.left) + 0.6, Math.max(hw, far.right) - 0.6);
+    this.wantX = clamp(this.desiredX(w, hw, gap), lo, hi);
     const blind = this.blunder.update(PLAN_EVERY, w.senses.blips, w.blunder);
     if (blind !== null) this.wantX = clamp(this.blunder.aimX, lo, hi);
     this.plan = planLateral({
       desiredX: this.wantX, prevX: this.plan.x, x: r.x, v: r.speed, lo, hi, asphalt: hw,
       horizon: (1 + 1.4 * p.skill) * (hunting ? 0.75 : 1), ignore: hunting ? hunting.id : null, blind,
-      canHop: this.hopCd <= 0 && p.skill > 0.35,
+      canHop: this.hopCd <= 0 && p.skill > 0.35, gap,
     }, w.senses.blips);
+    // The way out of a pin, for unstick(): the shared Senses belong to the rider scanned last, so the blips
+    // may only be read here, right after this rider's own scan.
+    this.escapeX = r.speed > UNSTICK_SPEED ? null : freeLaneNear(w.senses.blips, r.x, lo, hi);
     if (r.mode !== 'racing') return;
     if (this.fighter.melee(w.senses.blips, this.c, w.time)) return;
     this.skillT -= PLAN_EVERY;
@@ -249,7 +269,9 @@ export class Brain {
     const { r } = this;
     return {
       id: r.id, c: r.character, mode: r.mode, s: Math.round(r.s), x: +r.x.toFixed(2), v: +r.speed.toFixed(1),
-      planX: +this.plan.x.toFixed(2), wantX: +this.wantX.toFixed(2), draft: this.draft?.id ?? null, follow: this.plan.followSpeed, hunt: this.fighter.hunt?.id ?? null,
+      planX: +this.plan.x.toFixed(2), wantX: +this.wantX.toFixed(2), escape: this.escapeX === null ? null : +this.escapeX.toFixed(2),
+      gap: this.gap && [+this.gap.x.toFixed(2), +this.gap.ds.toFixed(1)],
+      draft: this.draft?.id ?? null, follow: this.plan.followSpeed, hunt: this.fighter.hunt?.id ?? null,
       pace: Number.isFinite(this.paceTop) ? +this.paceTop.toFixed(2) : null, base: Number.isFinite(this.basePace) ? +this.basePace.toFixed(2) : null,
       top: +topOf(r).toFixed(2), rubber: +r.rubber.toFixed(3), aLat: +this.grip.aLat.toFixed(2), drift: this.drift.active,
       steer: +this.c.steer.toFixed(2), throttle: +this.c.throttle.toFixed(2), brake: +this.c.brake.toFixed(2),
@@ -351,20 +373,25 @@ export class Brain {
     }
   }
 
-  /** Riders pinned against a wall or a stopped car pedal and steer back to the line. */
+  /** Riders pinned against a wall or a stopped car pedal and steer for the nearest lane that is clear. */
   private unstick(dt: number, c: Controls): void {
     const r = this.r;
-    if (r.mode !== 'racing' || r.speed > 4) {
+    if (r.mode !== 'racing' || r.speed > UNSTICK_SPEED) {
       this.stuckT = 0;
       return;
     }
     if (r.speed < 2) this.stuckT += dt;
-    if (this.stuckT < 1.2) return;
-    c.throttle = 1;
+    if (this.stuckT < UNSTICK_AFTER) return;
+    // Nothing to back up into and no reverse gear: the bike has to keep rolling to steer at all (SPEC §6),
+    // so it only comes off the throttle while it is pressed against the obstacle, and steers away meanwhile.
+    const pressed = this.plan.followKind !== null && this.plan.followGap < PRESSED_GAP;
+    c.throttle = pressed && r.speed > ROLL ? 0 : 1;
     c.brake = 0;
     c.drift = false;
-    c.steer = clamp(-r.x * 0.3, -1, 1);
-    if (this.stuckT > 3 && this.hopCd <= 0) {
+    // The centre line is as likely to be walled shut as the lane it is in: aim at free road instead, and
+    // fall back on the centre line (steered harder than the old gain of 0.3) when there is no free lane.
+    c.steer = clamp(((this.escapeX ?? 0) - r.x) * UNSTICK_STEER, -1, 1);
+    if (this.stuckT > UNSTICK_HOP && this.hopCd <= 0) {
       c.hop = true;
       this.hopCd = 1.5;
     }

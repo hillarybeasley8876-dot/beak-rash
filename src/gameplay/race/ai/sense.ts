@@ -84,3 +84,55 @@ export class Senses {
 }
 
 export { RIDER_HW, RIDER_HL };
+
+/** Blips that physically stand in the way (SPEC §9): barriers, props, traffic, the police. */
+export const BLOCKING: ReadonlySet<BlipKind> = new Set<BlipKind>(['solid', 'traffic', 'police']);
+
+/** A lane across the road with room to ride through it. */
+export interface FreeLane { x: number; half: number }
+
+/**
+ * The lanes of `lo..hi` (track space) that stay clear of every blocking blip whose body reaches into the
+ * band `near..far` metres ahead of the rider the blips were scanned for, each at least `minWidth` wide and
+ * with `margin` of room kept beside a blip. Sorted from the left edge; `half` is half the free width.
+ */
+export function freeLanes(
+  blips: readonly Blip[], lo: number, hi: number, near: number, far: number, margin: number, minWidth: number,
+): FreeLane[] {
+  const walls: FreeLane[] = [];
+  for (const b of blips) {
+    if (!BLOCKING.has(b.kind) || b.ds + b.hl < near || b.ds - b.hl > far) continue;
+    walls.push({ x: b.x, half: b.hw + margin });
+  }
+  walls.sort((a, b) => a.x - a.half - (b.x - b.half));
+  const out: FreeLane[] = [];
+  const push = (from: number, to: number): void => {
+    if (to - from >= minWidth) out.push({ x: (from + to) / 2, half: (to - from) / 2 });
+  };
+  let edge = lo;
+  for (const w of walls) {
+    push(edge, w.x - w.half);
+    edge = Math.max(edge, w.x + w.half);
+  }
+  push(edge, hi);
+  return out;
+}
+
+/** How far ahead a way out has to be clear, and the room the bike needs in it (unstick, SPEC §9). */
+const ESCAPE_AHEAD = 4;
+const ESCAPE_BEHIND = 1.2;
+const ESCAPE_ROOM = 1.2;
+const ESCAPE_MARGIN = 0.15;
+
+/**
+ * The lane nearest to `x` with room for the bike whose next few metres hold no barrier, prop or stopped car:
+ * the way out of a pin. Null when the rider is walled in on every side.
+ */
+export function freeLaneNear(blips: readonly Blip[], x: number, lo: number, hi: number): number | null {
+  const lanes = freeLanes(blips, lo, hi, -ESCAPE_BEHIND, ESCAPE_AHEAD, RIDER_HW + ESCAPE_MARGIN, ESCAPE_ROOM);
+  let best: FreeLane | null = null;
+  for (const lane of lanes) {
+    if (!best || Math.abs(lane.x - x) < Math.abs(best.x - x)) best = lane;
+  }
+  return best ? best.x : null;
+}
