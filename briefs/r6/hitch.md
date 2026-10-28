@@ -26,11 +26,11 @@ and `src/actors/warmup.ts`, and the acceptance `tools/r5/hitch.mjs`.
 
 ## Files you own
 `src/gameplay/race/events/warm.ts`, `src/gameplay/race/events/{fish-spill,geese,stalls,props}.ts` (only to share or
-expose materials — no visual change), `src/gameplay/race/police/warm.ts`, `src/gameplay/combat/visuals/` (warm-up only),
-`src/core/warmup.ts`.
+expose materials — no visual change), `src/gameplay/race/police/warm.ts`, `src/gameplay/combat/visuals/` (warm-up only).
+`src/core/warmup.ts` is the lead's: if core's scene walk itself must change, say what and why under Requests.
 
 ## Acceptance (the runner runs these)
-- `node tools/r4/tsc-own.mjs src/gameplay/race/events/ src/gameplay/race/police/ src/gameplay/combat/visuals/ src/core/warmup.ts` → TSC-OWN OK
+- `node tools/r4/tsc-own.mjs src/gameplay/race/events/ src/gameplay/race/police/ src/gameplay/combat/visuals/` → TSC-OWN OK
 - `node tools/r5/hitch.mjs` → r5-hitch OK
 - `node tools/r4/w3-fx.mjs` → w3-fx OK
 - `node tools/r6/police.mjs` → r6-police OK
