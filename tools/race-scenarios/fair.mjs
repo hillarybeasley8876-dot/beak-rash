@@ -96,10 +96,15 @@ export const fairScenarios = {
 
   /** Critic r2: a KO buys a real gap — the KO'd rival is still ≥ 25 m behind 30 s later (catch-up ≤ 8 %, none for 12 s). */
   async koGap(page, h, { check, stub, a }) {
-    await openRace(h, `race=coast&seed=${a.seed ?? 3}&level=1&manual=1&intro=0&traffic=0&police=0${stub}`);
+    // A pinned field (the r4 cast): the check measures the KO's recovery rules (no catch-up for 12 s, speed skills
+    // holstered), not how much crowd control a random 15-racer field throws at a passive player meanwhile.
+    await openRace(h, `race=coast&seed=${a.seed ?? 3}&level=1&manual=1&intro=0&traffic=0&police=0&rivals=goose,cat,capybara,shiba,pigeon,penguin,seagull${stub}`);
     await rideUntil(h, 40);
+    // The rival KO'd is the nearest one at least 3 m behind the player: a wreck beside or in front of the player
+    // takes the player down with it, and the gap after the KO is what is measured.
     const id = await h.eval(`(() => { const s = window.__br.session(), p = s.player;
-      const r = s.riders.filter((q) => !q.isPlayer && q.mode === 'racing').sort((x, y) => Math.abs(x.s - p.s) - Math.abs(y.s - p.s))[0];
+      const near = s.riders.filter((q) => !q.isPlayer && q.mode === 'racing').sort((x, y) => Math.abs(x.s - p.s) - Math.abs(y.s - p.s));
+      const r = near.find((q) => q.s < p.s - 3) ?? near[0];
       window.__br.ko(r.id, 0); return r.id; })()`);
     const t0 = await h.eval('window.__br.session().time');
     const gaps = [];

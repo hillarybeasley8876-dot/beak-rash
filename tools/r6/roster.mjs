@@ -94,7 +94,8 @@ await withPage(async (page, h) => {
     const name = await page.evaluate(() => document.querySelector('[data-roster-detail]')?.textContent ?? '');
     if (focus) seen.add(`${focus}|${name.slice(0, 40)}`);
     if (focus === 'moodeng') break;
-    await page.keyboard.press(i % 8 < 6 ? 'ArrowRight' : 'ArrowDown');
+    // → walks the cards in order (row by row), whatever ↓ does on the bottom row
+    await page.keyboard.press('ArrowRight');
     await sleep(140);
   }
   expect(focus === 'moodeng', `the arrow keys walk the grid to any racer (reached ${focus}; ${seen.size} focus steps)`);
@@ -212,5 +213,36 @@ if (!skip.has('race')) {
     await noErrors(h, 'howto kit');
   }, { size: '1280x720' });
 }
+
+// 4. The slot row is one ↓ away from every card of the bottom row, and ↑ returns to the card you came from.
+await withPage(async (page, h) => {
+  await h.goto(`/?screen=menu${STUB}`);
+  await page.evaluate((k) => localStorage.removeItem(k), SAVE_KEY);
+  await h.goto(`/?screen=roster${STUB}`);
+  if (!(await screenIs(page, 'roster'))) return;
+  await sleep(900);
+  const focusOf = () => page.evaluate(() => ({
+    card: document.querySelector('[data-roster].is-focus')?.getAttribute('data-roster') ?? null,
+    slot: document.querySelector('[data-slot].is-focus')?.getAttribute('data-slot') ?? null,
+  }));
+  const ids = await page.evaluate(async () => (await import('/src/data/roster.ts')).RACERS);
+  const cols = 5, bottom = ids.slice(Math.floor((ids.length - 1) / cols) * cols);
+  const rows = [];
+  for (const target of bottom) {
+    for (let i = 0; i < 20; i++) {
+      const f = await focusOf();
+      if (f.card === target) break;
+      await page.keyboard.press(f.slot ? 'ArrowUp' : 'ArrowRight'); await sleep(110);
+    }
+    await page.keyboard.press('ArrowDown'); await sleep(140);
+    const down = await focusOf();
+    await page.keyboard.press('ArrowUp'); await sleep(140);
+    const up = await focusOf();
+    rows.push({ target, slot: down.slot, back: up.card });
+  }
+  const ok = rows.every((r) => r.slot !== null && r.back === r.target);
+  expect(ok, `↓ from every card of the bottom row enters the slot row, ↑ returns to that card (${rows.map((r) => `${r.target}→${r.slot}→${r.back}`).join(' ')})`);
+  await noErrors(h, 'roster keys');
+}, { size: '1280x720' });
 
 finish('r6-roster');
