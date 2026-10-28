@@ -73,7 +73,8 @@ await withPage(async (page, h) => {
   await hold(page, { ...C, heavy: true, heavyHeld: true }, 1);
   await hold(page, { ...C, heavyHeld: true }, 60);
   await hold(page, { ...C, heavyHeld: false }, 30);
-  expect(!(await events(page, 'combat:throw')).length, 'unarmed: holding heavy never throws');
+  // the player's throws only: an armed rival may throw in the meantime (r6: cryingcat's leek)
+  expect(!(await events(page, 'combat:throw')).filter((x) => x.e.riderId === 0).length, 'unarmed: holding heavy never throws');
 
   // F. a thrown weapon hits an obstacle → combat:obstacleHit
   await page.evaluate(() => {

@@ -26,6 +26,7 @@ await withPage(async (page, h) => {
   expect(/SHIFT|Shift/.test(text) && /RB/.test(text), 'it names the keyboard key (Shift) and the pad button (RB) for tricks');
   // the tab is reachable with → and fits the screen
   for (let i = 0; i < tab; i++) { await page.keyboard.press('ArrowRight'); await sleep(200); }
+  await sleep(700); // the page and its cards rise in (br-rise 0.26–0.3 s): measure where they come to rest
   const fits = await page.evaluate((i) => {
     const p = document.querySelectorAll('.br-ht-body > *')[i];
     if (!p || !p.classList.contains('is-on')) return 'not shown';

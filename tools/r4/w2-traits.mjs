@@ -35,7 +35,8 @@ await withPage(async (page, h) => {
   // 2. baguette: every heavy hit knocks the victim's weapon loose
   let loose = 0;
   for (let i = 0; i < 4; i++) {
-    await cb('c.pin(a[0], 0.2, 1.3); c.give(a[0], "pan", 6); c.give(0, "baguette", 6); c.resetCooldowns(); c.force({ crit: false, block: false })', [r1]);
+    // the victim's hp is topped up: a KO would start the KO slow-mo (clock layer 'ko') under the parry test below
+    await cb('c.pin(a[0], 0.2, 1.3); c.set(a[0], { hp: 100 }); c.give(a[0], "pan", 6); c.give(0, "baguette", 6); c.resetCooldowns(); c.force({ crit: false, block: false })', [r1]);
     await hold(page, C, 10);
     await cb('c.swing(0, 1, true)', null);
     await hold(page, C, 40);
