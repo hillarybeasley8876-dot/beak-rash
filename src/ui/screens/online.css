@@ -44,6 +44,14 @@
   color: rgba(255, 255, 255, 0.72);
 }
 .br-scr-online .br-on-msg.is-warn { color: var(--yellow); }
+/* While the free relay host wakes: the line is long, so it gets the room to breathe and a slow pulse. */
+.br-scr-online .br-on-msg.is-wait {
+  font-size: 30px;
+  line-height: 1.4;
+  color: var(--white);
+  animation: br-on-wake 1.6s ease-in-out infinite;
+}
+@keyframes br-on-wake { 0%, 100% { opacity: 0.66; } 50% { opacity: 1; } }
 
 /* The side panel: what an online room is. */
 .br-scr-online .br-on-side { position: absolute; left: 1230px; top: 360px; width: 600px; }

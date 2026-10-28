@@ -1,7 +1,7 @@
 // The net unit (SPEC §28): the relay connection, the room, the host's start and the lockstep driver of an
 // online race. This file is the NetSystem the core talks to; the socket is client.ts, the lobby room.ts, the
 // host's race config config.ts and the tick driver lockstep.ts.
-import { RelayClient, relayUrl } from './client';
+import { RelayClient, relayUrl, relayWaitMs } from './client';
 import { RoomState } from './room';
 import { Lockstep } from './lockstep';
 import { parseStartConfig } from './config';
@@ -190,7 +190,8 @@ export function createNet(app: AppContext): NetSystem {
       };
     },
     connect(name: string): Promise<boolean> {
-      return client.connect(name, relayUrl(app));
+      // A free relay host sleeps: the client waits (and retries) until ?relayWait runs out.
+      return client.connect(name, relayUrl(app), relayWaitMs(app));
     },
     createRoom(): void {
       room.create();

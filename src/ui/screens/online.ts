@@ -12,6 +12,9 @@ import { ONLINE } from '../copy';
 /** Where the player's name is remembered between visits. */
 const NAME_KEY = 'beak-rash.net.name';
 
+/** The line while the client waits for the relay (the net unit says more once it knows more). */
+const CONNECTING = '连接联机服务器…';
+
 /** The stored name (empty when there is none). */
 function loadName(): string {
   try {
@@ -75,6 +78,8 @@ export const onlineScreen: ScreenFactory = (ctx) => {
   let bound: NetSystem | null = null;
   let offNet: (() => void) | null = null;
   let busy = false;
+  /** The screen is on the stage: a connect that outlives it must not paint it any more. */
+  let live = true;
 
   /** The code is ready to be sent when it has CODE_LENGTH letters. */
   const codeOk = (): boolean => codeInput.value.trim().length === CODE_LENGTH;
@@ -85,11 +90,15 @@ export const onlineScreen: ScreenFactory = (ctx) => {
   const paint = (): void => {
     const n = net();
     const ping = n.ping;
-    const text = n.message
-      ? (ping !== null ? `${n.message} · ${ping} ms` : n.message)
-      : (ping !== null ? `已连上联机服务器 · ${ping} ms` : ONLINE.hint);
+    const text = n.state === 'connecting'
+      // While a free relay host wakes the line is long and there is no ping to show.
+      ? (n.message || CONNECTING)
+      : n.message
+        ? (ping !== null ? `${n.message} · ${ping} ms` : n.message)
+        : (ping !== null ? `已连上联机服务器 · ${ping} ms` : ONLINE.hint);
     if (message.textContent !== text) message.textContent = text;
     message.classList.toggle('is-warn', n.state === 'error');
+    message.classList.toggle('is-wait', n.state === 'connecting');
     const ok = codeOk();
     joinBtn.classList.toggle('is-disabled', !ok);
     codeInput.classList.toggle('is-bad', ok && !codeValid());
@@ -117,18 +126,18 @@ export const onlineScreen: ScreenFactory = (ctx) => {
     onNet();
   };
 
-  /** Connect under the typed name; false when the relay is out of reach. */
+  /** Connect under the typed name; false when the relay is out of reach (or the player gave up). */
   const connect = async (): Promise<boolean> => {
     const name = nameInput.value.trim().slice(0, NAME_MAX) || ONLINE.defaultName;
     nameInput.value = name;
     saveName(name);
     try {
-      const ok = await net().connect(name);
-      paint();
+      const ok = await net().connect(name);   // a sleeping relay can take a minute
+      if (live) paint();
       return ok;
     } catch (err) {
       console.warn('[ui] the relay refused the connection', err);
-      paint();
+      if (live) paint();
       return false;
     }
   };
@@ -207,6 +216,7 @@ export const onlineScreen: ScreenFactory = (ctx) => {
       return nav.handle(a);
     },
     dispose: () => {
+      live = false;
       offNet?.();
       offNet = null;
     },

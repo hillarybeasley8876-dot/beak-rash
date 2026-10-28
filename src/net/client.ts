@@ -7,8 +7,14 @@ import type { AppContext, NetState } from '../core/contracts';
 const DEFAULT_RELAY_PORT = 8790;
 /** How often the client pings the relay (ms) — it also keeps the relay's idle timer happy. */
 const PING_MS = 2000;
-/** How long a connection may take before it counts as failed (ms). */
-const CONNECT_TIMEOUT_MS = 8000;
+/** How long one try may take before it counts as failed (ms). */
+const CONNECT_TIMEOUT_MS = 4000;
+/** How long to wait between two tries while the free host wakes (ms). */
+const RETRY_MS = 2500;
+/** How long the client waits out a sleeping relay before it gives up (ms). */
+const WAIT_MS = 90000;
+/** How often the waiting line counts up its seconds (ms). */
+const WAIT_TICK_MS = 1000;
 
 /** The Chinese line of a relay error — the player reads these, never the code. */
 export function errorText(code: string): string {
@@ -48,16 +54,43 @@ export function relayUrl(app: AppContext): string {
   return `ws://${location.hostname}:${DEFAULT_RELAY_PORT}/ws`;
 }
 
+/** How long to wait for a sleeping relay: ?relayWait=<ms> (the tests), else the default. */
+export function relayWaitMs(app: AppContext): number {
+  const param = Number(app.params.get('relayWait'));
+  return Number.isFinite(param) && param > 0 ? param : WAIT_MS;
+}
+
+/** The host's HTTP root behind a relay url (ws→http, wss→https) — '' when the url is not one. */
+export function httpRoot(url: string): string {
+  const m = /^(wss?):\/\/([^/?#]+)/.exec(url);
+  if (!m) return '';
+  return `${m[1] === 'wss' ? 'https' : 'http'}://${m[2]}/`;
+}
+
+/** The line while the free host wakes: it tells the player why it takes so long. */
+function waitText(waitedMs: number): string {
+  return `联机服务器唤醒中……第一次大约要一分钟（已等 ${Math.floor(waitedMs / 1000)} 秒）`;
+}
+
 export class RelayClient {
   private ws: WebSocket | null = null;
   /** Every socket gets a number; the events of an old socket are ignored. */
   private gen = 0;
   private pingTimer: number | null = null;
   private connectTimer: number | null = null;
+  private retryTimer: number | null = null;
+  private waitTimer: number | null = null;
+  private tickTimer: number | null = null;
   private pending: ((ok: boolean) => void) | null = null;
   private pingSentAt = 0;
   private connected = false;
-  private failed = false;
+  /** The handshake of the current wait: who we are and where we are going. */
+  private name = '';
+  private url = '';
+  private waitMs = WAIT_MS;
+  private waitStart = 0;
+  /** The host was poked over HTTP once for this wait (a free host needs exactly one). */
+  private woken = false;
 
   constructor(private readonly hooks: ClientHooks) {}
 
@@ -66,44 +99,24 @@ export class RelayClient {
     return this.ws !== null && this.ws.readyState === WebSocket.OPEN;
   }
 
-  /** Open the socket and shake hands; false when the relay is out of reach. */
-  connect(name: string, url: string): Promise<boolean> {
+  /** Open the socket and shake hands, retrying while the free host wakes; false when the wait runs out. */
+  connect(name: string, url: string, waitMs = WAIT_MS): Promise<boolean> {
     if (this.open) return Promise.resolve(true);
+    this.cancelWait();          // an older wait stops at once (its promise answers false)
     this.closeSocket();
-    this.failed = false;
+    this.name = name;
+    this.url = url;
+    this.waitMs = waitMs > 0 ? waitMs : WAIT_MS;
+    this.waitStart = Date.now();
+    this.woken = false;
     this.hooks.onState('connecting', '连接联机服务器…');
-    return new Promise<boolean>((resolve) => {
+    const p = new Promise<boolean>((resolve) => {
       this.pending = resolve;
-      let ws: WebSocket;
-      try {
-        ws = new WebSocket(url);
-      } catch (err) {
-        console.error('[net] the relay url is broken', err);
-        this.pending = null;
-        this.hooks.onState('error', '连接不上联机服务器');
-        resolve(false);
-        return;
-      }
-      this.ws = ws;
-      const gen = this.gen;
-      this.connectTimer = window.setTimeout(() => this.failConnect(), CONNECT_TIMEOUT_MS);
-      ws.onopen = (): void => {
-        if (gen !== this.gen) return;
-        this.send({ t: 'hello', v: PROTOCOL_VERSION, name });
-      };
-      ws.onmessage = (ev: MessageEvent): void => {
-        if (gen !== this.gen) return;
-        this.receive(ev.data);
-      };
-      ws.onerror = (): void => {
-        if (gen !== this.gen) return;
-        this.failConnect();
-      };
-      ws.onclose = (): void => {
-        if (gen !== this.gen) return;
-        this.closed();
-      };
     });
+    this.waitTimer = window.setTimeout(() => this.giveUp(), this.waitMs);
+    this.tickTimer = window.setInterval(() => this.sayWaiting(), WAIT_TICK_MS);
+    this.openSocket();
+    return p;
   }
 
   /** Send a message to the relay (dropped when the socket is not open). */
@@ -121,15 +134,46 @@ export class RelayClient {
 
   /** Close the socket (the unit decides what happens to the room). */
   close(): void {
+    this.cancelWait();
     this.closeSocket();
     this.connected = false;
+  }
+
+  /** One try: a fresh socket, the hello when it opens, the timeout when it does not. */
+  private openSocket(): void {
+    let ws: WebSocket;
+    try {
+      ws = new WebSocket(this.url);
+    } catch (err) {
+      console.warn('[net] the relay url is broken', err);
+      this.tryFailed();
+      return;
+    }
+    this.ws = ws;
+    const gen = this.gen;
+    this.connectTimer = window.setTimeout(() => this.tryFailed(), CONNECT_TIMEOUT_MS);
+    ws.onopen = (): void => {
+      if (gen !== this.gen) return;
+      this.send({ t: 'hello', v: PROTOCOL_VERSION, name: this.name });
+    };
+    ws.onmessage = (ev: MessageEvent): void => {
+      if (gen !== this.gen) return;
+      this.receive(ev.data);
+    };
+    ws.onerror = (): void => {
+      if (gen !== this.gen) return;
+      this.tryFailed();
+    };
+    ws.onclose = (): void => {
+      if (gen !== this.gen) return;
+      this.closed();
+    };
   }
 
   /** Drop the socket: its events are ignored from now on. */
   private closeSocket(): void {
     this.gen++;
-    this.clearTimers();
-    this.pending = null;
+    this.clearTryTimer();
     const ws = this.ws;
     this.ws = null;
     try {
@@ -139,46 +183,110 @@ export class RelayClient {
     }
   }
 
-  private clearTimers(): void {
+  private clearTryTimer(): void {
+    if (this.connectTimer !== null) {
+      window.clearTimeout(this.connectTimer);
+      this.connectTimer = null;
+    }
+  }
+
+  /** Every timer of the current wait (and of the ping) is off. */
+  private clearWaitTimers(): void {
+    if (this.retryTimer !== null) {
+      window.clearTimeout(this.retryTimer);
+      this.retryTimer = null;
+    }
+    if (this.waitTimer !== null) {
+      window.clearTimeout(this.waitTimer);
+      this.waitTimer = null;
+    }
+    if (this.tickTimer !== null) {
+      window.clearInterval(this.tickTimer);
+      this.tickTimer = null;
+    }
+  }
+
+  private clearPingTimer(): void {
     if (this.pingTimer !== null) {
       window.clearInterval(this.pingTimer);
       this.pingTimer = null;
     }
-    if (this.connectTimer !== null) {
-      window.clearTimeout(this.connectTimer);
-      this.connectTimer = null;
-    }
   }
 
-  /** The handshake failed (or timed out): the caller is told at once. */
-  private failConnect(): void {
-    if (this.connectTimer !== null) {
-      window.clearTimeout(this.connectTimer);
-      this.connectTimer = null;
+  private clearTimers(): void {
+    this.clearTryTimer();
+    this.clearWaitTimers();
+    this.clearPingTimer();
+  }
+
+  /** A try failed (error, close or no open in time): the next one follows in a moment. */
+  private tryFailed(): void {
+    if (this.connected) return;      // a connected socket drops through closed()
+    this.closeSocket();
+    this.retry();
+  }
+
+  /** The host is asleep or gone: poke it once, say so, and try again until the wait runs out. */
+  private retry(): void {
+    if (!this.pending) return;
+    if (!this.woken) {
+      this.woken = true;
+      this.poke();
     }
-    const resolve = this.pending;
-    if (!resolve) return;
-    this.pending = null;
-    this.failed = true;
-    this.hooks.onState('error', '连接不上联机服务器');
-    resolve(false);
+    this.sayWaiting();
+    if (Date.now() - this.waitStart >= this.waitMs) {
+      this.giveUp();
+      return;
+    }
+    this.retryTimer = window.setTimeout(() => {
+      this.retryTimer = null;
+      this.openSocket();
+    }, RETRY_MS);
+  }
+
+  /** The HTTP root of a sleeping free host wakes it; the answer (and any error) is ignored. */
+  private poke(): void {
+    const root = httpRoot(this.url);
+    if (!root) return;
+    fetch(root, { mode: 'no-cors', cache: 'no-store' }).catch((err: unknown) => {
+      console.debug('[net] the wake ping got no answer', err);
+    });
+  }
+
+  /** The waiting line counts up, so the screen shows that something is still happening. */
+  private sayWaiting(): void {
+    if (!this.pending) return;
+    this.hooks.onState('connecting', waitText(Date.now() - this.waitStart));
+  }
+
+  /** The wait ran out: the player is told, the promise answers false. */
+  private giveUp(): void {
+    this.clearTimers();
+    this.closeSocket();
+    this.hooks.onState('error', '连接不上联机服务器，稍后再试');
+    this.resolveConnect(false);
+  }
+
+  /** The player left (or connected again) while waiting: the tries stop at once. */
+  private cancelWait(): void {
+    if (!this.pending) return;
+    this.clearTimers();
+    this.resolveConnect(false);
+    this.hooks.onState('offline', '');
   }
 
   /** The socket is gone. */
   private closed(): void {
-    this.clearTimers();
-    this.ws = null;
+    this.clearTryTimer();
     const wasConnected = this.connected;
     this.connected = false;
-    const resolve = this.pending;
-    this.pending = null;
-    if (this.failed) {
-      this.failed = false;
-      resolve?.(false);
+    this.ws = null;
+    if (!wasConnected) {
+      this.retry();     // it closed before the welcome: the next try follows
       return;
     }
-    resolve?.(false);
-    this.hooks.onState('offline', wasConnected ? '服务器断开了' : '连接不上联机服务器');
+    this.clearTimers();
+    this.hooks.onState('offline', '服务器断开了');
   }
 
   private receive(data: unknown): void {
@@ -198,6 +306,8 @@ export class RelayClient {
       return;
     }
     if (msg.t === 'welcome') {
+      this.clearTryTimer();
+      this.clearWaitTimers();
       this.connected = true;
       this.hooks.onState('online', '');
       this.resolveConnect(true);
@@ -210,6 +320,11 @@ export class RelayClient {
       return;
     }
     if (msg.t === 'error') {
+      // The relay answered, so it is awake: its no is final (a wrong version is never retried).
+      if (!this.connected) {
+        this.clearTryTimer();
+        this.clearWaitTimers();
+      }
       this.hooks.onState('error', errorText(msg.code));
       if (!this.connected) this.resolveConnect(false);
       return;
