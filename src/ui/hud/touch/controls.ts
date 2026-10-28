@@ -1,14 +1,11 @@
-// Bottom-bar touch controls (grounded HUD v1.8). Every button goes through Input.press / hold / release,
-// which latch edges and hold the virtual KEYMAP codes. There is no second control path.
+// Two-thumb touch controls (grounded HUD v1.9f). Every button goes through Input.press / hold / release.
+// There is no second control path. The track centre stays empty.
 //
-//   steer disc     hold left / right (TouchLeft / TouchRight) — a wheel, not a stick
-//   AUTO-PEDAL     input.autoPedal (saved when the pill is tapped)
-//   鱼 吞 翼 天     press skill1 / skill2 / skill3 / ult   (U I O P)
-//   跳 JUMP        press hop
-//   漂移 DRIFT     hold drift
-//   攻击 ATTACK    tap → press attackL or attackR (扇翅); hold ≥ 340 ms → hold heavy (重击 / 投掷)
-//   铃             press bell
-//   暂停           press pause
+//   left thumb     steer disc (TouchLeft / TouchRight) + AUTO-PEDAL
+//   right thumb    2×2 skills (U I / O P) tight against a vertical stack:
+//                  跳 hop, 漂移 drift, 攻击 (largest, bottom-right)
+//                  tap attack → flap; hold ≥ 340 ms → heavy / throw
+//   暂停           small stamp, not in either thumb cluster
 import '../css/touch.css';
 import type { AppContext, Session } from '../../../core/contracts';
 import type { Action } from '../../../core/input';
@@ -54,12 +51,12 @@ export class TouchControls {
     this.root = el('div', 'brh-touch', parent);
     this.root.setAttribute('data-touch-hud', '');
 
-    const left = el('div', 'tch-left', this.root);
     const pause = button('tch-hit tch-pause', '暂停', '暂停');
     pause.dataset.touch = 'pause';
-    left.append(pause);
+    this.root.append(pause);
     bindTap(pause, () => this.tap('pause'));
 
+    const left = el('div', 'tch-left', this.root);
     this.steerBtn = button('tch-hit tch-steer', '', '转向');
     this.steerBtn.dataset.touch = 'steer';
     this.steerBtn.append(steerGraphic(), el('span', 'tch-steer-label', undefined));
@@ -76,34 +73,29 @@ export class TouchControls {
     left.append(this.pedalBtn);
     bindTap(this.pedalBtn, () => this.togglePedal());
 
-    const lane = el('div', 'tch-lane', this.root);
-    this.skillHost = el('div', 'tch-skills', lane);
-    const actions = el('div', 'tch-actions', lane);
+    const right = el('div', 'tch-right', this.root);
+    this.skillHost = el('div', 'tch-skills', right);
+    const stack = el('div', 'tch-stack', right);
 
     const jump = round('tch-jump', '跳', 'JUMP', '跳跃');
     jump.dataset.touch = 'hop';
-    actions.append(jump);
+    stack.append(jump);
     bindTap(jump, () => this.tap('hop'));
 
     const drift = round('tch-drift', '漂移', 'DRIFT', '漂移');
     drift.dataset.touch = 'drift';
-    actions.append(drift);
+    stack.append(drift);
     this.bindDrift(drift);
 
     this.attackBtn = button('tch-hit tch-atk', '', '攻击。点按扇翅，长按重击或投掷');
     this.attackBtn.dataset.touch = 'attack';
-    const stack = el('span', 'tch-atk-cn', this.attackBtn);
-    this.attackCn = el('b', '', stack, '攻击');
-    el('i', '', stack, 'ATTACK');
-    this.attackSub = el('small', '', stack, '点=扇翅 · 长按=重击/投掷');
+    const face = el('span', 'tch-atk-cn', this.attackBtn);
+    this.attackCn = el('b', '', face, '攻击');
+    el('i', '', face, 'ATTACK');
+    this.attackSub = el('small', '', face, '长按重击');
     el('span', 'tch-hold', this.attackBtn);
-    actions.append(this.attackBtn);
+    stack.append(this.attackBtn);
     this.bindAttack();
-
-    const bell = round('tch-bell', '铃', '', '打铃');
-    bell.dataset.touch = 'bell';
-    actions.append(bell);
-    bindTap(bell, () => this.tap('bell'));
 
     const rotate = el('div', 'tch-rotate', this.root);
     rotate.setAttribute('role', 'status');
@@ -304,7 +296,7 @@ export class TouchControls {
     this.attackBtn.classList.remove('is-down', 'is-heavy');
     this.attackBtn.style.setProperty('--hold', '0');
     this.attackCn.textContent = '攻击';
-    this.attackSub.textContent = '点=扇翅 · 长按=重击/投掷';
+    this.attackSub.textContent = '长按重击';
     if (kind === 'cancel') {
       if (a?.heavy) this.app.input.release('heavy');
       return;
@@ -392,7 +384,7 @@ export class TouchControls {
     this.attackBtn.classList.remove('is-down', 'is-heavy');
     this.attackBtn.style.setProperty('--hold', '0');
     this.attackCn.textContent = '攻击';
-    this.attackSub.textContent = '点=扇翅 · 长按=重击/投掷';
+    this.attackSub.textContent = '长按重击';
     this.root.querySelectorAll('.is-down').forEach((n) => n.classList.remove('is-down'));
   }
 }

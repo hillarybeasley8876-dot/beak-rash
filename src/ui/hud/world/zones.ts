@@ -62,7 +62,14 @@ export class HudZones {
     set(this.cluster, x0, y0, W, H);
     set(this.gauges, x0 + 40 * c, y0 + 80 * c, x0 + 492 * c, y0 + 370 * c);
     set(this.centre, W * 0.38, H * 0.25, W * 0.62, H * 0.5);
-    const band = this.hands ? Math.min(Math.max(108, H * 0.36), 230) : 0;
-    if (band > 0) set(this.touchBar, 0, H - band, W, H);
+    if (!this.hands) return;
+    // v1.9f: HP plate under the KO counters, thumbs only in the two bottom corners.
+    // The centre of the track is not a control band.
+    const thumbTop = H - Math.min(H * 0.48, 300);
+    set(this.touchBar, W * 0.56, thumbTop, W, H);
+    set(this.cluster, W * 0.56, thumbTop, W, H);
+    set(this.speedo, 0, H - Math.min(H * 0.42, 250), Math.min(W * 0.48, 480), H);
+    set(this.counters, W - Math.min(W * 0.48, 440), 0, W, Math.min(H * 0.36, 220));
+    set(this.gauges, W - Math.min(W * 0.46, 400), Math.min(120, H * 0.14), W - 4, Math.min(H * 0.38, 250));
   }
 }
