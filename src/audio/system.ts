@@ -7,6 +7,7 @@
 import { Vector3 } from 'three';
 import { AUDIO_RATE, Engine, type Volumes } from './engine';
 import { wireCombat } from './events-combat';
+import { wireR6 } from './events-r6';
 import { wireRace } from './events-race';
 import { wireR4 } from './events-r4';
 import { prepareDrumSamples } from './music/instruments/drum-samples';
@@ -100,6 +101,7 @@ export class AudioRuntime implements AudioSystem, Host {
       if (me) this.finishPlace = me.time === null ? Infinity : me.place;
     });
     wireCombat(app.bus, this);
+    wireR6(app.bus, this);
     wireR4(app.bus, this);
     app.bus.on('police:alert', ({ level }) => this.rt?.watcher.alert(level, this.now()));
     this.pump = new Pump({

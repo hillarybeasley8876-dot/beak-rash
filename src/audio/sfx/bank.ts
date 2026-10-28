@@ -9,13 +9,14 @@ import { SfxCache } from './cache';
 import { COMBAT_SFX } from './combat';
 import { R4_SFX } from './r4';
 import { SKILL_SFX } from './skills';
+import { REACT_SFX, SKILL_R6_SFX } from './skills-r6';
 import { BIKE_SFX, UI_SFX } from './ui-bike';
 import { WORLD_SFX } from './world';
 import type { Engine } from '../engine';
 import type { SfxFn } from './kit';
 
 export const SFX: Record<string, SfxFn> = {
-  ...UI_SFX, ...BIKE_SFX, ...COMBAT_SFX, ...SKILL_SFX, ...ANIMAL_SFX, ...WORLD_SFX, ...R4_SFX,
+  ...UI_SFX, ...BIKE_SFX, ...COMBAT_SFX, ...SKILL_SFX, ...SKILL_R6_SFX, ...REACT_SFX, ...ANIMAL_SFX, ...WORLD_SFX, ...R4_SFX,
 };
 
 export interface PlayOpts {

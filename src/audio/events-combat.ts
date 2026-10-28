@@ -20,6 +20,28 @@ export function hitSfx(weapon: string): string {
   return id in SFX ? id : 'hit.none';
 }
 
+/** The cast sound of an ult: its own (a shared ult has one too), the pelican's SHOWTIME as the fallback. */
+function ultCastSfx(skillId: string): string {
+  const id = `skill.${skillId}`;
+  return id in SFX ? id : 'skill.pelican.ult';
+}
+
+/** The impact sound of an ult: its own impact, its own hit, or the pelican's SHOWTIME impact. */
+function ultImpactSfx(skillId: string): string {
+  for (const id of [`skill.${skillId}.impact`, `skill.${skillId}.hit`, 'skill.pelican.ult.impact']) {
+    if (id in SFX) return id;
+  }
+  return 'skill.pelican.ult.impact';
+}
+
+/** Skills that hit a whole pack at once: their hit sound does not machine-gun (s between hits). */
+const HIT_GAP: Record<string, number> = {
+  'pool.ducks': 0.2, 'pool.firecracker': 0.2, 'pool.boomerang': 0.12, 'pool.watergun': 0.12,
+  'pool.firebreath': 0.1, 'pool.tornado': 0.12, 'pool.snowball': 0.12, 'pool.rocket': 0.12,
+  'pool.bubble': 0.12, 'pool.pie': 0.12, 'pool.popup': 0.12, 'pool.warsong': 0.12,
+  'moodeng.bounce': 0.12, 'pedro.trash': 0.12, 'ult.meteor': 0.12, 'ult.storm': 0.12,
+};
+
 function pickupSfx(kind: string): string {
   const k = kind.toLowerCase();
   if (k.includes('fish') && !k.includes('can')) return 'pickup.fish';
@@ -112,7 +134,11 @@ export function wireCombat(bus: EventBus<GameEvents>, h: Host): void {
     if (id) h.play(id, riderId);
     if (isPlayer(riderId)) h.play('ui.cutin', null, { volume: 0.8 });
   });
-  bus.on('skill:hit', ({ skillId, pos }) => h.play(skillSfx(skillId, '.hit') ?? 'skill.hit', pos));
+  bus.on('skill:hit', ({ skillId, pos }) => {
+    const gap = HIT_GAP[skillId];
+    if (gap !== undefined && !h.cooldown(`hit${skillId}`, gap)) return;
+    h.play(skillSfx(skillId, '.hit') ?? 'skill.hit', pos);
+  });
   bus.on('skill:end', ({ riderId, skillId }) => {
     const id = skillSfx(skillId, '.end');
     if (id) h.play(id, riderId);
@@ -120,14 +146,15 @@ export function wireCombat(bus: EventBus<GameEvents>, h: Host): void {
   bus.on('skill:denied', ({ riderId }) => {
     if (isPlayer(riderId) && h.cooldown('deny', 0.3)) h.play('ui.deny');
   });
-  bus.on('ult:start', ({ riderId }) => {
+  bus.on('ult:start', ({ riderId, skillId }) => {
     if (!isPlayer(riderId)) return;
-    h.play('skill.pelican.ult', riderId);
+    // the ult's own sound (a shared ult has one), never the pelican's SHOWTIME whoosh
+    h.play(ultCastSfx(skillId), riderId);
     h.play('ui.cutin');
     h.stinger('showtime');
     h.announce('ann_showtime', 3);
   });
-  bus.on('ult:impact', ({ pos }) => h.boom('skill.pelican.ult.impact', pos, { volume: 1.1 }));
+  bus.on('ult:impact', ({ skillId, pos }) => h.boom(ultImpactSfx(skillId), pos, { volume: 1.1 }));
   bus.on('pickup:take', ({ riderId, kind, pos }) => {
     h.play(pickupSfx(kind), isPlayer(riderId) ? riderId : pos, { volume: isPlayer(riderId) ? 1 : 0.5 });
   });
