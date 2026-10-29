@@ -114,6 +114,11 @@ class TimeStop extends TimedSkill {
     ctx.visuals.add(new AuraDisc(ctx.visuals, r, TIMESTOP.radius, TIMESTOP.dur, '#9fe8ff', '#3fb8ff'));
     ctx.visuals.add(new FlatRing(ctx.visuals, r.s, r.x, { color: '#bff0ff', from: 1, to: TIMESTOP.radius, dur: 0.9 }));
     ctx.bus.emit('ult:start', { riderId: r.id, skillId: ID });
+    // r7 (SPEC §29): every rider the freeze holds is a victim the HUD can name (时停 over its head, 命中 ×N), and
+    // the caster reads how many it stopped
+    const held = this.freeze.held.filter((h) => h.r.mode === 'racing');
+    for (const h of held) ctx.bus.emit('skill:hit', { riderId: r.id, skillId: ID, victim: h.r.id, pos: ctx.pos(h.r) });
+    ctx.bus.emit('skill:result', { riderId: r.id, skillId: ID, text: held.length > 0 ? `时停 ×${held.length}` : '没人可停', good: held.length > 0 });
   }
 
   protected tick(): void {

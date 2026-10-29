@@ -120,6 +120,7 @@ def main():
             'peak_mid': max(m for _w, m in scr),
             'peak_whole': max(w for w, _m in scr),
             'hud': new_texts[:30], 'hud_cls': hud_cls[:30], 'nums': nums[:20],
+            'has_readout': any('st-readout' in c for c in hud_cls), 'has_rear': any('st-rear' in c for c in hud_cls),
             'sounds': dict(snd),
             'rivals': {str(k): {'c': v['c'], 'lost': v['lost'], 'hp': v['hp'], 'sp': v['sp'], 'w': v['w'], 'st': sorted(v['st']), 'crash': v['crash']} for k, v in rivals.items()},
             'affected': len(affected),

@@ -97,12 +97,17 @@ class Gulp extends TimedSkill {
     const v = inBeakReach(ctx, r);
     if (!v) return;
     this.caught = true;
+    const name = ROSTER[v.character].name;
     if (ROSTER[v.character].scale > GULP.smallScale) {
       skillHit(ctx, r, v, ID, { damage: GULP.biteDamage, knock: 3, speedLoss: 0.08 });
       takeWeapon(ctx, r, v);
+      ctx.bus.emit('skill:result', { riderId: r.id, skillId: ID, text: `咬了${name}一口`, good: true }); // r7 SPEC §29
       return;
     }
     addStatus(v, 'gulped', GULP.hold + 0.2, 1, r.id, true);
+    // r7 (SPEC §29): the gulped rider is a victim the HUD can name (被吞), and the caster reads who went down
+    ctx.bus.emit('skill:hit', { riderId: r.id, skillId: ID, victim: v.id, pos: ctx.pos(v) });
+    ctx.bus.emit('skill:result', { riderId: r.id, skillId: ID, text: `吞下${name}！`, good: true });
     ctx.skills.interrupt(v);
     v.action = null;
     ctx.rd(v).buffered = null;

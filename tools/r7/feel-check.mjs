@@ -96,8 +96,10 @@ for (const [id, rule] of Object.entries(RULES)) {
     const cls = s.hud_cls ?? [];
     const offensive = rule.kind === 'hit' || rule.kind === 'trap';
     if (offensive && !(texts.some((t) => words.some((w) => t.includes(w))) || (s.nums ?? []).length > 0)) why.push('no status word or damage number on the HUD');
-    if (rule.kind !== 'move' && rule.kind !== 'defense' && !cls.some((c) => /st-readout/.test(c))) why.push("no caster readout (st-readout: 命中 ×N / 落空 / skill:result)");
-    if (rule.kind === 'trap' && !cls.some((c) => /st-rear/.test(c))) why.push('the trap firing behind is not called out (st-rear)');
+    const readout = s.has_readout ?? cls.some((c) => /st-readout/.test(c));
+    const rearOut = s.has_rear ?? cls.some((c) => /st-rear/.test(c));
+    if (rule.kind !== 'move' && rule.kind !== 'defense' && !readout) why.push("no caster readout (st-readout: 命中 ×N / 落空 / skill:result)");
+    if (rule.kind === 'trap' && !rearOut) why.push('the trap firing behind is not called out (st-rear)');
   }
   say(why.length === 0, `${id.padEnd(17)} ${why.length ? why.join('; ') : `seen ${(at03 * 100).toFixed(1)}→${(peak * 100).toFixed(1)} %, ${s.affected} affected, ${gain >= 0 ? '+' : ''}${gain.toFixed(1)} m`}`);
 }

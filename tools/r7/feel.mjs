@@ -75,7 +75,9 @@ function install(FORM) {
       for (const el of els) {
         if (!(el instanceof HTMLElement)) continue;
         const t = (el.textContent ?? '').replace(/\s+/g, ' ').trim();
-        if (t && t.length <= 40) k.texts.push([k.frame, String(el.className).slice(0, 60), t]);
+        // the classes of the element and its two parents: a HUD line often carries its class on a wrapper
+        const cls = [el, el.parentElement, el.parentElement?.parentElement].map((e) => (e ? String(e.className) : '')).filter(Boolean).join(' ');
+        if (t && t.length <= 40) k.texts.push([k.frame, cls.slice(0, 120), t]);
       }
     }
   }).observe(document.body, { subtree: true, childList: true, characterData: true });
