@@ -15,8 +15,8 @@ export const TEARS = {
   tick: 0.25,    // s between the soakings
   slow: 0.3,     // fraction of speed the soaked riders lose
   slowTime: 1.2,
-  boost: 0.25,   // the caster speeds up
-  boostTime: 2.5,
+  boost: 0.38,   // the caster speeds up (r7 SPEC §29: 0.25 gained 4 m in 3.5 s, under the 6 m floor)
+  boostTime: 3,
 } as const;
 
 class Tears extends TimedSkill {
