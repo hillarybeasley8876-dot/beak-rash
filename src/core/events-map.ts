@@ -58,6 +58,8 @@ export interface GameEvents {
   'skill:cast': { riderId: RiderId; skillId: string; slot: number };
   'skill:hit': { riderId: RiderId; skillId: string; victim: RiderId; pos: Vec3Like };
   'skill:end': { riderId: RiderId; skillId: string };
+  /** r7 (SPEC §29): what a cast achieved, in a few words the HUD shows the caster (+30 HP, 偷到 15 SP, 吸到 3 个, 没人可抢). */
+  'skill:result': { riderId: RiderId; skillId: string; text: string; good: boolean };
   'skill:denied': { riderId: RiderId; slot: number; reason: 'cooldown' | 'sp' | 'state' };
   'ult:start': { riderId: RiderId; skillId: string };      // UI cut-in + KO-style cinematic
   'ult:impact': { riderId: RiderId; skillId: string; pos: Vec3Like; victims: RiderId[] };

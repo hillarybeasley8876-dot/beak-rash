@@ -1,6 +1,7 @@
 // Helpers shared by skill files: damaging skill hits, debuff-only hits, cone and radius queries, and (r6 SPEC §25)
 // skill hits on the police and hittable props, which are obstacles, not riders.
 import type { Obstacle, ObstacleKind, RiderState, StatusId } from '../../../core/types';
+import { BIKES } from '../../../data/bikes';
 import { clampToRoad, finished, others, targetable, type CombatCtx } from '../ctx';
 import { applyHit, credit, type HitOutcome } from '../damage';
 import type { ImpactKind } from '../feedback';
@@ -18,9 +19,18 @@ export interface SkillHitOpts {
   countCombo?: boolean;
 }
 
-/** A skill speed buff: the 'boost' status (top speed through mods) + rider:boost for the camera kick / fx. */
+/**
+ * Share of a boost's extra top speed given at once (r7 SPEC §29). Raising the top speed alone was not felt: a rider
+ * still accelerating gained 2–3 m over a whole 2.5 s boost while the camera kicked 10°. The kick puts the bike on its
+ * way to the boosted top speed the moment the skill is cast.
+ */
+export const BOOST_KICK = 0.6;
+
+/** A skill speed buff: the 'boost' status (top speed through mods), the kick, and rider:boost for the camera / fx. */
 export function skillBoost(ctx: CombatCtx, r: RiderState, time: number, power: number): void {
   addStatus(r, 'boost', time, power, r.id, true);
+  const top = BIKES[r.bike].topSpeed;
+  r.speed = Math.max(r.speed, Math.min(top * (1 + power), r.speed + top * power * BOOST_KICK));
   ctx.bus.emit('rider:boost', { riderId: r.id, kind: 'skill', power, time });
 }
 

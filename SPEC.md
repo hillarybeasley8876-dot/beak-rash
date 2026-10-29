@@ -592,3 +592,27 @@ below are the starting point. Everything stays kind and cartoonish (pillar 5): n
   or doubled: a late message lands in the next tick). Limits: 4 humans/room, 4 KB/message, 120 messages/s/client, idle
   timeout 20 s, rooms die with their last member. `GET /` answers `beak-rash relay ok`. Runs locally with
   `deno run --allow-net relay/main.ts --port 8790`; the client's relay URL is `?relay=ws://…` or the build's default.
+
+## 29. r7 — Skill feel 技能手感: every cast is felt (combat skill groups + ui-hud; audit `tools/r7/feel.mjs`)
+- The audit (2026-10-29, `tools/r7/feel.mjs`): two rides per skill from the same seed and formation (seven rivals
+  around the player, their own skills off; three carry SP, one a pan; pickups ahead; the player at 70 % HP) — CONTROL
+  and CAST; whatever differs after t0 is what the skill did: its world visuals (frames drawn from the CONTROL camera,
+  no HUD), HUD words, sounds, and each rider's metres / HP / SP / statuses vs CONTROL (`summary.json`, sheets).
+  Found: no control status (眩晕/减速/沉默/颠倒/定身/寒冷/淋湿…) showed anything on its victim; boost skills kicked the
+  camera 8–10° but gained 2–3 m in 3.5 s (a raised top speed only — now `skillBoost` also kicks the bike, BOOST_KICK);
+  steal / whistle / five-second rule / thermos did nothing in an ordinary race; the violin was 2 % of the screen; the
+  peel lands behind the player, out of sight.
+- **The contract** (`tools/r7/feel-check.mjs` RULES, per skill):
+  1. 出手 cast — the P5 cut-in, the cast sound, the pose (r6).
+  2. 过程 delivery — the skill's own visuals cover ≥ 3 % of the middle of the screen at +0.3 s (traps ≥ 1.5 %) and
+     ≥ 6 % at their peak.
+  3. 结果 result — every rider it affects pops a status word over its head the moment the status takes hold
+     (`data/status-words.ts`; damage keeps its numbers); the caster reads 「命中 ×N」 / 「落空」 or the skill's own words
+     (`skill:result`); move skills gain ≥ 8 m in 3.5 s (dash 10, blink / ghost / flash 15); no skill does nothing in an
+     ordinary race — an effect that needs a condition (something to steal, an offender, an item, damage to heal) has
+     a baseline without it.
+  4. 余韵 duration — chips over riders while a status lasts; the player's own control status gets a banner with a
+     countdown and a screen cue (颠倒/沉默/冻住/眩晕), silenced locks the skill slots; a trap that fires behind the
+     player is called out (「身后 · 柴犬 踩中香蕉皮！」).
+- Events: `skill:result { riderId, skillId, text, good }` (core); `skill:hit` per victim for every skill; `skill:end`.
+  HUD debug surface `window.__br.hud.status()` (words, chips, banner, cue, slotsLocked, readouts, rear).
