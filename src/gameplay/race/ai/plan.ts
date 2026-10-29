@@ -26,6 +26,9 @@ export interface PlanOutput {
   followSpeed: number | null;
   followGap: number;
   followKind: Blip['kind'] | null;
+  /** Lateral centre and half width of the followed blip (0 / 0 when the lane is free). */
+  followX: number;
+  followHw: number;
   /** Distance to a hazard in the chosen lane worth hopping (null = none). */
   hopAt: number | null;
 }
@@ -159,22 +162,28 @@ export function planLateral(inp: PlanInput, blips: readonly Blip[]): PlanOutput 
  */
 function blockage(x: number, inp: PlanInput, blips: readonly Blip[]): Omit<PlanOutput, 'x'> {
   let followSpeed: number | null = null, followGap = Infinity, hopAt: number | null = null;
-  let followKind: Blip['kind'] | null = null;
+  let followKind: Blip['kind'] | null = null, followX = 0, followHw = 0;
   for (const b of blips) {
     if (b.ds <= 0 || ignored(b, inp) || b.kind === 'boost' || b.kind === 'ramp') continue;
     const clear = b.hw + RIDER_HW + CLEAR[b.kind] * 0.5;
     const chosen = Math.abs(x - b.x) < clear || inGap(b, x, inp);
     const gap = b.ds - b.hl - RIDER_HL;
+    const mine = Math.abs(inp.x - b.x) < b.hw + RIDER_HW;   // it stands in our own lane
     if (b.kind === 'hazard') {
       if (chosen && inp.canHop && gap > 0 && gap < inp.v * 0.22 + 1.5 && b.hl * 2 < inp.v * 0.36) hopAt = gap;
       continue;
     }
     const t = timeTo(b, inp.v);
+    // A stopped car or a standing prop we are already beside (its body level with ours) and out of our lane
+    // is being passed, not followed. Moving riders beside us keep their follow: the pack's racing depends on it.
+    if (gap <= 0 && !mine && b.vs < STOPPED) continue;
     if (!chosen && !(t < CROSS_T && Math.abs(inp.x - b.x) < clear)) continue;
     if (t > inp.horizon * 0.8 || gap >= followGap) continue;
     followGap = gap;
     followKind = b.kind;
     followSpeed = b.kind === 'solid' ? 0 : Math.max(0, b.vs);
+    followX = b.x;
+    followHw = b.hw;
   }
-  return { followSpeed, followGap, followKind, hopAt };
+  return { followSpeed, followGap, followKind, followX, followHw, hopAt };
 }

@@ -8,7 +8,7 @@ import { Fighter, type HuntTokens } from './fight';
 import type { RacingLine } from './line';
 import type { Personality } from './personality';
 import { blockGap, gapLane, planLateral, BLOCK_LOOK, type BlockGap, type PlanOutput } from './plan';
-import { freeLaneNear, type Senses } from './sense';
+import { freeLaneNear, RIDER_HW, type Senses } from './sense';
 import { useSkill } from './skills';
 import { cornerSpeed, GripModel, targetSpeed, updateDrift, type DriftPlan } from './speed';
 import { Showoff } from './tricks';
@@ -62,7 +62,7 @@ export class Brain {
   private thrower: Thrower;
   private showoff: Showoff;
   private drift: DriftPlan = { active: false, dir: 0, goal: 0.6, cool: 0 };
-  private plan: PlanOutput = { x: 0, followSpeed: null, followGap: Infinity, followKind: null, hopAt: null };
+  private plan: PlanOutput = { x: 0, followSpeed: null, followGap: Infinity, followKind: null, followX: 0, followHw: 0, hopAt: null };
   private tx: number;
   private planT: number;
   private skillT: number;
@@ -122,7 +122,7 @@ export class Brain {
     this.fighter.release();
     this.driver.reset();
     this.drift.active = false;
-    this.plan = { x: this.r.x, followSpeed: null, followGap: Infinity, followKind: null, hopAt: null };
+    this.plan = { x: this.r.x, followSpeed: null, followGap: Infinity, followKind: null, followX: 0, followHw: 0, hopAt: null };
     this.tx = this.r.x;
     this.hopCd = 0;
     this.stuckT = 0;
@@ -271,7 +271,9 @@ export class Brain {
       id: r.id, c: r.character, mode: r.mode, s: Math.round(r.s), x: +r.x.toFixed(2), v: +r.speed.toFixed(1),
       planX: +this.plan.x.toFixed(2), wantX: +this.wantX.toFixed(2), escape: this.escapeX === null ? null : +this.escapeX.toFixed(2),
       gap: this.gap && [+this.gap.x.toFixed(2), +this.gap.ds.toFixed(1)],
-      draft: this.draft?.id ?? null, follow: this.plan.followSpeed, hunt: this.fighter.hunt?.id ?? null,
+      draft: this.draft?.id ?? null, follow: this.plan.followSpeed,
+      fKind: this.plan.followKind, fGap: +this.plan.followGap.toFixed(2), fX: this.plan.followX, stuck: +this.stuckT.toFixed(1),
+      hunt: this.fighter.hunt?.id ?? null,
       pace: Number.isFinite(this.paceTop) ? +this.paceTop.toFixed(2) : null, base: Number.isFinite(this.basePace) ? +this.basePace.toFixed(2) : null,
       top: +topOf(r).toFixed(2), rubber: +r.rubber.toFixed(3), aLat: +this.grip.aLat.toFixed(2), drift: this.drift.active,
       steer: +this.c.steer.toFixed(2), throttle: +this.c.throttle.toFixed(2), brake: +this.c.brake.toFixed(2),
@@ -383,8 +385,11 @@ export class Brain {
     if (r.speed < 2) this.stuckT += dt;
     if (this.stuckT < UNSTICK_AFTER) return;
     // Nothing to back up into and no reverse gear: the bike has to keep rolling to steer at all (SPEC §6),
-    // so it only comes off the throttle while it is pressed against the obstacle, and steers away meanwhile.
-    const pressed = this.plan.followKind !== null && this.plan.followGap < PRESSED_GAP;
+    // so it only comes off the throttle while it is pressed against an obstacle standing in its OWN lane
+    // (its body overlaps the bike's, half widths and all). Steering past one, the pedals stay floored.
+    const { followKind, followGap, followX, followHw } = this.plan;
+    const ours = Math.abs(followX - r.x) < followHw + RIDER_HW;
+    const pressed = followKind !== null && ours && followGap < PRESSED_GAP;
     c.throttle = pressed && r.speed > ROLL ? 0 : 1;
     c.brake = 0;
     c.drift = false;
