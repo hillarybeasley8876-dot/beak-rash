@@ -13,6 +13,7 @@ import { ElementLayer } from './elements';
 import { IncomingWarning } from './incoming';
 import type { Projector } from './project';
 import { GaugeOcclusion } from './occlusion';
+import { StatusWords } from './statuswords';
 import { NameTags, type TagMark } from './tags';
 import { HudZones } from './zones';
 
@@ -25,6 +26,8 @@ export class WorldOverlay {
   private damage: DamageNumbers;
   /** The element badges over the riders and the reaction callouts (SPEC §24). */
   private elements: ElementLayer;
+  /** r7 (SPEC §29): the status word that slams in over a rider the moment a status takes hold. */
+  private words: StatusWords;
   readonly edges: EdgeWarnings;
   readonly incoming: IncomingWarning;
   /** Static HUD module rects + the keep-clear area above the vanishing point, for this viewport. */
@@ -39,6 +42,7 @@ export class WorldOverlay {
     this.tags = new NameTags(this.root);
     this.damage = new DamageNumbers(this.root);
     this.elements = new ElementLayer(this.root);
+    this.words = new StatusWords(this.root);
     this.bubbles = new Bubbles(this.root);
     this.edges = new EdgeWarnings(edgesParent, this.root);
     this.incoming = new IncomingWarning(edgesParent);
@@ -56,6 +60,7 @@ export class WorldOverlay {
     this.edges.clear();
     this.incoming.clear();
     this.elements.attach(session);
+    this.words.attach();
     const riders = session?.riders ?? [];
     this.tags.setRiders(riders);
     this.edges.setRiders(riders);
@@ -126,7 +131,18 @@ export class WorldOverlay {
     this.edges.update(s, this.proj, this.zones, k, dt);
     this.bubbles.update(s, this.proj, k, dt, [...this.tags.boxes(), ...this.edges.boxes()], this.zones, dyn);
     this.damage.update(this.proj, k, dt);
+    this.words.update(s, this.proj, k, dt, this.tags.boxes());
     this.gaugesCovered = this.occlusion.covered(s, this.proj, this.zones.gauges, this.tags.boxes());
     this.incoming.update(s, this.proj, k, dt);
+  }
+
+  /** r7 (SPEC §29): what the status layer shows right now — the words over riders and their chips. */
+  statusWords(): ReturnType<StatusWords['words']> {
+    return this.words.words();
+  }
+
+  /** The statuses chipped over each rival's plate. */
+  statusChips(): ReturnType<NameTags['chips']> {
+    return this.tags.chips();
   }
 }

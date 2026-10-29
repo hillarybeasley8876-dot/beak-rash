@@ -17,14 +17,24 @@
 .nt-hp { position: relative; width: 104px; height: 9px; margin-top: 5px; background: var(--ink); transform: skewX(-20deg); box-shadow: 0 0 0 2px var(--paper); overflow: hidden; }
 .nt-hp-f { position: absolute; inset: 2px; background: var(--paper); transform-origin: 0 50%; }
 .nt-hp-f.low { background: var(--hot); }
+/* Status chips (r7 SPEC §29): up to three over a plate, each with a thin ring draining over the status's
+   remaining time. Bad statuses are red-rimmed, the good ones green; the cast flash and the angry / weapon
+   chips keep their own looks. */
+.nt-chips { position: absolute; right: -26px; top: -30px; display: flex; align-items: flex-end; gap: 5px; }
 .nt-chip {
-  position: absolute; right: -30px; top: -14px; padding: 2px 5px 1px; font: 400 18px/1 "ZCOOL QingKe HuangYou", sans-serif;
-  background: var(--red); color: var(--paper); transform: rotate(10deg); box-shadow: 0 0 0 2px var(--ink); visibility: hidden;
+  position: relative; overflow: hidden; padding: 3px 6px 2px; background: var(--ink); color: var(--c, var(--paper));
+  font: 400 22px/1 "ZCOOL QingKe HuangYou", sans-serif; transform: rotate(7deg);
+  box-shadow: 0 0 0 2px var(--ink), 0 0 0 4px var(--paper); visibility: hidden;
 }
-.nt-chip.on { visibility: inherit; }
-.nt-chip.angry { background: var(--red); }
-.nt-chip.stun { background: var(--sp); color: var(--ink); }
-.nt-chip.shield { background: #2FA8FF; }
+.nt-chip i {
+  position: absolute; inset: 1px;
+  background: conic-gradient(from -90deg, var(--c, var(--paper)) calc(var(--f, 1) * 360deg), transparent 0);
+  mask-image: radial-gradient(closest-side, transparent 0 58%, #000 64%);
+}
+.nt-chip b { position: relative; font-weight: 400; }
+.nt-chip.st-bad { box-shadow: 0 0 0 2px var(--ink), 0 0 0 4px var(--red); }
+.nt-chip.st-good { box-shadow: 0 0 0 2px var(--ink), 0 0 0 4px #1E9E5A; }
+.nt-chip.angry { background: var(--red); color: var(--paper); }
 .nt-chip.weapon { background: var(--paper); color: var(--ink); }
 .nt-chip.cast { background: var(--sp); color: var(--ink); font-size: 24px; box-shadow: 0 0 0 3px var(--ink); }
 .nt.is-cast .nt-plate { box-shadow: 3px 3px 0 var(--sp), 0 0 0 3px var(--hot); }

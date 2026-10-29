@@ -6,9 +6,10 @@
 import { Vector3 } from 'three';
 import { approach, clamp, clamp01 } from '../../../core/math';
 import { ROSTER } from '../../../data/roster';
+import { STATUS_WORDS } from '../../../data/status-words';
 import { WEAPONS } from '../../../data/weapons';
 import type { Session } from '../../../core/contracts';
-import type { RiderId, RiderState } from '../../../core/types';
+import type { RiderId, RiderState, StatusId } from '../../../core/types';
 import { reducedMotion, slam } from '../anim';
 import { SPECIES_GLYPH } from '../badge';
 import { el, px, w, type W } from '../dom';
@@ -24,7 +25,7 @@ const TAG_W = 160;
 const TAG_H = 54;
 const PIP_W = 58;
 const PIP_H = 30;
-/** The status chip pokes out above and to the right of the plate (world.css .nt-chip). */
+/** The status chips poke out above and to the right of the plate (world.css .nt-chips). */
 const CHIP_OUT = 16;
 const CAST_TIME = 1.1;
 /** s a tag keeps its form (plate / pip) before it may switch back (no flicker at the 12 m line). */
@@ -33,7 +34,16 @@ const MODE_HOLD = 0.5;
 const LEAD_MIN = 10;
 /** A layout target moving more than this (px at 1080p) in one frame is a jump: eased, not followed. */
 const JUMP = 8;
-const CHIP_KINDS = ['cast', 'angry', 'stun', 'shield', 'weapon'] as const;
+/** Status chips on one plate (the caster's flash takes the first). */
+const MAX_CHIPS = 3;
+/** Bad statuses, most important first (SPEC §29); the good ones ride in their own green style. */
+const CHIP_ORDER: readonly StatusId[] = [
+  'frozen', 'stun', 'rooted', 'confused', 'silenced', 'chill', 'slow', 'cold',
+  'burn', 'wet', 'charged', 'oiled', 'blind', 'gulped', 'halted',
+];
+const GOOD_ORDER: readonly StatusId[] = ['boost', 'shield', 'intangible', 'invisible'];
+/** Relevance bonus for a rival carrying a status: its chips are worth a full plate. */
+const STATUS_RELEVANCE = 25;
 
 /** The alliance's chain link (SPEC §18): two links, drawn as SVG so no emoji font is needed. */
 const CHAIN_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true">'
@@ -43,12 +53,17 @@ const CHAIN_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true">'
 /** The mark on a rider's plate: the nemesis' red 宿敌 badge, an ally's chain link, or none. */
 export type TagMark = 'nemesis' | 'ally' | '';
 
-type ChipKind = (typeof CHIP_KINDS)[number] | '';
+/** What a chip slot draws: the cast flash, a status (with its ring), or the angry / weapon leftovers. */
+type ChipKind = 'cast' | 'st-bad' | 'st-good' | 'angry' | 'weapon';
+
+interface ChipSpec { kind: ChipKind; text: string; frac: number; status: StatusId | null; color: string }
+
+interface ChipEl { root: W; ring: W; glyph: W }
 
 interface Tag {
   r: RiderState;
   root: W; inner: W; pip: W; pipPl: W; lead: W; end: W; tip: W;
-  hp: W; pl: W; chip: W; mark: W;
+  hp: W; pl: W; chips: ChipEl[]; mark: W;
   /** The plate's mark (SPEC §18): 'nemesis', 'ally' or none. */
   markKind: TagMark;
   vis: number; x: number; y: number; scale: number; depth: number;
@@ -65,18 +80,41 @@ interface Tag {
   box: TagBox;
   /** Seconds left of the skill-cast flash, and the skill's glyph. */
   cast: number; castGlyph: string;
+  /** Longest time seen per live status (its ring drains from there) and the statuses chipped this frame. */
+  life: Map<StatusId, number>; shown: StatusId[];
 }
 
 /** A drawn tag's screen rectangle (chip overhang included), for overlays that must not cover it. */
 export interface TagBox extends Rect { id: RiderId; cx: number }
 
-function chipFor(r: RiderState, playerId: number): { kind: ChipKind; text: string } {
-  const has = (id: string, src?: number): boolean => r.statuses.some((s) => s.id === id && (src === undefined || s.source === src));
-  if (has('angry', playerId)) return { kind: 'angry', text: '怒' };
-  if (has('stun') || r.mods.steerMul === 0) return { kind: 'stun', text: '晕' };
-  if (r.mods.shield || has('shield')) return { kind: 'shield', text: '盾' };
-  if (r.weapon !== 'none') return { kind: 'weapon', text: WEAPONS[r.weapon].name };
-  return { kind: '', text: '' };
+/** The chips over one plate, most important first: the cast flash, then the statuses (bad before good),
+ *  then the angry mark and the held weapon. A status ring drains from the longest time seen for it. */
+function chipsFor(t: Tag, r: RiderState, playerId: number, casting: boolean): ChipSpec[] {
+  const out: ChipSpec[] = [];
+  if (casting) out.push({ kind: 'cast', text: `${t.castGlyph}!`, frac: 1, status: null, color: '' });
+  const live = new Set<StatusId>();
+  for (const st of r.statuses) {
+    if (st.time <= 0 || !STATUS_WORDS[st.id]) continue;
+    live.add(st.id);
+    t.life.set(st.id, Math.max(t.life.get(st.id) ?? 0, st.time));
+  }
+  for (const id of [...t.life.keys()]) if (!live.has(id)) t.life.delete(id);
+  const add = (id: StatusId): void => {
+    const word = STATUS_WORDS[id];
+    const status = r.statuses.find((s) => s.id === id);
+    if (!word || !status) return;
+    out.push({
+      kind: word.bad ? 'st-bad' : 'st-good', text: word.glyph, status: id, color: word.color,
+      frac: clamp01(status.time / Math.max(0.1, t.life.get(id) ?? status.time)),
+    });
+  };
+  for (const id of CHIP_ORDER) if (live.has(id)) add(id);
+  for (const id of GOOD_ORDER) if (live.has(id)) add(id);
+  // Left over from the single-chip days: a stun with no status behind it, the nemesis' anger, a weapon.
+  if (!live.has('stun') && r.mods.steerMul === 0) out.push({ kind: 'st-bad', text: '晕', frac: 1, status: null, color: '#ffe14d' });
+  if (r.statuses.some((s) => s.id === 'angry' && s.source === playerId)) out.push({ kind: 'angry', text: '怒', frac: 1, status: null, color: '' });
+  if (r.weapon !== 'none') out.push({ kind: 'weapon', text: WEAPONS[r.weapon].name, frac: 1, status: null, color: '' });
+  return out.slice(0, MAX_CHIPS);
 }
 
 function build(r: RiderState, host: HTMLElement): Tag {
@@ -96,17 +134,22 @@ function build(r: RiderState, host: HTMLElement): Tag {
   const pl = el('span', 'nt-pl', plate);
   const hpBox = el('div', 'nt-hp', inner);
   const hp = el('div', 'nt-hp-f', hpBox);
-  const chip = el('span', 'nt-chip', inner);
+  const chips = el('div', 'nt-chips', inner);
+  const chipEls: ChipEl[] = [];
+  for (let i = 0; i < MAX_CHIPS; i++) {
+    const chip = el('span', 'nt-chip', chips);
+    chipEls.push({ root: w(chip), ring: w(el('i', '', chip)), glyph: w(el('b', '', chip)) });
+  }
   const mark = el('span', 'nt-mark', inner);
   const tip = el('div', 'nt-tip', inner);
   return {
     r, root: w(root), inner: w(inner), pip: w(pip), pipPl: w(pipPl), lead: w(lead), end: w(end), tip: w(tip),
-    hp: w(hp), pl: w(pl), chip: w(chip), mark: w(mark), markKind: '',
+    hp: w(hp), pl: w(pl), chips: chipEls, mark: w(mark), markKind: '',
     vis: 0, x: 0, y: 0, scale: 1, depth: 0, full: false, modeT: MODE_HOLD, ox: 0, oy: 0, slamT: 9, lx: 0, ly: 0,
     fw: 0, fh: 0, pw: 0, ph: 0,
     item: { x: 0, y: 0, depth: 0, w: 0, h: 0, full: false, side: 0, tx: 0, ty: 0 },
     box: { id: r.id, cx: 0, l: 0, r: 0, t: 0, b: 0 },
-    cast: 0, castGlyph: '',
+    cast: 0, castGlyph: '', life: new Map(), shown: [],
   };
 }
 
@@ -232,10 +275,17 @@ export class NameTags {
     return this.boxList;
   }
 
+  /** The statuses chipped over each plate right now (SPEC §29; the HUD debug surface). */
+  chips(): Record<RiderId, StatusId[]> {
+    const out: Record<RiderId, StatusId[]> = {};
+    for (const t of this.tags) if (t.vis > 0.2 && t.full) out[t.r.id] = [...t.shown];
+    return out;
+  }
+
   /** Up to MAX_FULL most relevant rivals get the plate; forms hold MODE_HOLD s (casts switch at once). */
   private chooseForms(shown: Tag[], me: RiderState): void {
     const scored = shown
-      .map((t) => ({ t, score: relevance(t.r, me, t.cast > 0, t.full) }))
+      .map((t) => ({ t, score: relevance(t.r, me, t.cast > 0, t.full) + (t.r.statuses.some((s) => s.time > 0 && STATUS_WORDS[s.id]) ? STATUS_RELEVANCE : 0) }))
       .sort((a, b) => b.score - a.score);
     scored.forEach(({ t, score }, i) => {
       const want = score > 0 && i < MAX_FULL;
@@ -318,10 +368,22 @@ export class NameTags {
     t.hp.tf(`scaleX(${f.toFixed(3)})`);
     t.hp.cls('low', f < 0.3);
     t.pl.text(String(r.place));
-    const chip = casting ? { kind: 'cast' as const, text: `${t.castGlyph}!` } : chipFor(r, playerId);
-    t.chip.cls('on', chip.kind !== '');
-    for (const kind of CHIP_KINDS) t.chip.cls(kind, chip.kind === kind);
-    if (chip.text) t.chip.text(chip.text);
+    const chips = chipsFor(t, r, playerId, casting);
+    t.shown.length = 0;
+    t.chips.forEach((c, i) => {
+      const spec = chips[i];
+      c.root.show(spec !== undefined);
+      if (!spec) return;
+      c.root.cls('cast', spec.kind === 'cast');
+      c.root.cls('st-bad', spec.kind === 'st-bad');
+      c.root.cls('st-good', spec.kind === 'st-good');
+      c.root.cls('angry', spec.kind === 'angry');
+      c.root.cls('weapon', spec.kind === 'weapon');
+      c.root.style('--c', spec.color || '#ffffff');
+      c.ring.style('--f', spec.frac.toFixed(2));
+      c.glyph.text(spec.text);
+      if (spec.status) t.shown.push(spec.status);
+    });
     t.mark.cls('on', t.markKind !== '');
     t.mark.cls('nemesis', t.markKind === 'nemesis');
     t.mark.cls('ally', t.markKind === 'ally');

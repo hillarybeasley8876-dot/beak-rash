@@ -120,17 +120,27 @@ export class SkillRow {
   private ultSkill: SkillDef | null = null;
   private ultCost = 100;
   private sp = 0;
+  /** 沉默 (SPEC §29): the slots grey out behind a 琴 lock while the player cannot cast. */
+  private locked = false;
+  private rootW: W;
   /** Debounced RiderState.ultTarget (TARGET_HOLD) and how long the raw flag has disagreed with it. */
   private target = true;
   private targetT = 0;
 
   constructor(parent: HTMLElement, loadout: SkillLoadout) {
     this.root = el('div', 'sk', parent);
+    this.rootW = w(this.root);
     const kit = playerKit(loadout);
     kit.slots.forEach((s, i) => this.diamonds.push(new SkillDiamond(this.root, s, SLOT_KEYS[i] ?? 'skill1')));
     this.ultSkill = kit.ult;
     this.ult = new UltDiamond(this.root, kit.ult);
     this.ultCost = kit.ult && kit.ult.spCost > 0 ? kit.ult.spCost : 100;
+    el('div', 'sk-lock', this.root, '琴');
+  }
+
+  /** True while the player is silenced and the slots are locked. */
+  get slotsLocked(): boolean {
+    return this.locked;
   }
 
   /** What the SP bar and the P diamond say about SHOWTIME this frame. */
@@ -141,6 +151,8 @@ export class SkillRow {
 
   update(r: RiderState, dt: number): void {
     this.sp = r.sp;
+    this.locked = r.mods.silenced;
+    this.rootW.cls('is-locked', this.locked);
     if (r.ultTarget === this.target) this.targetT = 0;
     else if ((this.targetT += dt) >= TARGET_HOLD) {
       this.target = r.ultTarget;

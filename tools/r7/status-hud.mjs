@@ -152,17 +152,21 @@ await withPage(async (page, h) => {
   }
 
   if (want('rear')) {
+    // the rival rides 7 m behind in the caster's own lane (pinned there): the peels land on the road and fall back
+    // through that spot, so it skids on one — the catch itself must be called out, not only the trap
     await page.evaluate(() => window.__k.scene([[-7, 0]]));
-    const rid = await page.evaluate(() => { const r = window.__k.rivals()[0]; window.__br.combat.unpin(r.id); r.speed = window.__br.session().player.speed + 1.5; return r.id; });
+    const rid = await page.evaluate(() => window.__k.rivals()[0].id);
     const name = NAMES[await page.evaluate((id) => window.__br.session().rider(id).character, rid)];
     await page.evaluate(() => window.__k.cast('bananacat.peel'));
-    let rear = null, r = null;
+    let rear = null, r = null, skid = false;
     for (let i = 0; i < 40 && !rear; i++) {
       await page.evaluate(() => window.__k.step(6));
       r = await page.evaluate(() => window.__k.hud());
-      rear = (r?.rear ?? []).find((x) => x.text.includes('香蕉皮'));
+      skid = skid || await page.evaluate((id) => window.__br.session().rider(id).statuses.some((q) => q.id === 'confused'), rid);
+      rear = (r?.rear ?? []).find((x) => x.text.includes('香蕉皮') && x.text.includes('踩中'));
     }
-    expect(!!rear && rear.text.includes(name), `rear: the rival behind stepping on the peel is called out with its name 「${name}」 and 香蕉皮 (${JSON.stringify(r?.rear)})`);
+    expect(skid, `rear: the rival 7 m behind in the caster's lane skids on a peel (confused)`);
+    expect(!!rear && rear.text.includes(name), `rear: the skid behind is called out — 「身后 · ${name} 踩中香蕉皮！」 (${JSON.stringify(r?.rear)})`);
   }
   await noErrors(h, 'status-hud');
 }, { size: '1280x720' });

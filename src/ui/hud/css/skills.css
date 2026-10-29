@@ -40,6 +40,15 @@
   color: var(--paper); font: 400 20px/1 "ZCOOL QingKe HuangYou", sans-serif; box-shadow: 0 0 0 2px var(--ink); opacity: 0;
 }
 .sk-d.is-denied .sk-box { background: var(--hot); }
+/* 沉默 (SPEC §29): no casts — the diamonds grey out behind the sad violin's 琴 lock. */
+.sk-lock {
+  position: absolute; left: 50%; top: 50%; translate: -50% -50%; z-index: 2; padding: 4px 14px 2px;
+  background: var(--ink); color: var(--paper); font: 400 36px/1 "ZCOOL QingKe HuangYou", sans-serif;
+  box-shadow: 0 0 0 3px var(--paper), 6px 6px 0 3px var(--red); visibility: hidden;
+}
+.sk.is-locked .sk-lock { visibility: inherit; }
+.sk.is-locked .sk-d { filter: grayscale(1) brightness(0.55); }
+.sk.is-locked .sk-key { background: #8b8b94; }
 
 .wp { position: absolute; right: 262px; bottom: 12px; display: flex; align-items: stretch; transform: skewX(-14deg); box-shadow: 5px 5px 0 var(--ink); }
 .wp-k { background: var(--ink); color: var(--paper); font: 400 17px/1 "Bebas Neue", sans-serif; padding: 6px 6px 4px; writing-mode: vertical-rl; text-orientation: mixed; letter-spacing: 1px; }

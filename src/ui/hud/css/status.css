@@ -1,0 +1,90 @@
+/* r7 status feedback (SPEC §29): the status words over riders, the player's banner and screen cues,
+   the caster's readout and the rear callout. 1080p reference sizes for the corner pieces; the
+   world-anchored word scales itself in JS. */
+.stw-in { position: absolute; left: 0; bottom: 0; width: max-content; translate: -50% 0; transform-origin: 50% 100%; }
+.stw-t {
+  display: block; padding: 4px 15px 2px; background: var(--ink); color: var(--sp); white-space: nowrap;
+  font: 400 42px/1.06 "ZCOOL QingKe HuangYou", sans-serif; letter-spacing: 2px;
+  box-shadow: 0 0 0 3px var(--paper), 7px 7px 0 3px var(--red);
+}
+.st-word.is-good .stw-t { box-shadow: 0 0 0 3px var(--paper), 7px 7px 0 3px #1E9E5A; }
+
+/* The player's own control status: a banner under the place block with a countdown bar. */
+.st-banner {
+  position: absolute; left: 4px; top: 248px; width: 300px; transform: skewX(-10deg); transform-origin: 0 0;
+  visibility: hidden;
+}
+.st-banner.on { visibility: inherit; }
+.stb-w { display: flex; align-items: stretch; box-shadow: 5px 5px 0 var(--ink); }
+.stb-t {
+  flex: 1; padding: 6px 10px 3px; background: var(--ink); color: var(--sc, var(--sp));
+  font: 400 34px/1.06 "ZCOOL QingKe HuangYou", sans-serif; letter-spacing: 1px; white-space: nowrap;
+}
+.stb-s {
+  min-width: 84px; text-align: right; padding: 5px 9px 2px; background: var(--paper); color: var(--ink);
+  font: 400 32px/1.1 "Anton", sans-serif; font-weight: 400; font-variant-numeric: tabular-nums;
+}
+.stb-bar { height: 9px; margin-top: 4px; background: var(--ink); box-shadow: 0 0 0 2px var(--paper); overflow: hidden; }
+.stb-bar i { display: block; height: 100%; background: var(--sc, var(--sp)); transform-origin: 0 50%; }
+
+/* Screen cues: edge-only, never over the road in the middle (SPEC §29). */
+.st-cue { position: absolute; inset: 0; visibility: hidden; }
+.st-cue.on { visibility: inherit; }
+.stc-edge { position: absolute; inset: 0; }
+/* The cue's mark sits over the left verge, never in the middle of the road or over the words on riders. */
+.stc-mark {
+  position: absolute; left: 7%; top: 42%; translate: 0 -50%; font: 400 74px/1 "ZCOOL QingKe HuangYou", sans-serif;
+  color: var(--paper); -webkit-text-stroke: 9px var(--ink); paint-order: stroke fill; visibility: hidden;
+}
+/* 左右颠倒: a purple swirl around the edges and a ⇄ mark. */
+.st-cue[data-cue="confused"] .stc-edge {
+  background:
+    radial-gradient(ellipse 120% 100% at 50% 50%, transparent 52%, rgba(192, 139, 255, 0.55) 100%),
+    conic-gradient(from 0deg, rgba(192, 139, 255, 0.35), transparent 25%, rgba(192, 139, 255, 0.35) 50%, transparent 75%, rgba(192, 139, 255, 0.35));
+  animation: brh-swirl 6s linear infinite;
+}
+.st-cue[data-cue="confused"] .stc-mark { visibility: inherit; }
+/* 沉默: a flat grey rim (the locked skill slots carry the message). */
+.st-cue[data-cue="silenced"] .stc-edge { box-shadow: inset 0 0 90px 26px rgba(11, 11, 15, 0.75); }
+/* 冻住: frost creeping in from the edges. */
+.st-cue[data-cue="frozen"] .stc-edge {
+  background: radial-gradient(ellipse 110% 95% at 50% 50%, transparent 46%, rgba(191, 233, 255, 0.62) 88%, rgba(255, 255, 255, 0.8) 100%);
+  mask-image: repeating-conic-gradient(from 12deg, #000 0 6deg, rgba(0, 0, 0, 0.45) 6deg 12deg);
+}
+/* 眩晕: stars in the corners. */
+.st-cue[data-cue="stun"] .stc-edge {
+  background:
+    radial-gradient(circle at 6% 10%, var(--sp) 0 26px, transparent 27px),
+    radial-gradient(circle at 94% 12%, var(--sp) 0 20px, transparent 21px),
+    radial-gradient(circle at 10% 88%, var(--sp) 0 22px, transparent 23px),
+    radial-gradient(circle at 92% 86%, var(--sp) 0 30px, transparent 31px);
+  animation: brh-low 0.5s steps(2, end) infinite;
+}
+@keyframes brh-swirl { to { rotate: 360deg; } }
+.brh.is-reduced .st-cue .stc-edge { animation: none; }
+
+/* The caster's readout: beside the skill cluster (bottom-right corner box), right-aligned, above the
+   weapon slot and clear of the diamonds, the cast tag and the quip bubble. */
+.st-readout-host {
+  position: absolute; right: 600px; bottom: 176px; display: flex; flex-direction: column; align-items: flex-end; gap: 7px;
+}
+.st-readout {
+  padding: 5px 14px 3px; background: var(--ink); color: var(--paper); white-space: nowrap; transform-origin: 100% 50%;
+  font: 400 28px/1.1 "ZCOOL QingKe HuangYou", sans-serif; letter-spacing: 1px;
+  box-shadow: 0 0 0 3px var(--paper), 6px 6px 0 3px var(--red); visibility: hidden;
+}
+.st-readout b { font-weight: 400; }
+.st-readout.is-good { color: #5cff9d; box-shadow: 0 0 0 3px var(--paper), 6px 6px 0 3px #1E9E5A; }
+.st-readout.is-miss { color: #b8b8c0; box-shadow: 0 0 0 3px var(--paper), 6px 6px 0 3px #5a5a62; }
+
+/* Rear callout: a skill of the player's that caught somebody behind them (bottom edge, above the hints). */
+.st-rear-host {
+  position: absolute; left: 50%; bottom: calc(var(--k) * 116px); translate: -50% 0;
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+}
+.st-rear {
+  padding: 6px 18px 4px; background: var(--red); color: var(--paper); white-space: nowrap; transform-origin: 50% 50%;
+  font: 400 30px/1.15 "ZCOOL QingKe HuangYou", sans-serif; letter-spacing: 1px;
+  box-shadow: 0 0 0 3px var(--ink), 7px 7px 0 3px var(--ink); visibility: hidden;
+}
+.st-rear b { display: block; font-weight: 400; transform: skewX(-8deg); }
