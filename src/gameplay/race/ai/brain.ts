@@ -371,7 +371,10 @@ export class Brain {
     const t = prey.human ? prey.speed + close : Math.max(prey.speed + Math.max(RIVAL_PASS, close), g.target * FIGHT_PACE);
     if (t < g.target) {
       g.target = t;
-      g.soft = (goal.ds < 0 && !this.fighter.owes) || (goal.ds >= 0 && this.r.speed - prey.speed < SOFT_CLOSING);
+      // Closing in from behind only eases off — unless closing fast: a hunter coming up on a stopped or braking
+      // human at 13 m/s coasted into it (r7: tools/race-scenarios stopped, seed 3). Then it brakes like a follower.
+      const closing = this.r.speed - prey.speed;
+      g.soft = closing < SOFT_CLOSING ? (goal.ds < 0 && !this.fighter.owes) || goal.ds >= 0 : false;
     }
   }
 

@@ -56,12 +56,15 @@ export const fixes2 = [
     return { ok: !!k1 && Math.abs(k1.s - k0.s) < 0.01 && Math.abs(k1.x - k0.x) < 0.01 && pulled && home && taken === 0 &&
       Math.abs(k2.s - k0.s) < 0.01, info: { k0, k1, pulled, coin, c0, taken, k2 } };
   }],
-  ['whistle slows offenders only', () => {
+  // r7 (SPEC §29): the whistle warns everyone in its cone (slow 25 %) and fines the offenders (slow 50 %)
+  ['whistle warns everyone ahead (slow 25 %) and fines offenders (slow 50 %)', () => {
     const cc = window.__cc; cc.reset(); const c = cc.C(); const p = cc.P();
+    const slowOf = () => Math.max(0, ...p.statuses.filter((q) => q.id === 'slow' && q.time > 0).map((q) => q.strength));
     c.pin(9, -8, 0); cc.step(2); p.heat = 0; c.cast(9, 1); cc.step(3);
-    const innocent = cc.has(p, 'slow');
-    c.resetCooldowns(9); cc.step(60); p.heat = 0.6; c.cast(9, 1); cc.step(3);
-    return { ok: !innocent && cc.has(p, 'slow'), info: { innocent, slowed: cc.has(p, 'slow') } };
+    const warned = slowOf();
+    c.resetCooldowns(9); cc.step(100); p.heat = 0.6; c.cast(9, 1); cc.step(3);
+    const fined = slowOf();
+    return { ok: Math.abs(warned - 0.25) < 0.01 && Math.abs(fined - 0.5) < 0.01, info: { warned, fined } };
   }],
   ['the bell cannot ring a hit stagger away; SHOWTIME executes riders it leaves at <= 20 % HP', () => {
     const cc = window.__cc; cc.reset(); const c = cc.C(); const p = cc.P(); c.force({ crit: false, block: false, loose: false });

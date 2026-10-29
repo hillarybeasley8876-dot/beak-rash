@@ -118,10 +118,10 @@ export const BOOST_HOLD = {
   closing: 4,    // m/s
 } as const;
 
-/** The skills that speed the caster up: they all wait for the lane ahead to be clear. */
+/** The skills that speed the caster up: they all wait for the lane ahead to be clear (r7: the thermos's 枸杞提神 kick too). */
 export const SELF_SPEED: ReadonlySet<string> = new Set([
   'pelican.wing', 'pigeon.ghost', 'penguin.slide', 'sloth.flash', 'xinxian.fresh', 'pool.rocket', 'pool.blink',
-  'pool.warsong', 'shiba.doge', 'cryingcat.tears', 'ult.timestop',
+  'pool.warsong', 'shiba.doge', 'cryingcat.tears', 'ult.timestop', 'pool.thermos',
 ]);
 
 /** A slower rider in my lane ahead that I close on fast: a speed skill would ram it, so it is held. */

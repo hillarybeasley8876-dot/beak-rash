@@ -105,8 +105,8 @@ class Gulp extends TimedSkill {
       return;
     }
     addStatus(v, 'gulped', GULP.hold + 0.2, 1, r.id, true);
-    // r7 (SPEC §29): the gulped rider is a victim the HUD can name (被吞), and the caster reads who went down
-    ctx.bus.emit('skill:hit', { riderId: r.id, skillId: ID, victim: v.id, pos: ctx.pos(v) });
+    // r7 (SPEC §29): the caster reads who went down the pouch (the HUD pops 被吞 from the status; the one
+    // skill:hit of a gulp stays at the spit)
     ctx.bus.emit('skill:result', { riderId: r.id, skillId: ID, text: `吞下${name}！`, good: true });
     ctx.skills.interrupt(v);
     v.action = null;
