@@ -23,7 +23,23 @@
     rider beside us keeps its follow as before.
 
 ## In progress / next
-- Nothing.
+- Nothing. The lead's narrowed rule (`b.vs < STOPPED`) is in the tree; the worker re-ran every acceptance
+  command on that final state after round 1's two failures (see Evidence).
+
+## Worker re-run of all 10 acceptance commands on the final state (branch r6, clean tree)
+| command | result |
+| --- | --- |
+| `node tools/r4/tsc-own.mjs src/gameplay/race/ai/` | `TSC-OWN OK` |
+| `node tools/race-soak.mjs --track gobi` | `SOAK OK` (maxStuck 2.5 / 0.5 / 0.5 s) |
+| `node tools/race-soak.mjs --track watertown` | `SOAK OK` (2.5 / 0.5 / 0.5 s) |
+| `node tools/race-soak.mjs --track city` | `SOAK OK` (0.5 / 0.5 / 1.0 s) — round 1's `police never busted` gone |
+| `node tools/race-soak.mjs --track coast` | `SOAK OK` (0.5 / 1.5 / 2.0 s) |
+| `node tools/race-soak.mjs --track mountain` | `SOAK OK` (0.5 / 0.5 / 3.0 s) |
+| `node tools/race-scenarios.mjs` | `62/62 checks passed`, no FAIL, exit 0 — round 1's 61/62 gone |
+| `node tools/r4/w2-police.mjs` | `w2-police OK` |
+| `node tools/r6/net-det.mjs` | `r6-net-det OK` |
+| `node tools/core-check.mjs` | `core-check OK` |
+
 
 ## How to test (exact commands)
 - `node tools/race-soak.mjs --track gobi` (and watertown, city, coast, mountain; `--seeds 4 --extra ...` variants)
@@ -39,6 +55,9 @@
 
 ## Known issues
 - watertown seed 1 can still queue ~4.5 s behind a stopped van at s≈2785 (under the 5 s rule; r6-unstick note).
+- mountain seed 3 shows `maxStuck=3.0 s` — the slowest case left, under the soak's 5 s rule.
+- Probes kept for the record: `shots/r6-unstick-2/probe-gobi.mjs` (rider 7 through the gobi work zone: it now
+  passes s=1980 at 18 m/s instead of crawling at 1.5), `probe-police.mjs` (the corgi busting the braking player).
 
 ## Requests
 - (none)
