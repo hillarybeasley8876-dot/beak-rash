@@ -1,6 +1,6 @@
 // Geometries this folder's skills draw (built once at session start by the PropLibrary: no cast builds geometry
 // mid-race). Key → maker; read them with ctx.lib.get('<key>'). Keys must be unique across all prop tables.
-import { BoxGeometry, ConeGeometry, CylinderGeometry, SphereGeometry, type BufferGeometry } from 'three';
+import { BoxGeometry, CircleGeometry, ConeGeometry, CylinderGeometry, SphereGeometry, type BufferGeometry } from 'three';
 import { PartBuilder } from '../../meshes/build';
 import { saltfishGeometry } from '../../meshes/weapon-props';
 
@@ -40,6 +40,26 @@ function ad(): BufferGeometry {
     .build();
 }
 
+/** A blink afterimage: a rider seen head-on (wheels, handlebar, body, head) as a flat silhouette in the XY plane. */
+function afterimage(): BufferGeometry {
+  const disc = (): CircleGeometry => new CircleGeometry(1, 18);
+  return new PartBuilder()
+    .add(disc(), '#7ef9ff', [0, 0.42, 0], [0, 0, 0], [0.1, 0.44, 1])     // front wheel
+    .add(new BoxGeometry(0.46, 0.5, 0.01), '#7ef9ff', [0, 0.86, 0])       // frame / legs
+    .add(disc(), '#7ef9ff', [0, 1.2, 0], [0, 0, 0], [0.44, 0.52, 1])      // body
+    .add(new BoxGeometry(1.15, 0.11, 0.01), '#7ef9ff', [0, 1.3, 0])       // handlebar / arms
+    .add(disc(), '#7ef9ff', [0, 1.82, 0], [0, 0, 0], [0.24, 0.26, 1])     // head
+    .build();
+}
+
+/** A goji berry (枸杞): a small red-orange berry with a green tip. */
+function goji(): BufferGeometry {
+  return new PartBuilder()
+    .add(new SphereGeometry(1, 12, 8), '#e0452f', [0, 0, 0], [0, 0, 0], [0.07, 0.05, 0.07])
+    .add(new ConeGeometry(0.02, 0.05, 5), '#5f9e3a', [0, 0.06, 0])
+    .build();
+}
+
 /** A little music note for the war song. */
 function note(): BufferGeometry {
   return new PartBuilder()
@@ -54,4 +74,6 @@ export const PROPS = {
   'gag:duck': duck,
   'gag:ad': ad,
   'gag:note': note,
+  'gag:after': afterimage,
+  'gag:goji': goji,
 } satisfies Record<string, () => BufferGeometry>;

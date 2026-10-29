@@ -1,29 +1,44 @@
-// pool.boomerang — 回旋咸鱼: a salted fish flies out in front of the caster and comes back; it hits a rider (and
-// an officer in its reach) on the way out and again on the way home.
+// pool.boomerang — 回旋咸鱼: a whole salted fish, big enough to read, flies out over the caster's head and comes
+// back behind a white swoosh, glinting where it turns; it hits a rider (and an officer in its reach) on the way out
+// and again on the way home.
 import type { RiderState } from '../../../../core/types';
 import { targetable, type CombatCtx } from '../../ctx';
+import { Trail } from '../../visuals/trail';
+import { FlatRing } from '../../visuals/waves';
 import { skillHit, skillObstacleHit, obstaclesIn } from '../common';
 import { TimedSkill, type SkillImpl } from '../types';
 import { Flyer } from './flyer';
+import { Glint } from './glint';
 
 const ID = 'pool.boomerang';
 export const BOOM = {
-  out: 14,        // m the fish flies out (and the same distance back)
-  dur: 1.2,       // s for the whole round trip
+  out: 16,        // m the fish flies out (and the same distance back)
+  dur: 1.8,       // s for the whole round trip (it leaves slower now, so the eye can follow it)
   damage: 10,     // per pass
   knock: 4,
-  reach: 1.3,     // m around the fish that it hits
-  height: 1.35,   // m above the road
+  reach: 1.3,     // m around the fish that it hits (the fish looks twice as big now, its hitbox does not grow with
+                  // it: a wider one had rivals' fish landing on the player so often that the SP came in too fast)
+  height: 1.85,   // m above the road: over the caster's head, so the fish is never hidden behind it
+  scale: 3,       // the fish's size: a whole salted fish, twice the old throw (r7 SPEC §29)
+  spin: 9,        // rad/s
+  trail: { width: 0.7, life: 0.35, max: 26, alpha: 0.55 }, // the white swoosh behind it
+  glint: { size: 2.2, dur: 0.4 },                            // the flash where it turns round
 } as const;
 
 class Boomerang extends TimedSkill {
   private fish: Flyer;
+  private swoosh: Trail;
+  private glinted = -1;                                   // the pass whose turn already flashed
   private riderHits = new Map<number, number>();  // rider id → the pass it was hit on
   private officerHits = new Map<number, number>(); // obstacle id → the pass it was hit on
 
   constructor(ctx: CombatCtx, r: RiderState) {
     super(ctx, r, ID, BOOM.dur, false);
-    this.fish = ctx.visuals.add(new Flyer(ctx.visuals, ctx.lib.get('gag:fish'), { scale: 1.3, spin: 9 }));
+    this.fish = ctx.visuals.add(new Flyer(ctx.visuals, ctx.lib.get('gag:fish'), { scale: BOOM.scale, spin: BOOM.spin }));
+    this.swoosh = ctx.visuals.add(new Trail(ctx.visuals, (out) => {
+      ctx.world(this.fish.s, this.fish.x, this.fish.y, out);
+      return true;
+    }, { color: '#ffffff', ...BOOM.trail, additive: true }));
     this.place(0);
   }
 
@@ -50,6 +65,7 @@ class Boomerang extends TimedSkill {
     const d = this.distance(this.t);
     this.place(d);
     const pass = this.pass;
+    this.turnGlint(pass);
     for (const v of ctx.session.riders) {
       if (v === r || !targetable(ctx, v)) continue;
       if (this.riderHits.get(v.id) === pass) continue;
@@ -64,8 +80,18 @@ class Boomerang extends TimedSkill {
     }
   }
 
+  /** The turn glint: a flash where the fish turns round at the far end of its flight (never over the caster's face). */
+  private turnGlint(pass: number): void {
+    if (pass !== 1 || this.glinted === pass) return;
+    this.glinted = pass;
+    const { ctx } = this;
+    ctx.visuals.add(new Glint(ctx.visuals, this.fish.s, this.fish.x, this.fish.y, BOOM.glint));
+    ctx.visuals.add(new FlatRing(ctx.visuals, this.fish.s, this.fish.x, { color: '#ffffff', from: 0.3, to: 2.6, dur: 0.4 }));
+  }
+
   protected override cleanup(): void {
     this.fish.stop();
+    this.swoosh.stop();
   }
 }
 
