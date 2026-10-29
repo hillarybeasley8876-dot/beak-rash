@@ -189,9 +189,10 @@ jagged clip-path polygons, star bursts, halftone dot fields, torn edges, thick o
   ahead / 20 m behind: 45 dmg + knock + 1 s stun (usually a chain KO); the leap only homes forward, never costing places.
   goose.honk (cone 14 m ±30°: stun .8 s, −15 % speed) · capybara.chill (aura 10 m, 4 s: others ×0.85 speed,
   can't attack) · cat.spin (.8 s spin, 2.6 m radius, 10 dmg + knock) · shiba.doge (3 s shield reflects melee,
-  +15 % speed) · pigeon.ghost (1.5 s invisible+intangible, reappear 25 m ahead) · penguin.slide (2.5 s
-  melee-immune, +25 % speed) · seagull.steal (nearest ≤ 6 m: weapon or 20 SP) · sloth.flash (3 s +60 % top,
-  instant accel) · corgi.whistle (offenders ahead ≤ 20 m: slow 1 s).
+  launched to 1.45× top speed, +15 % for 3 s — r7) · pigeon.ghost (1.5 s invisible+intangible, reappear 25 m ahead) ·
+  penguin.slide (2.5 s melee-immune, +33 % speed — r7) · seagull.steal (nearest ≤ 9 m that has something: its weapon
+  and ≤ 25 SP; nobody has anything → the fries, +10 SP — r7) · sloth.flash (3 s +60 % top, instant accel) ·
+  corgi.whistle (everyone ahead ≤ 20 m ±35°: slow 25 % 1.2 s; offenders: slow 50 % 2 s — r7).
 
 ## 8. KO slow-mo cinematic (fx unit: `fx/ko/director`)
 Trigger: `combat:ko` where the player is attacker or victim, or `ult:impact`. Timeline (real time):

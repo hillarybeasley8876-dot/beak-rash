@@ -8,7 +8,7 @@ import { skillBoost } from './common';
 import { TimedSkill, type SkillImpl } from './types';
 
 const ID = 'penguin.slide';
-export const SLIDE = { dur: 2.5, boost: 0.25 } as const;
+export const SLIDE = { dur: 2.5, boost: 0.33 } as const;
 
 class Slide extends TimedSkill {
   private streak: Trail;
