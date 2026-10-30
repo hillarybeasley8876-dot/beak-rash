@@ -9,7 +9,7 @@
 import '../css/touch.css';
 import type { AppContext, Session } from '../../../core/contracts';
 import type { Action } from '../../../core/input';
-import type { CharacterId } from '../../../core/types';
+import type { SkillLoadout } from '../../../core/types';
 import { playerKit } from '../skills';
 import { el, svg } from '../dom';
 import {
@@ -122,7 +122,7 @@ export class TouchControls {
 
   attach(session: Session | null): void {
     this.session = session;
-    this.rebuildSkills(session?.player.character ?? null);
+    this.rebuildSkills(session?.player.loadout ?? null);
     if (session && this.enabled) this.primePedal();
   }
 
@@ -316,10 +316,10 @@ export class TouchControls {
     this.tap(side);
   }
 
-  private rebuildSkills(character: CharacterId | null): void {
+  private rebuildSkills(loadout: SkillLoadout | null): void {
     this.skillHost.replaceChildren();
-    if (!character) return;
-    const kit = playerKit(character);
+    if (!loadout) return;
+    const kit = playerKit(loadout);
     kit.slots.forEach((skill, i) => {
       const action = SKILL_ACTIONS[i] ?? 'skill1';
       const wrap = el('div', 'tch-sk', this.skillHost);
