@@ -2,7 +2,7 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>暴力鹈鹕 BEAK RASH</title>
     <meta name="description" content="鹈鹕骑自行车的格斗竞速：五条赛道、警察柯基、空中特技、扔咸鱼。浏览器直接玩，键盘或手柄。" />
     <meta name="theme-color" content="#e5191c" />
@@ -18,9 +18,9 @@
     <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
     <style>
-      html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
-      #game { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
-      #ui { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #000; overscroll-behavior: none; }
+      #game { position: fixed; inset: 0; width: 100vw; height: 100vh; height: 100dvh; display: block; touch-action: none; }
+      #ui { position: fixed; inset: 0; pointer-events: none; overflow: hidden; touch-action: none; }
     </style>
   </head>
   <body>

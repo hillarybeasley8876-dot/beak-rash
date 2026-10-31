@@ -10,14 +10,14 @@ export type Action =
   | 'skill1' | 'skill2' | 'skill3' | 'ult' | 'bell' | 'lookBack' | 'pause' | 'confirm' | 'back';
 
 export const KEYMAP: Record<Action, string[]> = {
-  left: ['ArrowLeft', 'KeyA'],
-  right: ['ArrowRight', 'KeyD'],
+  left: ['ArrowLeft', 'KeyA', 'TouchLeft'],
+  right: ['ArrowRight', 'KeyD', 'TouchRight'],
   up: ['ArrowUp', 'KeyW'],
   down: ['ArrowDown', 'KeyS'],
-  drift: ['ShiftLeft', 'ShiftRight'],
+  drift: ['ShiftLeft', 'ShiftRight', 'TouchDrift'],
   hop: ['Space'],
   attackL: ['KeyJ'],
-  heavy: ['KeyK'],
+  heavy: ['KeyK', 'TouchHeavy'],
   attackR: ['KeyL'],
   skill1: ['KeyU'],
   skill2: ['KeyI'],
@@ -29,6 +29,11 @@ export const KEYMAP: Record<Action, string[]> = {
   confirm: ['Enter', 'NumpadEnter', 'Space'],
   back: ['Escape', 'Backspace'],
 };
+
+/** On-screen binding inside KEYMAP (not a real KeyboardEvent.code). A finger and a physical key never share a code. */
+export function touchCode(action: Action): string | undefined {
+  return KEYMAP[action].find((code) => code.startsWith('Touch'));
+}
 
 /** Standard-mapping gamepad buttons per action. */
 export const PADMAP: Partial<Record<Action, number[]>> = {
@@ -118,7 +123,7 @@ export class Input {
     return this.padDown.has(action) || KEYMAP[action].some((code) => this.keys.has(code));
   }
 
-  /** Simulate a press (tests, on-screen buttons). */
+  /** Simulate a press (tests, on-screen buttons). Edges latch; this does not hold a key. */
   press(action: Action): void {
     if ((EDGE_ACTIONS as readonly string[]).includes(action)) this.edges.add(action as EdgeAction);
     for (const fn of Array.from(this.listeners)) {
@@ -128,6 +133,25 @@ export class Input {
         console.error('[input] action listener threw', err);
       }
     }
+  }
+
+  /**
+   * On-screen button down. Holds the action through its virtual KEYMAP code (steer, drift, heavy)
+   * and fires press() once, so isDown / digital steer / heavyHeld stay on the keyboard path.
+   * No-op when the action has no touch code or the finger is already down.
+   */
+  hold(action: Action): void {
+    const code = touchCode(action);
+    if (!code || this.keys.has(code)) return;
+    this.keys.add(code);
+    this.lastDevice = 'keyboard';
+    this.press(action);
+  }
+
+  /** On-screen button up. Drops the virtual KEYMAP code; a latched edge stays until consumeEdges(). */
+  release(action: Action): void {
+    const code = touchCode(action);
+    if (code) this.keys.delete(code);
   }
 
   /** Per rendered frame: poll gamepads and ramp analog values. */

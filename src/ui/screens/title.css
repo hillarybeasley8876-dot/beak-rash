@@ -63,7 +63,7 @@
   box-shadow: 10px 10px 0 var(--ink);
   animation: br-pulse 1.1s ease-in-out infinite, br-title-press-shadow 1.1s ease-in-out infinite;
 }
-/* Touch devices (title.ts): a white note under PRESS ANY KEY. */
+/* Touch devices (title.ts): a note under PRESS ANY KEY — turn sideways, the bottom bar rides. */
 .br-title-touch { position: absolute; left: 110px; top: 990px; display: flex; align-items: baseline; gap: 18px; padding: 8px 26px 6px;
   background: var(--ink); color: var(--white); transform: skewX(var(--skew)) rotate(-3deg); box-shadow: 6px 6px 0 var(--red); }
 .br-title-touch b { font-family: var(--f-cn-block); font-weight: 400; font-size: 34px; color: var(--red); }

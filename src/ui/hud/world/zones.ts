@@ -31,12 +31,21 @@ export class HudZones {
   /** Above the vanishing point (x 38–62 %, y 25–50 %): no tag plates or floating bubbles. */
   readonly centre = rect();
   /** Static modules as one list (obstacles for floating bubbles). */
-  readonly fixed: readonly Rect[] = [this.place, this.progress, this.counters, this.speedo, this.cluster];
+  private readonly modules: readonly Rect[] = [this.place, this.progress, this.counters, this.speedo, this.cluster];
+  /** Bottom touch bar. Included in `fixed` only while `hands` is set. */
+  readonly touchBar = rect();
+  private readonly withHands: readonly Rect[] = [...this.modules, this.touchBar];
+  /** Touch controls own the lower band (bubbles stay above the hands). */
+  hands = false;
   private key = '';
+
+  get fixed(): readonly Rect[] {
+    return this.hands ? this.withHands : this.modules;
+  }
 
   /** Recompute for this viewport (cheap no-op while the size is unchanged). */
   update(W: number, H: number, k: number): void {
-    const key = `${W}x${H}@${k.toFixed(4)}`;
+    const key = `${W}x${H}@${k.toFixed(4)}:${this.hands ? 1 : 0}`;
     if (key === this.key) return;
     this.key = key;
     // Place block 330×176 + timer row (+ ticket chip), top-left at (34k, 26k).
@@ -53,5 +62,14 @@ export class HudZones {
     set(this.cluster, x0, y0, W, H);
     set(this.gauges, x0 + 40 * c, y0 + 80 * c, x0 + 492 * c, y0 + 370 * c);
     set(this.centre, W * 0.38, H * 0.25, W * 0.62, H * 0.5);
+    if (!this.hands) return;
+    // v1.9f: HP plate under the KO counters, thumbs only in the two bottom corners.
+    // The centre of the track is not a control band.
+    const thumbTop = H - Math.min(H * 0.48, 300);
+    set(this.touchBar, W * 0.56, thumbTop, W, H);
+    set(this.cluster, W * 0.56, thumbTop, W, H);
+    set(this.speedo, 0, H - Math.min(H * 0.42, 250), Math.min(W * 0.48, 480), H);
+    set(this.counters, W - Math.min(W * 0.48, 440), 0, W, Math.min(H * 0.36, 220));
+    set(this.gauges, W - Math.min(W * 0.46, 400), Math.min(120, H * 0.14), W - 4, Math.min(H * 0.38, 250));
   }
 }
